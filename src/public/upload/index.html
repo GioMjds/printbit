@@ -4,107 +4,184 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="/globals.css" />
-    <title>PrintBit Upload</title>
+    <title>Upload · PrintBit</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="bg-mesh"></div>
+    <!-- Background blobs -->
+    <div class="kiosk-bg" aria-hidden="true">
+      <div class="bg-circle bg-circle--1"></div>
+      <div class="bg-circle bg-circle--2"></div>
+      <div class="bg-circle bg-circle--3"></div>
+    </div>
 
     <main class="upload-shell">
-      <section class="upload-card" aria-labelledby="uploadTitle">
-        <div class="card-icon">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+      <div class="upload-card" aria-labelledby="uploadTitle">
+        <!-- Header -->
+        <header class="card-header">
+          <div class="brand-mark">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+              <rect
+                x="7"
+                y="4"
+                width="18"
+                height="11"
+                rx="2"
+                fill="currentColor"
+              />
+              <rect
+                x="4"
+                y="12"
+                width="24"
+                height="14"
+                rx="3"
+                fill="currentColor"
+                opacity=".8"
+              />
+              <rect x="7" y="20" width="18" height="10" rx="2" fill="#0e0d1f" />
+              <rect
+                x="10"
+                y="23"
+                width="12"
+                height="2"
+                rx="1"
+                fill="currentColor"
+                opacity=".6"
+              />
+              <rect
+                x="10"
+                y="27"
+                width="8"
+                height="2"
+                rx="1"
+                fill="currentColor"
+                opacity=".4"
+              />
+              <circle cx="23" cy="17.5" r="2" fill="var(--peach)" />
+            </svg>
+          </div>
+          <div>
+            <h1 id="uploadTitle" class="card-title">Send to PrintBit</h1>
+            <p class="card-sub">
+              PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX · up to 25 MB each
+            </p>
+          </div>
+        </header>
+
+        <div class="card-divider"></div>
+
+        <!-- Session status strip -->
+        <div class="session-strip" id="sessionStrip">
+          <span class="session-strip__dot" id="sessionDotUpload"></span>
+          <span class="session-strip__text" id="sessionMetaUpload"
+            >Connecting to session…</span
           >
-            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-            <path
-              d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
-            ></path>
-            <rect x="6" y="14" width="12" height="8"></rect>
-          </svg>
+          <button
+            id="retrySessionButton"
+            type="button"
+            class="retry-btn"
+            aria-label="Retry session"
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601
+                2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1
+                0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0
+                0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002
+                7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Retry
+          </button>
         </div>
 
-        <h1 id="uploadTitle" class="card-title">Upload Your Documents</h1>
-        <p class="card-subtitle">
-          Accepted formats: PDF, DOC, DOCX — up to 25 MB
-        </p>
-
-        <hr class="divider" />
-
-        <form id="uploadForm" class="upload-form" novalidate>
-          <label class="file-section-label" for="fileInput">Choose File</label>
-
+        <!-- Drop zone -->
+        <form id="uploadForm" novalidate>
           <div
             id="dropZone"
             class="drop-zone"
             role="button"
             tabindex="0"
-            aria-label="Upload area — click or drag file here"
+            aria-label="Upload area — tap or drag files here"
           >
-            <div class="drop-icon-wrap">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="26"
-                height="26"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
+            <div class="drop-zone__icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none">
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="22"
+                  fill="currentColor"
+                  opacity=".07"
+                />
+                <path
+                  d="M24 32V18M24 18l-6 6M24 18l6 6"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M14 36h20"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  opacity=".5"
+                />
               </svg>
             </div>
-            <p class="drop-text">
-              <label for="fileInput" class="browse-link">Browse file</label>
-              <span> or drag &amp; drop here</span>
+            <p class="drop-zone__label">
+              <span class="drop-zone__browse">Tap to browse</span>
+              <span class="drop-zone__or"> or drag files here</span>
             </p>
-            <p class="drop-hint">PDF, DOC or DOCX</p>
+            <p class="drop-zone__hint">Multiple files supported</p>
             <input
               id="fileInput"
               name="file"
               type="file"
-              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              required
-              class="hidden-input"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+              multiple
+              class="drop-zone__input"
+              aria-hidden="true"
+              tabindex="-1"
             />
           </div>
 
-          <p id="selectedFileName" class="selected-file">No file selected</p>
+          <!-- File queue -->
+          <div
+            class="file-queue"
+            id="fileQueue"
+            aria-live="polite"
+            aria-label="Selected files"
+          >
+            <!-- Populated by JS -->
+          </div>
 
-          <button id="uploadButton" type="submit" disabled>
-            Upload to Kiosk
+          <!-- Upload button -->
+          <button id="uploadButton" type="submit" class="upload-btn" disabled>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0
+                01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0
+                01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0
+                01-1.414 0z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span id="uploadBtnLabel">Send to Kiosk</span>
           </button>
         </form>
 
+        <!-- Global status message -->
         <div
           id="statusBox"
-          class="status-bar"
+          class="status-box"
           role="status"
           aria-live="polite"
         ></div>
-
-        <div class="bottom-meta">
-          <p id="wirelessStatus" class="meta-line" aria-live="polite"></p>
-          <p id="sessionMeta" class="meta-line session-id">
-            Session: checking…
-          </p>
-          <button id="retrySessionButton" type="button" class="retry-btn">
-            ↺ Retry session
-          </button>
-        </div>
-      </section>
+      </div>
     </main>
 
     <script>

@@ -20,6 +20,7 @@ export interface Session {
   // Full URL the phone should open to upload a file
   uploadUrl: string;
   status: "pending" | "uploaded";
+  documents?: UploadedDocument[];
   document?: UploadedDocument;
   createdAt: Date;
 }
@@ -37,6 +38,16 @@ const ALLOWED_TYPES = new Map<string, string>([
   [
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".docx",
+  ],
+  ["application/vnd.ms-excel", ".xls"],
+  [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xlsx",
+  ],
+  ["application/vnd.ms-powerpoint", ".ppt"],
+  [
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".pptx",
   ],
 ]);
 
@@ -106,14 +117,6 @@ export class SessionStore {
       };
     }
 
-    if (session.status === "uploaded") {
-      return {
-        isSuccess: false,
-        errorMsg: "File already uploaded for this session",
-        errorCode: "ALREADY_UPLOADED",
-      };
-    }
-
     if (file.size > MAX_BYTES) {
       return {
         isSuccess: false,
@@ -126,7 +129,7 @@ export class SessionStore {
     if (!allowedExt) {
       return {
         isSuccess: false,
-        errorMsg: `Unsupported file type: ${file.mimetype}. Use PDF or Word documents.`,
+        errorMsg: `Unsupported file type: ${file.mimetype}. Use PDF, Word, Excel, or PowerPoint documents.`,
         errorCode: "UNSUPPORTED_TYPE",
       };
     }
@@ -146,8 +149,16 @@ export class SessionStore {
       filePath: destPath,
     };
 
+    const documents = session.documents
+      ? [...session.documents]
+      : session.document
+        ? [session.document]
+        : [];
+
+    documents.push(document);
+    session.documents = documents;
     session.status = "uploaded";
-    session.document = document;
+    session.document = documents[0];
 
     return { isSuccess: true, document, errorCode: "", errorMsg: "" };
   }

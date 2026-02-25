@@ -1,44 +1,257 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/globals.css" />
+    <link rel="stylesheet" href="./globals.css" />
     <title>PrintBit</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="container">
-      <header class="header" role="banner">
-        <h1>Welcome to PrintBit</h1>
+    <div class="kiosk-bg">
+      <div class="bg-circle bg-circle--1"></div>
+      <div class="bg-circle bg-circle--2"></div>
+      <div class="bg-circle bg-circle--3"></div>
+    </div>
+
+    <div class="kiosk-shell">
+      <!-- Top Bar -->
+      <header class="topbar" role="banner">
+        <div class="brand"></div>
+
+        <div
+          class="clock-block"
+          id="clockBlock"
+          aria-live="polite"
+          aria-label="Current time and date"
+        >
+          <div class="clock-time" id="clockTime">--:--</div>
+          <div class="clock-date" id="clockDate">--- --, ----</div>
+        </div>
       </header>
 
-      <main class="cards" role="main" aria-label="Main actions">
-        <div class="card" role="group" aria-labelledby="print-label">
-          <div class="icon" aria-hidden="true">
-            <!-- SVG printer -->
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M19 8H5a1 1 0 00-1 1v6h3v3h10v-3h3V9a1 1 0 00-1-1zm-7 9H8v-4h4v4zM17 3H7v4h10V3z"/>
-            </svg>
-          </div>
-          <h2 id="print-label">Print</h2>
-          <button id="openPrintBtn" class="primary-btn">Open Print</button>
-        </div>
+      <!-- Main Action Area -->
+      <main class="action-area" role="main" aria-label="Main actions">
+        <p class="action-hint">Please select an print method</p>
 
-        <div class="card" role="group" aria-labelledby="scan-label">
-          <div class="icon" aria-hidden="true">
-            <!-- SVG scanner -->
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M20 8H4V6h16v2zM20 18H4v-2h16v2zM4 10h16v4H4v-4z"/>
-            </svg>
-          </div>
-          <h2 id="scan-label">Scan</h2>
-          <button id="openScanBtn" class="primary-btn">Open Scan</button>
+        <div class="action-grid">
+          <!-- Print Card -->
+          <button class="action-card" id="openPrintBtn" aria-label="Open Print">
+            <div class="action-card__glow"></div>
+            <div class="action-card__icon-wrap">
+              <svg
+                class="action-card__icon"
+                viewBox="0 0 64 64"
+                aria-hidden="true"
+              >
+                <rect
+                  x="14"
+                  y="8"
+                  width="36"
+                  height="20"
+                  rx="3"
+                  fill="currentColor"
+                  opacity=".9"
+                />
+                <rect
+                  x="8"
+                  y="24"
+                  width="48"
+                  height="22"
+                  rx="4"
+                  fill="currentColor"
+                />
+                <rect
+                  x="14"
+                  y="38"
+                  width="36"
+                  height="18"
+                  rx="3"
+                  fill="var(--white)"
+                  opacity=".15"
+                />
+                <rect
+                  x="20"
+                  y="43"
+                  width="24"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--white)"
+                  opacity=".7"
+                />
+                <rect
+                  x="20"
+                  y="49"
+                  width="16"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--white)"
+                  opacity=".5"
+                />
+                <circle cx="44" cy="31" r="3" fill="var(--peach)" />
+              </svg>
+            </div>
+            <h2 class="action-card__title">Print</h2>
+            <p class="action-card__sub">Print your documents</p>
+            <div class="action-card__arrow">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </div>
+          </button>
+
+          <!-- Scan Card -->
+          <button
+            class="action-card action-card--scan"
+            id="openScanBtn"
+            aria-label="Open Scan"
+          >
+            <div class="action-card__glow"></div>
+            <div class="action-card__icon-wrap">
+              <svg
+                class="action-card__icon"
+                viewBox="0 0 64 64"
+                aria-hidden="true"
+              >
+                <rect
+                  x="8"
+                  y="10"
+                  width="48"
+                  height="44"
+                  rx="4"
+                  fill="currentColor"
+                  opacity=".15"
+                />
+                <rect
+                  x="8"
+                  y="10"
+                  width="48"
+                  height="6"
+                  rx="3"
+                  fill="currentColor"
+                  opacity=".9"
+                />
+                <rect
+                  x="8"
+                  y="48"
+                  width="48"
+                  height="6"
+                  rx="3"
+                  fill="currentColor"
+                  opacity=".9"
+                />
+                <rect
+                  x="14"
+                  y="14"
+                  width="2.5"
+                  height="36"
+                  rx="1.25"
+                  fill="currentColor"
+                  opacity=".5"
+                />
+                <rect
+                  x="47.5"
+                  y="14"
+                  width="2.5"
+                  height="36"
+                  rx="1.25"
+                  fill="currentColor"
+                  opacity=".5"
+                />
+                <rect
+                  x="8"
+                  y="30"
+                  width="48"
+                  height="4"
+                  rx="2"
+                  fill="var(--pink)"
+                  opacity=".8"
+                />
+                <line
+                  x1="8"
+                  y1="32"
+                  x2="56"
+                  y2="32"
+                  stroke="var(--pink)"
+                  stroke-width="1"
+                  opacity=".4"
+                />
+              </svg>
+            </div>
+            <h2 class="action-card__title">Scan</h2>
+            <p class="action-card__sub">Scan to PDF or image</p>
+            <div class="action-card__arrow">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </div>
+          </button>
         </div>
       </main>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="bundle.js"></script>
+    <script>
+      function updateClock() {
+        const now = new Date();
+        const timeEl = document.getElementById("clockTime");
+        const dateEl = document.getElementById("clockDate");
+
+        const hours = now.getHours();
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        const h12 = hours % 12 || 12;
+        timeEl.textContent = h12 + ":" + minutes + " " + ampm;
+
+        const days = [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ];
+        const months = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        dateEl.textContent =
+          days[now.getDay()] +
+          ", " +
+          months[now.getMonth()] +
+          " " +
+          now.getDate() +
+          ", " +
+          now.getFullYear();
+      }
+      updateClock();
+      setInterval(updateClock, 1000);
+    </script>
   </body>
 </html>

@@ -1,51 +1,433 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/globals.css">
-  <title>Print - PrintBit</title>
-  <link rel="stylesheet" href="/print/styles.css">
-</head>
-<body>
-  <main class="page-shell">
-    <section class="page-card" aria-labelledby="printTitle">
-      <header class="page-header">
-        <h1 id="printTitle">Print</h1>
-        <p>Upload your file first, then continue to print settings.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/globals.css" />
+    <title>Print · PrintBit</title>
+    <link rel="stylesheet" href="/print/styles.css" />
+  </head>
+  <body>
+    <!-- Background blobs (consistent with home) -->
+    <div class="kiosk-bg" aria-hidden="true">
+      <div class="bg-circle bg-circle--1"></div>
+      <div class="bg-circle bg-circle--2"></div>
+      <div class="bg-circle bg-circle--3"></div>
+    </div>
+
+    <div class="page-shell">
+      <!-- Top bar -->
+      <header class="topbar">
+        <a href="/" class="back-btn" aria-label="Back to home">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M19 12H5M11 6l-6 6 6 6" />
+          </svg>
+          <span>Back</span>
+        </a>
+        <div class="page-title-block">
+          <svg class="page-title-icon" viewBox="0 0 32 32" aria-hidden="true">
+            <rect
+              x="7"
+              y="4"
+              width="18"
+              height="11"
+              rx="2"
+              fill="currentColor"
+            />
+            <rect
+              x="4"
+              y="12"
+              width="24"
+              height="14"
+              rx="3"
+              fill="currentColor"
+              opacity=".85"
+            />
+            <rect x="7" y="20" width="18" height="10" rx="2" fill="#0e0d1f" />
+            <rect
+              x="10"
+              y="23"
+              width="12"
+              height="2"
+              rx="1"
+              fill="currentColor"
+              opacity=".6"
+            />
+            <rect
+              x="10"
+              y="27"
+              width="8"
+              height="2"
+              rx="1"
+              fill="currentColor"
+              opacity=".4"
+            />
+            <circle cx="23" cy="17.5" r="2" fill="var(--peach)" />
+          </svg>
+          <h1>Print</h1>
+        </div>
+        <div class="session-pill">
+          <span class="session-dot" id="sessionDot"></span>
+          <span id="sessionText">Starting…</span>
+        </div>
       </header>
 
-      <section class="section-block">
-        <h2>QR Fallback Upload</h2>
-        <p class="helper">
-          Open this upload page on the user device. Upload status here updates automatically.
-        </p>
-        <div class="qr-wrap">
-          <canvas id="uploadQrCanvas" width="220" height="220" aria-label="Upload QR code"></canvas>
-        </div>
-        <div class="upload-link-box">
-          <a id="uploadLink" href="/upload" target="_blank" rel="noopener">/upload</a>
-        </div>
-        <div class="button-row">
-          <button id="openUploadBtn" type="button">Open Upload Page</button>
-          <button id="refreshSessionBtn" type="button" class="secondary">Refresh Session</button>
-        </div>
-      </section>
+      <!-- Main split -->
+      <main class="print-layout" role="main">
+        <!-- ── LEFT: QR panel ── -->
+        <section class="qr-panel" aria-label="Upload via QR code">
+          <div class="qr-panel__inner">
+            <p class="qr-panel__eyebrow">Scan to upload</p>
 
-      <section class="section-block">
-        <h2>Upload Status</h2>
-        <p id="sessionText" class="status-line">Session: preparing...</p>
-        <p id="fileStatus" class="status-line">Waiting for uploaded file.</p>
-      </section>
+            <div class="qr-frame">
+              <div class="qr-corner qr-corner--tl"></div>
+              <div class="qr-corner qr-corner--tr"></div>
+              <div class="qr-corner qr-corner--bl"></div>
+              <div class="qr-corner qr-corner--br"></div>
+              <canvas
+                id="uploadQrCanvas"
+                width="220"
+                height="220"
+                aria-label="QR code to upload your file"
+              ></canvas>
+            </div>
 
-      <footer class="footer-actions">
-        <a href="/" class="text-link">Back</a>
-        <button id="continueBtn" type="button" disabled>Continue to Config</button>
+            <div class="qr-link-row">
+              <svg
+                class="qr-link-icon"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828
+                0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1
+                1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0
+                00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5
+                1.5a2 2 0 11-2.828-2.828l3-3z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <a id="uploadLink" href="/upload" target="_blank" rel="noopener"
+                >/upload</a
+              >
+            </div>
+
+            <div class="qr-actions">
+              <button
+                id="openUploadBtn"
+                type="button"
+                class="qr-action-btn qr-action-btn--primary"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path
+                    d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15
+                  6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"
+                  />
+                  <path
+                    d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2
+                  0v3H5V7h3a1 1 0 000-2H5z"
+                  />
+                </svg>
+                Open upload page
+              </button>
+              <button
+                id="refreshSessionBtn"
+                type="button"
+                class="qr-action-btn"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path
+                    fill-rule="evenodd"
+                    d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601
+                  2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1
+                  0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0
+                  0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002
+                  7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                New session
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── RIGHT: File list panel ── -->
+        <section class="files-panel" aria-label="Received files">
+          <div class="files-panel__header">
+            <h2>Received files</h2>
+            <span class="files-count" id="filesCount">0 files</span>
+          </div>
+
+          <!-- Waiting state -->
+          <div class="files-empty" id="filesEmpty" aria-live="polite">
+            <div class="files-empty__icon" aria-hidden="true">
+              <svg viewBox="0 0 64 64" fill="none">
+                <rect
+                  x="12"
+                  y="8"
+                  width="30"
+                  height="40"
+                  rx="4"
+                  fill="currentColor"
+                  opacity=".12"
+                />
+                <path
+                  d="M12 12a4 4 0 014-4h20l10 10v32a4 4 0 01-4 4H16a4 4 0 01-4-4V12z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="none"
+                  opacity=".4"
+                />
+                <path
+                  d="M36 8v10h10"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  opacity=".4"
+                />
+                <circle
+                  cx="44"
+                  cy="44"
+                  r="12"
+                  fill="#0e0d1f"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  opacity=".5"
+                />
+                <path
+                  d="M44 39v5l3 3"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  opacity=".5"
+                />
+              </svg>
+            </div>
+            <p class="files-empty__title">Waiting for files…</p>
+            <p class="files-empty__sub">
+              Scan the QR code or open the upload page<br />from your phone or
+              computer.
+            </p>
+          </div>
+
+          <!-- File list (populated by JS) -->
+          <ul
+            class="file-list"
+            id="fileList"
+            aria-label="Uploaded files"
+            role="listbox"
+            aria-multiselectable="false"
+          ></ul>
+        </section>
+      </main>
+
+      <!-- Footer -->
+      <footer class="print-footer">
+        <div class="footer-hint" id="footerHint">
+          Select a file above to continue.
+        </div>
+        <button
+          id="continueBtn"
+          type="button"
+          class="continue-btn"
+          disabled
+          aria-disabled="true"
+        >
+          <span>Continue to settings</span>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </button>
       </footer>
-    </section>
-  </main>
+    </div>
+    <!-- /page-shell -->
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="/print/app.js"></script>
-</body>
+    <!-- SVG sprite for file type icons -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none">
+      <!-- PDF -->
+      <symbol id="icon-pdf" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="10" fill="#FF4B4B" opacity=".15" />
+        <path
+          d="M12 10a4 4 0 014-4h12l10 10v22a4 4 0 01-4 4H16a4 4 0 01-4-4V10z"
+          fill="#FF4B4B"
+          opacity=".85"
+        />
+        <path
+          d="M28 6v10h10"
+          stroke="#fff"
+          stroke-width="2"
+          fill="none"
+          opacity=".6"
+        />
+        <text
+          x="24"
+          y="36"
+          text-anchor="middle"
+          font-size="10"
+          font-weight="700"
+          font-family="Plus Jakarta Sans,sans-serif"
+          fill="#fff"
+        >
+          PDF
+        </text>
+      </symbol>
+      <!-- DOC / DOCX -->
+      <symbol id="icon-doc" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="10" fill="#2B6CB0" opacity=".15" />
+        <path
+          d="M12 10a4 4 0 014-4h12l10 10v22a4 4 0 01-4 4H16a4 4 0 01-4-4V10z"
+          fill="#2B6CB0"
+          opacity=".85"
+        />
+        <path
+          d="M28 6v10h10"
+          stroke="#fff"
+          stroke-width="2"
+          fill="none"
+          opacity=".6"
+        />
+        <text
+          x="24"
+          y="36"
+          text-anchor="middle"
+          font-size="9"
+          font-weight="700"
+          font-family="Plus Jakarta Sans,sans-serif"
+          fill="#fff"
+        >
+          DOC
+        </text>
+      </symbol>
+      <!-- XLS / XLSX -->
+      <symbol id="icon-xls" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="10" fill="#276749" opacity=".15" />
+        <path
+          d="M12 10a4 4 0 014-4h12l10 10v22a4 4 0 01-4 4H16a4 4 0 01-4-4V10z"
+          fill="#276749"
+          opacity=".85"
+        />
+        <path
+          d="M28 6v10h10"
+          stroke="#fff"
+          stroke-width="2"
+          fill="none"
+          opacity=".6"
+        />
+        <text
+          x="24"
+          y="36"
+          text-anchor="middle"
+          font-size="9"
+          font-weight="700"
+          font-family="Plus Jakarta Sans,sans-serif"
+          fill="#fff"
+        >
+          XLS
+        </text>
+      </symbol>
+      <!-- PPT / PPTX -->
+      <symbol id="icon-ppt" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="10" fill="#C05621" opacity=".15" />
+        <path
+          d="M12 10a4 4 0 014-4h12l10 10v22a4 4 0 01-4 4H16a4 4 0 01-4-4V10z"
+          fill="#C05621"
+          opacity=".85"
+        />
+        <path
+          d="M28 6v10h10"
+          stroke="#fff"
+          stroke-width="2"
+          fill="none"
+          opacity=".6"
+        />
+        <text
+          x="24"
+          y="36"
+          text-anchor="middle"
+          font-size="9"
+          font-weight="700"
+          font-family="Plus Jakarta Sans,sans-serif"
+          fill="#fff"
+        >
+          PPT
+        </text>
+      </symbol>
+      <!-- JPG / PNG / image -->
+      <symbol id="icon-img" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="10" fill="#6B46C1" opacity=".15" />
+        <path
+          d="M12 10a4 4 0 014-4h12l10 10v22a4 4 0 01-4 4H16a4 4 0 01-4-4V10z"
+          fill="#6B46C1"
+          opacity=".85"
+        />
+        <path
+          d="M28 6v10h10"
+          stroke="#fff"
+          stroke-width="2"
+          fill="none"
+          opacity=".6"
+        />
+        <circle cx="21" cy="26" r="3" fill="#fff" opacity=".8" />
+        <path d="M14 36l8-8 4 4 4-6 4 10H14z" fill="#fff" opacity=".6" />
+      </symbol>
+      <!-- TXT / generic -->
+      <symbol id="icon-txt" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="10" fill="#718096" opacity=".15" />
+        <path
+          d="M12 10a4 4 0 014-4h12l10 10v22a4 4 0 01-4 4H16a4 4 0 01-4-4V10z"
+          fill="#718096"
+          opacity=".85"
+        />
+        <path
+          d="M28 6v10h10"
+          stroke="#fff"
+          stroke-width="2"
+          fill="none"
+          opacity=".6"
+        />
+        <rect
+          x="17"
+          y="26"
+          width="14"
+          height="2"
+          rx="1"
+          fill="#fff"
+          opacity=".7"
+        />
+        <rect
+          x="17"
+          y="30"
+          width="10"
+          height="2"
+          rx="1"
+          fill="#fff"
+          opacity=".5"
+        />
+      </symbol>
+    </svg>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/print/app.js"></script>
+  </body>
 </html>
