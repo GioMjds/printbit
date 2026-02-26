@@ -1,5 +1,30 @@
 export {};
 
+// ── Section navigation ─────────────────────────────────────────
+const SECTION_LABELS: Record<string, string> = {
+  overview: "Overview",
+  earnings: "Earnings",
+  coins: "Coin Stats",
+  system: "System",
+  settings: "Settings",
+  logs: "Logs",
+};
+
+function navigateTo(section: string): void {
+  document.querySelectorAll<HTMLElement>(".page").forEach((el) => el.classList.add("hidden"));
+  const target = document.getElementById(`section-${section}`);
+  if (target) target.classList.remove("hidden");
+
+  document.querySelectorAll<HTMLButtonElement>("[data-section]").forEach((btn) => {
+    const isActive = btn.dataset.section === section;
+    btn.classList.toggle("nav-btn--active", isActive && btn.classList.contains("nav-btn"));
+    btn.classList.toggle("mob-nav__btn--active", isActive && btn.classList.contains("mob-nav__btn"));
+  });
+
+  const titleEl = document.getElementById("currentSectionTitle");
+  if (titleEl) titleEl.textContent = SECTION_LABELS[section] ?? section;
+}
+
 type SummaryResponse = {
   balance: number;
   earnings: {
@@ -71,6 +96,7 @@ const clearStorageBtn = document.getElementById("clearStorageBtn") as HTMLButton
 
 const metricBalance = document.getElementById("metricBalance") as HTMLElement;
 const earningsToday = document.getElementById("earningsToday") as HTMLElement;
+const earningsTodaySync = document.getElementById("earningsToday_sync") as HTMLElement | null;
 const earningsWeek = document.getElementById("earningsWeek") as HTMLElement;
 const earningsAll = document.getElementById("earningsAll") as HTMLElement;
 const jobsTotal = document.getElementById("jobsTotal") as HTMLElement;
@@ -83,10 +109,17 @@ const coins20 = document.getElementById("coins20") as HTMLElement;
 const storageFiles = document.getElementById("storageFiles") as HTMLElement;
 const storageBytes = document.getElementById("storageBytes") as HTMLElement;
 const serverStatus = document.getElementById("serverStatus") as HTMLElement;
+const serverBadge = document.getElementById("serverBadge") as HTMLElement | null;
 const hostStatus = document.getElementById("hostStatus") as HTMLElement;
 const wifiStatus = document.getElementById("wifiStatus") as HTMLElement;
+const wifiBadge = document.getElementById("wifiBadge") as HTMLElement | null;
 const serialStatus = document.getElementById("serialStatus") as HTMLElement;
+const serialBadge = document.getElementById("serialBadge") as HTMLElement | null;
 const serialPortStatus = document.getElementById("serialPortStatus") as HTMLElement;
+const barPrint = document.getElementById("barPrint") as HTMLElement | null;
+const barCopy = document.getElementById("barCopy") as HTMLElement | null;
+const eBarToday = document.getElementById("eBarToday") as HTMLElement | null;
+const eBarWeek = document.getElementById("eBarWeek") as HTMLElement | null;
 
 const settingPrintPerPage = document.getElementById("settingPrintPerPage") as HTMLInputElement;
 const settingCopyPerPage = document.getElementById("settingCopyPerPage") as HTMLInputElement;
@@ -142,6 +175,7 @@ function showDashboard(isVisible: boolean): void {
 function applySummary(summary: SummaryResponse): void {
   metricBalance.textContent = peso(summary.balance);
   earningsToday.textContent = peso(summary.earnings.today);
+  if (earningsTodaySync) earningsTodaySync.textContent = peso(summary.earnings.today);
   earningsWeek.textContent = peso(summary.earnings.week);
   earningsAll.textContent = peso(summary.earnings.allTime);
   jobsTotal.textContent = String(summary.jobStats.total);
@@ -153,11 +187,26 @@ function applySummary(summary: SummaryResponse): void {
   coins20.textContent = String(summary.coinStats.twenty);
   storageFiles.textContent = String(summary.storage.fileCount);
   storageBytes.textContent = formatBytes(summary.storage.bytes);
+
+  // System status
   serverStatus.textContent = summary.status.serverRunning ? "Running" : "Down";
+  serverBadge?.setAttribute("data-ok", String(summary.status.serverRunning));
   hostStatus.textContent = summary.status.host;
   wifiStatus.textContent = summary.status.wifiActive ? "Active" : "Inactive";
+  wifiBadge?.setAttribute("data-ok", String(summary.status.wifiActive));
   serialStatus.textContent = summary.status.serial.connected ? "Connected" : "Disconnected";
+  serialBadge?.setAttribute("data-ok", String(summary.status.serial.connected));
   serialPortStatus.textContent = summary.status.serial.portPath ?? "-";
+
+  // Bar fills — job breakdown
+  const total = summary.jobStats.total || 1;
+  if (barPrint) barPrint.style.width = `${Math.round((summary.jobStats.print / total) * 100)}%`;
+  if (barCopy) barCopy.style.width = `${Math.round((summary.jobStats.copy / total) * 100)}%`;
+
+  // Bar fills — earnings
+  const maxE = summary.earnings.allTime || 1;
+  if (eBarToday) eBarToday.style.width = `${Math.min(100, Math.round((summary.earnings.today / maxE) * 100))}%`;
+  if (eBarWeek) eBarWeek.style.width = `${Math.min(100, Math.round((summary.earnings.week / maxE) * 100))}%`;
 }
 
 function applySettings(settings: SettingsResponse): void {
@@ -344,6 +393,11 @@ logoutBtn.addEventListener("click", () => {
   }
   showDashboard(false);
   setMessage("Admin panel locked.");
+});
+
+// Sidebar + mobile nav section switching
+document.querySelectorAll<HTMLButtonElement>("[data-section]").forEach((btn) => {
+  btn.addEventListener("click", () => navigateTo(btn.dataset.section ?? "overview"));
 });
 
 void (async () => {
