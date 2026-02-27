@@ -47,13 +47,14 @@ export function printFile(
 
     const settings = buildPrintSettings(options);
     const args = [
+      "-silent",
       "-print-to-default",
-      `-print-settings`,
+      "-print-settings",
       settings,
       filePath,
     ];
 
-    execFile(SUMATRA_PATH, args, { timeout: 60_000 }, (error, _stdout, stderr) => {
+    execFile(SUMATRA_PATH, args, { timeout: 60_000, windowsHide: true }, (error, _stdout, stderr) => {
       if (error) {
         return reject(
           new Error(`Print failed: ${error.message}${stderr ? ` — ${stderr}` : ""}`),
