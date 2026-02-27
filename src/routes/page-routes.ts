@@ -20,11 +20,15 @@ export function registerPageRoutes(app: Express, deps: RegisterPageRoutesDeps) {
     res.redirect(`/upload/${encodeURIComponent(session.token)}`);
   });
 
+  // Redirect /admin to /admin/dashboard
+  app.get("/admin", requireAdminLocalAccess, (_req: Request, res: Response) => {
+    res.redirect("/admin/dashboard");
+  });
+
   for (const page of deps.publicPageRoutes) {
-    const routeHandlers =
-      page.route === "/admin"
-        ? [requireAdminLocalAccess]
-        : [];
+    const routeHandlers = page.route.startsWith("/admin/")
+      ? [requireAdminLocalAccess]
+      : [];
 
     app.get(page.route, ...routeHandlers, (_req: Request, res: Response) => {
       res.sendFile(page.filePath);
