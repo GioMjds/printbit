@@ -183,26 +183,35 @@
               aria-atomic="true"
             ></div>
 
-            <!-- Debug reset -->
-            <button
-              id="resetBalanceBtn"
-              type="button"
-              class="reset-btn"
-              title="Reset coin balance"
-            >
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                  fill-rule="evenodd"
-                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601
-                2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0
-                01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001
-                13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0
-                01-11.601-2.566 1 1 0 01.61-1.276z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              Reset (Test)
-            </button>
+            <!-- Test panel: coin simulation + reset -->
+            <div class="test-panel" id="testPanel">
+              <span class="test-panel__label">Insert Coin (Test)</span>
+              <div class="test-coin-row">
+                <button type="button" class="coin-btn" data-value="1" aria-label="Insert ₱1 coin">₱1</button>
+                <button type="button" class="coin-btn" data-value="5" aria-label="Insert ₱5 coin">₱5</button>
+                <button type="button" class="coin-btn" data-value="10" aria-label="Insert ₱10 coin">₱10</button>
+                <button type="button" class="coin-btn" data-value="20" aria-label="Insert ₱20 coin">₱20</button>
+              </div>
+              <button
+                id="resetBalanceBtn"
+                type="button"
+                class="reset-btn"
+                title="Reset coin balance"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path
+                    fill-rule="evenodd"
+                    d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601
+                  2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0
+                  01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001
+                  13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0
+                  01-11.601-2.566 1 1 0 01.61-1.276z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                Reset Balance
+              </button>
+            </div>
           </div>
         </section>
 

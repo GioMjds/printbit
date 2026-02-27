@@ -50,6 +50,37 @@ export function registerFinancialRoutes(
     });
   });
 
+  const ACCEPTED_TEST_COINS = new Set([1, 5, 10, 20]);
+
+  // This route is for testing/demo purposes only, allowing insertion of test coins without real payment processing.
+  app.post("/api/balance/add-test-coin", async (req: Request, res: Response) => {
+    const { value } = req.body as { value?: unknown };
+    const coinValue = typeof value === "number" && Number.isFinite(value) ? value : null;
+
+    if (coinValue === null || !ACCEPTED_TEST_COINS.has(coinValue)) {
+      return res.status(400).json({ error: "Invalid coin value. Accepted: 1, 5, 10, 20" });
+    }
+
+    db.data!.balance += coinValue;
+    await db.write();
+
+    await appendAdminLog("coin_accepted", `Test coin inserted: ${coinValue}`, {
+      coinValue,
+      balance: db.data!.balance,
+      source: "test-ui",
+    });
+
+    deps.io.emit("balance", db.data!.balance);
+    deps.io.emit("coinAccepted", { value: coinValue, balance: db.data!.balance });
+
+    res.json({
+      ok: true,
+      coinValue,
+      balance: db.data!.balance,
+    });
+  });
+
+
   app.post("/upload", deps.uploadSingle, (req: Request, res: Response) => {
     if (!req.file) {
       void appendAdminLog("upload_failed", "Upload failed: no file provided.");

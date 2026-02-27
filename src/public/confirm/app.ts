@@ -253,6 +253,35 @@ resetBalanceBtn?.addEventListener("click", () => {
   void resetBalanceForTesting();
 });
 
+async function insertTestCoin(value: number): Promise<void> {
+  const buttons = document.querySelectorAll<HTMLButtonElement>(".coin-btn");
+  buttons.forEach((b) => (b.disabled = true));
+
+  try {
+    const response = await fetch("/api/balance/add-test-coin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value }),
+    });
+
+    const payload = (await response.json()) as { balance?: number; error?: string };
+    if (!response.ok) {
+      setCoinEventMessage(payload.error ?? "Failed to insert coin.");
+    }
+  } catch {
+    setCoinEventMessage("Network error inserting test coin.");
+  } finally {
+    buttons.forEach((b) => (b.disabled = false));
+  }
+}
+
+document.querySelectorAll<HTMLButtonElement>(".coin-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const value = parseInt(btn.dataset.value ?? "0", 10);
+    if (value > 0) void insertTestCoin(value);
+  });
+});
+
 const ioFactory = (
   window as unknown as { io?: (...args: unknown[]) => SocketLike }
 ).io;
