@@ -62,6 +62,11 @@ if (confirmBtn) {
     config.mode === "print" ? "Confirm & Print" : "Confirm & Copy";
 }
 
+const modalConfirmBtnSpan = document.querySelector("#modalConfirmBtn span");
+if (modalConfirmBtnSpan) {
+  modalConfirmBtnSpan.textContent = config.mode === "print" ? "Yes, Print" : "Yes, Copy";
+}
+
 if (modeValue) modeValue.textContent = config.mode.toUpperCase();
 if (fileValue)
   fileValue.textContent =
@@ -228,60 +233,149 @@ modalConfirmBtn?.addEventListener("click", async () => {
   hideModal();
   confirmBtn.disabled = true;
 
-  // Show printing in progress overlay
   showOverlay(printingOverlay);
-  if (statusMessage) statusMessage.textContent = "Sending to printer…";
-
   const MIN_OVERLAY_MS = 3_000;
   const overlayStart = Date.now();
 
-  const response = await fetch("/api/confirm-payment", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      amount: totalPrice,
-      mode: config.mode,
-      sessionId: config.sessionId,
-      copies: config.copies,
-      colorMode: config.colorMode,
-      orientation: config.orientation,
-      paperSize: config.paperSize,
-    }),
-  });
+  if (config.mode === "copy") {
+    // Copy flow: create copy job and poll
+    if (statusMessage) statusMessage.textContent = "Starting copy job...";
 
-  if (!response.ok) {
+    try {
+      const createRes = await fetch("/api/copy/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          copies: config.copies,
+          colorMode: config.colorMode,
+          orientation: config.orientation,
+          paperSize: config.paperSize,
+          amount: totalPrice,
+        }),
+      });
+
+      if (!createRes.ok) {
+        const payload = (await createRes.json()) as { error?: string };
+        hideOverlay(printingOverlay);
+        if (statusMessage) statusMessage.textContent = payload.error ?? "Failed to start copy job.";
+        confirmBtn.disabled = false;
+        modalConfirmBtn.disabled = false;
+        return;
+      }
+
+      const createData = (await createRes.json()) as { job: { id: string; state: string } };
+      const jobId = createData.job.id;
+
+      // Poll job status
+      const pollResult = await pollCopyJob(jobId);
+
+      const remaining = MIN_OVERLAY_MS - (Date.now() - overlayStart);
+      if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+      hideOverlay(printingOverlay);
+
+      if (pollResult === "succeeded") {
+        showOverlay(thankYouOverlay);
+        if (statusMessage) statusMessage.textContent = "Your copies are ready!";
+        sessionStorage.removeItem("printbit.config");
+        sessionStorage.removeItem("printbit.uploadedFile");
+        sessionStorage.removeItem("printbit.sessionId");
+      } else if (pollResult === "failed") {
+        if (statusMessage) statusMessage.textContent = "Copy job failed. Please try again.";
+        confirmBtn.disabled = false;
+        modalConfirmBtn.disabled = false;
+      } else {
+        if (statusMessage) statusMessage.textContent = "Copy was cancelled.";
+        confirmBtn.disabled = false;
+        modalConfirmBtn.disabled = false;
+      }
+    } catch {
+      hideOverlay(printingOverlay);
+      if (statusMessage) statusMessage.textContent = "Network error during copy job.";
+      confirmBtn.disabled = false;
+      modalConfirmBtn.disabled = false;
+    }
+  } else {
+    // Print flow: existing behavior
+    if (statusMessage) statusMessage.textContent = "Sending to printer…";
+
+    const response = await fetch("/api/confirm-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: totalPrice,
+        mode: config.mode,
+        sessionId: config.sessionId,
+        copies: config.copies,
+        colorMode: config.colorMode,
+        orientation: config.orientation,
+        paperSize: config.paperSize,
+      }),
+    });
+
+    if (!response.ok) {
+      hideOverlay(printingOverlay);
+      const payload = (await response.json()) as { error?: string };
+      if (statusMessage)
+        statusMessage.textContent =
+          payload.error ?? "Payment confirmation failed.";
+      confirmBtn.disabled = false;
+      modalConfirmBtn.disabled = false;
+      return;
+    }
+
+    // Brief "Document sent!" confirmation before transitioning
+    if (statusMessage) statusMessage.textContent = "Document sent to printer!";
+
+    // Ensure the printing overlay is visible for at least MIN_OVERLAY_MS
+    const remaining = MIN_OVERLAY_MS - (Date.now() - overlayStart);
+    if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+
     hideOverlay(printingOverlay);
-    const payload = (await response.json()) as { error?: string };
-    if (statusMessage)
-      statusMessage.textContent =
-        payload.error ?? "Payment confirmation failed.";
-    confirmBtn.disabled = false;
-    modalConfirmBtn.disabled = false;
-    return;
+
+    // Show thank-you overlay
+    showOverlay(thankYouOverlay);
+
+    if (statusMessage) {
+      statusMessage.textContent = "Your document has been sent to the printer!";
+    }
+    sessionStorage.removeItem("printbit.config");
+    sessionStorage.removeItem("printbit.uploadedFile");
+    sessionStorage.removeItem("printbit.sessionId");
   }
-
-  // Brief "Document sent!" confirmation before transitioning
-  if (statusMessage) statusMessage.textContent = "Document sent to printer!";
-
-  // Ensure the printing overlay is visible for at least MIN_OVERLAY_MS
-  const remaining = MIN_OVERLAY_MS - (Date.now() - overlayStart);
-  if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
-
-  hideOverlay(printingOverlay);
-
-  // Show thank-you overlay
-  showOverlay(thankYouOverlay);
-
-  if (statusMessage) {
-    statusMessage.textContent =
-      config.mode === "print"
-        ? "Your document has been sent to the printer!"
-        : "Payment accepted. You can now run the copy operation.";
-  }
-  sessionStorage.removeItem("printbit.config");
-  sessionStorage.removeItem("printbit.uploadedFile");
-  sessionStorage.removeItem("printbit.sessionId");
 });
+
+async function pollCopyJob(jobId: string): Promise<string> {
+  return new Promise((resolve) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/copy/jobs/${encodeURIComponent(jobId)}`);
+        if (!res.ok) { clearInterval(interval); resolve("failed"); return; }
+        const data = (await res.json()) as {
+          job: { state: string; progress?: { pagesCompleted: number; pagesTotal: number | null } }
+        };
+        const { state, progress } = data.job;
+
+        if (state === "queued" && statusMessage) {
+          statusMessage.textContent = "Preparing scanner and feeder...";
+        } else if (state === "running" && statusMessage) {
+          if (progress && progress.pagesTotal) {
+            statusMessage.textContent = `Copying page ${progress.pagesCompleted} of ${progress.pagesTotal}...`;
+          } else {
+            statusMessage.textContent = "Copying... please wait.";
+          }
+        }
+
+        if (state === "succeeded" || state === "failed" || state === "cancelled") {
+          clearInterval(interval);
+          resolve(state);
+        }
+      } catch {
+        clearInterval(interval);
+        resolve("failed");
+      }
+    }, 1500);
+  });
+}
 
 thankYouDoneBtn?.addEventListener("click", () => {
   hideOverlay(thankYouOverlay);
