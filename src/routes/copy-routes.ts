@@ -1,25 +1,26 @@
 import type { Express, Request, Response } from "express";
 import type { Server } from "socket.io";
 import { jobStore } from "../services/job-store";
-import { getAdapter } from "../services/scanner";
 import { printFile, type PrintJobOptions } from "../services/printer";
 import { db } from "../services/db";
 import { appendAdminLog, calculateJobAmount, incrementJobStats } from "../services/admin";
 import path from "node:path";
+import fs from "node:fs";
 
 const VALID_COLOR_MODES = new Set(["colored", "grayscale"]);
 const VALID_ORIENTATIONS = new Set(["portrait", "landscape"]);
 const VALID_PAPER_SIZES = new Set(["A4", "Letter", "Legal"]);
 
 export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
-  // ── POST /api/copy/jobs — Start a copy job (charge + scan + print) ─
+  // ── POST /api/copy/jobs — Start a copy job (charge + print checked scan) ─
   app.post("/api/copy/jobs", async (req: Request, res: Response) => {
-    const { copies, colorMode, orientation, paperSize, amount } = req.body as {
+    const { copies, colorMode, orientation, paperSize, amount, previewPath } = req.body as {
       copies?: number;
       colorMode?: string;
       orientation?: string;
       paperSize?: string;
       amount?: number;
+      previewPath?: string;
     };
 
     const safeCopies =
@@ -38,6 +39,27 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       paperSize && VALID_PAPER_SIZES.has(paperSize)
         ? (paperSize as "A4" | "Letter" | "Legal")
         : "A4";
+    const safePreviewPath = typeof previewPath === "string" ? previewPath.trim() : "";
+
+    if (!safePreviewPath) {
+      return res.status(400).json({
+        error: "Missing checked document. Please go back to /copy and tap Check for Document again.",
+      });
+    }
+
+    const previewFilename = path.basename(safePreviewPath);
+    if (previewFilename !== safePreviewPath) {
+      return res.status(400).json({
+        error: "Invalid preview path. Please check your document again.",
+      });
+    }
+
+    const previewAbsPath = path.resolve("uploads", "scans", previewFilename);
+    if (!fs.existsSync(previewAbsPath)) {
+      return res.status(409).json({
+        error: "Checked document not found. Please go back to /copy and scan again.",
+      });
+    }
 
     const requiredAmount = calculateJobAmount("copy", safeColorMode, safeCopies);
 
@@ -96,30 +118,18 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       paperSize: safePaperSize,
     });
 
-    // Start copy asynchronously (scan then print)
+    // Start copy asynchronously (print already-checked scan)
     void (async () => {
       jobStore.updateJobState(job.id, "running");
       try {
-        // Scan phase
-        const scanSettings = {
-          source: "flatbed" as const,
-          dpi: 300,
-          colorMode: safeColorMode,
-          duplex: false,
-          format: "pdf" as const,
-          paperSize: safePaperSize,
-        };
-        const scanResult = await getAdapter().scan(scanSettings, "uploads/scans");
-
-        // Print phase — scanResult.outputPath is relative (e.g. "uploads/scans/file.pdf")
-        // printFile expects path relative to "uploads/", so strip "uploads/" prefix
+        // Print phase from the checked-scan file
         const printOptions: PrintJobOptions = {
           copies: safeCopies,
           colorMode: safeColorMode,
           orientation: safeOrientation,
           paperSize: safePaperSize,
         };
-        const relPath = path.relative("uploads", scanResult.outputPath);
+        const relPath = path.join("scans", previewFilename);
         await printFile(relPath, printOptions);
 
         jobStore.updateJobState(job.id, "succeeded");
@@ -168,7 +178,6 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       return res.status(409).json({ error: "Job is already in a terminal state" });
     }
 
-    getAdapter().cancel();
     res.status(202).json({ ok: true, state: "cancel_requested" });
   });
 }

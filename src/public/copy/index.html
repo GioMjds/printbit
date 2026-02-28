@@ -14,8 +14,29 @@
       <div class="bg-circle bg-circle--3"></div>
     </div>
 
+    <!-- ══ Scan overlay — full-screen, toggled via .is-visible ═══ -->
+    <div
+      id="scanOverlay"
+      class="scan-overlay"
+      aria-hidden="true"
+      role="status"
+      aria-label="Scanning in progress"
+    >
+      <div class="scan-overlay__card">
+        <div class="scan-overlay__anim" aria-hidden="true">
+          <div class="scan-overlay__page">
+            <div class="scan-overlay__beam"></div>
+          </div>
+        </div>
+        <p class="scan-overlay__title">Scanning document…</p>
+        <p class="scan-overlay__sub">
+          Please keep the document flat on the glass.
+        </p>
+      </div>
+    </div>
+
     <div class="page-shell">
-      <!-- Topbar -->
+      <!-- ── Topbar ──────────────────────────────────────────────── -->
       <header class="topbar">
         <a href="/" class="back-btn" aria-label="Back to home">
           <svg
@@ -59,7 +80,7 @@
               stroke="currentColor"
               stroke-width="2"
               fill="currentColor"
-              opacity=".15"
+              opacity=".18"
             />
             <rect
               x="7"
@@ -95,410 +116,345 @@
         <div class="topbar-spacer"></div>
       </header>
 
-      <!-- Main content -->
+      <!-- ── Two-column body ─────────────────────────────────────── -->
       <main class="copy-layout" role="main">
-        <!-- Illustration + lead text -->
-        <div class="hero">
-          <div class="hero__illustration" aria-hidden="true">
-            <!-- Printer bed illustration -->
-            <svg class="hero__svg" viewBox="0 0 220 160" fill="none">
-              <!-- Printer body -->
-              <rect
-                x="20"
-                y="60"
-                width="180"
-                height="70"
-                rx="10"
-                fill="var(--indigo)"
-                opacity=".12"
-              />
-              <rect
-                x="20"
-                y="60"
-                width="180"
-                height="70"
-                rx="10"
-                stroke="var(--lavender)"
-                stroke-width="1.5"
-                opacity=".25"
-              />
+        <!-- LEFT — document preview -->
+        <section class="preview-col" aria-label="Document preview">
+          <div class="preview-panel">
+            <div class="preview-panel__header">
+              <span class="preview-panel__eyebrow">Document Preview</span>
+              <span class="preview-panel__status" id="previewStatusText"
+                >Waiting for scan</span
+              >
+            </div>
 
-              <!-- Paper slot -->
-              <rect
-                x="50"
-                y="56"
-                width="120"
-                height="8"
-                rx="2"
-                fill="var(--lavender)"
-                opacity=".15"
-              />
-              <rect
-                x="50"
-                y="56"
-                width="120"
-                height="8"
-                rx="2"
-                stroke="var(--lavender)"
-                stroke-width="1"
-                opacity=".3"
-              />
+            <!-- Placeholder — visible before any scan -->
+            <div class="preview-placeholder" id="previewPlaceholder">
+              <div class="scan-bed" aria-hidden="true">
+                <div class="scan-bed__frame">
+                  <div class="scan-bed__corner scan-bed__corner--tl"></div>
+                  <div class="scan-bed__corner scan-bed__corner--tr"></div>
+                  <div class="scan-bed__corner scan-bed__corner--bl"></div>
+                  <div class="scan-bed__corner scan-bed__corner--br"></div>
+                  <div class="scan-bed__doc">
+                    <div class="scan-bed__line"></div>
+                    <div class="scan-bed__line scan-bed__line--short"></div>
+                    <div class="scan-bed__line"></div>
+                    <div class="scan-bed__line scan-bed__line--mid"></div>
+                    <div class="scan-bed__line"></div>
+                    <div class="scan-bed__line scan-bed__line--short"></div>
+                  </div>
+                </div>
+              </div>
+              <p class="placeholder-label">
+                Place your document face-down,<br />
+                then tap <strong>Check Document</strong>
+              </p>
+            </div>
 
-              <!-- Paper coming out -->
-              <rect
-                x="65"
-                y="28"
-                width="90"
-                height="34"
-                rx="3"
-                fill="var(--white)"
-                opacity=".07"
-                stroke="var(--lavender)"
-                stroke-width="1.5"
-                opacity=".3"
-              />
-              <!-- Lines on paper -->
-              <rect
-                x="74"
-                y="36"
-                width="50"
-                height="2.5"
-                rx="1.25"
-                fill="var(--lavender)"
-                opacity=".3"
-              />
-              <rect
-                x="74"
-                y="42"
-                width="60"
-                height="2.5"
-                rx="1.25"
-                fill="var(--lavender)"
-                opacity=".2"
-              />
-              <rect
-                x="74"
-                y="48"
-                width="40"
-                height="2.5"
-                rx="1.25"
-                fill="var(--lavender)"
-                opacity=".15"
-              />
-
-              <!-- Scan line sweeping across document -->
-              <line
-                x1="65"
-                y1="42"
-                x2="155"
-                y2="42"
-                stroke="var(--indigo)"
-                stroke-width="1.5"
-                opacity=".6"
-                stroke-dasharray="4 3"
-              />
-
-              <!-- Status light on printer -->
-              <circle cx="170" cy="92" r="5" fill="#4ade80" opacity=".8">
-                <animate
-                  attributeName="opacity"
-                  values="0.8;0.3;0.8"
-                  dur="1.8s"
-                  repeatCount="indefinite"
-                />
-              </circle>
-
-              <!-- Feed rollers -->
-              <rect
-                x="75"
-                y="96"
-                width="70"
-                height="6"
-                rx="3"
-                fill="var(--lavender)"
-                opacity=".15"
-              />
-              <circle
-                cx="90"
-                cy="99"
-                r="2.5"
-                fill="var(--lavender)"
-                opacity=".2"
-              />
-              <circle
-                cx="110"
-                cy="99"
-                r="2.5"
-                fill="var(--lavender)"
-                opacity=".2"
-              />
-              <circle
-                cx="130"
-                cy="99"
-                r="2.5"
-                fill="var(--lavender)"
-                opacity=".2"
-              />
-
-              <!-- Shadow -->
-              <ellipse
-                cx="110"
-                cy="136"
-                rx="70"
-                ry="6"
-                fill="var(--indigo)"
-                opacity=".08"
-              />
-            </svg>
+            <!-- Preview result — hidden until scan succeeds -->
+            <!-- app.ts sets style.display="" to show, style.display="none" to hide -->
+            <div
+              id="previewSection"
+              class="preview-result"
+              style="display: none"
+              aria-live="polite"
+            >
+              <iframe
+                id="previewFrame"
+                class="preview-result__frame"
+                title="Scanned document preview"
+                sandbox="allow-same-origin"
+              ></iframe>
+              <div class="preview-result__ready-badge">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1
+                  1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0
+                  001.414 0l4-4z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                Scan ready — review your document
+              </div>
+            </div>
           </div>
+        </section>
 
-          <div class="hero__text">
-            <h2 class="hero__heading">Ready to Copy?</h2>
-            <p class="hero__lead">
-              Place your physical document on the printer tray before
-              continuing. Follow the steps below to complete your copy job.
+        <!-- RIGHT — steps + error -->
+        <section class="controls-col" aria-label="Copy instructions">
+          <div class="steps-panel">
+            <p class="steps-panel__lead">
+              Follow these steps to complete your copy job.
             </p>
+
+            <ol class="steps" aria-label="Copy steps">
+              <li class="step">
+                <div class="step__number" aria-hidden="true">1</div>
+                <div class="step__icon" aria-hidden="true">
+                  <svg viewBox="0 0 32 32" fill="none">
+                    <rect
+                      x="6"
+                      y="4"
+                      width="20"
+                      height="26"
+                      rx="3"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      fill="currentColor"
+                      opacity=".08"
+                    />
+                    <rect
+                      x="10"
+                      y="10"
+                      width="12"
+                      height="2.5"
+                      rx="1.25"
+                      fill="currentColor"
+                      opacity=".55"
+                    />
+                    <rect
+                      x="10"
+                      y="15"
+                      width="12"
+                      height="2.5"
+                      rx="1.25"
+                      fill="currentColor"
+                      opacity=".4"
+                    />
+                    <rect
+                      x="10"
+                      y="20"
+                      width="8"
+                      height="2.5"
+                      rx="1.25"
+                      fill="currentColor"
+                      opacity=".3"
+                    />
+                  </svg>
+                </div>
+                <div class="step__body">
+                  <span class="step__title">Place your document</span>
+                  <span class="step__desc"
+                    >Align the paper face-down on the glass or insert it into
+                    the feeder tray.</span
+                  >
+                </div>
+                <div class="step__connector" aria-hidden="true"></div>
+              </li>
+
+              <li class="step">
+                <div class="step__number" aria-hidden="true">2</div>
+                <div class="step__icon" aria-hidden="true">
+                  <svg viewBox="0 0 32 32" fill="none">
+                    <rect
+                      x="4"
+                      y="10"
+                      width="24"
+                      height="14"
+                      rx="3"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      fill="currentColor"
+                      opacity=".08"
+                    />
+                    <line
+                      x1="4"
+                      y1="17"
+                      x2="28"
+                      y2="17"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      opacity=".35"
+                      stroke-dasharray="3 2"
+                    />
+                    <circle cx="24" cy="25" r="3" fill="#4ade80" opacity=".7">
+                      <animate
+                        attributeName="opacity"
+                        values="0.7;0.3;0.7"
+                        dur="1.6s"
+                        repeatCount="indefinite"
+                      />
+                    </circle>
+                  </svg>
+                </div>
+                <div class="step__body">
+                  <span class="step__title">Check document</span>
+                  <span class="step__desc"
+                    >Tap the button below — the scanner will detect and preview
+                    your document on the left.</span
+                  >
+                </div>
+                <div class="step__connector" aria-hidden="true"></div>
+              </li>
+
+              <li class="step">
+                <div class="step__number" aria-hidden="true">3</div>
+                <div class="step__icon" aria-hidden="true">
+                  <svg viewBox="0 0 32 32" fill="none">
+                    <circle
+                      cx="16"
+                      cy="16"
+                      r="11"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      fill="currentColor"
+                      opacity=".08"
+                    />
+                    <line
+                      x1="10"
+                      y1="12"
+                      x2="22"
+                      y2="12"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      opacity=".4"
+                    />
+                    <circle
+                      cx="15"
+                      cy="12"
+                      r="2.5"
+                      fill="currentColor"
+                      opacity=".7"
+                    />
+                    <line
+                      x1="10"
+                      y1="17"
+                      x2="22"
+                      y2="17"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      opacity=".4"
+                    />
+                    <circle
+                      cx="19"
+                      cy="17"
+                      r="2.5"
+                      fill="currentColor"
+                      opacity=".7"
+                    />
+                    <line
+                      x1="10"
+                      y1="22"
+                      x2="22"
+                      y2="22"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      opacity=".4"
+                    />
+                    <circle
+                      cx="13"
+                      cy="22"
+                      r="2.5"
+                      fill="currentColor"
+                      opacity=".7"
+                    />
+                  </svg>
+                </div>
+                <div class="step__body">
+                  <span class="step__title">Set preferences &amp; pay</span>
+                  <span class="step__desc"
+                    >Choose paper size, colour mode and copies, then insert
+                    coins on the Confirm screen.</span
+                  >
+                </div>
+              </li>
+            </ol>
           </div>
-        </div>
 
-        <!-- Steps -->
-        <ol class="steps" aria-label="Copy steps">
-          <li class="step">
-            <div class="step__number" aria-hidden="true">1</div>
-            <div class="step__icon" aria-hidden="true">
-              <svg viewBox="0 0 32 32" fill="none">
-                <rect
-                  x="6"
-                  y="4"
-                  width="20"
-                  height="26"
-                  rx="3"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  fill="currentColor"
-                  opacity=".08"
-                />
-                <rect
-                  x="10"
-                  y="10"
-                  width="12"
-                  height="2.5"
-                  rx="1.25"
-                  fill="currentColor"
-                  opacity=".55"
-                />
-                <rect
-                  x="10"
-                  y="15"
-                  width="12"
-                  height="2.5"
-                  rx="1.25"
-                  fill="currentColor"
-                  opacity=".4"
-                />
-                <rect
-                  x="10"
-                  y="20"
-                  width="8"
-                  height="2.5"
-                  rx="1.25"
-                  fill="currentColor"
-                  opacity=".3"
-                />
-                <!-- Corner arrow -->
+          <!-- Error banner — hidden until scan fails -->
+          <!-- app.ts sets style.display="" to show, style.display="none" to hide -->
+          <div
+            id="errorBanner"
+            class="error-banner"
+            style="display: none"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div class="error-banner__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor">
                 <path
-                  d="M21 5v5h5"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  opacity=".6"
+                  fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486
+                0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53
+                0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0
+                012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"
                 />
               </svg>
             </div>
-            <div class="step__body">
-              <span class="step__title">Place your document</span>
-              <span class="step__desc"
-                >Align the paper face-down on the glass or insert it into the
-                feeder tray.</span
-              >
-            </div>
-            <div class="step__connector" aria-hidden="true"></div>
-          </li>
-
-          <li class="step">
-            <div class="step__number" aria-hidden="true">2</div>
-            <div class="step__icon" aria-hidden="true">
-              <svg viewBox="0 0 32 32" fill="none">
-                <circle
-                  cx="16"
-                  cy="16"
-                  r="11"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  fill="currentColor"
-                  opacity=".08"
-                />
-                <!-- Sliders -->
-                <line
-                  x1="10"
-                  y1="12"
-                  x2="22"
-                  y2="12"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  opacity=".4"
-                />
-                <circle
-                  cx="15"
-                  cy="12"
-                  r="2.5"
-                  fill="currentColor"
-                  opacity=".7"
-                />
-                <line
-                  x1="10"
-                  y1="17"
-                  x2="22"
-                  y2="17"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  opacity=".4"
-                />
-                <circle
-                  cx="19"
-                  cy="17"
-                  r="2.5"
-                  fill="currentColor"
-                  opacity=".7"
-                />
-                <line
-                  x1="10"
-                  y1="22"
-                  x2="22"
-                  y2="22"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  opacity=".4"
-                />
-                <circle
-                  cx="13"
-                  cy="22"
-                  r="2.5"
-                  fill="currentColor"
-                  opacity=".7"
-                />
-              </svg>
-            </div>
-            <div class="step__body">
-              <span class="step__title">Set print preferences</span>
-              <span class="step__desc"
-                >Choose paper size, colour mode, orientation, and number of
-                copies in the next screen.</span
-              >
-            </div>
-            <div class="step__connector" aria-hidden="true"></div>
-          </li>
-
-          <li class="step">
-            <div class="step__number" aria-hidden="true">3</div>
-            <div class="step__icon" aria-hidden="true">
-              <svg viewBox="0 0 32 32" fill="none">
-                <circle
-                  cx="16"
-                  cy="16"
-                  r="11"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  fill="currentColor"
-                  opacity=".08"
-                />
+            <p class="error-banner__text" id="errorText">
+              No document detected.
+            </p>
+            <button id="retryBtn" type="button" class="retry-btn">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path
-                  d="M11 16h10M16 11v10"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  opacity=".6"
-                />
-                <!-- Coin circles -->
-                <circle
-                  cx="21"
-                  cy="12"
-                  r="3"
-                  fill="var(--peach)"
-                  opacity=".5"
-                />
-                <circle
-                  cx="21"
-                  cy="12"
-                  r="1.5"
-                  fill="var(--peach)"
-                  opacity=".8"
+                  fill-rule="evenodd"
+                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0
+                0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0
+                010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002
+                5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2
+                0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                  clip-rule="evenodd"
                 />
               </svg>
-            </div>
-            <div class="step__body">
-              <span class="step__title">Insert coins &amp; confirm</span>
-              <span class="step__desc"
-                >On the Confirm &amp; Pay screen, insert the required amount to
-                start the copy job.</span
-              >
-            </div>
-          </li>
-        </ol>
+              Retry
+            </button>
+          </div>
+        </section>
       </main>
 
       <!-- Footer -->
       <footer class="copy-footer">
         <p class="copy-footer__note">
-          Your document stays on the tray until you confirm.
+          Ensure your document is flat and fully on the glass.
         </p>
-        <button id="checkDocBtn" type="button" class="continue-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-          <span>Check for Document</span>
-        </button>
-        <button id="continueBtn" type="button" class="continue-btn" style="display:none">
-          <span>Continue to Config</span>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+        <div class="copy-footer__actions">
+          <!-- Check document — visible initially, hidden after successful scan -->
+          <button id="checkDocBtn" type="button" class="check-btn">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="7" width="18" height="13" rx="2" />
+              <path d="M3 12h18M8 3h8" />
+            </svg>
+            <span>Check Document</span>
+          </button>
+
+          <!-- Continue — starts hidden; app.ts reveals after successful scan -->
+          <button
+            id="continueBtn"
+            type="button"
+            class="continue-btn"
+            style="display: none"
+            disabled
+            aria-disabled="true"
           >
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
-        </button>
-      </footer>
-
-      <!-- Error banner -->
-      <div id="errorBanner" class="error-banner" style="display:none">
-        <p id="errorText" class="error-banner__text"></p>
-        <button id="retryBtn" type="button" class="retry-btn">Try Again</button>
-      </div>
-
-      <!-- Preview section -->
-      <div id="previewSection" class="preview-section" style="display:none">
-        <h3 class="preview-section__title">Document Preview</h3>
-        <iframe id="previewFrame" class="preview-section__frame" title="Scanned document preview"></iframe>
-      </div>
-
-      <!-- Scanning overlay -->
-      <div id="scanOverlay" class="scan-overlay" aria-hidden="true">
-        <div class="scan-overlay__content">
-          <div class="scan-overlay__spinner"></div>
-          <p class="scan-overlay__title">Checking for document…</p>
-          <p class="scan-overlay__subtitle">Please wait while the scanner checks for your document.</p>
+            <span>Continue to Config</span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </button>
         </div>
-      </div>
+      </footer>
     </div>
 
     <script src="/copy/app.js"></script>

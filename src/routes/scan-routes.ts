@@ -118,12 +118,12 @@ export function registerScanRoutes(app: Express): void {
 
   // ── POST /api/scan/preview — Quick preview scan for document detection ──
   app.post("/api/scan/preview", async (_req: Request, res: Response) => {
-    console.log("[SCAN-PREVIEW] Starting preview scan (150 DPI grayscale)…");
+    console.log("[SCAN-PREVIEW] Starting copy pre-scan (300 DPI color)…");
 
     const previewSettings = {
       source: "flatbed" as const,
-      dpi: 150,
-      colorMode: "grayscale" as const,
+      dpi: 300,
+      colorMode: "colored" as const,
       duplex: false,
       format: "pdf" as const,
     };

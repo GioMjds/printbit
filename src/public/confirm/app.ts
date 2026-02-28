@@ -7,6 +7,7 @@ type SocketLike = {
 type ConfirmConfig = {
   mode: "print" | "copy";
   sessionId: string | null;
+  copyPreviewPath?: string | null;
   colorMode: "colored" | "grayscale";
   copies: number;
   orientation: "portrait" | "landscape";
@@ -238,8 +239,19 @@ modalConfirmBtn?.addEventListener("click", async () => {
   const overlayStart = Date.now();
 
   if (config.mode === "copy") {
-    // Copy flow: create copy job and poll
-    if (statusMessage) statusMessage.textContent = "Starting copy job...";
+    // Copy flow: print the already checked scan file
+    if (!config.copyPreviewPath) {
+      hideOverlay(printingOverlay);
+      if (statusMessage) {
+        statusMessage.textContent =
+          "No checked document found. Please go back to /copy and tap Check for Document again.";
+      }
+      confirmBtn.disabled = false;
+      modalConfirmBtn.disabled = false;
+      return;
+    }
+
+    if (statusMessage) statusMessage.textContent = "Sending checked document to printer...";
 
     try {
       const createRes = await fetch("/api/copy/jobs", {
@@ -251,6 +263,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
           orientation: config.orientation,
           paperSize: config.paperSize,
           amount: totalPrice,
+          previewPath: config.copyPreviewPath,
         }),
       });
 
@@ -277,6 +290,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
         showOverlay(thankYouOverlay);
         if (statusMessage) statusMessage.textContent = "Your copies are ready!";
         sessionStorage.removeItem("printbit.config");
+        sessionStorage.removeItem("printbit.copyPreviewPath");
         sessionStorage.removeItem("printbit.uploadedFile");
         sessionStorage.removeItem("printbit.sessionId");
       } else if (pollResult === "failed") {
@@ -339,6 +353,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
       statusMessage.textContent = "Your document has been sent to the printer!";
     }
     sessionStorage.removeItem("printbit.config");
+    sessionStorage.removeItem("printbit.copyPreviewPath");
     sessionStorage.removeItem("printbit.uploadedFile");
     sessionStorage.removeItem("printbit.sessionId");
   }
@@ -356,12 +371,12 @@ async function pollCopyJob(jobId: string): Promise<string> {
         const { state, progress } = data;
 
         if (state === "queued" && statusMessage) {
-          statusMessage.textContent = "Preparing scanner and feeder...";
+          statusMessage.textContent = "Preparing printer...";
         } else if (state === "running" && statusMessage) {
           if (progress && progress.pagesTotal) {
-            statusMessage.textContent = `Copying page ${progress.pagesCompleted} of ${progress.pagesTotal}...`;
+            statusMessage.textContent = `Printing copy ${progress.pagesCompleted} of ${progress.pagesTotal}...`;
           } else {
-            statusMessage.textContent = "Copying... please wait.";
+            statusMessage.textContent = "Printing your copy... please wait.";
           }
         }
 

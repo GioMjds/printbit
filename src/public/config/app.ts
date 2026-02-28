@@ -10,6 +10,7 @@ interface PrintConfig {
   mode: "print" | "copy";
   sessionId: string | null;
   filename: string | null;
+  copyPreviewPath?: string | null;
   colorMode: ColorMode;
   copies: number;
   orientation: Orientation;
@@ -406,6 +407,7 @@ const sessionId =
   params.get("sessionId") ?? sessionStorage.getItem("printbit.sessionId");
 const selectedFile =
   params.get("file") ?? sessionStorage.getItem("printbit.uploadedFile");
+const copyPreviewPath = sessionStorage.getItem("printbit.copyPreviewPath");
 
 const backLink = document.getElementById(
   "backLink",
@@ -438,11 +440,13 @@ if (mode === "print" && continueBtn) {
 }
 
 if (mode === "copy" && continueBtn) {
-  continueBtn.disabled = false;
-  continueBtn.setAttribute("aria-disabled", "false");
+  const hasCopyPreview = Boolean(copyPreviewPath);
+  continueBtn.disabled = !hasCopyPreview;
+  continueBtn.setAttribute("aria-disabled", hasCopyPreview ? "false" : "true");
   if (footerSummary)
-    footerSummary.textContent =
-      "Copy mode — insert your document, then confirm.";
+    footerSummary.textContent = hasCopyPreview
+      ? "Copy mode — checked document ready."
+      : "No checked document found — go back to /copy first.";
 }
 
 function getRadio(name: string): string {
@@ -517,7 +521,7 @@ updateSummary();
 
 async function loadPreview(): Promise<void> {
   if (mode === "copy") {
-    const copyPreview = sessionStorage.getItem("printbit.copyPreviewPath");
+    const copyPreview = copyPreviewPath;
     if (!copyPreview) return;
 
     const url = `/api/scan/preview/${encodeURIComponent(copyPreview)}`;
@@ -556,12 +560,14 @@ async function loadPreview(): Promise<void> {
 
 continueBtn?.addEventListener("click", () => {
   if (mode === "print" && !sessionId) return;
+  if (mode === "copy" && !copyPreviewPath) return;
 
   const cfg = currentPreviewConfig();
   const config: PrintConfig = {
     mode,
     sessionId,
     filename: selectedFile,
+    copyPreviewPath: mode === "copy" ? copyPreviewPath : null,
     colorMode: cfg.colorMode,
     copies: getCopies(),
     orientation: cfg.orientation,
