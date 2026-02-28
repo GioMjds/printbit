@@ -116,6 +116,60 @@ export function registerScanRoutes(app: Express): void {
     fs.createReadStream(absPath).pipe(res);
   });
 
+  // ── POST /api/scan/preview — Quick preview scan for document detection ──
+  app.post("/api/scan/preview", async (_req: Request, res: Response) => {
+    console.log("[SCAN-PREVIEW] Starting preview scan (150 DPI grayscale)…");
+
+    const previewSettings = {
+      source: "flatbed" as const,
+      dpi: 150,
+      colorMode: "grayscale" as const,
+      duplex: false,
+      format: "pdf" as const,
+    };
+
+    try {
+      const result = await getAdapter().scan(previewSettings, "uploads/scans");
+
+      // Check the output file has meaningful content (> 1 KB suggests a real scan)
+      const absPath = path.resolve(result.outputPath);
+      const stat = fs.statSync(absPath);
+      console.log(`[SCAN-PREVIEW] ✓ Preview scan complete: ${absPath} (${stat.size} bytes)`);
+
+      const filename = path.basename(result.outputPath);
+      res.json({
+        detected: true,
+        previewPath: filename,
+        pageCount: result.pageCount,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      console.error(`[SCAN-PREVIEW] ✗ Preview scan failed: ${message}`);
+
+      void appendAdminLog("scan_preview_failed", "Preview scan failed.", { error: message });
+      res.json({
+        detected: false,
+        error: "No document detected. Place your document face-down on the scanner glass and try again.",
+      });
+    }
+  });
+
+  // ── GET /api/scan/preview/:filename — Serve preview scan files ─────
+  app.get("/api/scan/preview/:filename", (req: Request, res: Response) => {
+    const filename = path.basename(req.params.filename as string);
+    const absPath = path.resolve("uploads", "scans", filename);
+
+    if (!fs.existsSync(absPath)) {
+      return res.status(404).json({ error: "Preview file not found" });
+    }
+
+    const ext = path.extname(filename).toLowerCase().replace(".", "");
+    const contentType = FORMAT_CONTENT_TYPES[ext] ?? "application/octet-stream";
+
+    res.setHeader("Content-Type", contentType);
+    fs.createReadStream(absPath).pipe(res);
+  });
+
   // ── POST /api/scan/jobs/:id/cancel — Cancel a scan job ────────────
   app.post("/api/scan/jobs/:id/cancel", (req: Request, res: Response) => {
     const job = jobStore.getJob(req.params.id as string);

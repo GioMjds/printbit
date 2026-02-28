@@ -382,6 +382,19 @@ class PrintPreview {
     this.resizeObserver.disconnect();
     this.pdfDoc?.destroy();
   }
+
+  /** Load from a raw ArrayBuffer (used by copy preview) */
+  async loadFromBuffer(buf: ArrayBuffer, mime: string): Promise<void> {
+    if (mime === "application/pdf") {
+      await this.loadPdf(buf);
+    } else if (mime.startsWith("image/")) {
+      const blob = new Blob([buf], { type: mime });
+      const url = URL.createObjectURL(blob);
+      await this.loadImage(url);
+    } else {
+      this.showError("Unsupported preview format.");
+    }
+  }
 }
 
 const params = new URLSearchParams(window.location.search);
@@ -503,6 +516,25 @@ copiesInput?.addEventListener("change", () => {
 updateSummary();
 
 async function loadPreview(): Promise<void> {
+  if (mode === "copy") {
+    const copyPreview = sessionStorage.getItem("printbit.copyPreviewPath");
+    if (!copyPreview) return;
+
+    const url = `/api/scan/preview/${encodeURIComponent(copyPreview)}`;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) return;
+      const buf = await resp.arrayBuffer();
+      await preview.loadFromBuffer(buf, "application/pdf");
+    } catch {
+      // Preview not critical for copy mode
+    }
+
+    if (footerSummary)
+      footerSummary.textContent = "Copy preview loaded — adjust settings above.";
+    return;
+  }
+
   if (mode !== "print") return;
 
   if (!sessionId) {

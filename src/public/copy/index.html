@@ -456,7 +456,14 @@
         <p class="copy-footer__note">
           Your document stays on the tray until you confirm.
         </p>
-        <button id="continueBtn" type="button" class="continue-btn">
+        <button id="checkDocBtn" type="button" class="continue-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span>Check for Document</span>
+        </button>
+        <button id="continueBtn" type="button" class="continue-btn" style="display:none">
           <span>Continue to Config</span>
           <svg
             viewBox="0 0 24 24"
@@ -471,6 +478,27 @@
           </svg>
         </button>
       </footer>
+
+      <!-- Error banner -->
+      <div id="errorBanner" class="error-banner" style="display:none">
+        <p id="errorText" class="error-banner__text"></p>
+        <button id="retryBtn" type="button" class="retry-btn">Try Again</button>
+      </div>
+
+      <!-- Preview section -->
+      <div id="previewSection" class="preview-section" style="display:none">
+        <h3 class="preview-section__title">Document Preview</h3>
+        <iframe id="previewFrame" class="preview-section__frame" title="Scanned document preview"></iframe>
+      </div>
+
+      <!-- Scanning overlay -->
+      <div id="scanOverlay" class="scan-overlay" aria-hidden="true">
+        <div class="scan-overlay__content">
+          <div class="scan-overlay__spinner"></div>
+          <p class="scan-overlay__title">Checking for document…</p>
+          <p class="scan-overlay__subtitle">Please wait while the scanner checks for your document.</p>
+        </div>
+      </div>
     </div>
 
     <script src="/copy/app.js"></script>
