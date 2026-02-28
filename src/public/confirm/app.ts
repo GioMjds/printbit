@@ -178,6 +178,9 @@ const modalCopies = document.getElementById("modalCopies");
 const modalOrientation = document.getElementById("modalOrientation");
 const modalPaper = document.getElementById("modalPaper");
 const modalPrice = document.getElementById("modalPrice");
+const printingOverlay = document.getElementById("printingOverlay");
+const thankYouOverlay = document.getElementById("thankYouOverlay");
+const thankYouDoneBtn = document.getElementById("thankYouDoneBtn") as HTMLButtonElement;
 
 function showModal(): void {
   if (!confirmModal) return;
@@ -200,6 +203,18 @@ function hideModal(): void {
   confirmModal.setAttribute("aria-hidden", "true");
 }
 
+function showOverlay(el: HTMLElement | null): void {
+  if (!el) return;
+  el.classList.add("is-visible");
+  el.setAttribute("aria-hidden", "false");
+}
+
+function hideOverlay(el: HTMLElement | null): void {
+  if (!el) return;
+  el.classList.remove("is-visible");
+  el.setAttribute("aria-hidden", "true");
+}
+
 confirmBtn?.addEventListener("click", () => {
   showModal();
 });
@@ -210,9 +225,12 @@ modalCancelBtn?.addEventListener("click", () => {
 
 modalConfirmBtn?.addEventListener("click", async () => {
   modalConfirmBtn.disabled = true;
-  if (statusMessage) statusMessage.textContent = "Processing payment...";
   hideModal();
   confirmBtn.disabled = true;
+
+  // Show printing in progress overlay
+  showOverlay(printingOverlay);
+  if (statusMessage) statusMessage.textContent = "Processing payment...";
 
   const response = await fetch("/api/confirm-payment", {
     method: "POST",
@@ -228,6 +246,8 @@ modalConfirmBtn?.addEventListener("click", async () => {
     }),
   });
 
+  hideOverlay(printingOverlay);
+
   if (!response.ok) {
     const payload = (await response.json()) as { error?: string };
     if (statusMessage)
@@ -238,6 +258,9 @@ modalConfirmBtn?.addEventListener("click", async () => {
     return;
   }
 
+  // Show thank-you overlay
+  showOverlay(thankYouOverlay);
+
   if (statusMessage) {
     statusMessage.textContent =
       config.mode === "print"
@@ -247,6 +270,11 @@ modalConfirmBtn?.addEventListener("click", async () => {
   sessionStorage.removeItem("printbit.config");
   sessionStorage.removeItem("printbit.uploadedFile");
   sessionStorage.removeItem("printbit.sessionId");
+});
+
+thankYouDoneBtn?.addEventListener("click", () => {
+  hideOverlay(thankYouOverlay);
+  window.location.href = "/";
 });
 
 resetBalanceBtn?.addEventListener("click", () => {

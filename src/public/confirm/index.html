@@ -471,6 +471,41 @@
       </div>
     </div>
 
+    <!-- Printing In Progress Overlay -->
+    <div class="modal-overlay" id="printingOverlay" aria-hidden="true" role="dialog" aria-labelledby="printingTitle" aria-modal="true">
+      <div class="modal-card modal-card--status">
+        <div class="status-icon status-icon--spinner" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="20" stroke="rgba(167,170,225,0.15)" stroke-width="4" fill="none" />
+            <circle cx="24" cy="24" r="20" stroke="var(--indigo)" stroke-width="4" fill="none"
+              stroke-linecap="round" stroke-dasharray="90 126" class="spinner-arc" />
+          </svg>
+        </div>
+        <h2 class="modal-title" id="printingTitle">Printing in Progress</h2>
+        <p class="modal-subtitle">Please wait while your document is being printed…</p>
+        <p class="modal-subtitle modal-subtitle--hint">Do not turn off the machine.</p>
+      </div>
+    </div>
+
+    <!-- Thank You Overlay -->
+    <div class="modal-overlay" id="thankYouOverlay" aria-hidden="true" role="dialog" aria-labelledby="thankYouTitle" aria-modal="true">
+      <div class="modal-card modal-card--status">
+        <div class="status-icon status-icon--check" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="22" fill="rgba(58,158,82,0.15)" />
+            <circle cx="24" cy="24" r="22" stroke="#3a9e52" stroke-width="2.5" fill="none" />
+            <path d="M15 24l6 6 12-12" stroke="#6ac47a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <h2 class="modal-title" id="thankYouTitle">Thank You!</h2>
+        <p class="modal-subtitle">Your document has been printed successfully.</p>
+        <p class="modal-subtitle modal-subtitle--brand">Thank you for using PrintBit! 🖨️</p>
+        <button id="thankYouDoneBtn" type="button" class="modal-btn modal-btn--confirm modal-btn--wide">
+          <span>Done</span>
+        </button>
+      </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="/confirm/app.js"></script>
   </body>
