@@ -263,8 +263,8 @@ modalConfirmBtn?.addEventListener("click", async () => {
         return;
       }
 
-      const createData = (await createRes.json()) as { job: { id: string; state: string } };
-      const jobId = createData.job.id;
+      const createData = (await createRes.json()) as { id: string; state: string };
+      const jobId = createData.id;
 
       // Poll job status
       const pollResult = await pollCopyJob(jobId);
@@ -351,9 +351,9 @@ async function pollCopyJob(jobId: string): Promise<string> {
         const res = await fetch(`/api/copy/jobs/${encodeURIComponent(jobId)}`);
         if (!res.ok) { clearInterval(interval); resolve("failed"); return; }
         const data = (await res.json()) as {
-          job: { state: string; progress?: { pagesCompleted: number; pagesTotal: number | null } }
+          state: string; progress?: { pagesCompleted: number; pagesTotal: number | null }
         };
-        const { state, progress } = data.job;
+        const { state, progress } = data;
 
         if (state === "queued" && statusMessage) {
           statusMessage.textContent = "Preparing scanner and feeder...";

@@ -16,8 +16,11 @@ import { registerPageRoutes } from "./routes/page-routes";
 import { registerAdminRoutes } from "./routes/admin-routes";
 import { registerUploadPortalRoutes } from "./routes/upload-portal-routes";
 import { registerWirelessSessionRoutes } from "./routes/wireless-session-routes";
+import { registerScanRoutes } from "./routes/scan-routes";
+import { registerCopyRoutes } from "./routes/copy-routes";
 import { initDB } from "./services/db";
 import { detectDefaultPrinter } from "./services/printer";
+import { detectScanner } from "./services/scanner";
 import { convertToPdfPreview } from "./services/preview";
 import { getSerialStatus, initSerial } from "./services/serial";
 import {
@@ -82,8 +85,10 @@ registerWirelessSessionRoutes(app, {
   resolvePublicBaseUrl,
   convertToPdfPreview,
 });
+registerScanRoutes(app);
+registerCopyRoutes(app, { io });
 
-io.on("connection", (socket) => {
+io.on("connection",(socket) => {
   socket.on("joinSession", (sessionId: string) => {
     socket.join(`session:${sessionId}`);
   });
@@ -92,6 +97,7 @@ io.on("connection", (socket) => {
 async function start() {
   await initDB();
   await detectDefaultPrinter();
+  await detectScanner();
   initSerial(io);
 
   server.listen(PORT, "0.0.0.0", () => {

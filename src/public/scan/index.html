@@ -1,22 +1,152 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/globals.css">
-  <link rel="stylesheet" href="/scan/styles.css">
-  <title>Scan - PrintBit</title>
-</head>
-<body>
-  <main class="page-shell">
-    <section class="page-card">
-      <h1>Scan</h1>
-      <p>Scanner flow template is ready. Connect scanner hardware integration next.</p>
-      <div class="actions">
-        <a href="/" class="text-link">Back</a>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/globals.css" />
+    <link rel="stylesheet" href="/scan/styles.css" />
+    <title>Scan Document · PrintBit</title>
+  </head>
+  <body>
+    <main class="page-shell">
+      <!-- Setup Section (visible by default) -->
+      <section class="page-card" id="setupSection">
+        <h1>Scan Document</h1>
+        <p class="lead">
+          Place your document on the scanner, choose your settings, then tap
+          Start Scan.
+        </p>
+
+        <!-- Source: ADF / Flatbed -->
+        <div class="option-group">
+          <label class="option-label">Source</label>
+          <div class="option-row">
+            <label class="option-chip"
+              ><input type="radio" name="source" value="adf" checked />
+              ADF</label
+            >
+            <label class="option-chip"
+              ><input type="radio" name="source" value="flatbed" />
+              Flatbed</label
+            >
+          </div>
+        </div>
+
+        <!-- Color: Colored / Grayscale -->
+        <div class="option-group">
+          <label class="option-label">Color</label>
+          <div class="option-row">
+            <label class="option-chip"
+              ><input type="radio" name="colorMode" value="colored" />
+              Colored</label
+            >
+            <label class="option-chip"
+              ><input type="radio" name="colorMode" value="grayscale" checked />
+              Grayscale</label
+            >
+          </div>
+        </div>
+
+        <!-- DPI: 150 / 300 / 600 -->
+        <div class="option-group">
+          <label class="option-label">Resolution (DPI)</label>
+          <div class="option-row">
+            <label class="option-chip"
+              ><input type="radio" name="dpi" value="150" /> 150</label
+            >
+            <label class="option-chip"
+              ><input type="radio" name="dpi" value="300" checked /> 300</label
+            >
+            <label class="option-chip"
+              ><input type="radio" name="dpi" value="600" /> 600</label
+            >
+          </div>
+        </div>
+
+        <!-- Format: PDF / JPG / PNG -->
+        <div class="option-group">
+          <label class="option-label">Output Format</label>
+          <div class="option-row">
+            <label class="option-chip"
+              ><input type="radio" name="format" value="pdf" checked />
+              PDF</label
+            >
+            <label class="option-chip"
+              ><input type="radio" name="format" value="jpg" /> JPG</label
+            >
+            <label class="option-chip"
+              ><input type="radio" name="format" value="png" /> PNG</label
+            >
+          </div>
+        </div>
+
+        <div class="actions">
+          <a href="/" class="text-link">Back</a>
+          <button id="startScanBtn" type="button" class="primary-btn">
+            Start Scan
+          </button>
+        </div>
+      </section>
+
+      <!-- Progress Overlay (hidden by default) -->
+      <div class="scan-overlay" id="scanProgressOverlay" aria-hidden="true">
+        <div class="overlay-card">
+          <div class="spinner" aria-hidden="true"></div>
+          <h2 id="scanProgressTitle">Scanner is preparing...</h2>
+          <p id="scanProgressMessage">
+            Please wait while your document is being scanned.
+          </p>
+          <p class="hint">Do not remove the document.</p>
+          <button id="cancelScanBtn" type="button" class="cancel-btn">
+            Cancel Scan
+          </button>
+        </div>
       </div>
-    </section>
-  </main>
-  <script src="/scan/app.js"></script>
-</body>
+
+      <!-- Result Section (hidden by default) -->
+      <section class="page-card" id="resultSection" style="display: none">
+        <h1>Scan Complete</h1>
+        <p class="lead" id="resultSummary">
+          Your document has been scanned successfully.
+        </p>
+
+        <div class="result-details">
+          <div class="result-row">
+            <span>Pages</span><span id="resultPages">—</span>
+          </div>
+          <div class="result-row">
+            <span>Format</span><span id="resultFormat">—</span>
+          </div>
+        </div>
+
+        <div class="result-actions">
+          <a id="downloadBtn" href="#" class="primary-btn" download>Download</a>
+          <button id="sendToPrintBtn" type="button" class="secondary-btn">
+            Send to Print
+          </button>
+        </div>
+        <div class="actions" style="margin-top: 12px">
+          <button id="scanAgainBtn" type="button" class="text-link-btn">
+            Scan Another
+          </button>
+          <a href="/" class="text-link">Back to Home</a>
+        </div>
+      </section>
+
+      <!-- Error Section (hidden by default) -->
+      <section class="page-card" id="errorSection" style="display: none">
+        <h1>Scan Failed</h1>
+        <p class="lead error-text" id="errorMessage">
+          Something went wrong while scanning.
+        </p>
+        <div class="actions">
+          <button id="retryBtn" type="button" class="primary-btn">
+            Try Again
+          </button>
+          <a href="/" class="text-link">Back to Home</a>
+        </div>
+      </section>
+    </main>
+    <script src="/scan/app.js"></script>
+  </body>
 </html>
