@@ -230,7 +230,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
 
   // Show printing in progress overlay
   showOverlay(printingOverlay);
-  if (statusMessage) statusMessage.textContent = "Printing your document…";
+  if (statusMessage) statusMessage.textContent = "Sending to printer…";
 
   const MIN_OVERLAY_MS = 3_000;
   const overlayStart = Date.now();
@@ -249,13 +249,8 @@ modalConfirmBtn?.addEventListener("click", async () => {
     }),
   });
 
-  // Ensure the printing overlay is visible for at least MIN_OVERLAY_MS
-  const remaining = MIN_OVERLAY_MS - (Date.now() - overlayStart);
-  if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
-
-  hideOverlay(printingOverlay);
-
   if (!response.ok) {
+    hideOverlay(printingOverlay);
     const payload = (await response.json()) as { error?: string };
     if (statusMessage)
       statusMessage.textContent =
@@ -265,13 +260,22 @@ modalConfirmBtn?.addEventListener("click", async () => {
     return;
   }
 
+  // Brief "Document sent!" confirmation before transitioning
+  if (statusMessage) statusMessage.textContent = "Document sent to printer!";
+
+  // Ensure the printing overlay is visible for at least MIN_OVERLAY_MS
+  const remaining = MIN_OVERLAY_MS - (Date.now() - overlayStart);
+  if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+
+  hideOverlay(printingOverlay);
+
   // Show thank-you overlay
   showOverlay(thankYouOverlay);
 
   if (statusMessage) {
     statusMessage.textContent =
       config.mode === "print"
-        ? "Payment accepted. Print job sent."
+        ? "Your document has been sent to the printer!"
         : "Payment accepted. You can now run the copy operation.";
   }
   sessionStorage.removeItem("printbit.config");

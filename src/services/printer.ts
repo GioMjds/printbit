@@ -130,73 +130,7 @@ export function printFile(
       }
 
       console.log(`[PRINTER] ✓ Print job sent to spooler in ${elapsed}ms`);
-      console.log("[PRINTER] Waiting for spooler to finish…");
-
-      waitForSpoolerDrain()
-        .then(() => {
-          const totalMs = Date.now() - startMs;
-          console.log(`[PRINTER] ✓ Spooler drained — total print time ${totalMs}ms`);
-          resolve();
-        })
-        .catch((spoolErr) => {
-          const totalMs = Date.now() - startMs;
-          console.warn(
-            `[PRINTER] ⚠ Spooler wait ended (${totalMs}ms): ${spoolErr instanceof Error ? spoolErr.message : spoolErr}`,
-          );
-          // Non-fatal — the job was already sent successfully
-          resolve();
-        });
+      resolve();
     });
-  });
-}
-
-const SPOOLER_POLL_INTERVAL_MS = 2_000;
-const SPOOLER_TIMEOUT_MS = 30_000;
-
-/**
- * Polls the Windows print spooler until no active jobs remain for the default
- * printer, or the timeout expires.  Uses `Get-PrintJob` PowerShell cmdlet.
- */
-function waitForSpoolerDrain(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + SPOOLER_TIMEOUT_MS;
-
-    const poll = (): void => {
-      execFile(
-        "powershell.exe",
-        [
-          "-NoProfile",
-          "-Command",
-          `$p = Get-CimInstance -ClassName Win32_Printer | Where-Object {$_.Default -eq $true};` +
-          `if (-not $p) { Write-Output '0'; exit }` +
-          `$jobs = Get-PrintJob -PrinterName $p.Name -ErrorAction SilentlyContinue;` +
-          `Write-Output ($jobs | Measure-Object).Count`,
-        ],
-        { timeout: 10_000, windowsHide: true },
-        (error, stdout) => {
-          if (error) {
-            console.warn(`[PRINTER] ⚠ Spooler poll error: ${error.message}`);
-            return reject(error);
-          }
-
-          const count = parseInt(stdout.trim(), 10);
-          console.log(`[PRINTER] Spooler jobs remaining: ${isNaN(count) ? "?" : count}`);
-
-          if (!isNaN(count) && count === 0) {
-            return resolve();
-          }
-
-          if (Date.now() >= deadline) {
-            console.warn("[PRINTER] ⚠ Spooler wait timed out — proceeding anyway");
-            return resolve();
-          }
-
-          setTimeout(poll, SPOOLER_POLL_INTERVAL_MS);
-        },
-      );
-    };
-
-    // Small initial delay — give the spooler a moment to register the job
-    setTimeout(poll, 1_000);
   });
 }
