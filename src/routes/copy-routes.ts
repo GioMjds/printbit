@@ -107,6 +107,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
           colorMode: safeColorMode,
           duplex: false,
           format: "pdf" as const,
+          paperSize: safePaperSize,
         };
         const scanResult = await getAdapter().scan(scanSettings, "uploads/scans");
 
