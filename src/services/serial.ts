@@ -20,21 +20,30 @@ export function getSerialStatus() {
 }
 
 export async function initSerial(io: Server) {
+  console.log("[SERIAL] ── Initializing serial connection ──────────────");
   try {
     const ports = await SerialPort.list();
+
+    console.log(`[SERIAL] Found ${ports.length} serial port(s):`);
+    for (const p of ports) {
+      console.log(
+        `[SERIAL]   → ${p.path} (manufacturer: ${p.manufacturer ?? "unknown"}, vendorId: ${p.vendorId ?? "unknown"}, productId: ${p.productId ?? "unknown"}, serialNumber: ${p.serialNumber ?? "unknown"})`,
+      );
+    }
 
     if (!ports.length) {
       serialConnected = false;
       serialPortPath = null;
       serialLastError = "No serial ports found.";
       console.warn(
-        "No serial ports found. Continuing without serial connection.",
+        "[SERIAL] ✗ No serial ports found. Continuing without serial connection.",
       );
       return;
     }
 
     const portPath = ports[0].path;
     serialPortPath = portPath;
+    console.log(`[SERIAL] Selected port: ${portPath} (baud: 9600)`);
     const port = new SerialPort({
       path: portPath,
       baudRate: 9600,
@@ -42,12 +51,14 @@ export async function initSerial(io: Server) {
     const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
 
     port.on("open", () => {
+      console.log(`[SERIAL] ✓ Port opened — Arduino connected on ${portPath}`);
       serialConnected = true;
       serialLastError = null;
       io.emit("serialStatus", getSerialStatus());
     });
 
     port.on("close", () => {
+      console.log("[SERIAL] ✗ Port closed — Arduino disconnected");
       serialConnected = false;
       io.emit("serialStatus", getSerialStatus());
     });
@@ -56,7 +67,7 @@ export async function initSerial(io: Server) {
       serialConnected = false;
       serialLastError = error.message;
       io.emit("serialStatus", getSerialStatus());
-      console.error("Serial port runtime error:", error);
+      console.error("[SERIAL] ✗ Port error:", error.message, error);
     });
 
     let pendingPrefix: "1" | "2" | null = null;
@@ -75,6 +86,7 @@ export async function initSerial(io: Server) {
         coinValue,
         balance: db.data!.balance,
       });
+      console.log(`[SERIAL] ✓ Coin accepted: ₱${coinValue} → new balance: ₱${db.data!.balance}`);
       io.emit("balance", db.data!.balance);
       io.emit("coinAccepted", { value: coinValue, balance: db.data!.balance });
     };
@@ -82,6 +94,7 @@ export async function initSerial(io: Server) {
     const flushPending = async (reason: "timeout" | "interrupted") => {
       if (!pendingPrefix) return;
       const prefix = pendingPrefix;
+      console.log(`[SERIAL] Flushing pending "${prefix}" (reason: ${reason})`);
       clearPending();
 
       if (prefix === "1") {
@@ -101,6 +114,7 @@ export async function initSerial(io: Server) {
     };
 
     const armPending = (prefix: "1" | "2") => {
+      console.log(`[SERIAL] Pending fragment: "${prefix}" (waiting ${FRAGMENT_WINDOW_MS}ms)`);
       clearPending();
       pendingPrefix = prefix;
       pendingTimer = setTimeout(() => {
@@ -109,6 +123,7 @@ export async function initSerial(io: Server) {
     };
 
     const processToken = async (token: string) => {
+      console.log(`[SERIAL] Token: "${token}"`);
       if (pendingPrefix) {
         if (token === "0") {
           const combined = Number(`${pendingPrefix}${token}`);
@@ -168,12 +183,13 @@ export async function initSerial(io: Server) {
     };
 
     parser.on("data", (rawLine: string) => {
+      console.log(`[SERIAL] Raw data: "${rawLine}"`);
       const token = rawLine.trim().replace(/[^0-9]/g, "");
       if (!token) return;
       void processToken(token);
     });
 
-    console.log(`Serial port initialized on ${portPath}`);
+    console.log(`[SERIAL] ✓ Serial port initialized on ${portPath}`);
     void appendAdminLog("serial_connected", `Serial port initialized on ${portPath}`, {
       portPath,
     });
@@ -181,7 +197,8 @@ export async function initSerial(io: Server) {
     serialConnected = false;
     serialLastError = error instanceof Error ? error.message : "Unknown serial error.";
     console.error(
-      "Error initializing serial port. Continuing without serial connection.",
+      "[SERIAL] ✗ Init error:",
+      serialLastError,
       error,
     );
     void appendAdminLog(

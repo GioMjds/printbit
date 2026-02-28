@@ -17,6 +17,7 @@ import { registerAdminRoutes } from "./routes/admin-routes";
 import { registerUploadPortalRoutes } from "./routes/upload-portal-routes";
 import { registerWirelessSessionRoutes } from "./routes/wireless-session-routes";
 import { initDB } from "./services/db";
+import { detectDefaultPrinter } from "./services/printer";
 import { convertToPdfPreview } from "./services/preview";
 import { getSerialStatus, initSerial } from "./services/serial";
 import {
@@ -90,6 +91,7 @@ io.on("connection", (socket) => {
 
 async function start() {
   await initDB();
+  await detectDefaultPrinter();
   initSerial(io);
 
   server.listen(PORT, "0.0.0.0", () => {
