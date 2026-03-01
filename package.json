@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev src/server.ts",
     "build": "node scripts/build-client.js",
+    "build:css": "npx @tailwindcss/cli -i src/input.css -o src/public/output.css",
     "kiosk": "node ./scripts/launch-kiosk.js"
   },
   "keywords": [],
@@ -14,6 +15,7 @@
   "packageManager": "pnpm@10.13.1",
   "dependencies": {
     "@serialport/parser-readline": "^13.0.0",
+    "@tailwindcss/cli": "^4.2.1",
     "express": "^5.2.1",
     "lowdb": "^7.0.1",
     "mammoth": "^1.11.0",
@@ -23,6 +25,7 @@
     "qrcode": "^1.5.4",
     "serialport": "^13.0.0",
     "socket.io": "^4.8.3",
+    "tailwindcss": "^4.2.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

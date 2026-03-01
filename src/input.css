@@ -1,0 +1,780 @@
+@import "tailwindcss";
+
+/* ── Page-specific component imports (compiled into output.css) ── */
+@import "./public/print/styles.css" layer(components);
+@import "./public/copy/styles.css" layer(components);
+@import "./public/scan/styles.css" layer(components);
+@import "./public/upload/styles.css" layer(components);
+@import "./public/confirm/styles.css" layer(components);
+@import "./public/config/styles.css" layer(components);
+@import "./public/admin/shared.css" layer(components);
+@import "./public/admin/dashboard/styles.css" layer(components);
+@import "./public/admin/earnings/styles.css" layer(components);
+@import "./public/admin/coin-stats/styles.css" layer(components);
+@import "./public/admin/logs/styles.css" layer(components);
+@import "./public/admin/settings/styles.css" layer(components);
+@import "./public/admin/system/styles.css" layer(components);
+
+@source "./public";
+
+@theme {
+  /* Brand & UI colours */
+  --color-indigo: #696fc7;
+  --color-lavender: #a7aae1;
+  --color-peach: #f5d3c4;
+  --color-pink: #f2aebb;
+  --color-ink: #2c2b4b;
+  --color-ink-muted: #7a788f;
+  --color-body: #0b0a1a;
+  --color-kiosk-body: #0e0d1f;
+
+  /* Functional colours */
+  --color-green: #4ade80;
+  --color-green-dim: rgba(74, 222, 128, 0.15);
+  --color-amber: #fbbf24;
+  --color-amber-dim: rgba(251, 191, 36, 0.12);
+  --color-red: #f87171;
+  --color-red-dim: rgba(248, 113, 113, 0.12);
+  --color-teal: #3ecfb2;
+
+  /* Surface / chrome colours */
+  --color-surface: rgba(255, 255, 255, 0.04);
+  --color-surface-2: rgba(255, 255, 255, 0.07);
+  --color-border: rgba(167, 170, 225, 0.12);
+  --color-border-2: rgba(167, 170, 225, 0.2);
+  --color-indigo-glow: rgba(105, 111, 199, 0.35);
+  --color-peach-glow: rgba(245, 211, 196, 0.25);
+
+  /* Font family */
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+
+  /* Extra breakpoints (Tailwind v4 keeps sm/md/lg/xl/2xl built-in) */
+  --breakpoint-xs: 480px;
+  --breakpoint-2xs: 680px;
+  --breakpoint-3md: 780px;
+  --breakpoint-4md: 820px;
+  --breakpoint-5md: 860px;
+  --breakpoint-6md: 900px;
+  --breakpoint-7lg: 1100px;
+  --breakpoint-3xl: 1400px;
+
+  /* Animation shorthand tokens → class="animate-drift" etc. */
+  --animate-drift: drift 18s ease-in-out infinite alternate;
+  --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
+  --animate-card-in: card-in 400ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  --animate-fade-up: fade-up 350ms ease both;
+  --animate-fade-in: fade-in 300ms ease both;
+  --animate-fade-state: fade-state 300ms ease both;
+  --animate-shimmer: shimmer 2s linear infinite;
+  --animate-spin: spin 1s linear infinite;
+  --animate-pulse-btn: pulse-btn 2.5s ease-in-out infinite;
+  --animate-pulse-green: pulse-green 2s ease-in-out infinite;
+  --animate-pulse-live: pulse-live 2.4s ease-in-out infinite;
+  --animate-slide-down: slide-down 300ms ease both;
+  --animate-overlay-card: overlay-card 350ms cubic-bezier(0.34, 1.4, 0.64, 1)
+    both;
+  --animate-step-in: step-in 300ms ease both;
+  --animate-file-in: file-in 280ms ease both;
+  --animate-item-in: item-in 250ms ease both;
+  --animate-row-in: row-in 280ms ease both;
+  --animate-pop-in: pop-in 350ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  --animate-scan-sweep: scan-sweep 2.4s ease-in-out infinite;
+  --animate-scan-beam: scan-beam 2.4s ease-in-out infinite;
+  --animate-progress-pulse: progress-pulse 1.5s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   KEYFRAMES
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(40px, 30px) scale(1.08);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-state {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-btn {
+  0%,
+  100% {
+    box-shadow: 0 4px 20px rgba(105, 111, 199, 0.35);
+  }
+  50% {
+    box-shadow: 0 4px 32px rgba(105, 111, 199, 0.55);
+  }
+}
+
+@keyframes pulse-green {
+  0%,
+  100% {
+    box-shadow: 0 4px 20px rgba(58, 158, 82, 0.35);
+  }
+  50% {
+    box-shadow: 0 4px 32px rgba(58, 158, 82, 0.55);
+  }
+}
+
+@keyframes pulse-live {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes overlay-card {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes file-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scan-sweep {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes scan-beam {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes progress-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BASE  — font-faces, resets, and body defaults
+   ═══════════════════════════════════════════════════════════════ */
+@layer base {
+  /* Plus Jakarta Sans – offline font faces */
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 200;
+    font-style: normal;
+    src: url("/fonts/PlusJakartaSans-ExtraLight.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 200;
+    font-style: italic;
+    src: url("/fonts/PlusJakartaSans-ExtraLightItalic.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 300;
+    font-style: normal;
+    src: url("/fonts/PlusJakartaSans-Light.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 300;
+    font-style: italic;
+    src: url("/fonts/PlusJakartaSans-LightItalic.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 400;
+    font-style: normal;
+    src: url("/fonts/PlusJakartaSans-Regular.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 400;
+    font-style: italic;
+    src: url("/fonts/PlusJakartaSans-Italic.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 500;
+    font-style: normal;
+    src: url("/fonts/PlusJakartaSans-Medium.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 500;
+    font-style: italic;
+    src: url("/fonts/PlusJakartaSans-MediumItalic.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 600;
+    font-style: normal;
+    src: url("/fonts/PlusJakartaSans-SemiBold.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 700;
+    font-style: normal;
+    src: url("/fonts/PlusJakartaSans-Bold.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 700;
+    font-style: italic;
+    src: url("/fonts/PlusJakartaSans-BoldItalic.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 800;
+    font-style: normal;
+    src: url("/fonts/PlusJakartaSans-ExtraBold.ttf") format("truetype");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    font-weight: 800;
+    font-style: italic;
+    src: url("/fonts/PlusJakartaSans-ExtraBoldItalic.ttf") format("truetype");
+    font-display: swap;
+  }
+
+  html,
+  body {
+    height: 100%;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Legacy variable aliases for inline SVG fill/stroke references */
+  :root {
+    --indigo: var(--color-indigo);
+    --lavender: var(--color-lavender);
+    --peach: var(--color-peach);
+    --pink: var(--color-pink);
+    --white: #f8fafc;
+    --ink: var(--color-ink);
+    --ink-muted: var(--color-ink-muted);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENTS  — complex styles that can't be pure utilities
+   ═══════════════════════════════════════════════════════════════ */
+@layer components {
+  /* ── Shared kiosk background blobs ── */
+  .kiosk-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .bg-circle {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.35;
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+
+  .bg-circle--1 {
+    width: 520px;
+    height: 520px;
+    background: var(--color-indigo);
+    top: -160px;
+    left: -100px;
+    animation-duration: 20s;
+  }
+
+  .bg-circle--2 {
+    width: 440px;
+    height: 440px;
+    background: var(--color-pink);
+    bottom: -140px;
+    right: -80px;
+    animation-duration: 16s;
+    animation-delay: -6s;
+  }
+
+  .bg-circle--3 {
+    width: 300px;
+    height: 300px;
+    background: var(--color-lavender);
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation-duration: 24s;
+    animation-delay: -12s;
+  }
+
+  /* ── Shared kiosk page shell ── */
+  .kiosk-shell {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 32px 0;
+  }
+
+  @media (max-width: 680px) {
+    .kiosk-shell {
+      padding: 0 20px;
+    }
+  }
+
+  @media (min-width: 1400px) {
+    .kiosk-shell {
+      padding: 0 64px;
+    }
+  }
+
+  /* ── Shared back button (pill style, used across kiosk sub-pages) ── */
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-lavender);
+    text-decoration: none;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 40px;
+    border: 1.5px solid rgba(167, 170, 225, 0.2);
+    background: rgba(167, 170, 225, 0.06);
+    cursor: pointer;
+    transition:
+      background 150ms ease,
+      border-color 150ms ease;
+    width: fit-content;
+  }
+
+  .back-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .back-btn:hover {
+    background: rgba(167, 170, 225, 0.13);
+    border-color: rgba(167, 170, 225, 0.38);
+  }
+
+  .back-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* ── Shared page shell (sub-pages) ── */
+  .page-shell {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+
+  /* ── Shared sub-page topbar ── */
+  .topbar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 18px 0 14px;
+    border-bottom: 1px solid rgba(167, 170, 225, 0.1);
+    flex-shrink: 0;
+  }
+
+  .page-title-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .page-title-icon {
+    width: 26px;
+    height: 26px;
+    color: var(--color-lavender);
+    flex-shrink: 0;
+  }
+
+  .page-title-block h1 {
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    margin: 0;
+  }
+
+  /* ── Shared balance pill ── */
+  .balance-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-lavender);
+    background: rgba(105, 111, 199, 0.12);
+    border: 1.5px solid rgba(167, 170, 225, 0.2);
+  }
+
+  .balance-pill svg {
+    width: 16px;
+    height: 16px;
+    opacity: 0.7;
+  }
+
+  /* ── Shared status dot ── */
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
+
+  /* ── Home page action cards ── */
+  .action-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: clamp(36px, 4.5vw, 64px) clamp(24px, 3vw, 48px);
+    border: 1.5px solid rgba(167, 170, 225, 0.22);
+    border-radius: 28px;
+    cursor: pointer;
+    overflow: hidden;
+    text-align: center;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    background: linear-gradient(
+      145deg,
+      rgba(105, 111, 199, 0.22) 0%,
+      rgba(105, 111, 199, 0.08) 100%
+    );
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    color: var(--color-lavender);
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform 160ms cubic-bezier(0.34, 1.4, 0.64, 1),
+      box-shadow 160ms ease,
+      border-color 160ms ease;
+  }
+
+  .action-card:hover,
+  .action-card:focus-visible {
+    transform: translateY(-6px) scale(1.015);
+    box-shadow:
+      0 20px 56px rgba(105, 111, 199, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border-color: rgba(167, 170, 225, 0.5);
+    outline: none;
+  }
+
+  .action-card:active {
+    transform: scale(0.97);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    transition-duration: 80ms;
+  }
+
+  .action-card--scan {
+    background: linear-gradient(
+      145deg,
+      rgba(242, 174, 187, 0.2) 0%,
+      rgba(245, 211, 196, 0.08) 100%
+    );
+    border-color: rgba(242, 174, 187, 0.25);
+    color: #f2aebb;
+  }
+
+  .action-card--scan:hover,
+  .action-card--scan:focus-visible {
+    box-shadow:
+      0 20px 56px rgba(242, 174, 187, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border-color: rgba(242, 174, 187, 0.55);
+  }
+
+  .action-card--copy {
+    background: linear-gradient(
+      145deg,
+      rgba(62, 207, 178, 0.18) 0%,
+      rgba(62, 207, 178, 0.06) 100%
+    );
+    border-color: rgba(62, 207, 178, 0.25);
+    color: #3ecfb2;
+  }
+
+  .action-card--copy:hover,
+  .action-card--copy:focus-visible {
+    box-shadow:
+      0 20px 56px rgba(62, 207, 178, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border-color: rgba(62, 207, 178, 0.55);
+  }
+
+  .action-card__glow {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      ellipse 70% 60% at 50% 0%,
+      rgba(255, 255, 255, 0.07) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+
+  .action-card:hover .action-card__glow,
+  .action-card:focus-visible .action-card__glow {
+    opacity: 1;
+  }
+
+  .action-card__icon-wrap {
+    width: clamp(72px, 9vw, 120px);
+    height: clamp(72px, 9vw, 120px);
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(4px);
+    transition: background 160ms ease;
+  }
+
+  .action-card:hover .action-card__icon-wrap {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .action-card__icon {
+    width: 65%;
+    height: 65%;
+  }
+
+  .action-card__arrow {
+    width: clamp(28px, 3vw, 40px);
+    height: clamp(28px, 3vw, 40px);
+    color: inherit;
+    opacity: 0.6;
+    transition:
+      opacity 160ms ease,
+      transform 160ms ease;
+  }
+
+  .action-card:hover .action-card__arrow {
+    opacity: 1;
+    transform: translateX(4px);
+  }
+
+  .action-card__title {
+    font-size: clamp(26px, 3.2vw, 46px);
+    font-weight: 700;
+    letter-spacing: -1px;
+    color: #fff;
+    margin: 0;
+  }
+
+  .action-card__sub {
+    text-transform: uppercase;
+    font-size: clamp(8px, 1.1vw, 14px);
+    font-weight: 400;
+    color: inherit;
+    opacity: 0.75;
+    margin: 0;
+  }
+
+  .action-card__arrow svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+@utility hidden {
+  display: none !important;
+}

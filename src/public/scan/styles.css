@@ -1,36 +1,4 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body {
-  height: 100%;
-  background: #0e0d1f;
-  color: var(--white);
-  font-family: "Plus Jakarta Sans", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* ── Animated background blobs ────────────────────────────── */
+/* ── Animated background blobs────────────────────────────── */
 .kiosk-bg {
   position: fixed;
   inset: 0;
@@ -88,7 +56,6 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 0 28px;
   box-sizing: border-box;
 }
 

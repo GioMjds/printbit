@@ -1,24 +1,4 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body {
-  height: 100%;
-  background: #0e0d1f;
-  color: var(--white);
-  font-family: "Plus Jakarta Sans", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* ── Background blobs ─────────────────────────────────────── */
+/* ── Background blobs─────────────────────────────────────── */
 .kiosk-bg {
   position: fixed;
   inset: 0;
@@ -76,7 +56,6 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 0 28px;
   box-sizing: border-box;
 }
 

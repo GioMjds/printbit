@@ -1,13 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="h-full">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="./globals.css" />
     <title>PrintBit</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="/output.css" />
   </head>
-  <body>
+  <body
+    class="h-full bg-kiosk-body text-white antialiased overflow-hidden select-none"
+  >
     <div class="kiosk-bg">
       <div class="bg-circle bg-circle--1"></div>
       <div class="bg-circle bg-circle--2"></div>
@@ -16,25 +17,48 @@
 
     <div class="kiosk-shell">
       <!-- Top Bar -->
-      <header class="topbar" role="banner">
-        <div class="brand"></div>
+      <header
+        class="grid grid-cols-[auto_1fr_auto] items-center gap-2 pt-5 2xs:grid-cols-[1fr_auto_1fr] 2xs:gap-0"
+        role="banner"
+      >
+        <div class="flex items-center gap-2.5"></div>
 
         <div
-          class="clock-block"
+          class="text-center leading-tight"
           id="clockBlock"
           aria-live="polite"
           aria-label="Current time and date"
         >
-          <div class="clock-time" id="clockTime">--:--</div>
-          <div class="clock-date" id="clockDate">--- --, ----</div>
+          <div
+            class="text-[32px] font-bold tracking-[-1px] text-white tabular-nums 2xs:text-[clamp(40px,5.5vw,72px)] 2xs:tracking-[-2px]"
+            id="clockTime"
+          >
+            --:--
+          </div>
+          <div
+            class="text-[clamp(13px,1.4vw,18px)] font-normal text-lavender mt-0.5 tracking-wide"
+            id="clockDate"
+          >
+            --- --, ----
+          </div>
         </div>
       </header>
 
       <!-- Main Action Area -->
-      <main class="action-area" role="main" aria-label="Main actions">
-        <p class="action-hint">Please select an print method</p>
+      <main
+        class="flex-1 flex flex-col items-center justify-center gap-7 py-6"
+        role="main"
+        aria-label="Main actions"
+      >
+        <p
+          class="text-[clamp(14px,1.5vw,18px)] font-medium text-ink-muted tracking-wider uppercase"
+        >
+          Please select an print method
+        </p>
 
-        <div class="action-grid">
+        <div
+          class="grid grid-cols-1 gap-[clamp(16px,2vw,36px)] w-full max-w-105 2xs:grid-cols-3 2xs:max-w-275"
+        >
           <!-- Print Card -->
           <button class="action-card" id="openPrintBtn" aria-label="Open Print">
             <div class="action-card__glow"></div>

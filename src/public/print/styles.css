@@ -1,16 +1,3 @@
-html,
-body {
-  height: 100%;
-  margin: 0;
-  background: #0e0d1f;
-  color: var(--white);
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* ── Background blobs ─────────────────────────────────────── */
 .kiosk-bg {
   position: fixed;
   inset: 0;
@@ -72,7 +59,6 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 0 32px;
 }
 
 /* ── Top bar ──────────────────────────────────────────────── */
