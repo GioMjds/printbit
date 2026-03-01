@@ -28,19 +28,27 @@ export function registerScanRoutes(app: Express): void {
     };
 
     if (!source || !VALID_SOURCES.has(source)) {
-      return res.status(400).json({ error: 'Invalid source. Accepted: "adf", "flatbed"' });
+      return res
+        .status(400)
+        .json({ error: 'Invalid source. Accepted: "adf", "flatbed"' });
     }
     if (typeof dpi !== "number" || !VALID_DPI.has(dpi)) {
-      return res.status(400).json({ error: "Invalid dpi. Accepted: 150, 300, 600" });
+      return res
+        .status(400)
+        .json({ error: "Invalid dpi. Accepted: 150, 300, 600" });
     }
     if (!colorMode || !VALID_COLOR_MODES.has(colorMode)) {
-      return res.status(400).json({ error: 'Invalid colorMode. Accepted: "colored", "grayscale"' });
+      return res
+        .status(400)
+        .json({ error: 'Invalid colorMode. Accepted: "colored", "grayscale"' });
     }
     if (typeof duplex !== "boolean") {
       return res.status(400).json({ error: "duplex must be a boolean" });
     }
     if (!format || !VALID_FORMATS.has(format)) {
-      return res.status(400).json({ error: 'Invalid format. Accepted: "pdf", "jpg", "png"' });
+      return res
+        .status(400)
+        .json({ error: 'Invalid format. Accepted: "pdf", "jpg", "png"' });
     }
 
     const settings = {
@@ -66,7 +74,9 @@ export function registerScanRoutes(app: Express): void {
       jobStore.updateJobState(job.id, "running");
       try {
         const result = await getAdapter().scan(settings, "uploads/scans");
-        jobStore.updateJobState(job.id, "succeeded", { resultPath: result.outputPath });
+        jobStore.updateJobState(job.id, "succeeded", {
+          resultPath: result.outputPath,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         jobStore.updateJobState(job.id, "failed", {
@@ -108,7 +118,8 @@ export function registerScanRoutes(app: Express): void {
       return res.status(404).json({ error: "Result file not found on disk" });
     }
 
-    const contentType = FORMAT_CONTENT_TYPES[job.settings.format] ?? "application/octet-stream";
+    const contentType =
+      FORMAT_CONTENT_TYPES[job.settings.format] ?? "application/octet-stream";
     const filename = path.basename(absPath);
 
     res.setHeader("Content-Type", contentType);
@@ -134,7 +145,9 @@ export function registerScanRoutes(app: Express): void {
       // Check the output file has meaningful content (> 1 KB suggests a real scan)
       const absPath = path.resolve(result.outputPath);
       const stat = fs.statSync(absPath);
-      console.log(`[SCAN-PREVIEW] ✓ Preview scan complete: ${absPath} (${stat.size} bytes)`);
+      console.log(
+        `[SCAN-PREVIEW] ✓ Preview scan complete: ${absPath} (${stat.size} bytes)`,
+      );
 
       const filename = path.basename(result.outputPath);
       res.json({
@@ -146,10 +159,13 @@ export function registerScanRoutes(app: Express): void {
       const message = err instanceof Error ? err.message : "Unknown error";
       console.error(`[SCAN-PREVIEW] ✗ Preview scan failed: ${message}`);
 
-      void appendAdminLog("scan_preview_failed", "Preview scan failed.", { error: message });
+      void appendAdminLog("scan_preview_failed", "Preview scan failed.", {
+        error: message,
+      });
       res.json({
         detected: false,
-        error: "No document detected. Place your document face-down on the scanner glass and try again.",
+        error:
+          "No document detected. Place your document face-down on the scanner glass and try again.",
       });
     }
   });
@@ -179,7 +195,9 @@ export function registerScanRoutes(app: Express): void {
 
     const cancelled = jobStore.requestCancel(job.id);
     if (!cancelled) {
-      return res.status(409).json({ error: "Job is already in a terminal state" });
+      return res
+        .status(409)
+        .json({ error: "Job is already in a terminal state" });
     }
 
     getAdapter().cancel();

@@ -14,11 +14,43 @@
         <div class="auth-card__brand" aria-hidden="true">
           <div class="auth-card__logomark">
             <svg viewBox="0 0 40 40" fill="none">
-              <rect x="6" y="5" width="28" height="17" rx="3.5" fill="var(--indigo)" opacity=".3" />
-              <rect x="3" y="14" width="34" height="19" rx="5" fill="var(--indigo)" opacity=".85" />
+              <rect
+                x="6"
+                y="5"
+                width="28"
+                height="17"
+                rx="3.5"
+                fill="var(--indigo)"
+                opacity=".3"
+              />
+              <rect
+                x="3"
+                y="14"
+                width="34"
+                height="19"
+                rx="5"
+                fill="var(--indigo)"
+                opacity=".85"
+              />
               <rect x="6" y="20" width="28" height="14" rx="3" fill="#0b0a1a" />
-              <rect x="10" y="25" width="16" height="2.5" rx="1.25" fill="var(--lavender)" opacity=".55" />
-              <rect x="10" y="30" width="11" height="2.5" rx="1.25" fill="var(--lavender)" opacity=".3" />
+              <rect
+                x="10"
+                y="25"
+                width="16"
+                height="2.5"
+                rx="1.25"
+                fill="var(--lavender)"
+                opacity=".55"
+              />
+              <rect
+                x="10"
+                y="30"
+                width="11"
+                height="2.5"
+                rx="1.25"
+                fill="var(--lavender)"
+                opacity=".3"
+              />
               <circle cx="30" cy="30" r="3" fill="var(--peach)" opacity=".9" />
             </svg>
           </div>
@@ -33,7 +65,12 @@
           Enter your administrator PIN to unlock machine controls and analytics.
         </p>
 
-        <form id="adminAuthForm" class="auth-form" autocomplete="off" novalidate>
+        <form
+          id="adminAuthForm"
+          class="auth-form"
+          autocomplete="off"
+          novalidate
+        >
           <div class="pin-field">
             <label for="adminPinInput" class="pin-field__label">
               <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -72,7 +109,12 @@
           </button>
         </form>
 
-        <p id="adminMessage" class="auth-msg" role="alert" aria-live="polite"></p>
+        <p
+          id="adminMessage"
+          class="auth-msg"
+          role="alert"
+          aria-live="polite"
+        ></p>
       </div>
     </div>
 
@@ -82,11 +124,42 @@
         <div class="sidebar__brand">
           <div class="sidebar__logomark" aria-hidden="true">
             <svg viewBox="0 0 28 28" fill="none">
-              <rect x="4" y="3" width="20" height="12" rx="2.5" fill="var(--indigo)" opacity=".35" />
-              <rect x="2" y="10" width="24" height="13" rx="3.5" fill="var(--indigo)" />
+              <rect
+                x="4"
+                y="3"
+                width="20"
+                height="12"
+                rx="2.5"
+                fill="var(--indigo)"
+                opacity=".35"
+              />
+              <rect
+                x="2"
+                y="10"
+                width="24"
+                height="13"
+                rx="3.5"
+                fill="var(--indigo)"
+              />
               <rect x="4" y="14" width="20" height="10" rx="2" fill="#0b0a1a" />
-              <rect x="7" y="17" width="11" height="2" rx="1" fill="var(--lavender)" opacity=".6" />
-              <rect x="7" y="21" width="7" height="2" rx="1" fill="var(--lavender)" opacity=".3" />
+              <rect
+                x="7"
+                y="17"
+                width="11"
+                height="2"
+                rx="1"
+                fill="var(--lavender)"
+                opacity=".6"
+              />
+              <rect
+                x="7"
+                y="21"
+                width="7"
+                height="2"
+                rx="1"
+                fill="var(--lavender)"
+                opacity=".3"
+              />
               <circle cx="21" cy="21" r="2" fill="var(--peach)" />
             </svg>
           </div>
@@ -201,16 +274,35 @@
         <header class="topbar">
           <div class="topbar__left">
             <h2 class="topbar__title">Logs</h2>
-            <div class="live-pill"><span class="live-pill__dot" aria-hidden="true"></span>Live</div>
+            <div class="live-pill">
+              <span class="live-pill__dot" aria-hidden="true"></span>Live
+            </div>
           </div>
           <div class="topbar__right">
-            <p id="adminMessage" class="topbar__msg" role="alert" aria-live="polite"></p>
+            <p
+              id="adminMessage"
+              class="topbar__msg"
+              role="alert"
+              aria-live="polite"
+            ></p>
             <button id="refreshBtn" class="topbar-btn">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg>
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                  clip-rule="evenodd"
+                />
+              </svg>
               <span>Refresh</span>
             </button>
             <button id="exportLogsBtn" class="topbar-btn topbar-btn--accent">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                  clip-rule="evenodd"
+                />
+              </svg>
               <span>Export CSV</span>
             </button>
           </div>
@@ -220,7 +312,9 @@
           <section class="page">
             <div class="logs-panel">
               <div class="logs-panel__bar">
-                <span class="logs-panel__hint">Latest 120 entries · auto-refreshes every 10 s</span>
+                <span class="logs-panel__hint"
+                  >Latest 120 entries · auto-refreshes every 10 s</span
+                >
               </div>
               <div class="logs-scroll">
                 <table class="logs-table">
