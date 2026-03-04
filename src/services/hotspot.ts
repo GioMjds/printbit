@@ -15,6 +15,7 @@ const MPWF_LOGIN = path.join(MYPUBLICWIFI_PATH, "Web", "login.html");
 const MPWF_LOGIN_BACKUP = path.join(MYPUBLICWIFI_PATH, "Web", "login.html.bak");
 
 let hotspotProcess: ChildProcess | null = null;
+let hotspotRunning = false;
 
 /* ------------------------------------------------------------------ */
 /*  IP helpers                                                        */
@@ -45,12 +46,11 @@ function configureDatabase(): void {
   const updates: Record<string, string | number> = {
     NetworkSSID: HOTSPOT_SSID,
     NetworkKey: HOTSPOT_PASSWORD,
-    AuthenticationEnabled: "Y",
-    TOCGuestAuthenticationEnabled: "Y",
+    AuthenticationEnabled: "N",
+    TOCGuestAuthenticationEnabled: "N",
     AutoHotspotStartEnabled: "Y",
     LocalHostAccessDisabled: "N",
-    DhcpForceDNS: "Y",
-    DhcpDNSServerIP: ipToInt32(routerIp),
+    DhcpForceDNS: "N",
     DhcpRouterIP: ipToInt32(routerIp),
     DhcpNetMask: ipToInt32("255.255.255.0"),
     DhcpStartIP: ipToInt32("192.168.5.2"),
@@ -93,89 +93,23 @@ function configureDatabase(): void {
 /*  Captive portal redirect page                                      */
 /* ------------------------------------------------------------------ */
 
-/** Deploy a redirect login.html that sends phones to PrintBit's upload page. */
+/** Deploy a success login.html that satisfies captive-portal detection. */
 function deployLoginPage(): void {
-  // Back up original if not already done
   if (fs.existsSync(MPWF_LOGIN) && !fs.existsSync(MPWF_LOGIN_BACKUP)) {
     try {
       fs.copyFileSync(MPWF_LOGIN, MPWF_LOGIN_BACKUP);
     } catch { /* may fail if locked */ }
   }
 
-  const kioskOrigin = `http://192.168.5.1:${PORT}`;
-
   const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>PrintBit Kiosk</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f0f2f5; display: flex; align-items: center; justify-content: center;
-    min-height: 100vh; color: #333;
-  }
-  .card {
-    background: #fff; border-radius: 16px; padding: 2rem; max-width: 360px;
-    width: 90%; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  }
-  h2 { margin-bottom: 0.5rem; font-size: 1.3rem; }
-  p { color: #666; font-size: 0.95rem; margin-bottom: 1rem; }
-  .spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0;
-    border-top-color: #1a73e8; border-radius: 50%; animation: spin 0.8s linear infinite;
-    margin: 1rem auto; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .fallback { display: none; margin-top: 1rem; }
-  .fallback a { color: #1a73e8; text-decoration: none; font-weight: 500; }
-</style>
+<title>Success</title>
 </head>
 <body>
-<div class="card">
-  <h2>📄 PrintBit Kiosk</h2>
-  <p id="status">Connecting to upload page…</p>
-  <div class="spinner" id="spinner"></div>
-  <div class="fallback" id="fallback">
-    <p>Could not auto-redirect. <a id="manualLink" href="${kioskOrigin}/upload">Open upload page</a></p>
-  </div>
-</div>
-<script>
-(function() {
-  var origin = '${kioskOrigin}';
-  var statusEl = document.getElementById('status');
-  var spinnerEl = document.getElementById('spinner');
-  var fallbackEl = document.getElementById('fallback');
-  var linkEl = document.getElementById('manualLink');
-
-  function showFallback(msg) {
-    statusEl.textContent = msg;
-    spinnerEl.style.display = 'none';
-    fallbackEl.style.display = 'block';
-    linkEl.href = origin + '/upload';
-  }
-
-  // Try to fetch active session and redirect
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', origin + '/api/session/active', true);
-  xhr.timeout = 5000;
-  xhr.onload = function() {
-    if (xhr.status === 200) {
-      try {
-        var data = JSON.parse(xhr.responseText);
-        if (data.uploadUrl) {
-          window.location.replace(data.uploadUrl);
-          return;
-        }
-      } catch(e) {}
-    }
-    showFallback('No active print session. Please start one on the kiosk screen.');
-  };
-  xhr.onerror = function() { showFallback('Could not reach kiosk server.'); };
-  xhr.ontimeout = function() { showFallback('Connection timed out.'); };
-  xhr.send();
-})();
-</script>
+<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>
 </body>
 </html>`;
 
@@ -223,8 +157,14 @@ function ensureFirewallRules(): void {
 /**
  * Start MyPublicWiFi as a background process.
  * Configures the database and captive portal page first.
+ * Safe to call multiple times — skips if already running.
  */
 export async function startHotspot(): Promise<void> {
+  if (hotspotRunning) {
+    console.log("[HOTSPOT] Already running — skipping");
+    return;
+  }
+
   if (!fs.existsSync(MPWF_EXE)) {
     console.warn(
       "[HOTSPOT] ⚠ MyPublicWiFi not found at:",
@@ -264,9 +204,27 @@ export async function startHotspot(): Promise<void> {
   hotspotProcess.unref();
   hotspotProcess.on("error", (err) => {
     console.warn("[HOTSPOT] ⚠ Failed to launch MyPublicWiFi:", err.message);
+    hotspotRunning = false;
   });
 
   // Wait for hotspot to initialize
   await new Promise<void>((resolve) => setTimeout(resolve, 3_000));
+  hotspotRunning = true;
   console.log("[HOTSPOT] ✓ MyPublicWiFi launched — hotspot starting");
+}
+
+/** Stop MyPublicWiFi if running. */
+export function stopHotspot(): void {
+  if (!hotspotRunning) return;
+  try {
+    execSync('taskkill /F /IM MyPublicWiFi.exe', { stdio: "ignore", timeout: 5_000 });
+  } catch { /* not running */ }
+  hotspotProcess = null;
+  hotspotRunning = false;
+  console.log("[HOTSPOT] ✗ MyPublicWiFi stopped");
+}
+
+/** Check if the hotspot is currently running. */
+export function isHotspotRunning(): boolean {
+  return hotspotRunning;
 }

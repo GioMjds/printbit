@@ -2,15 +2,12 @@ import type { Request, Response, NextFunction } from "express";
 import type { SessionStore } from "../services/session";
 import { CAPTIVE_PORTAL_ENABLED } from "../config/http";
 
-/**
- * Known captive-portal detection paths used by mobile OSes:
- *  iOS     – /hotspot-detect.html
- *  Android – /generate_204, /gen_204
- *  Windows – /connecttest.txt, /ncsi.txt
- *  Firefox – /success.txt
- */
+const IOS_SUCCESS_HTML =
+  "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>";
+
 const CAPTIVE_PATHS = new Set([
   "/hotspot-detect.html",
+  "/library/test/success.html",
   "/generate_204",
   "/gen_204",
   "/connecttest.txt",
@@ -18,9 +15,9 @@ const CAPTIVE_PATHS = new Set([
   "/success.txt",
   "/redirect",
   "/canonical.html",
+  "/check_network_status.txt",
 ]);
 
-/** Hostnames used by OS-level captive-portal probes. */
 const CAPTIVE_HOSTS = new Set([
   "captive.apple.com",
   "www.apple.com",
@@ -33,26 +30,59 @@ const CAPTIVE_HOSTS = new Set([
   "network-test.debian.org",
 ]);
 
-export function createCaptivePortalMiddleware(sessionStore: SessionStore) {
+export function createCaptivePortalMiddleware(_sessionStore: SessionStore) {
   return function captivePortal(req: Request, res: Response, next: NextFunction): void {
     if (!CAPTIVE_PORTAL_ENABLED) { next(); return; }
 
     const host = (req.hostname ?? "").toLowerCase();
-    const path = req.path.toLowerCase();
+    const pathname = req.path.toLowerCase();
 
-    const isCaptiveProbe = CAPTIVE_HOSTS.has(host) || CAPTIVE_PATHS.has(path);
+    const isCaptiveProbe = CAPTIVE_HOSTS.has(host) || CAPTIVE_PATHS.has(pathname);
     if (!isCaptiveProbe) { next(); return; }
 
-    // Redirect to the most recent session's upload page
-    const token = sessionStore.getActiveSessionToken();
-    if (token) {
-      res.redirect(302, `/upload/${encodeURIComponent(token)}`);
-    } else {
-      // No active session — return a simple "not-internet" response
-      // so the phone keeps showing the captive portal popup
-      res.status(200).type("html").send(
-        `<html><body><h2>PrintBit Kiosk</h2><p>Please start a Print session on the kiosk screen first.</p></body></html>`,
-      );
+    if (
+      pathname === "/hotspot-detect.html" ||
+      pathname === "/library/test/success.html"
+    ) {
+      res.status(200).type("html").send(IOS_SUCCESS_HTML);
+      return;
     }
+
+    if (pathname === "/generate_204" || pathname === "/gen_204") {
+      res.status(204).end();
+      return;
+    }
+
+    if (pathname === "/connecttest.txt") {
+      res.status(200).type("text").send("Microsoft Connect Test");
+      return;
+    }
+
+    if (pathname === "/ncsi.txt") {
+      res.status(200).type("text").send("Microsoft NCSI");
+      return;
+    }
+
+    if (pathname === "/success.txt") {
+      res.status(200).type("text").send("success\n");
+      return;
+    }
+
+    if (pathname === "/canonical.html" || pathname === "/redirect") {
+      res.status(200).type("html").send(IOS_SUCCESS_HTML);
+      return;
+    }
+
+    if (pathname === "/check_network_status.txt") {
+      res.status(200).type("text").send("NetworkCheck");
+      return;
+    }
+
+    if (CAPTIVE_HOSTS.has(host)) {
+      res.status(204).end();
+      return;
+    }
+
+    next();
   };
 }

@@ -47,6 +47,9 @@ const filesEmpty = document.getElementById("filesEmpty") as HTMLElement | null;
 const fileList = document.getElementById("fileList") as HTMLUListElement | null;
 const filesCount = document.getElementById("filesCount") as HTMLElement | null;
 const footerHint = document.getElementById("footerHint") as HTMLElement | null;
+const wifiSsidEl = document.getElementById("wifiSsid") as HTMLElement | null;
+const wifiPasswordEl = document.getElementById("wifiPassword") as HTMLElement | null;
+const wifiStepEl = document.getElementById("wifiStep") as HTMLElement | null;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -178,7 +181,6 @@ function escapeHtml(str: string): string {
 // ── Session management ────────────────────────────────────────────────────────
 
 function updateUploadLink(uploadUrl: string): void {
-  // Extract relative path for same-origin navigation
   let href: string;
   try {
     href = new URL(uploadUrl).pathname;
@@ -186,47 +188,31 @@ function updateUploadLink(uploadUrl: string): void {
     href = uploadUrl;
   }
 
-  const eyebrow = document.querySelector(".qr-panel__eyebrow");
-
-  if (hotspotConfig) {
-    // Wi-Fi QR mode — update UI to reflect "connect to Wi-Fi" flow
-    if (eyebrow) eyebrow.textContent = `Scan to connect to "${hotspotConfig.ssid}"`;
-    if (uploadLink) {
-      uploadLink.href = href;
-      uploadLink.textContent = `Wi-Fi: ${hotspotConfig.ssid}`;
-    }
-  } else {
-    // URL QR mode — show direct upload link
-    if (eyebrow) eyebrow.textContent = "Scan to upload";
-    if (uploadLink) {
-      uploadLink.href = href;
-      uploadLink.textContent = uploadUrl;
-    }
+  if (uploadLink) {
+    uploadLink.href = href;
+    uploadLink.textContent = uploadUrl;
   }
 
   if (openUploadBtn) {
     openUploadBtn.onclick = () => window.open(href, "_blank");
   }
 
-  if (uploadQrCanvas) {
-    // When hotspot config is available, QR encodes Wi-Fi credentials
-    // so phones auto-connect; the captive portal then opens the upload page.
-    const qrData = hotspotConfig
-      ? `WIFI:T:WPA;S:${escapeWifi(hotspotConfig.ssid)};P:${escapeWifi(hotspotConfig.password)};;`
-      : uploadUrl;
+  if (hotspotConfig) {
+    if (wifiSsidEl) wifiSsidEl.textContent = hotspotConfig.ssid;
+    if (wifiPasswordEl) wifiPasswordEl.textContent = hotspotConfig.password;
+    if (wifiStepEl) wifiStepEl.style.display = "";
+  } else {
+    if (wifiStepEl) wifiStepEl.style.display = "none";
+  }
 
-    void QRCode.toCanvas(uploadQrCanvas, qrData, {
+  if (uploadQrCanvas) {
+    void QRCode.toCanvas(uploadQrCanvas, uploadUrl, {
       width: 220,
       margin: 1,
       color: { dark: "#1a1a2e", light: "#ffffff" },
       errorCorrectionLevel: "M",
     });
   }
-}
-
-/** Escape special chars in Wi-Fi QR string fields. */
-function escapeWifi(s: string): string {
-  return s.replace(/([\\;,:"'])/g, "\\$1");
 }
 
 async function createSession(): Promise<void> {
@@ -243,6 +229,13 @@ async function createSession(): Promise<void> {
     } catch {
       /* non-critical — falls back to URL QR */
     }
+  }
+
+  // Start the hotspot on-demand so the Wi-Fi network is ready for scanning
+  if (hotspotConfig) {
+    try {
+      await fetch("/api/hotspot/start", { method: "POST" });
+    } catch { /* best-effort */ }
   }
 
   // Reset UI

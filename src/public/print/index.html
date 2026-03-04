@@ -85,41 +85,44 @@
         <!-- ── LEFT: QR panel ── -->
         <section class="qr-panel" aria-label="Upload via QR code">
           <div class="qr-panel__inner">
-            <p class="qr-panel__eyebrow">Scan to connect</p>
 
-            <div class="qr-frame">
-              <div class="qr-corner qr-corner--tl"></div>
-              <div class="qr-corner qr-corner--tr"></div>
-              <div class="qr-corner qr-corner--bl"></div>
-              <div class="qr-corner qr-corner--br"></div>
-              <canvas
-                id="uploadQrCanvas"
-                width="220"
-                height="220"
-                aria-label="QR code to upload your file"
-              ></canvas>
+            <!-- Step 1: Connect to Wi-Fi -->
+            <div class="step-block" id="wifiStep">
+              <div class="step-badge">
+                <span class="step-number">1</span>
+                <span class="step-label">Connect to Wi-Fi</span>
+              </div>
+              <div class="wifi-credentials" id="wifiCredentials">
+                <div class="wifi-credential">
+                  <span class="wifi-label">Network</span>
+                  <span class="wifi-value" id="wifiSsid">—</span>
+                </div>
+                <div class="wifi-credential">
+                  <span class="wifi-label">Password</span>
+                  <span class="wifi-value" id="wifiPassword">—</span>
+                </div>
+              </div>
             </div>
 
-            <div class="qr-link-row">
-              <svg
-                class="qr-link-icon"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828
-                0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1
-                1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0
-                00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5
-                1.5a2 2 0 11-2.828-2.828l3-3z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <a id="uploadLink" href="/upload" target="_blank" rel="noopener"
-                >/upload</a
-              >
+            <!-- Step 2: Scan QR to upload -->
+            <div class="step-block">
+              <div class="step-badge">
+                <span class="step-number">2</span>
+                <span class="step-label">Scan to upload file</span>
+              </div>
+
+              <div class="qr-frame">
+                <div class="qr-corner qr-corner--tl"></div>
+                <div class="qr-corner qr-corner--tr"></div>
+                <div class="qr-corner qr-corner--bl"></div>
+                <div class="qr-corner qr-corner--br"></div>
+                <canvas
+                  id="uploadQrCanvas"
+                  width="220"
+                  height="220"
+                  aria-label="QR code to upload your file"
+                ></canvas>
+              </div>
             </div>
 
             <div class="qr-actions">

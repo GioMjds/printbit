@@ -198,13 +198,94 @@ body {
   background: rgba(105, 111, 199, 0.08);
   border: 1.5px solid rgba(167, 170, 225, 0.15);
   border-radius: 28px;
-  padding: 28px 24px;
+  padding: 24px 22px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   height: 100%;
   box-sizing: border-box;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 170, 225, 0.2) transparent;
+}
+
+/* ── Step blocks ──────────────────────────────────────────── */
+.step-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.step-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--indigo);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--lavender);
+  opacity: 0.8;
+}
+
+/* ── Wi-Fi credentials ────────────────────────────────────── */
+.wifi-credentials {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(167, 170, 225, 0.12);
+  border-radius: 14px;
+  padding: 12px 16px;
+  width: 100%;
+}
+
+.wifi-credential {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wifi-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 600;
+}
+
+.wifi-value {
+  font-family: "SF Mono", "Consolas", "Liberation Mono", monospace;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* ── Step divider ─────────────────────────────────────────── */
+.step-block + .step-block {
+  padding-top: 14px;
+  border-top: 1px solid rgba(167, 170, 225, 0.1);
 }
 
 .qr-panel__eyebrow {
@@ -702,8 +783,8 @@ body {
   }
 
   .qr-panel__inner {
-    padding: 20px;
-    gap: 16px;
+    padding: 18px 16px;
+    gap: 14px;
   }
 
   #uploadQrCanvas {
@@ -722,6 +803,14 @@ body {
   .topbar {
     grid-template-columns: auto 1fr auto;
     gap: 8px;
+  }
+
+  .wifi-credentials {
+    padding: 10px 14px;
+  }
+
+  .wifi-value {
+    font-size: 13px;
   }
 }
 

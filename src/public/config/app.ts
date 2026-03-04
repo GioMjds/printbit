@@ -119,9 +119,15 @@ class PrintPreview {
       this.goToPage(this.currentPage + 1),
     );
 
-    const zoomInBtn = document.getElementById("zoomIn") as HTMLButtonElement | null;
-    const zoomOutBtn = document.getElementById("zoomOut") as HTMLButtonElement | null;
-    const zoomResetBtn = document.getElementById("zoomReset") as HTMLButtonElement | null;
+    const zoomInBtn = document.getElementById(
+      "zoomIn",
+    ) as HTMLButtonElement | null;
+    const zoomOutBtn = document.getElementById(
+      "zoomOut",
+    ) as HTMLButtonElement | null;
+    const zoomResetBtn = document.getElementById(
+      "zoomReset",
+    ) as HTMLButtonElement | null;
     zoomInBtn?.addEventListener("click", () => this.zoomIn());
     zoomOutBtn?.addEventListener("click", () => this.zoomOut());
     zoomResetBtn?.addEventListener("click", () => this.zoomReset());

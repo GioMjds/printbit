@@ -30,7 +30,7 @@ if %errorlevel% neq 0 (
 
 :: Start PrintBit server (this also launches MyPublicWiFi + hotspot)
 echo [PrintBit] Starting server...
-start "PrintBit Server" /min cmd /c "cd /d "%PROJECT_DIR%" && pnpm dev"
+start "PrintBit Server" /min cmd /c "cd /d "%PROJECT_DIR%" && pnpm run dev"
 
 :: Wait for server to come up
 echo [PrintBit] Waiting for server to start...
