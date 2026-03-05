@@ -1,7 +1,7 @@
 import type { Express, Request, RequestHandler, Response } from "express";
 import path from "node:path";
 import type { Server } from "socket.io";
-import { db, withBalanceLock, checkIdempotencyKey, storeIdempotencyKey } from "../services/db";
+import { db, withBalanceLock, acquireIdempotencyKey, storeIdempotencyKey, releaseIdempotencyKey } from "../services/db";
 import {
   appendAdminLog,
   calculateJobAmount,
@@ -146,14 +146,41 @@ export function registerFinancialRoutes(
 
   app.post("/api/confirm-payment", async (req: Request, res: Response) => {
     // ── Idempotency guard ──────────────────────────────────────────────
+    // The slot is claimed synchronously BEFORE any side effects so that two
+    // concurrent requests with the same key cannot both proceed.
     const idempotencyKey = req.get("Idempotency-Key") ?? "";
+    let idempotencyClaimed = false;
     if (idempotencyKey) {
-      const cached = checkIdempotencyKey(idempotencyKey);
-      if (cached) {
-        res.status(cached.statusCode).json(cached.response);
+      const slot = acquireIdempotencyKey(idempotencyKey, "POST:/api/confirm-payment");
+      if (slot.type === "hit") {
+        res.status(slot.entry.statusCode).json(slot.entry.response);
         return;
       }
+      if (slot.type === "inflight") {
+        const entry = await slot.promise;
+        if (entry) {
+          res.status(entry.statusCode).json(entry.response);
+        } else {
+          res.status(503).json({ error: "Concurrent request failed. Please retry." });
+        }
+        return;
+      }
+      idempotencyClaimed = true;
     }
+
+    // Helper: send response and update the idempotency slot.
+    // Errors < 500 are cached (permanent validation failures); 5xx release the
+    // slot so the client can retry with the same key.
+    const sendResponse = (status: number, body: unknown): void => {
+      if (idempotencyClaimed) {
+        if (status < 500) {
+          storeIdempotencyKey(idempotencyKey, "POST:/api/confirm-payment", status, body);
+        } else {
+          releaseIdempotencyKey(idempotencyKey, "POST:/api/confirm-payment");
+        }
+      }
+      res.status(status).json(body);
+    };
 
     const { amount, mode, sessionId, filename } = req.body as {
       amount?: number;
@@ -170,7 +197,7 @@ export function registerFinancialRoutes(
       void appendAdminLog("payment_failed", "Confirm payment failed: invalid mode.", {
         mode: mode ?? null,
       });
-      return res.status(400).json({ error: "Invalid mode" });
+      return sendResponse(400, { error: "Invalid mode" });
     }
 
     const copies =
@@ -191,12 +218,110 @@ export function registerFinancialRoutes(
         : "A4";
     const requiredAmount = calculateJobAmount(mode, colorMode, copies);
 
-    // ── Balance lock: serialise all balance mutations ─────────────────
+    if (typeof amount === "number" && Number.isFinite(amount) && amount !== requiredAmount) {
+      void appendAdminLog("payment_amount_mismatch", "Client amount differed from server pricing.", {
+        amount,
+        requiredAmount,
+      });
+    }
+
+    // ── Resolve the file to print (for "print" mode) — outside the lock ──────
+    // Validation and file lookup happen before acquiring the balance lock so the
+    // lock is held only for the minimal balance/earnings mutation + db.write().
+    let serverFilename: string | null = null;
+    let printOptions: PrintJobOptions | null = null;
+
+    if (mode === "print") {
+      if (!sessionId) {
+        void appendAdminLog(
+          "payment_failed",
+          "Confirm payment failed: missing print session.",
+        );
+        return sendResponse(400, { error: "Print session is required" });
+      }
+
+      const session = deps.sessionStore.tryGetSession(
+        sessionId,
+        deps.resolvePublicBaseUrl(req),
+      );
+      if (!session) {
+        void appendAdminLog(
+          "payment_failed",
+          "Confirm payment failed: session not found.",
+          { sessionId },
+        );
+        return sendResponse(404, { error: "Session not found" });
+      }
+
+      const allDocs =
+        session.documents && session.documents.length > 0
+          ? session.documents
+          : session.document
+            ? [session.document]
+            : [];
+
+      if (allDocs.length === 0) {
+        void appendAdminLog(
+          "payment_failed",
+          "Confirm payment failed: no uploaded document in session.",
+          { sessionId },
+        );
+        return sendResponse(400, { error: "No uploaded document found for this session" });
+      }
+
+      const target = filename
+        ? allDocs.find((d) => d.filename === filename)
+        : allDocs[allDocs.length - 1];
+
+      if (!target) {
+        void appendAdminLog(
+          "payment_failed",
+          "Confirm payment failed: target document not found.",
+          { sessionId, filename: filename ?? null },
+        );
+        return sendResponse(400, { error: `Document "${filename}" not found in session` });
+      }
+
+      serverFilename = path.basename(target.filePath);
+      printOptions = { copies, colorMode, orientation, paperSize };
+    }
+
+    // ── Pre-check balance (will re-verify inside lock) ────────────────────────
+    if ((db.data?.balance ?? 0) < requiredAmount) {
+      void appendAdminLog(
+        "payment_failed",
+        "Confirm payment failed: insufficient balance.",
+        { balance: db.data?.balance ?? 0, requiredAmount },
+      );
+      // Release so the client can retry once more balance has been inserted
+      if (idempotencyClaimed) releaseIdempotencyKey(idempotencyKey, "POST:/api/confirm-payment");
+      return res.status(400).json({
+        error: "Insufficient balance",
+        balance: db.data?.balance ?? 0,
+        requiredAmount,
+      });
+    }
+
+    // ── Print (outside the lock — keeps the critical section minimal) ─────────
+    if (mode === "print" && serverFilename && printOptions) {
+      try {
+        await printFile(serverFilename, printOptions);
+      } catch (err) {
+        void appendAdminLog("print_failed", "Print failed: printer error.", {
+          sessionId: sessionId ?? null,
+          filename: serverFilename,
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+        return sendResponse(500, { error: "Print failed. Please try again." });
+      }
+    }
+
+    // ── Balance lock: minimal critical section — mutation + db.write only ─────
     const result = await withBalanceLock(async () => {
       if ((db.data?.balance ?? 0) < requiredAmount) {
         void appendAdminLog(
           "payment_failed",
-          "Confirm payment failed: insufficient balance.",
+          "Confirm payment failed: insufficient balance after print.",
           { balance: db.data?.balance ?? 0, requiredAmount },
         );
         return {
@@ -209,93 +334,26 @@ export function registerFinancialRoutes(
         };
       }
 
-      if (typeof amount === "number" && Number.isFinite(amount) && amount !== requiredAmount) {
-        void appendAdminLog("payment_amount_mismatch", "Client amount differed from server pricing.", {
-          amount,
-          requiredAmount,
-        });
-      }
-
-      if (mode === "print") {
-        if (!sessionId) {
-          void appendAdminLog(
-            "payment_failed",
-            "Confirm payment failed: missing print session.",
-          );
-          return { status: 400, body: { error: "Print session is required" } };
-        }
-
-        const session = deps.sessionStore.tryGetSession(
-          sessionId,
-          deps.resolvePublicBaseUrl(req),
-        );
-        if (!session) {
-          void appendAdminLog(
-            "payment_failed",
-            "Confirm payment failed: session not found.",
-            { sessionId },
-          );
-          return { status: 404, body: { error: "Session not found" } };
-        }
-
-        const allDocs =
-          session.documents && session.documents.length > 0
-            ? session.documents
-            : session.document
-              ? [session.document]
-              : [];
-
-        if (allDocs.length === 0) {
-          void appendAdminLog(
-            "payment_failed",
-            "Confirm payment failed: no uploaded document in session.",
-            { sessionId },
-          );
-          return {
-            status: 400,
-            body: { error: "No uploaded document found for this session" },
-          };
-        }
-
-        const target = filename
-          ? allDocs.find((d) => d.filename === filename)
-          : allDocs[allDocs.length - 1];
-
-        if (!target) {
-          void appendAdminLog(
-            "payment_failed",
-            "Confirm payment failed: target document not found.",
-            { sessionId, filename: filename ?? null },
-          );
-          return {
-            status: 400,
-            body: { error: `Document "${filename}" not found in session` },
-          };
-        }
-
-        const serverFilename = path.basename(target.filePath);
-        const printOptions: PrintJobOptions = {
-          copies,
-          colorMode,
-          orientation,
-          paperSize,
-        };
-
-        try {
-          await printFile(serverFilename, printOptions);
-        } catch (err) {
-          void appendAdminLog("print_failed", "Print failed: printer error.", {
-            sessionId,
-            filename: serverFilename,
-            error: err instanceof Error ? err.message : "Unknown error",
-          });
-          return { status: 500, body: { error: "Print failed. Please try again." } };
-        }
-      }
-
       db.data!.balance -= requiredAmount;
       db.data!.earnings += requiredAmount;
       await db.write();
+      const remainingBalance = db.data!.balance;
+      const currentEarnings = db.data!.earnings;
+      deps.io.emit("balance", remainingBalance);
+
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          chargedAmount: requiredAmount,
+          balance: remainingBalance,
+          earnings: currentEarnings,
+        },
+      };
+    });
+
+    // Logging and stats updates happen outside the lock
+    if (result.status === 200) {
       await incrementJobStats(mode);
       await appendAdminLog("payment_confirmed", "Payment confirmed.", {
         mode,
@@ -304,24 +362,10 @@ export function registerFinancialRoutes(
         colorMode,
         sessionId: sessionId ?? null,
         filename: filename ?? null,
-        remainingBalance: db.data!.balance,
+        remainingBalance: (result.body as { balance: number }).balance,
       });
-
-      deps.io.emit("balance", db.data!.balance);
-      return {
-        status: 200,
-        body: {
-          ok: true,
-          chargedAmount: requiredAmount,
-          balance: db.data!.balance,
-          earnings: db.data!.earnings,
-        },
-      };
-    });
-
-    if (idempotencyKey) {
-      storeIdempotencyKey(idempotencyKey, result.status, result.body);
     }
-    res.status(result.status).json(result.body);
+
+    sendResponse(result.status, result.body);
   });
 }

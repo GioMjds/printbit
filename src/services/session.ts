@@ -238,11 +238,11 @@ export class SessionStore {
     for (const [id, session] of this.sessions) {
       if (now - session.createdAt.getTime() <= SESSION_TTL_MS) continue;
 
-      // Delete uploaded files
+      // Delete uploaded files asynchronously to avoid blocking the event loop
       const docs = session.documents ?? (session.document ? [session.document] : []);
-      for (const doc of docs) {
-        try { fs.unlinkSync(doc.filePath); } catch { /* already gone */ }
-      }
+      void Promise.allSettled(
+        docs.map((doc) => fs.promises.unlink(doc.filePath)),
+      );
 
       this.byToken.delete(session.token);
       this.sessions.delete(id);

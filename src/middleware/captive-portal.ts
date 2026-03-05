@@ -50,8 +50,10 @@ export function createCaptivePortalMiddleware(_sessionStore: SessionStore) {
     const isCaptiveProbe = CAPTIVE_HOSTS.has(host) || CAPTIVE_PATHS.has(pathname);
     if (!isCaptiveProbe) { next(); return; }
 
-    // iOS probes: redirect to /portal so the captive sheet shows guided upload instructions
-    if (IOS_PROBE_PATHS.has(pathname) || APPLE_HOSTS.has(host)) {
+    // iOS probes: redirect to /portal so the captive sheet shows guided upload instructions.
+    // Exclude /portal itself to prevent an infinite redirect loop when Apple hosts
+    // proxy the request (common with DNS-hijack captive portals).
+    if ((IOS_PROBE_PATHS.has(pathname) || APPLE_HOSTS.has(host)) && pathname !== "/portal") {
       void appendAdminLog("captive_ios_redirect", "iOS captive probe redirected to /portal.", {
         path: pathname,
         host,

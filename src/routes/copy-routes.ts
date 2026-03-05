@@ -5,8 +5,9 @@ import { printFile, type PrintJobOptions } from "../services/printer";
 import {
   db,
   withBalanceLock,
-  checkIdempotencyKey,
+  acquireIdempotencyKey,
   storeIdempotencyKey,
+  releaseIdempotencyKey,
 } from "../services/db";
 import {
   appendAdminLog,
@@ -24,13 +25,27 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
   // ── POST /api/copy/jobs — Start a copy job (print checked scan, then charge) ─
   app.post("/api/copy/jobs", async (req: Request, res: Response) => {
     // ── Idempotency guard ──────────────────────────────────────────────
+    // The key is claimed (or waits) BEFORE any side effects so that two
+    // simultaneous requests with the same key cannot both create jobs.
     const idempotencyKey = req.get("Idempotency-Key") ?? "";
+    let idempotencyClaimed = false;
     if (idempotencyKey) {
-      const cached = checkIdempotencyKey(idempotencyKey);
-      if (cached) {
-        res.status(cached.statusCode).json(cached.response);
+      const slot = acquireIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs");
+      if (slot.type === "hit") {
+        res.status(slot.entry.statusCode).json(slot.entry.response);
         return;
       }
+      if (slot.type === "inflight") {
+        const entry = await slot.promise;
+        if (entry) {
+          res.status(entry.statusCode).json(entry.response);
+        } else {
+          res.status(503).json({ error: "Concurrent request failed. Please retry." });
+        }
+        return;
+      }
+      // type === "claimed": this call owns the slot
+      idempotencyClaimed = true;
     }
 
     const { copies, colorMode, orientation, paperSize, amount, previewPath } =
@@ -63,25 +78,27 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       typeof previewPath === "string" ? previewPath.trim() : "";
 
     if (!safePreviewPath) {
-      return res.status(400).json({
-        error:
-          "Missing checked document. Please go back to /copy and tap Check for Document again.",
-      });
+      const errorBody = {
+        error: "Missing checked document. Please go back to /copy and tap Check for Document again.",
+      };
+      if (idempotencyClaimed) storeIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs", 400, errorBody);
+      return res.status(400).json(errorBody);
     }
 
     const previewFilename = path.basename(safePreviewPath);
     if (previewFilename !== safePreviewPath) {
-      return res.status(400).json({
-        error: "Invalid preview path. Please check your document again.",
-      });
+      const errorBody = { error: "Invalid preview path. Please check your document again." };
+      if (idempotencyClaimed) storeIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs", 400, errorBody);
+      return res.status(400).json(errorBody);
     }
 
     const previewAbsPath = path.resolve("uploads", "scans", previewFilename);
     if (!fs.existsSync(previewAbsPath)) {
-      return res.status(409).json({
-        error:
-          "Checked document not found. Please go back to /copy and scan again.",
-      });
+      const errorBody = {
+        error: "Checked document not found. Please go back to /copy and scan again.",
+      };
+      if (idempotencyClaimed) storeIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs", 409, errorBody);
+      return res.status(409).json(errorBody);
     }
 
     const requiredAmount = calculateJobAmount(
@@ -92,6 +109,11 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
 
     // Pre-check balance (will re-verify inside lock after print succeeds)
     if ((db.data?.balance ?? 0) < requiredAmount) {
+      const errorBody = {
+        error: "Insufficient balance",
+        balance: db.data?.balance ?? 0,
+        requiredAmount,
+      };
       void appendAdminLog(
         "payment_failed",
         "Copy job failed: insufficient balance.",
@@ -100,11 +122,9 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
           requiredAmount,
         },
       );
-      return res.status(400).json({
-        error: "Insufficient balance",
-        balance: db.data?.balance ?? 0,
-        requiredAmount,
-      });
+      // Release so the client can retry once more balance is inserted
+      if (idempotencyClaimed) releaseIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs");
+      return res.status(400).json(errorBody);
     }
 
     if (
@@ -153,8 +173,8 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
         const relPath = path.join("scans", previewFilename);
         await printFile(relPath, printOptions);
 
-        // Print succeeded — charge balance inside the lock
-        await withBalanceLock(async () => {
+        // Print succeeded — charge balance inside the lock, capturing the new balance
+        const chargedBalance = await withBalanceLock(async () => {
           if ((db.data?.balance ?? 0) < requiredAmount) {
             // Rare edge: balance was spent between pre-check and print completion
             void appendAdminLog(
@@ -166,30 +186,41 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
                 requiredAmount,
               },
             );
-            return;
+            return null;
           }
           db.data!.balance -= requiredAmount;
           db.data!.earnings += requiredAmount;
           await db.write();
           deps.io.emit("balance", db.data!.balance);
+          return db.data!.balance; // captured inside the lock
         });
 
-        job.payment = {
-          chargedAmount: requiredAmount,
-          remainingBalance: db.data!.balance,
-        };
-
-        jobStore.updateJobState(job.id, "succeeded");
-        await incrementJobStats("copy");
-        void appendAdminLog(
-          "copy_job_completed",
-          "Copy job completed and charged.",
-          {
-            jobId: job.id,
+        if (chargedBalance !== null) {
+          job.payment = {
             chargedAmount: requiredAmount,
-            remainingBalance: db.data!.balance,
-          },
-        );
+            remainingBalance: chargedBalance,
+          };
+          jobStore.updateJobState(job.id, "succeeded");
+          await incrementJobStats("copy");
+          void appendAdminLog(
+            "copy_job_completed",
+            "Copy job completed and charged.",
+            {
+              jobId: job.id,
+              chargedAmount: requiredAmount,
+              remainingBalance: chargedBalance,
+            },
+          );
+        } else {
+          jobStore.updateJobState(job.id, "failed", {
+            failure: {
+              code: "COPY_ERROR",
+              message: "Balance drained before charge could complete.",
+              retryable: false,
+              stage: "running",
+            },
+          });
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         jobStore.updateJobState(job.id, "failed", {
@@ -211,9 +242,11 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       }
     })();
 
-    const responseBody = job;
-    if (idempotencyKey) {
-      storeIdempotencyKey(idempotencyKey, 201, responseBody);
+    // Deep-clone the response body so the cached idempotency entry is not
+    // mutated by later jobStore state updates (e.g. state → "running"/"succeeded").
+    const responseBody = JSON.parse(JSON.stringify(job)) as typeof job;
+    if (idempotencyClaimed) {
+      storeIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs", 201, responseBody);
     }
     res.status(201).json(responseBody);
   });
