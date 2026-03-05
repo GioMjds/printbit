@@ -147,7 +147,7 @@ How it works:
 - src/services/printer.ts uses SumatraPDF CLI for silent, dialog-free printing
 - Command: SumatraPDF.exe -print-to-default -print-settings "<settings>" "<file>"
 - Settings from /config page (color, copies, orientation, paper size) are passed programmatically
-- No OS print dialog (Ctrl+P) appears — everything is controlled by the kiosk system
+- No OS print dialog (Ctrl+P) appears — everything is controlled by the kiosk system  
 - Prints to the OS default printer automatically
 
 Kiosk Needs to Install:
