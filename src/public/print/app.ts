@@ -338,12 +338,34 @@ const dialogOverlay = document.getElementById("newSessionOverlay") as HTMLElemen
 const dialogConfirmBtn = document.getElementById("newSessionConfirm") as HTMLButtonElement | null;
 const dialogCancelBtn = document.getElementById("newSessionCancel") as HTMLButtonElement | null;
 
+let lastFocusedElement: HTMLElement | null = null;
+
 function showNewSessionDialog(): void {
-  dialogOverlay?.classList.add("is-visible");
+  const activeElement = document.activeElement;
+  lastFocusedElement = activeElement instanceof HTMLElement ? activeElement : null;
+
+  if (dialogOverlay) {
+    dialogOverlay.classList.add("is-visible");
+    dialogOverlay.setAttribute("aria-hidden", "false");
+  }
+
+  if (dialogConfirmBtn) {
+    dialogConfirmBtn.focus();
+  } else if (dialogCancelBtn) {
+    dialogCancelBtn.focus();
+  }
 }
 
 function hideNewSessionDialog(): void {
-  dialogOverlay?.classList.remove("is-visible");
+  if (dialogOverlay) {
+    dialogOverlay.classList.remove("is-visible");
+    dialogOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+    lastFocusedElement.focus();
+  }
+  lastFocusedElement = null;
 }
 
 dialogCancelBtn?.addEventListener("click", hideNewSessionDialog);

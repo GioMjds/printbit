@@ -6,3 +6,4 @@ db.json
 *app.js
 *uploads
 bin/
+package-lock.json

@@ -148,8 +148,11 @@ export async function initDB() {
 }
 
 // ── Balance mutex ─────────────────────────────────────────────────────────────
-// Serialises concurrent balance/earnings mutations to prevent interleaving
-// at async boundaries (e.g. two simultaneous confirm-payment requests).
+// Serialises balance/earnings mutations in the payment endpoints
+// (/api/confirm-payment and /api/copy/jobs) to prevent interleaving at async
+// boundaries. Other balance mutations (serial coin events, admin/test routes)
+// do not currently hold this lock; those paths run at low concurrency and are
+// therefore unlikely to interleave in practice.
 
 let balanceLockPromise = Promise.resolve();
 
@@ -169,7 +172,9 @@ export async function withBalanceLock<T>(fn: () => Promise<T>): Promise<T> {
 
 // ── Idempotency key store ────────────────────────────────────────────────────
 // Prevents double-charge from retry/double-click on payment endpoints.
-// Keys are kept for a short window and then evicted.
+// Keys are namespaced by "METHOD:route" to avoid cross-endpoint collisions.
+// An "in-flight" sentinel is reserved synchronously before any async work so
+// that concurrent requests with the same key receive 409 instead of racing.
 
 const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -177,29 +182,51 @@ interface IdempotencyEntry {
   response: unknown;
   statusCode: number;
   expiresAt: number;
+  inFlight: boolean;
 }
 
 const idempotencyStore = new Map<string, IdempotencyEntry>();
 
-export function checkIdempotencyKey(key: string): IdempotencyEntry | null {
-  const entry = idempotencyStore.get(key);
+export function checkIdempotencyKey(
+  key: string,
+  namespace: string,
+): IdempotencyEntry | null {
+  const namespacedKey = `${namespace}:${key}`;
+  const entry = idempotencyStore.get(namespacedKey);
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) {
-    idempotencyStore.delete(key);
+    idempotencyStore.delete(namespacedKey);
     return null;
   }
   return entry;
 }
 
+/** Reserve an in-flight slot synchronously before any await. */
+export function markIdempotencyKeyInFlight(
+  key: string,
+  namespace: string,
+): void {
+  const namespacedKey = `${namespace}:${key}`;
+  idempotencyStore.set(namespacedKey, {
+    response: null,
+    statusCode: 0,
+    expiresAt: Date.now() + IDEMPOTENCY_TTL_MS,
+    inFlight: true,
+  });
+}
+
 export function storeIdempotencyKey(
   key: string,
+  namespace: string,
   statusCode: number,
   response: unknown,
 ): void {
-  idempotencyStore.set(key, {
+  const namespacedKey = `${namespace}:${key}`;
+  idempotencyStore.set(namespacedKey, {
     response,
     statusCode,
     expiresAt: Date.now() + IDEMPOTENCY_TTL_MS,
+    inFlight: false,
   });
 }
 

@@ -6,6 +6,7 @@ import {
   db,
   withBalanceLock,
   checkIdempotencyKey,
+  markIdempotencyKeyInFlight,
   storeIdempotencyKey,
 } from "../services/db";
 import {
@@ -20,17 +21,26 @@ const VALID_COLOR_MODES = new Set(["colored", "grayscale"]);
 const VALID_ORIENTATIONS = new Set(["portrait", "landscape"]);
 const VALID_PAPER_SIZES = new Set(["A4", "Letter", "Legal"]);
 
+const COPY_IDEMPOTENCY_NS = "POST:/api/copy/jobs";
+
 export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
   // ── POST /api/copy/jobs — Start a copy job (print checked scan, then charge) ─
   app.post("/api/copy/jobs", async (req: Request, res: Response) => {
     // ── Idempotency guard ──────────────────────────────────────────────
     const idempotencyKey = req.get("Idempotency-Key") ?? "";
     if (idempotencyKey) {
-      const cached = checkIdempotencyKey(idempotencyKey);
+      const cached = checkIdempotencyKey(idempotencyKey, COPY_IDEMPOTENCY_NS);
       if (cached) {
+        if (cached.inFlight) {
+          res.status(409).json({ error: "A request with this Idempotency-Key is already in progress" });
+          return;
+        }
         res.status(cached.statusCode).json(cached.response);
         return;
       }
+      // Reserve the slot synchronously before any await so concurrent
+      // duplicates see "in-flight" and receive 409 instead of racing.
+      markIdempotencyKeyInFlight(idempotencyKey, COPY_IDEMPOTENCY_NS);
     }
 
     const { copies, colorMode, orientation, paperSize, amount, previewPath } =
@@ -154,7 +164,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
         await printFile(relPath, printOptions);
 
         // Print succeeded — charge balance inside the lock
-        await withBalanceLock(async () => {
+        const newBalance = await withBalanceLock(async () => {
           if ((db.data?.balance ?? 0) < requiredAmount) {
             // Rare edge: balance was spent between pre-check and print completion
             void appendAdminLog(
@@ -166,17 +176,18 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
                 requiredAmount,
               },
             );
-            return;
+            return null;
           }
           db.data!.balance -= requiredAmount;
           db.data!.earnings += requiredAmount;
           await db.write();
           deps.io.emit("balance", db.data!.balance);
+          return db.data!.balance;
         });
 
         job.payment = {
           chargedAmount: requiredAmount,
-          remainingBalance: db.data!.balance,
+          remainingBalance: newBalance ?? db.data!.balance,
         };
 
         jobStore.updateJobState(job.id, "succeeded");
@@ -187,7 +198,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
           {
             jobId: job.id,
             chargedAmount: requiredAmount,
-            remainingBalance: db.data!.balance,
+            remainingBalance: newBalance ?? db.data!.balance,
           },
         );
       } catch (err) {
@@ -211,9 +222,9 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       }
     })();
 
-    const responseBody = job;
+    const responseBody = JSON.parse(JSON.stringify(job)) as unknown;
     if (idempotencyKey) {
-      storeIdempotencyKey(idempotencyKey, 201, responseBody);
+      storeIdempotencyKey(idempotencyKey, COPY_IDEMPOTENCY_NS, 201, responseBody);
     }
     res.status(201).json(responseBody);
   });

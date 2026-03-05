@@ -235,18 +235,21 @@ export class SessionStore {
   /** Remove expired sessions and their uploaded files from disk. */
   private cleanupExpired(): void {
     const now = Date.now();
+    const deletePromises: Promise<void>[] = [];
+
     for (const [id, session] of this.sessions) {
       if (now - session.createdAt.getTime() <= SESSION_TTL_MS) continue;
 
-      // Delete uploaded files
       const docs = session.documents ?? (session.document ? [session.document] : []);
       for (const doc of docs) {
-        try { fs.unlinkSync(doc.filePath); } catch { /* already gone */ }
+        deletePromises.push(fs.promises.unlink(doc.filePath).catch(() => {}));
       }
 
       this.byToken.delete(session.token);
       this.sessions.delete(id);
     }
+
+    void Promise.allSettled(deletePromises);
   }
 
   /** Stop the cleanup timer (for graceful shutdown). */
