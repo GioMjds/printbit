@@ -210,7 +210,7 @@ export class SessionStore {
     documents.push(document);
     session.documents = documents;
     session.status = "uploaded";
-    session.document = documents[0];
+    session.document = document;
 
     return { isSuccess: true, document, errorCode: "", errorMsg: "" };
   }
