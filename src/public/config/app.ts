@@ -1,7 +1,5 @@
 export {};
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type ColorMode = "colored" | "grayscale";
 type Orientation = "portrait" | "landscape";
 type PaperSize = "A4" | "Letter" | "Legal";
@@ -169,14 +167,15 @@ class PrintPreview {
     }
   }
 
-  async load(sessionId: string): Promise<void> {
+  async load(sessionId: string, filename?: string): Promise<void> {
     this.iframe.onload = null; // clear any stale iframe load handler
     this.showLoading(true);
     this.showCanvas(false);
     this.showImg(false);
     this.setHint("Loading preview…");
 
-    const url = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/preview`;
+    let url = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/preview`;
+    if (filename) url += `?filename=${encodeURIComponent(filename)}`;
 
     let response: Response;
     try {
@@ -612,7 +611,7 @@ async function loadPreview(): Promise<void> {
     return;
   }
 
-  await preview.load(sessionId);
+  await preview.load(sessionId, selectedFile ?? undefined);
 
   // Enable continue now that preview has loaded successfully
   if (continueBtn) {

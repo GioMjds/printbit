@@ -62,11 +62,26 @@ export function registerWirelessSessionRoutes(
         publicBaseUrl,
       );
 
-      if (!session?.document) {
-        return res.status(404).send("No uploaded file available for preview.");
+      const requestedFilename = req.query.filename as string;
+
+      const allDocs = 
+        session?.documents && session.documents.length > 0
+          ? session.documents
+          : session?.document
+            ? [session.document]
+            : [];
+
+      const target = requestedFilename
+        ? allDocs.find((doc) => doc.filename === requestedFilename)
+        : session?.document ?? allDocs[0];
+
+      if (!target) {
+        return requestedFilename
+          ? res.status(404).json({ error: "Document not found." })
+          : res.status(404).json({ error: "No documents available for preview." });
       }
 
-      const absolutePath = path.resolve(session.document.filePath);
+      const absolutePath = path.resolve(target.filePath);
       const extension = path.extname(absolutePath).toLowerCase();
 
       try {
