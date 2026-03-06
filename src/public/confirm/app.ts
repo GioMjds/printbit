@@ -4,6 +4,11 @@ type SocketLike = {
   on: (event: string, cb: (...args: unknown[]) => void) => void;
 };
 
+type PageRangeSelection =
+  | { type: "all" }
+  | { type: "custom"; range: string }
+  | { type: "single"; page: number };
+
 type ConfirmConfig = {
   mode: "print" | "copy";
   sessionId: string | null;
@@ -12,6 +17,7 @@ type ConfirmConfig = {
   copies: number;
   orientation: "portrait" | "landscape";
   paperSize: "A4" | "Letter" | "Legal";
+  pageRange?: PageRangeSelection;
 };
 
 type PricingResponse = {
@@ -24,6 +30,8 @@ const modeValue = document.getElementById("modeValue");
 const fileValue = document.getElementById("fileValue");
 const colorValue = document.getElementById("colorValue");
 const copiesValue = document.getElementById("copiesValue");
+const pagesValue = document.getElementById("pagesValue");
+const pagesRow = document.getElementById("pagesRow");
 const orientationValue = document.getElementById("orientationValue");
 const paperSizeValue = document.getElementById("paperSizeValue");
 const priceValue = document.getElementById("priceValue");
@@ -57,6 +65,12 @@ if (!rawConfig) {
 
 const config = JSON.parse(rawConfig ?? "{}") as ConfirmConfig;
 
+function pageRangeLabel(sel?: PageRangeSelection): string {
+  if (!sel || sel.type === "all") return "All Pages";
+  if (sel.type === "single") return `Page ${sel.page}`;
+  return sel.range ? `Pages ${sel.range}` : "Pages (custom)";
+}
+
 function calculateTotalPrice(pricing: PricingResponse): number {
   const base =
     config.mode === "copy" ? pricing.copyPerPage : pricing.printPerPage;
@@ -75,6 +89,10 @@ if (modalConfirmBtnSpan) {
     config.mode === "print" ? "Yes, Print" : "Yes, Copy";
 }
 
+if (config.mode === "copy") {
+  pagesRow?.setAttribute("hidden", "");
+}
+
 if (modeValue) modeValue.textContent = config.mode.toUpperCase();
 if (fileValue)
   fileValue.textContent =
@@ -83,6 +101,7 @@ if (fileValue)
       : "Physical document copy";
 if (colorValue) colorValue.textContent = config.colorMode;
 if (copiesValue) copiesValue.textContent = String(config.copies);
+if (pagesValue) pagesValue.textContent = pageRangeLabel(config.pageRange);
 if (orientationValue) orientationValue.textContent = config.orientation;
 if (paperSizeValue) paperSizeValue.textContent = config.paperSize;
 if (priceValue) priceValue.textContent = "Loading...";
@@ -207,6 +226,8 @@ const modalFile = document.getElementById("modalFile");
 const modalMode = document.getElementById("modalMode");
 const modalColor = document.getElementById("modalColor");
 const modalCopies = document.getElementById("modalCopies");
+const modalPages = document.getElementById("modalPages");
+const modalPagesRow = document.getElementById("modalPagesRow");
 const modalOrientation = document.getElementById("modalOrientation");
 const modalPaper = document.getElementById("modalPaper");
 const modalPrice = document.getElementById("modalPrice");
@@ -215,6 +236,10 @@ const thankYouOverlay = document.getElementById("thankYouOverlay");
 const thankYouDoneBtn = document.getElementById(
   "thankYouDoneBtn",
 ) as HTMLButtonElement;
+
+if (config.mode === "copy") {
+  modalPagesRow?.setAttribute("hidden", "");
+}
 
 function showModal(): void {
   if (!confirmModal) return;
@@ -226,6 +251,7 @@ function showModal(): void {
   if (modalMode) modalMode.textContent = config.mode.toUpperCase();
   if (modalColor) modalColor.textContent = config.colorMode;
   if (modalCopies) modalCopies.textContent = String(config.copies);
+  if (modalPages) modalPages.textContent = pageRangeLabel(config.pageRange);
   if (modalOrientation) modalOrientation.textContent = config.orientation;
   if (modalPaper) modalPaper.textContent = config.paperSize;
   if (modalPrice) modalPrice.textContent = `₱ ${totalPrice.toFixed(2)}`;
@@ -375,6 +401,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
         colorMode: config.colorMode,
         orientation: config.orientation,
         paperSize: config.paperSize,
+        pageRange: config.pageRange,
       }),
     });
 

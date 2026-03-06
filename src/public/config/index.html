@@ -528,6 +528,87 @@
               </div>
             </fieldset>
 
+            <fieldset class="option-group" id="pageRangeGroup">
+              <legend class="option-label">Page Range</legend>
+              <div class="option-grid">
+                <label class="option-card">
+                  <input
+                    id="pageModeAll"
+                    type="radio"
+                    name="pageRangeMode"
+                    value="all"
+                    checked
+                    class="sr-only"
+                  />
+                  <span class="option-card__label">All Pages</span>
+                  <span class="option-card__radio" aria-hidden="true"></span>
+                </label>
+                <label class="option-card">
+                  <input
+                    id="pageModeCustom"
+                    type="radio"
+                    name="pageRangeMode"
+                    value="custom"
+                    class="sr-only"
+                  />
+                  <span class="option-card__label">Custom Range</span>
+                  <span class="option-card__radio" aria-hidden="true"></span>
+                </label>
+                <label class="option-card">
+                  <input
+                    id="pageModeSingle"
+                    type="radio"
+                    name="pageRangeMode"
+                    value="single"
+                    class="sr-only"
+                  />
+                  <span class="option-card__label">Single Page</span>
+                  <span class="option-card__radio" aria-hidden="true"></span>
+                </label>
+              </div>
+
+              <div id="pageRangeCustomWrap" class="page-range-wrap hidden">
+                <input
+                  id="pageRangeInput"
+                  type="text"
+                  class="page-range-input"
+                  placeholder="e.g. 1-3, 5, 7-9"
+                  pattern="\\d+(\\s*-\\s*\\d+)?(\\s*,\\s*\\d+(\\s*-\\s*\\d+)?)*"
+                  title="Use formats like 1-3, 5, 7-9 or a single page number"
+                  aria-label="Custom page range"
+                />
+              </div>
+
+              <div id="pageRangeSingleWrap" class="page-range-wrap hidden">
+                <div class="copies-control">
+                  <button
+                    type="button"
+                    id="singlePageDec"
+                    class="copies-btn"
+                    aria-label="Previous page"
+                  >
+                    -
+                  </button>
+                  <input
+                    id="singlePageInput"
+                    type="number"
+                    min="1"
+                    value="1"
+                    class="copies-input"
+                    aria-label="Single page number"
+                  />
+                  <button
+                    type="button"
+                    id="singlePageInc"
+                    class="copies-btn"
+                    aria-label="Next page"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </fieldset>
+
             <div class="option-group">
               <span class="option-label">Copies</span>
               <div class="copies-control">

@@ -18,6 +18,75 @@ interface RegisterFinancialRoutesDeps {
   resolvePublicBaseUrl: (req: Request) => URL;
 }
 
+type PageRangeSelectionPayload =
+  | { type: "all" }
+  | { type: "custom"; range?: unknown }
+  | { type: "single"; page?: unknown };
+
+function normalizeRangeString(raw: string): string | null {
+  const compact = raw.replace(/\s+/g, "");
+  if (!compact) return null;
+  if (!/^\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$/.test(compact)) return null;
+
+  const chunks = compact.split(",");
+  for (const chunk of chunks) {
+    if (chunk.includes("-")) {
+      const [startRaw, endRaw] = chunk.split("-");
+      const start = Number(startRaw);
+      const end = Number(endRaw);
+      if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
+      if (start < 1 || end < 1 || start > end) return null;
+      continue;
+    }
+
+    const page = Number(chunk);
+    if (!Number.isInteger(page) || page < 1) return null;
+  }
+
+  return compact;
+}
+
+function parsePageRange(raw: unknown): { value?: string; error?: string } {
+  if (raw == null) return {};
+
+  if (typeof raw === "string") {
+    const normalized = normalizeRangeString(raw);
+    if (!normalized) {
+      return { error: "Invalid page range format" };
+    }
+    return { value: normalized };
+  }
+
+  if (typeof raw !== "object") {
+    return { error: "Invalid page range payload" };
+  }
+
+  const payload = raw as PageRangeSelectionPayload;
+  if (payload.type === "all") return {};
+
+  if (payload.type === "single") {
+    const pageRaw = payload.page;
+    const page =
+      typeof pageRaw === "number" && Number.isFinite(pageRaw)
+        ? Math.floor(pageRaw)
+        : Number(pageRaw);
+    if (!Number.isInteger(page) || page < 1) {
+      return { error: "Invalid single page selection" };
+    }
+    return { value: String(page) };
+  }
+
+  if (payload.type === "custom") {
+    const normalized = normalizeRangeString(String(payload.range ?? ""));
+    if (!normalized) {
+      return { error: "Invalid custom page range" };
+    }
+    return { value: normalized };
+  }
+
+  return { error: "Invalid page range payload" };
+}
+
 export function registerFinancialRoutes(
   app: Express,
   deps: RegisterFinancialRoutesDeps,
@@ -191,6 +260,7 @@ export function registerFinancialRoutes(
       colorMode?: "colored" | "grayscale";
       orientation?: "portrait" | "landscape";
       paperSize?: "A4" | "Letter" | "Legal";
+      pageRange?: unknown;
     };
 
     if (mode !== "print" && mode !== "copy") {
@@ -282,8 +352,28 @@ export function registerFinancialRoutes(
         return sendResponse(400, { error: `Document "${filename}" not found in session` });
       }
 
+      const parsedPageRange = parsePageRange(req.body?.pageRange);
+      if (parsedPageRange.error) {
+        void appendAdminLog(
+          "payment_failed",
+          "Confirm payment failed: invalid page range.",
+          {
+            sessionId,
+            pageRange: req.body?.pageRange ?? null,
+            error: parsedPageRange.error,
+          },
+        );
+        return sendResponse(400, { error: parsedPageRange.error });
+      }
+
       serverFilename = path.basename(target.filePath);
-      printOptions = { copies, colorMode, orientation, paperSize };
+      printOptions = {
+        copies,
+        colorMode,
+        orientation,
+        paperSize,
+        pageRange: parsedPageRange.value,
+      };
     }
 
     // ── Pre-check balance (will re-verify inside lock) ────────────────────────
@@ -360,6 +450,7 @@ export function registerFinancialRoutes(
         amount: requiredAmount,
         copies,
         colorMode,
+        pageRange: printOptions?.pageRange ?? null,
         sessionId: sessionId ?? null,
         filename: filename ?? null,
         remainingBalance: (result.body as { balance: number }).balance,

@@ -596,7 +596,33 @@ body {
   transform: scale(1);
 }
 
-/* ── Copies stepper ───────────────────────────────────────── */
+/* Page Range */
+.page-range-wrap {
+  margin-top: 10px;
+}
+.page-range-wrap.hidden {
+  display: none;
+}
+.page-range-input {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(167, 170, 225, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--white);
+  padding: 0 14px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 14px;
+  outline: none;
+}
+.page-range-input::placeholder {
+  color: rgba(222, 224, 255, 0.5);
+}
+.page-range-input:focus {
+  border-color: var(--indigo);
+}
+
+/* Copies stepper */
 .copies-control {
   display: flex;
   align-items: center;

@@ -11,6 +11,7 @@ export interface PrintJobOptions {
   colorMode: ColorMode;
   orientation: Orientation;
   paperSize: PaperSize;
+  pageRange?: string;
 }
 
 const SUMATRA_PATH = path.resolve("bin", "SumatraPDF.exe");
@@ -66,6 +67,9 @@ export async function detectDefaultPrinter(): Promise<void> {
 
 function buildPrintSettings(options: PrintJobOptions): string {
   const parts: string[] = [];
+
+  const pageRange = options.pageRange?.trim();
+  if (pageRange) parts.push(pageRange);
 
   const copies = Math.max(1, Math.floor(options.copies));
   if (copies > 1) parts.push(`${copies}x`);

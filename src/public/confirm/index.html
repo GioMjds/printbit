@@ -115,7 +115,9 @@
               </svg>
             </div>
 
-            <p class="coin-panel__cta">Insert coins into the kiosk slot to pay</p>
+            <p class="coin-panel__cta">
+              Insert coins into the kiosk slot to pay
+            </p>
 
             <!-- Balance ring -->
             <div
@@ -187,10 +189,38 @@
             <div class="test-panel" id="testPanel">
               <span class="test-panel__label">Insert Coin (Test)</span>
               <div class="test-coin-row">
-                <button type="button" class="coin-btn" data-value="1" aria-label="Insert ₱1 coin">₱1</button>
-                <button type="button" class="coin-btn" data-value="5" aria-label="Insert ₱5 coin">₱5</button>
-                <button type="button" class="coin-btn" data-value="10" aria-label="Insert ₱10 coin">₱10</button>
-                <button type="button" class="coin-btn" data-value="20" aria-label="Insert ₱20 coin">₱20</button>
+                <button
+                  type="button"
+                  class="coin-btn"
+                  data-value="1"
+                  aria-label="Insert ₱1 coin"
+                >
+                  ₱1
+                </button>
+                <button
+                  type="button"
+                  class="coin-btn"
+                  data-value="5"
+                  aria-label="Insert ₱5 coin"
+                >
+                  ₱5
+                </button>
+                <button
+                  type="button"
+                  class="coin-btn"
+                  data-value="10"
+                  aria-label="Insert ₱10 coin"
+                >
+                  ₱10
+                </button>
+                <button
+                  type="button"
+                  class="coin-btn"
+                  data-value="20"
+                  aria-label="Insert ₱20 coin"
+                >
+                  ₱20
+                </button>
               </div>
               <button
                 id="resetBalanceBtn"
@@ -298,6 +328,11 @@
                 <dd class="summary-row__value" id="copiesValue">—</dd>
               </div>
 
+              <div class="summary-row" id="pagesRow">
+                <dt class="summary-row__label">Pages</dt>
+                <dd class="summary-row__value" id="pagesValue">—</dd>
+              </div>
+
               <div class="summary-row">
                 <dt class="summary-row__label">
                   <svg
@@ -389,7 +424,11 @@
                 </dd>
               </div>
 
-              <div class="summary-row summary-row--change" id="changeRow" hidden>
+              <div
+                class="summary-row summary-row--change"
+                id="changeRow"
+                hidden
+              >
                 <dt class="summary-row__label">
                   <svg
                     viewBox="0 0 16 16"
@@ -447,10 +486,19 @@
     </div>
 
     <!-- Confirmation Modal Overlay -->
-    <div class="modal-overlay" id="confirmModal" aria-hidden="true" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
+    <div
+      class="modal-overlay"
+      id="confirmModal"
+      aria-hidden="true"
+      role="dialog"
+      aria-labelledby="modalTitle"
+      aria-modal="true"
+    >
       <div class="modal-card">
         <h2 class="modal-title" id="modalTitle">Confirm Your Print Job</h2>
-        <p class="modal-subtitle">Please review your settings before printing.</p>
+        <p class="modal-subtitle">
+          Please review your settings before printing.
+        </p>
 
         <dl class="modal-summary">
           <div class="modal-summary__row">
@@ -465,6 +513,10 @@
             <dt>Copies</dt>
             <dd id="modalCopies">—</dd>
           </div>
+          <div class="modal-summary__row" id="modalPagesRow">
+            <dt>Pages</dt>
+            <dd id="modalPages">—</dd>
+          </div>
           <div class="modal-summary__row">
             <dt>Orientation</dt>
             <dd id="modalOrientation">—</dd>
@@ -478,16 +530,38 @@
             <dt>Total Price</dt>
             <dd id="modalPrice">—</dd>
           </div>
-          <div class="modal-summary__row modal-summary__row--change" id="modalChangeRow" hidden>
+          <div
+            class="modal-summary__row modal-summary__row--change"
+            id="modalChangeRow"
+            hidden
+          >
             <dt>Coin Change</dt>
             <dd id="modalChange">—</dd>
           </div>
         </dl>
 
         <div class="modal-actions">
-          <button id="modalCancelBtn" type="button" class="modal-btn modal-btn--cancel">Cancel</button>
-          <button id="modalConfirmBtn" type="button" class="modal-btn modal-btn--confirm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <button
+            id="modalCancelBtn"
+            type="button"
+            class="modal-btn modal-btn--cancel"
+          >
+            Cancel
+          </button>
+          <button
+            id="modalConfirmBtn"
+            type="button"
+            class="modal-btn modal-btn--confirm"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M20 6L9 17l-5-5" />
             </svg>
             <span>Yes, Print</span>
@@ -497,35 +571,90 @@
     </div>
 
     <!-- Printing In Progress Overlay -->
-    <div class="modal-overlay" id="printingOverlay" aria-hidden="true" role="dialog" aria-labelledby="printingTitle" aria-modal="true">
+    <div
+      class="modal-overlay"
+      id="printingOverlay"
+      aria-hidden="true"
+      role="dialog"
+      aria-labelledby="printingTitle"
+      aria-modal="true"
+    >
       <div class="modal-card modal-card--status">
         <div class="status-icon status-icon--spinner" aria-hidden="true">
           <svg viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="24" r="20" stroke="rgba(167,170,225,0.15)" stroke-width="4" fill="none" />
-            <circle cx="24" cy="24" r="20" stroke="var(--indigo)" stroke-width="4" fill="none"
-              stroke-linecap="round" stroke-dasharray="90 126" class="spinner-arc" />
+            <circle
+              cx="24"
+              cy="24"
+              r="20"
+              stroke="rgba(167,170,225,0.15)"
+              stroke-width="4"
+              fill="none"
+            />
+            <circle
+              cx="24"
+              cy="24"
+              r="20"
+              stroke="var(--indigo)"
+              stroke-width="4"
+              fill="none"
+              stroke-linecap="round"
+              stroke-dasharray="90 126"
+              class="spinner-arc"
+            />
           </svg>
         </div>
         <h2 class="modal-title" id="printingTitle">Printing in Progress</h2>
-        <p class="modal-subtitle">Please wait while your document is being printed…</p>
-        <p class="modal-subtitle modal-subtitle--hint">Do not turn off the machine.</p>
+        <p class="modal-subtitle">
+          Please wait while your document is being printed…
+        </p>
+        <p class="modal-subtitle modal-subtitle--hint">
+          Do not turn off the machine.
+        </p>
       </div>
     </div>
 
     <!-- Thank You Overlay -->
-    <div class="modal-overlay" id="thankYouOverlay" aria-hidden="true" role="dialog" aria-labelledby="thankYouTitle" aria-modal="true">
+    <div
+      class="modal-overlay"
+      id="thankYouOverlay"
+      aria-hidden="true"
+      role="dialog"
+      aria-labelledby="thankYouTitle"
+      aria-modal="true"
+    >
       <div class="modal-card modal-card--status">
         <div class="status-icon status-icon--check" aria-hidden="true">
           <svg viewBox="0 0 48 48" fill="none">
             <circle cx="24" cy="24" r="22" fill="rgba(58,158,82,0.15)" />
-            <circle cx="24" cy="24" r="22" stroke="#3a9e52" stroke-width="2.5" fill="none" />
-            <path d="M15 24l6 6 12-12" stroke="#6ac47a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <circle
+              cx="24"
+              cy="24"
+              r="22"
+              stroke="#3a9e52"
+              stroke-width="2.5"
+              fill="none"
+            />
+            <path
+              d="M15 24l6 6 12-12"
+              stroke="#6ac47a"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </div>
         <h2 class="modal-title" id="thankYouTitle">Thank You!</h2>
-        <p class="modal-subtitle">Your document has been printed successfully.</p>
-        <p class="modal-subtitle modal-subtitle--brand">Thank you for using PrintBit! 🖨️</p>
-        <button id="thankYouDoneBtn" type="button" class="modal-btn modal-btn--confirm modal-btn--wide">
+        <p class="modal-subtitle">
+          Your document has been printed successfully.
+        </p>
+        <p class="modal-subtitle modal-subtitle--brand">
+          Thank you for using PrintBit! 🖨️
+        </p>
+        <button
+          id="thankYouDoneBtn"
+          type="button"
+          class="modal-btn modal-btn--confirm modal-btn--wide"
+        >
           <span>Done</span>
         </button>
       </div>

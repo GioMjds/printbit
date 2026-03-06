@@ -4,6 +4,11 @@ type ColorMode = "colored" | "grayscale";
 type Orientation = "portrait" | "landscape";
 type PaperSize = "A4" | "Letter" | "Legal";
 
+type PageRangeSelection =
+  | { type: "all" }
+  | { type: "custom"; range: string }
+  | { type: "single"; page: number };
+
 interface PrintConfig {
   mode: "print" | "copy";
   sessionId: string | null;
@@ -13,6 +18,7 @@ interface PrintConfig {
   copies: number;
   orientation: Orientation;
   paperSize: PaperSize;
+  pageRange: PageRangeSelection;
 }
 
 interface PreviewConfig {
@@ -89,6 +95,11 @@ class PrintPreview {
   private pdfDoc: PDFDocumentProxy | null = null;
   private currentPage = 1;
   private totalPages = 1;
+
+  get pageCount(): number {
+    return this.totalPages;
+  }
+
   private renderTask: Promise<void> | null = null;
   private resizeObserver: ResizeObserver;
 
@@ -483,6 +494,37 @@ const copiesInc = document.getElementById(
   "copiesInc",
 ) as HTMLButtonElement | null;
 
+const pageModeAll = document.getElementById(
+  "pageModeAll",
+) as HTMLInputElement | null;
+const pageModeCustom = document.getElementById(
+  "pageModeCustom",
+) as HTMLInputElement | null;
+const pageModeSingle = document.getElementById(
+  "pageModeSingle",
+) as HTMLInputElement | null;
+const pageRangeGroup = document.getElementById(
+  "pageRangeGroup",
+) as HTMLElement | null;
+const pageRangeCustomWrap = document.getElementById(
+  "pageRangeCustomWrap",
+) as HTMLElement | null;
+const pageRangeSingleWrap = document.getElementById(
+  "pageRangeSingleWrap",
+) as HTMLElement | null;
+const pageRangeInput = document.getElementById(
+  "pageRangeInput",
+) as HTMLInputElement | null;
+const singlePageInput = document.getElementById(
+  "singlePageInput",
+) as HTMLInputElement | null;
+const singlePageDec = document.getElementById(
+  "singlePageDec",
+) as HTMLButtonElement | null;
+const singlePageInc = document.getElementById(
+  "singlePageInc",
+) as HTMLButtonElement | null;
+
 if (backLink) {
   const fallbackHref = mode === "copy" ? "/copy" : "/print";
   backLink.href = fallbackHref;
@@ -501,6 +543,7 @@ if (mode === "print" && continueBtn) {
 }
 
 if (mode === "copy" && continueBtn) {
+  pageRangeGroup?.classList.add("hidden");
   const hasCopyPreview = Boolean(copyPreviewPath);
   continueBtn.disabled = !hasCopyPreview;
   continueBtn.setAttribute("aria-disabled", hasCopyPreview ? "false" : "true");
@@ -508,6 +551,96 @@ if (mode === "copy" && continueBtn) {
     footerSummary.textContent = hasCopyPreview
       ? "Copy mode — checked document ready."
       : "No checked document found — go back to /copy first.";
+}
+
+[pageModeAll, pageModeCustom, pageModeSingle].forEach((el) => {
+  el?.addEventListener("change", () => {
+    syncPageRangeUI();
+    syncCustomRangeValidity();
+    updateSummary();
+  });
+});
+
+pageRangeInput?.addEventListener("input", () => updateSummary());
+pageRangeInput?.addEventListener("input", () => syncCustomRangeValidity());
+
+singlePageDec?.addEventListener("click", () => {
+  if (!singlePageInput) return;
+  singlePageInput.value = String(Math.max(1, clampSinglePage() - 1));
+  clampSinglePage();
+  updateSummary();
+});
+
+singlePageInc?.addEventListener("click", () => {
+  if (!singlePageInput) return;
+  singlePageInput.value = String(clampSinglePage() + 1);
+  clampSinglePage();
+  updateSummary();
+});
+
+singlePageInput?.addEventListener("change", () => {
+  clampSinglePage();
+  updateSummary();
+});
+
+function clampSinglePage(): number {
+  const max = Math.max(1, preview.pageCount || 1);
+  const raw = parseInt(singlePageInput?.value ?? "1", 10) || 1;
+  const next = Math.max(1, Math.min(max, raw));
+  if (singlePageInput) {
+    singlePageInput.max = String(max);
+    singlePageInput.value = String(next);
+  }
+  return next;
+}
+
+function isValidCustomRange(raw: string): boolean {
+  const value = raw.trim();
+  if (!value) return false;
+  return /^\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*$/.test(value);
+}
+
+function syncCustomRangeValidity(): void {
+  if (!pageRangeInput) return;
+  if (!pageModeCustom?.checked) {
+    pageRangeInput.setCustomValidity("");
+    return;
+  }
+
+  const raw = pageRangeInput.value;
+  if (isValidCustomRange(raw)) {
+    pageRangeInput.setCustomValidity("");
+    return;
+  }
+
+  pageRangeInput.setCustomValidity(
+    "Use formats like 1-3, 5, 7-9 or a single page number.",
+  );
+}
+
+function getPageRange(): PageRangeSelection {
+  if (pageModeCustom?.checked) {
+    const range = (pageRangeInput?.value ?? "").trim();
+    return { type: "custom", range };
+  }
+  if (pageModeSingle?.checked) {
+    return { type: "single", page: clampSinglePage() };
+  }
+  return { type: "all" };
+}
+
+function pageRangeLabel(sel: PageRangeSelection): string {
+  if (sel.type === "single") return `Page ${sel.page}`;
+  if (sel.type === "custom")
+    return sel.range ? `Pages ${sel.range}` : "Pages (custom)";
+  return "All pages";
+}
+
+function syncPageRangeUI(): void {
+  const isCustom = Boolean(pageModeCustom?.checked);
+  const isSingle = Boolean(pageModeSingle?.checked);
+  pageRangeCustomWrap?.classList.toggle("hidden", !isCustom);
+  pageRangeSingleWrap?.classList.toggle("hidden", !isSingle);
 }
 
 function getRadio(name: string): string {
@@ -536,8 +669,9 @@ function updateSummary(): void {
   if (!footerSummary || mode === "copy") return;
   const cfg = currentPreviewConfig();
   const n = getCopies();
+  const pages = pageRangeLabel(getPageRange());
   footerSummary.textContent =
-    `${n} cop${n === 1 ? "y" : "ies"} · ${cfg.paperSize} · ` +
+    `${n} cop${n === 1 ? "y" : "ies"} · ${pages} · ${cfg.paperSize} · ` +
     `${cfg.orientation === "portrait" ? "Portrait" : "Landscape"} · ` +
     `${cfg.colorMode === "colored" ? "Colour" : "Grayscale"}`;
   footerSummary.classList.add("ready");
@@ -579,6 +713,9 @@ copiesInput?.addEventListener("change", () => {
 });
 
 updateSummary();
+syncPageRangeUI();
+clampSinglePage();
+syncCustomRangeValidity();
 
 async function loadPreview(): Promise<void> {
   if (mode === "copy") {
@@ -612,6 +749,8 @@ async function loadPreview(): Promise<void> {
   }
 
   await preview.load(sessionId, selectedFile ?? undefined);
+  clampSinglePage();
+  updateSummary();
 
   // Enable continue now that preview has loaded successfully
   if (continueBtn) {
@@ -623,6 +762,14 @@ async function loadPreview(): Promise<void> {
 continueBtn?.addEventListener("click", () => {
   if (mode === "print" && !sessionId) return;
   if (mode === "copy" && !copyPreviewPath) return;
+  if (mode === "print" && pageModeCustom?.checked) {
+    syncCustomRangeValidity();
+    if (pageRangeInput && !pageRangeInput.checkValidity()) {
+      pageRangeInput.reportValidity();
+      pageRangeInput.focus();
+      return;
+    }
+  }
 
   const cfg = currentPreviewConfig();
   const config: PrintConfig = {
@@ -634,6 +781,7 @@ continueBtn?.addEventListener("click", () => {
     copies: getCopies(),
     orientation: cfg.orientation,
     paperSize: cfg.paperSize,
+    pageRange: getPageRange(),
   };
 
   sessionStorage.setItem("printbit.mode", mode);
