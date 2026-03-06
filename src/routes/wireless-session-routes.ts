@@ -113,8 +113,12 @@ export function registerWirelessSessionRoutes(
         });
       } catch (error) {
         console.error("Preview error:", error);
+        const reason =
+          error instanceof Error ? error.message : "Unknown preview error";
         return res.status(500).json({
-          error: "Preview conversion failed. Ensure LibreOffice is installed.",
+          error:
+            "Preview conversion failed. Ensure Microsoft Word or LibreOffice is installed and available.",
+          reason,
           code: "PREVIEW_CONVERSION_FAILED",
         });
       }

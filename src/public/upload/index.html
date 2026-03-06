@@ -63,7 +63,7 @@
           <div>
             <h1 id="uploadTitle" class="card-title">Send to PrintBit</h1>
             <p class="card-sub">
-              PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX · up to 25 MB each
+              PDF, DOC, and DOCX files only · up to 25 MB each
             </p>
           </div>
         </header>
@@ -71,7 +71,12 @@
         <div class="card-divider"></div>
 
         <!-- Session status strip -->
-        <div class="session-strip" id="sessionStrip" role="status" aria-live="polite">
+        <div
+          class="session-strip"
+          id="sessionStrip"
+          role="status"
+          aria-live="polite"
+        >
           <span class="session-strip__dot" id="sessionDotUpload"></span>
           <span class="session-strip__text" id="sessionMetaUpload"
             >Connecting to session…</span
@@ -133,7 +138,9 @@
             </div>
             <p class="drop-zone__label">
               <span class="drop-zone__browse">Tap to browse</span>
-              <span class="drop-zone__or drop-zone__desktop-only"> or drag files here</span>
+              <span class="drop-zone__or drop-zone__desktop-only">
+                or drag files here</span
+              >
             </p>
             <p class="drop-zone__hint">Multiple files supported</p>
             <!-- Disable first `.xls`, `.xlsx`, `.ppt`, and `.pptx` -->

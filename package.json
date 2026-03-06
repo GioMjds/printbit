@@ -16,7 +16,6 @@
     "@serialport/parser-readline": "^13.0.0",
     "express": "^5.2.1",
     "lowdb": "^7.0.1",
-    "mammoth": "^1.11.0",
     "multer": "^2.0.2",
     "pdfjs": "^2.5.4",
     "pdfjs-dist": "^5.4.624",

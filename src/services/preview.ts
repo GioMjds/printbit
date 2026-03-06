@@ -1,9 +1,8 @@
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
-import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { PREVIEW_CACHE_DIR } from "../config/http";
 
@@ -28,10 +27,35 @@ function resolveLibreOfficePath(): string | null {
       "program",
       "soffice.exe",
     ),
+    path.join(
+      process.env.ProgramFiles ?? "",
+      "LibreOffice",
+      "program",
+      "soffice.com",
+    ),
+    path.join(
+      process.env["ProgramFiles(x86)"] ?? "",
+      "LibreOffice",
+      "program",
+      "soffice.com",
+    ),
   ];
 
   for (const candidate of candidates) {
     if (candidate && fs.existsSync(candidate)) return candidate;
+  }
+
+  const lookup = spawnSync("where.exe", ["soffice"], {
+    windowsHide: true,
+    encoding: "utf8",
+  });
+  if (lookup.status === 0 && lookup.stdout) {
+    const resolved = lookup.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line.length > 0 && fs.existsSync(line));
+
+    if (resolved) return resolved;
   }
 
   return null;
@@ -70,26 +94,31 @@ export async function convertToPdfPreview(sourcePath: string): Promise<string> {
   const sofficePath = resolveLibreOfficePath();
   if (!sofficePath) {
     throw new Error(
-      "LibreOffice not found. Install LibreOffice for document preview.",
+      "Preview conversion tool not found. Install Microsoft Word or LibreOffice, or set PRINTBIT_LIBREOFFICE_PATH.",
     );
   }
 
-  await execFileAsync(
-    sofficePath,
-    [
-      "--headless",
-      "--nologo",
-      "--nodefault",
-      "--norestore",
-      "--nolockcheck",
-      "--convert-to",
-      "pdf",
-      "--outdir",
-      PREVIEW_CACHE_DIR,
-      cacheSource,
-    ],
-    { timeout: 60000 },
-  );
+  try {
+    await execFileAsync(
+      sofficePath,
+      [
+        "--headless",
+        "--nologo",
+        "--nodefault",
+        "--norestore",
+        "--nolockcheck",
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        PREVIEW_CACHE_DIR,
+        cacheSource,
+      ],
+      { timeout: 60000 },
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`LibreOffice conversion failed: ${message}`);
+  }
 
   const convertedPdf = path.join(
     PREVIEW_CACHE_DIR,
@@ -161,11 +190,6 @@ function wrapPreviewHtml(body: string): string {
 
 export async function generateHtmlPreview(sourcePath: string): Promise<string> {
   const ext = path.extname(sourcePath).toLowerCase();
-
-  if (ext === ".docx" || ext === ".doc") {
-    const result = await mammoth.convertToHtml({ path: sourcePath });
-    return wrapPreviewHtml(result.value || "<p>Empty document.</p>");
-  }
 
   if (ext === ".xlsx" || ext === ".xls") {
     const workbook = XLSX.readFile(sourcePath);

@@ -206,7 +206,8 @@ class PrintPreview {
         if (body.code === "UNSUPPORTED_PREVIEW")
           reason = `No preview for this file type.`;
         else if (body.code === "PREVIEW_CONVERSION_FAILED")
-          reason = "Conversion failed — ensure LibreOffice is installed.";
+          reason =
+            "Conversion failed — ensure Microsoft Word or LibreOffice is installed on this machine.";
         else if (body.error) reason = body.error;
       } catch {
         /* plain text response */
