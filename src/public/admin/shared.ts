@@ -30,6 +30,20 @@ export type SummaryResponse = {
       portPath: string | null;
       lastError: string | null;
     };
+    printer: {
+      connected: boolean;
+      name: string | null;
+      driverName: string | null;
+      portName: string | null;
+      status: string;
+      ink: Array<{
+        name: string;
+        level: number | null;
+        status: "ok" | "low" | "empty" | "unknown";
+      }>;
+      lastCheckedAt: string;
+      lastError: string | null;
+    };
   };
 };
 
@@ -81,7 +95,10 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export async function apiFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
   const headers = new Headers(init.headers ?? {});
   headers.set("x-admin-pin", getAdminPin());
   if (!headers.has("Content-Type") && init.body) {
@@ -151,7 +168,8 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
     void unlock(pin)
       .then(() => setMessage("Admin panel unlocked."))
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Failed to unlock admin panel.";
+        const msg =
+          err instanceof Error ? err.message : "Failed to unlock admin panel.";
         setMessage(msg);
         showDashboard(false);
       });

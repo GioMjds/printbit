@@ -29,6 +29,13 @@
 - Confirm uploaded file exists in `uploads/`.
 - Check default Windows printer status.
 
+## Ink / toner levels show "N/A"
+
+- Most consumer and office printers do not expose per-cartridge fill levels through Windows WMI/CIM.
+- If the admin System page shows "N/A" for ink, the printer driver does not report supply data to Windows.
+- Printers that expose `DetectedErrorState` may still show "Low" or "Empty" alerts even without exact percentages.
+- Telemetry is queried from the Windows default printer only; ensure the correct printer is set as default.
+
 ## Coins not updating
 
 - Verify serial cable and COM availability.

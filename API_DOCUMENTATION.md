@@ -158,10 +158,31 @@ All routes below require admin local access + valid `x-admin-pin`.
 Validates PIN.
 
 ### `GET /api/admin/summary`
-Returns balance, earnings buckets, job stats, coin stats, storage, system status.
+Returns balance, earnings buckets, job stats, coin stats, storage, system status (including printer telemetry).
+
+The `status.printer` object contains:
+
+```json
+{
+  "connected": true,
+  "name": "HP LaserJet Pro",
+  "driverName": "HP Universal Printing PCL 6",
+  "portName": "USB001",
+  "status": "Idle",
+  "ink": [
+    { "name": "Ink / Toner", "level": null, "status": "unknown" }
+  ],
+  "lastCheckedAt": "2026-03-06T12:00:00.000Z",
+  "lastError": null
+}
+```
+
+Each `ink` entry has:
+- `level`: `0`–`100` when the driver exposes it, `null` otherwise.
+- `status`: `"ok"` | `"low"` | `"empty"` | `"unknown"`.
 
 ### `GET /api/admin/status`
-Returns system/runtime status.
+Returns system/runtime status (includes `printer` telemetry with the same shape as above).
 
 ### `GET /api/admin/settings`
 Returns settings.

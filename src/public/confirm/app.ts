@@ -59,11 +59,25 @@ let pricingLoaded = false;
 let currentBalance = 0;
 
 if (!rawConfig) {
-  window.location.href = "/config";
+  const storedSessionId = sessionStorage.getItem("printbit.sessionId");
+  const fallback = storedSessionId
+    ? `/config?sessionId=${encodeURIComponent(storedSessionId)}`
+    : "/config";
+  window.location.href = fallback;
   throw new Error("Missing print configuration");
 }
 
 const config = JSON.parse(rawConfig ?? "{}") as ConfirmConfig;
+
+// Update back link to return to the correct config page with the session
+const backLink = document.getElementById("backLink") as HTMLAnchorElement | null;
+if (backLink) {
+  if (config.mode === "copy") {
+    backLink.href = "/copy";
+  } else if (config.sessionId) {
+    backLink.href = `/config?sessionId=${encodeURIComponent(config.sessionId)}`;
+  }
+}
 
 function pageRangeLabel(sel?: PageRangeSelection): string {
   if (!sel || sel.type === "all") return "All Pages";

@@ -12,6 +12,7 @@ import {
   logsToCsv,
 } from "../services/admin";
 import { db } from "../services/db";
+import { getPrinterTelemetry } from "../services/printer-status";
 
 interface RegisterAdminRoutesDeps {
   uploadDir: string;
@@ -52,6 +53,7 @@ export function registerAdminRoutes(
       const host = req.get("host") ?? "unknown";
       const wifiActive =
         !host.startsWith("localhost") && !host.startsWith("127.0.0.1");
+      const printer = getPrinterTelemetry();
       res.json({
         balance: db.data!.balance,
         earnings: computeEarningsBuckets(),
@@ -62,6 +64,7 @@ export function registerAdminRoutes(
           serverRunning: true,
           uptimeSeconds: Math.floor(process.uptime()),
           serial: deps.getSerialStatus(),
+          printer,
           host,
           wifiActive,
         },
@@ -78,10 +81,12 @@ export function registerAdminRoutes(
       const host = req.get("host") ?? "unknown";
       const wifiActive =
         !host.startsWith("localhost") && !host.startsWith("127.0.0.1");
+      const printer = getPrinterTelemetry();
       res.json({
         serverRunning: true,
         uptimeSeconds: Math.floor(process.uptime()),
         serial: deps.getSerialStatus(),
+        printer,
         storage,
         host,
         wifiActive,

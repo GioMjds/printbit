@@ -45,6 +45,10 @@
   background: rgba(251, 191, 36, 0.12);
   color: var(--amber);
 }
+.sys-card__icon--printer {
+  background: rgba(105, 111, 199, 0.15);
+  color: var(--lavender);
+}
 
 .sys-card__info {
   flex: 1;
@@ -103,4 +107,94 @@
   .sys-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Ink / Toner section ──────────────────────────────────────── */
+
+.ink-section {
+  margin-top: 20px;
+  padding: 20px 18px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+}
+.ink-section__title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 14px;
+}
+
+.ink-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ink-empty {
+  font-size: 13px;
+  color: var(--ink-muted);
+  text-align: center;
+  padding: 12px 0;
+}
+
+.ink-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ink-item__name {
+  flex: 0 0 90px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: capitalize;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ink-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.ink-bar__fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 400ms ease;
+}
+.ink-bar--ok {
+  background: var(--green);
+}
+.ink-bar--low {
+  background: var(--amber);
+}
+.ink-bar--empty {
+  background: var(--red);
+}
+.ink-bar--unknown {
+  background: rgba(255, 255, 255, 0.12);
+  width: 100% !important;
+}
+
+.ink-item__label {
+  flex: 0 0 44px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+.ink-item__label--ok {
+  color: var(--green);
+}
+.ink-item__label--low {
+  color: var(--amber);
+}
+.ink-item__label--empty {
+  color: var(--red);
+}
+.ink-item__label--unknown {
+  color: var(--ink-muted);
 }
