@@ -579,6 +579,46 @@ body {
   scrollbar-width: none;
 }
 
+.scan-guide {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(167, 170, 225, 0.15);
+  background: rgba(105, 111, 199, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.scan-guide__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lavender);
+}
+
+.scan-guide__steps,
+.scan-guide__tips {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scan-guide__steps li,
+.scan-guide__tips li {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.scan-guide strong {
+  color: var(--white);
+}
+
 /* ── Scanner status card ─────────────────────────────────── */
 .status-card {
   display: flex;

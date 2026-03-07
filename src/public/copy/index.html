@@ -237,8 +237,8 @@
                 <div class="step__body">
                   <span class="step__title">Place your document</span>
                   <span class="step__desc"
-                    >Align the paper face-down on the glass or insert it into
-                    the feeder tray.</span
+                    >Align the page face-down on the scanner glass before
+                    checking.</span
                   >
                 </div>
                 <div class="step__connector" aria-hidden="true"></div>
@@ -282,8 +282,8 @@
                 <div class="step__body">
                   <span class="step__title">Check document</span>
                   <span class="step__desc"
-                    >Tap the button below — the scanner will detect and preview
-                    your document on the left.</span
+                    >Tap <strong>Check Document</strong> to scan and preview your
+                    page on the left panel.</span
                   >
                 </div>
                 <div class="step__connector" aria-hidden="true"></div>
@@ -356,14 +356,67 @@
                   </svg>
                 </div>
                 <div class="step__body">
-                  <span class="step__title">Set preferences &amp; pay</span>
+                  <span class="step__title">Continue, configure, and pay</span>
                   <span class="step__desc"
-                    >Choose paper size, colour mode and copies, then insert
-                    coins on the Confirm screen.</span
+                    >Continue to settings, choose copy options, then insert coins
+                    and confirm your copy job.</span
+                  >
+                </div>
+                <div class="step__connector" aria-hidden="true"></div>
+              </li>
+
+              <li class="step">
+                <div class="step__number" aria-hidden="true">4</div>
+                <div class="step__icon" aria-hidden="true">
+                  <svg viewBox="0 0 32 32" fill="none">
+                    <rect
+                      x="6"
+                      y="7"
+                      width="20"
+                      height="18"
+                      rx="3"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      fill="currentColor"
+                      opacity=".08"
+                    />
+                    <path
+                      d="M10 13h12M10 17h8M18 22l2 2 4-4"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      opacity=".6"
+                    />
+                  </svg>
+                </div>
+                <div class="step__body">
+                  <span class="step__title">Collect your copies</span>
+                  <span class="step__desc"
+                    >Wait for printing to finish, then take all pages from the
+                    output tray.</span
                   >
                 </div>
               </li>
             </ol>
+
+            <div class="steps-help" aria-label="Copy troubleshooting guide">
+              <p class="steps-help__title">If something goes wrong</p>
+              <ul class="steps-help__list">
+                <li>
+                  No document detected? Reposition the page on the scanner glass
+                  and tap <strong>Retry</strong>.
+                </li>
+                <li>
+                  Preview does not look right? Tap
+                  <strong>Check Document</strong> again before continuing.
+                </li>
+                <li>
+                  Insufficient coins on Confirm? Insert more coins, then confirm
+                  the copy again.
+                </li>
+              </ul>
+            </div>
           </div>
 
           <!-- Error banner — hidden until scan fails -->
