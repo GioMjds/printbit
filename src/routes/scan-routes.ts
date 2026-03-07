@@ -1,8 +1,14 @@
 import type { Express, Request, Response } from "express";
+import { Server } from "socket.io";
 import path from "node:path";
 import fs from "node:fs";
 import { jobStore } from "../services/job-store";
-import { appendAdminLog } from "../services/admin";
+import {
+  appendAdminLog,
+  getPricingSettings,
+  incrementJobStats,
+} from "../services/admin";
+import { db, withBalanceLock } from "../services/db";
 import {
   getAdapter,
   getScannerStatus,
@@ -23,7 +29,11 @@ const FORMAT_CONTENT_TYPES: Record<string, string> = {
   png: "image/png",
 };
 
+const CHARGED_SCAN_TTL_MS = 30 * 60 * 1000;
+const chargedScanFiles = new Map<string, number>();
+
 interface RegisterScanRoutesDeps {
+  io: Server;
   resolvePublicBaseUrl: (req: Request) => URL;
 }
 
@@ -44,6 +54,24 @@ function toScanSource(source: ScannerPageSource): "flatbed" | "adf" {
 
 function toColorMode(color: ScannerPageColor): "colored" | "grayscale" {
   return color === "grayscale" ? "grayscale" : "colored";
+}
+
+function markSoftCopyPaid(filename: string): void {
+  chargedScanFiles.set(filename, Date.now() + CHARGED_SCAN_TTL_MS);
+}
+
+function clearSoftCopyPaid(filename: string): void {
+  chargedScanFiles.delete(filename);
+}
+
+function isSoftCopyPaid(filename: string): boolean {
+  const expiresAt = chargedScanFiles.get(filename);
+  if (!expiresAt) return false;
+  if (expiresAt <= Date.now()) {
+    chargedScanFiles.delete(filename);
+    return false;
+  }
+  return true;
 }
 
 function mapCapabilitiesForUi(caps: ScannerCapabilities | null): {
@@ -143,6 +171,7 @@ export function registerScanRoutes(
     try {
       const result = await getAdapter().scan(settings, "uploads/scans");
       const filename = path.basename(result.outputPath);
+      clearSoftCopyPaid(filename);
 
       void appendAdminLog("scan_completed", "Interactive scan completed.", {
         source: settings.source,
@@ -167,6 +196,109 @@ export function registerScanRoutes(
       res.status(500).json({ error: message });
     }
   });
+
+  // ── POST /api/scanner/soft-copy/charge — Charge for soft copy access ───
+  app.post(
+    "/api/scanner/soft-copy/charge",
+    async (req: Request, res: Response) => {
+      const safeFilename = toSafeScanFilename(req.body?.filename);
+      if (!safeFilename) {
+        return res.status(400).json({ error: "Invalid filename." });
+      }
+
+      const sourcePath = path.resolve("uploads", "scans", safeFilename);
+      if (!fs.existsSync(sourcePath)) {
+        return res.status(404).json({ error: "Scanned file not found." });
+      }
+
+      const requiredAmount = Number(
+        getPricingSettings().scanDocument.toFixed(2),
+      );
+      if (requiredAmount <= 0 || isSoftCopyPaid(safeFilename)) {
+        return res.json({
+          ok: true,
+          charged: false,
+          alreadyPaid: true,
+          requiredAmount,
+          amount: 0,
+          balance: db.data!.balance,
+        });
+      }
+
+      const result = await withBalanceLock(async () => {
+        if (isSoftCopyPaid(safeFilename)) {
+          return {
+            ok: true,
+            charged: false,
+            alreadyPaid: true,
+            requiredAmount,
+            amount: 0,
+            balance: db.data!.balance,
+          };
+        }
+
+        if (db.data!.balance < requiredAmount) {
+          return {
+            ok: false,
+            error: `Insufficient balance. Please add P${requiredAmount.toFixed(2)} to access this scan.`,
+            requiredAmount,
+            balance: db.data!.balance,
+          };
+        }
+
+        db.data!.balance = Number(
+          (db.data!.balance - requiredAmount).toFixed(2),
+        );
+        db.data!.earnings = Number(
+          (db.data!.earnings + requiredAmount).toFixed(2),
+        );
+        await db.write();
+        markSoftCopyPaid(safeFilename);
+
+        return {
+          ok: true,
+          charged: true,
+          alreadyPaid: false,
+          requiredAmount,
+          amount: requiredAmount,
+          balance: db.data!.balance,
+        };
+      });
+
+      if (!result.ok) {
+        await appendAdminLog(
+          "scan_soft_copy_charge_failed",
+          "Failed to charge for soft copy access.",
+          {
+            filename: safeFilename,
+            requiredAmount,
+            balance: result.balance,
+          },
+        );
+        return res.status(402).json({
+          error: result.error,
+          requiredAmount,
+          balance: result.balance,
+        });
+      }
+
+      if (result.charged) {
+        deps.io.emit("balance", result.balance);
+        await appendAdminLog(
+          "scan_soft_copy_charged",
+          "Soft copy access charged.",
+          {
+            filename: safeFilename,
+            amount: result.amount,
+            requiredAmount: result.requiredAmount,
+            balance: result.balance,
+          },
+        );
+      }
+
+      return res.json(result);
+    },
+  );
 
   // ── GET /api/scanner/wired/drives — Detect removable USB drives ─────
   app.get("/api/scanner/wired/drives", async (_req: Request, res: Response) => {
@@ -391,6 +523,7 @@ export function registerScanRoutes(
       );
 
       const filename = path.basename(result.outputPath);
+      clearSoftCopyPaid(filename);
       res.json({
         detected: true,
         previewPath: filename,

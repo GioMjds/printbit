@@ -25,7 +25,7 @@ let hotspotRunning = false;
 function ipToInt32(ip: string): number {
   const parts = ip.split(".").map(Number);
   // Big-endian signed 32-bit
-  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) | 0;
+  return (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3] | 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,40 +85,11 @@ function configureDatabase(): void {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn("[HOTSPOT] ⚠ Could not configure Data.db:", msg);
   } finally {
-    try { fs.unlinkSync(pyScript); } catch { /* cleanup */ }
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Captive portal redirect page                                      */
-/* ------------------------------------------------------------------ */
-
-/** Deploy a success login.html that satisfies captive-portal detection. */
-function deployLoginPage(): void {
-  if (fs.existsSync(MPWF_LOGIN) && !fs.existsSync(MPWF_LOGIN_BACKUP)) {
     try {
-      fs.copyFileSync(MPWF_LOGIN, MPWF_LOGIN_BACKUP);
-    } catch { /* may fail if locked */ }
-  }
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Success</title>
-</head>
-<body>
-<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>
-</body>
-</html>`;
-
-  try {
-    fs.writeFileSync(MPWF_LOGIN, html, "utf-8");
-    console.log("[HOTSPOT] ✓ Captive portal redirect page deployed");
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn("[HOTSPOT] ⚠ Could not deploy login.html:", msg);
+      fs.unlinkSync(pyScript);
+    } catch {
+      /* cleanup */
+    }
   }
 }
 
@@ -127,9 +98,7 @@ function deployLoginPage(): void {
 /* ------------------------------------------------------------------ */
 
 function ensureFirewallRules(): void {
-  const rules = [
-    { name: "PrintBit-Server-3000", port: 3000, proto: "TCP" },
-  ];
+  const rules = [{ name: "PrintBit-Server-3000", port: 3000, proto: "TCP" }];
 
   for (const { name, port, proto } of rules) {
     try {
@@ -145,7 +114,9 @@ function ensureFirewallRules(): void {
           { stdio: "ignore", timeout: 5_000 },
         );
         console.log(`[HOTSPOT] → Firewall rule added: ${name}`);
-      } catch { /* not admin or exists */ }
+      } catch {
+        /* not admin or exists */
+      }
     }
   }
 }
@@ -178,7 +149,6 @@ export async function startHotspot(): Promise<void> {
 
   ensureFirewallRules();
   configureDatabase();
-  deployLoginPage();
 
   // Kill any existing instance (we'll re-launch with our config)
   try {
@@ -187,11 +157,13 @@ export async function startHotspot(): Promise<void> {
       timeout: 5_000,
       stdio: "pipe",
     }).includes("MyPublicWiFi.exe") &&
-      execSync('taskkill /F /IM MyPublicWiFi.exe', {
+      execSync("taskkill /F /IM MyPublicWiFi.exe", {
         stdio: "ignore",
         timeout: 5_000,
       });
-  } catch { /* not running */ }
+  } catch {
+    /* not running */
+  }
 
   // Launch MyPublicWiFi (requires admin — use shell to handle elevated exe)
   hotspotProcess = spawn("cmd", ["/c", "start", "", MPWF_EXE], {
@@ -217,8 +189,13 @@ export async function startHotspot(): Promise<void> {
 export function stopHotspot(): void {
   if (!hotspotRunning) return;
   try {
-    execSync('taskkill /F /IM MyPublicWiFi.exe', { stdio: "ignore", timeout: 5_000 });
-  } catch { /* not running */ }
+    execSync("taskkill /F /IM MyPublicWiFi.exe", {
+      stdio: "ignore",
+      timeout: 5_000,
+    });
+  } catch {
+    /* not running */1
+  }
   hotspotProcess = null;
   hotspotRunning = false;
   console.log("[HOTSPOT] ✗ MyPublicWiFi stopped");

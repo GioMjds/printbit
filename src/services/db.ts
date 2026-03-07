@@ -7,6 +7,7 @@ export type ColorMode = "colored" | "grayscale";
 export interface PricingSettings {
   printPerPage: number;
   copyPerPage: number;
+  scanDocument: number;
   colorSurcharge: number;
 }
 
@@ -28,6 +29,35 @@ export interface JobStats {
   total: number;
   print: number;
   copy: number;
+  scan: number;
+}
+
+export interface HopperSettings {
+  enabled: boolean;
+  timeoutMs: number;
+  retryCount: number;
+  dispenseCommandPrefix: string;
+  selfTestCommand: string;
+}
+
+export interface HopperStats {
+  dispenseAttempts: number;
+  dispenseSuccess: number;
+  dispenseFailures: number;
+  totalDispensed: number;
+  lastDispensedAt: string | null;
+  lastError: string | null;
+  selfTestPassed: boolean | null;
+  lastSelfTestAt: string | null;
+}
+
+export interface OwedChangeEntry {
+  id: string;
+  timestamp: string;
+  amount: number;
+  reason: string;
+  status: "open" | "resolved";
+  meta?: LogMeta;
 }
 
 export type LogMeta = Record<string, string | number | boolean | null>;
@@ -46,6 +76,9 @@ export type Schema = {
   settings: AdminSettings;
   coinStats: CoinStats;
   jobStats: JobStats;
+  hopperSettings: HopperSettings;
+  hopperStats: HopperStats;
+  owedChanges: OwedChangeEntry[];
   logs: AdminLogEntry[];
 };
 
@@ -56,6 +89,7 @@ const DEFAULT_DATA: Schema = {
     pricing: {
       printPerPage: 5,
       copyPerPage: 3,
+      scanDocument: 5,
       colorSurcharge: 2,
     },
     idleTimeoutSeconds: 120,
@@ -72,7 +106,26 @@ const DEFAULT_DATA: Schema = {
     total: 0,
     print: 0,
     copy: 0,
+    scan: 0,
   },
+  hopperSettings: {
+    enabled: true,
+    timeoutMs: 8000,
+    retryCount: 1,
+    dispenseCommandPrefix: "HOPPER DISPENSE",
+    selfTestCommand: "HOPPER SELFTEST",
+  },
+  hopperStats: {
+    dispenseAttempts: 0,
+    dispenseSuccess: 0,
+    dispenseFailures: 0,
+    totalDispensed: 0,
+    lastDispensedAt: null,
+    lastError: null,
+    selfTestPassed: null,
+    lastSelfTestAt: null,
+  },
+  owedChanges: [],
   logs: [],
 };
 
@@ -82,6 +135,8 @@ function finiteOr(value: unknown, fallback: number): number {
 
 function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const pricing = data?.settings?.pricing;
+  const hopperSettings = data?.hopperSettings;
+  const hopperStats = data?.hopperStats;
 
   return {
     balance: finiteOr(data?.balance, DEFAULT_DATA.balance),
@@ -95,6 +150,10 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
         copyPerPage: finiteOr(
           pricing?.copyPerPage,
           DEFAULT_DATA.settings.pricing.copyPerPage,
+        ),
+        scanDocument: finiteOr(
+          pricing?.scanDocument,
+          DEFAULT_DATA.settings.pricing.scanDocument,
         ),
         colorSurcharge: finiteOr(
           pricing?.colorSurcharge,
@@ -125,7 +184,69 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
       total: finiteOr(data?.jobStats?.total, DEFAULT_DATA.jobStats.total),
       print: finiteOr(data?.jobStats?.print, DEFAULT_DATA.jobStats.print),
       copy: finiteOr(data?.jobStats?.copy, DEFAULT_DATA.jobStats.copy),
+      scan: finiteOr(data?.jobStats?.scan, DEFAULT_DATA.jobStats.scan),
     },
+    hopperSettings: {
+      enabled:
+        typeof hopperSettings?.enabled === "boolean"
+          ? hopperSettings.enabled
+          : DEFAULT_DATA.hopperSettings.enabled,
+      timeoutMs: finiteOr(
+        hopperSettings?.timeoutMs,
+        DEFAULT_DATA.hopperSettings.timeoutMs,
+      ),
+      retryCount: finiteOr(
+        hopperSettings?.retryCount,
+        DEFAULT_DATA.hopperSettings.retryCount,
+      ),
+      dispenseCommandPrefix:
+        typeof hopperSettings?.dispenseCommandPrefix === "string" &&
+        hopperSettings.dispenseCommandPrefix.trim()
+          ? hopperSettings.dispenseCommandPrefix
+          : DEFAULT_DATA.hopperSettings.dispenseCommandPrefix,
+      selfTestCommand:
+        typeof hopperSettings?.selfTestCommand === "string" &&
+        hopperSettings.selfTestCommand.trim()
+          ? hopperSettings.selfTestCommand
+          : DEFAULT_DATA.hopperSettings.selfTestCommand,
+    },
+    hopperStats: {
+      dispenseAttempts: finiteOr(
+        hopperStats?.dispenseAttempts,
+        DEFAULT_DATA.hopperStats.dispenseAttempts,
+      ),
+      dispenseSuccess: finiteOr(
+        hopperStats?.dispenseSuccess,
+        DEFAULT_DATA.hopperStats.dispenseSuccess,
+      ),
+      dispenseFailures: finiteOr(
+        hopperStats?.dispenseFailures,
+        DEFAULT_DATA.hopperStats.dispenseFailures,
+      ),
+      totalDispensed: finiteOr(
+        hopperStats?.totalDispensed,
+        DEFAULT_DATA.hopperStats.totalDispensed,
+      ),
+      lastDispensedAt:
+        typeof hopperStats?.lastDispensedAt === "string"
+          ? hopperStats.lastDispensedAt
+          : DEFAULT_DATA.hopperStats.lastDispensedAt,
+      lastError:
+        typeof hopperStats?.lastError === "string"
+          ? hopperStats.lastError
+          : DEFAULT_DATA.hopperStats.lastError,
+      selfTestPassed:
+        typeof hopperStats?.selfTestPassed === "boolean"
+          ? hopperStats.selfTestPassed
+          : DEFAULT_DATA.hopperStats.selfTestPassed,
+      lastSelfTestAt:
+        typeof hopperStats?.lastSelfTestAt === "string"
+          ? hopperStats.lastSelfTestAt
+          : DEFAULT_DATA.hopperStats.lastSelfTestAt,
+    },
+    owedChanges: Array.isArray(data?.owedChanges)
+      ? data.owedChanges
+      : DEFAULT_DATA.owedChanges,
     logs: Array.isArray(data?.logs) ? data.logs : DEFAULT_DATA.logs,
   };
 }
@@ -229,7 +350,8 @@ export function acquireIdempotencyKey(
 
   const completed = idempotencyStore.get(nk);
   if (completed) {
-    if (Date.now() <= completed.expiresAt) return { type: "hit", entry: completed };
+    if (Date.now() <= completed.expiresAt)
+      return { type: "hit", entry: completed };
     idempotencyStore.delete(nk);
   }
 

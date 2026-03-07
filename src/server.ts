@@ -142,7 +142,7 @@ registerWirelessSessionRoutes(app, {
   resolvePublicBaseUrl,
   convertToPdfPreview,
 });
-registerScanRoutes(app, { resolvePublicBaseUrl });
+registerScanRoutes(app, { io, resolvePublicBaseUrl });
 registerCopyRoutes(app, { io });
 
 io.on("connection", (socket) => {

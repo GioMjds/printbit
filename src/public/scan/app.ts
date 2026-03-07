@@ -38,6 +38,21 @@ interface WirelessLinkResponse {
   error?: string;
 }
 
+interface PricingResponse {
+  printPerPage: number;
+  copyPerPage: number;
+  scanDocument: number;
+  colorSurcharge: number;
+}
+
+interface SoftCopyChargeResponse {
+  ok?: boolean;
+  charged?: boolean;
+  alreadyPaid?: boolean;
+  requiredAmount?: number;
+  error?: string;
+}
+
 const scannerPill = document.getElementById("scannerPill") as HTMLElement;
 const scannerPillText = document.getElementById(
   "scannerPillText",
@@ -77,6 +92,12 @@ const scanBtn = document.getElementById("scanBtn") as HTMLButtonElement;
 const scanBtnLabel = document.getElementById("scanBtnLabel") as HTMLElement;
 const rescanBtn = document.getElementById("rescanBtn") as HTMLButtonElement;
 const proceedBtn = document.getElementById("proceedBtn") as HTMLButtonElement;
+const proceedBtnLabel = document.getElementById(
+  "proceedBtnLabel",
+) as HTMLElement;
+const softCopyFeeText = document.getElementById(
+  "softCopyFeeText",
+) as HTMLElement;
 
 const deliveryPanel = document.getElementById("deliveryPanel") as HTMLElement;
 const wiredDeliveryCard = document.getElementById(
@@ -89,8 +110,12 @@ const driveSelect = document.getElementById("driveSelect") as HTMLSelectElement;
 const refreshDrivesBtn = document.getElementById(
   "refreshDrivesBtn",
 ) as HTMLButtonElement;
-const exportUsbBtn = document.getElementById("exportUsbBtn") as HTMLButtonElement;
-const wiredStatusText = document.getElementById("wiredStatusText") as HTMLElement;
+const exportUsbBtn = document.getElementById(
+  "exportUsbBtn",
+) as HTMLButtonElement;
+const wiredStatusText = document.getElementById(
+  "wiredStatusText",
+) as HTMLElement;
 const wirelessQrCanvas = document.getElementById(
   "wirelessQrCanvas",
 ) as HTMLCanvasElement;
@@ -104,7 +129,10 @@ const wirelessStatusText = document.getElementById(
   "wirelessStatusText",
 ) as HTMLElement;
 
-const PREVIEW_STATES: Record<"idle" | "scanning" | "result" | "error", HTMLElement> = {
+const PREVIEW_STATES: Record<
+  "idle" | "scanning" | "result" | "error",
+  HTMLElement
+> = {
   idle: stateIdle,
   scanning: stateScanning,
   result: stateResult,
@@ -115,7 +143,10 @@ let scannerReady = false;
 let scannedPages: string[] = [];
 let currentPage = 0;
 let scanFilename: string | null = null;
-let wirelessLinkCache: { filename: string; link: WirelessLinkResponse } | null = null;
+let wirelessLinkCache: { filename: string; link: WirelessLinkResponse } | null =
+  null;
+let paidSoftCopyFilename: string;
+let scanDocumentPrice = 5;
 
 function getRadio<T extends string>(name: string): T {
   return document.querySelector<HTMLInputElement>(
@@ -197,6 +228,78 @@ function clearDeliveryMessages(): void {
   wirelessStatusText.textContent = "";
 }
 
+function formatPeso(value: number): string {
+  return `₱${value.toFixed(2)}`;
+}
+
+function updateSoftCopyPricingUi(): void {
+  proceedBtnLabel.textContent = `Get Soft Copy (${formatPeso(scanDocumentPrice)})`;
+  softCopyFeeText.textContent = `A fee of ${formatPeso(scanDocumentPrice)} applies for soft copy access. You can pay at the kiosk or via the wireless link.`;
+}
+
+async function loadPricing(): Promise<void> {
+  try {
+    const response = await fetch("/api/pricing");
+    if (!response.ok) throw new Error("Failed to load pricing information.");
+
+    const payload = (await response.json()) as Partial<PricingResponse>;
+    if (
+      typeof payload.scanDocument === "number" &&
+      Number.isFinite(payload.scanDocument)
+    ) {
+      scanDocumentPrice = Number(payload.scanDocument.toFixed(2));
+    }
+  } catch {
+    scanDocumentPrice = 5;
+  } finally {
+    updateSoftCopyPricingUi();
+  }
+}
+
+async function ensureSoftCopyPaid(filename: string): Promise<boolean> {
+  if (!scanFilename) return false;
+  if (paidSoftCopyFilename === scanFilename) return true;
+
+  proceedBtn.disabled = true;
+  proceedBtn.setAttribute("aria-disabled", "true");
+  proceedBtnLabel.textContent = "Checking payment...";
+
+  try {
+    const response = await fetch("/api/scanner/soft-copy/charge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: scanFilename }),
+    });
+
+    const data = (await response.json()) as SoftCopyChargeResponse;
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error ?? "Unable to process soft-copy payment.");
+    }
+
+    if (
+      typeof data.requiredAmount === "number" &&
+      Number.isFinite(data.requiredAmount)
+    ) {
+      scanDocumentPrice = Number(data.requiredAmount.toFixed(2));
+    }
+
+    paidSoftCopyFilename = scanFilename;
+    updateSoftCopyPricingUi();
+    return true;
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Unable to process soft-copy payment.";
+    previewHint.textContent = message;
+    return false;
+  } finally {
+    proceedBtn.disabled = false;
+    proceedBtn.setAttribute("aria-disabled", "false");
+    updateSoftCopyPricingUi();
+  }
+}
+
 async function checkScanner(): Promise<void> {
   applyState("checking");
   scanBtn.disabled = true;
@@ -267,7 +370,8 @@ async function loadUsbDrives(): Promise<void> {
 
     wiredStatusText.textContent = "Select a USB drive and tap Export to USB.";
   } catch (err) {
-    const message = err instanceof Error ? err.message : "USB detection failed.";
+    const message =
+      err instanceof Error ? err.message : "USB detection failed.";
     wiredStatusText.textContent = message;
   } finally {
     refreshDrivesBtn.disabled = false;
@@ -277,7 +381,11 @@ async function loadUsbDrives(): Promise<void> {
 
 async function createWirelessLink(force = false): Promise<void> {
   if (!scanFilename) return;
-  if (wirelessLinkCache && wirelessLinkCache.filename === scanFilename && !force) {
+  if (
+    wirelessLinkCache &&
+    wirelessLinkCache.filename === scanFilename &&
+    !force
+  ) {
     const cached = wirelessLinkCache.link;
     wirelessDownloadLink.href = cached.downloadUrl;
     wirelessDownloadLink.textContent = cached.downloadUrl;
@@ -321,7 +429,8 @@ async function createWirelessLink(force = false): Promise<void> {
     });
     wirelessStatusText.textContent = `Link expires at ${expiry}.`;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to generate QR link.";
+    const message =
+      err instanceof Error ? err.message : "Failed to generate QR link.";
     wirelessStatusText.textContent = message;
   } finally {
     refreshWirelessLinkBtn.disabled = false;
@@ -365,13 +474,23 @@ async function startScan(): Promise<void> {
   proceedBtn.style.display = "none";
   deliveryPanel.style.display = "none";
   clearDeliveryMessages();
-  scanProgress.textContent = source === "feeder"
-    ? "Feeding document…"
-    : "Initialising scanner";
+  scanProgress.textContent =
+    source === "feeder" ? "Feeding document…" : "Initialising scanner";
 
-  const progressMessages = source === "feeder"
-    ? ["Feeding document…", "Scanning page…", "Processing image", "Finalising…"]
-    : ["Initialising scanner", "Calibrating sensor", "Scanning page…", "Finalising…"];
+  const progressMessages =
+    source === "feeder"
+      ? [
+          "Feeding document…",
+          "Scanning page…",
+          "Processing image",
+          "Finalising…",
+        ]
+      : [
+          "Initialising scanner",
+          "Calibrating sensor",
+          "Scanning page…",
+          "Finalising…",
+        ];
   let progIdx = 0;
   const progTimer = window.setInterval(() => {
     progIdx = Math.min(progIdx + 1, progressMessages.length - 1);
@@ -399,11 +518,13 @@ async function startScan(): Promise<void> {
     scannedPages = data.pages;
     scanFilename = data.filename;
     wirelessLinkCache = null;
+    paidSoftCopyFilename = "";
     currentPage = 0;
 
     applyState("done");
     showPreview("result", `Page 1 of ${data.pages.length}`);
     updatePager();
+    updateSoftCopyPricingUi();
 
     // Show rescan + "Get Soft Copy" — delivery panel only after user confirms
     rescanBtn.style.display = "flex";
@@ -429,6 +550,7 @@ function resetToIdle(): void {
   scanFilename = null;
   currentPage = 0;
   wirelessLinkCache = null;
+  paidSoftCopyFilename = "";
 
   applyState("ready");
   showPreview("idle", "Place document and press Scan");
@@ -493,7 +615,11 @@ exportUsbBtn.addEventListener("click", async () => {
         drive: driveSelect.value,
       }),
     });
-    const data = (await res.json()) as { ok?: boolean; exportPath?: string; error?: string };
+    const data = (await res.json()) as {
+      ok?: boolean;
+      exportPath?: string;
+      error?: string;
+    };
     if (!res.ok || !data.ok) {
       throw new Error(data.error ?? "USB export failed.");
     }
@@ -510,12 +636,15 @@ refreshWirelessLinkBtn.addEventListener("click", () => {
   void createWirelessLink(true);
 });
 
-proceedBtn.addEventListener("click", () => {
+proceedBtn.addEventListener("click", async () => {
   if (!scannedPages.length || !scanFilename) return;
 
-  // Hide the confirm button, show delivery panel
+  const paid = await ensureSoftCopyPaid(scanFilename);
+  if (!paid) return;
+
   proceedBtn.style.display = "none";
-  void syncDeliveryPanel();
+  await syncDeliveryPanel();
 });
 
+void loadPricing();
 void checkScanner();

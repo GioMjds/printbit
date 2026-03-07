@@ -1,12 +1,31 @@
-import { SettingsResponse, apiFetch, setMessage, initAuth, setAdminPin } from "../shared";
+import {
+  SettingsResponse,
+  apiFetch,
+  setMessage,
+  initAuth,
+  setAdminPin,
+} from "../shared";
 
 const settingsForm = document.getElementById("settingsForm") as HTMLFormElement;
-const settingPrintPerPage = document.getElementById("settingPrintPerPage") as HTMLInputElement;
-const settingCopyPerPage = document.getElementById("settingCopyPerPage") as HTMLInputElement;
-const settingColorSurcharge = document.getElementById("settingColorSurcharge") as HTMLInputElement;
-const settingIdleTimeout = document.getElementById("settingIdleTimeout") as HTMLInputElement;
-const settingAdminPin = document.getElementById("settingAdminPin") as HTMLInputElement;
-const settingAdminLocalOnly = document.getElementById("settingAdminLocalOnly") as HTMLInputElement;
+const settingPrintPerPage = document.getElementById(
+  "settingPrintPerPage",
+) as HTMLInputElement;
+const settingCopyPerPage = document.getElementById(
+  "settingCopyPerPage",
+) as HTMLInputElement;
+const settingScanDocument = document.getElementById("settingScanDocument") as HTMLInputElement;
+const settingColorSurcharge = document.getElementById(
+  "settingColorSurcharge",
+) as HTMLInputElement;
+const settingIdleTimeout = document.getElementById(
+  "settingIdleTimeout",
+) as HTMLInputElement;
+const settingAdminPin = document.getElementById(
+  "settingAdminPin",
+) as HTMLInputElement;
+const settingAdminLocalOnly = document.getElementById(
+  "settingAdminLocalOnly",
+) as HTMLInputElement;
 
 const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
 let refreshTimer: number | null = null;
@@ -14,6 +33,7 @@ let refreshTimer: number | null = null;
 function applySettings(settings: SettingsResponse): void {
   settingPrintPerPage.value = settings.pricing.printPerPage.toFixed(2);
   settingCopyPerPage.value = settings.pricing.copyPerPage.toFixed(2);
+  settingScanDocument.value = settings.pricing.scanDocument.toFixed(2);
   settingColorSurcharge.value = settings.pricing.colorSurcharge.toFixed(2);
   settingIdleTimeout.value = String(settings.idleTimeoutSeconds);
   settingAdminPin.value = settings.adminPin;
@@ -36,6 +56,7 @@ settingsForm.addEventListener("submit", (e) => {
     pricing: {
       printPerPage: Number(settingPrintPerPage.value),
       copyPerPage: Number(settingCopyPerPage.value),
+      scanDocument: Number(settingScanDocument.value),
       colorSurcharge: Number(settingColorSurcharge.value),
     },
     idleTimeoutSeconds: Number(settingIdleTimeout.value),
@@ -58,7 +79,8 @@ settingsForm.addEventListener("submit", (e) => {
       setMessage("Settings saved.");
     })
     .catch((error: unknown) => {
-      const msg = error instanceof Error ? error.message : "Failed to save settings.";
+      const msg =
+        error instanceof Error ? error.message : "Failed to save settings.";
       setMessage(msg);
     });
 });
@@ -67,7 +89,9 @@ refreshBtn.addEventListener("click", () => {
   setMessage("Refreshing...");
   void loadData()
     .then(() => setMessage("Settings refreshed."))
-    .catch((e: unknown) => setMessage(e instanceof Error ? e.message : "Refresh failed."));
+    .catch((e: unknown) =>
+      setMessage(e instanceof Error ? e.message : "Refresh failed."),
+    );
 });
 
 initAuth(async () => {
