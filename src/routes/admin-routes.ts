@@ -145,6 +145,7 @@ export function registerAdminRoutes(
         pricing?: {
           printPerPage?: number;
           copyPerPage?: number;
+          scanDocument?: number;
           colorSurcharge?: number;
         };
         idleTimeoutSeconds?: number;
@@ -154,6 +155,7 @@ export function registerAdminRoutes(
 
       const printPerPage = body.pricing?.printPerPage;
       const copyPerPage = body.pricing?.copyPerPage;
+      const scanDocument = body.pricing?.scanDocument;
       const colorSurcharge = body.pricing?.colorSurcharge;
 
       if (
@@ -167,6 +169,12 @@ export function registerAdminRoutes(
         (!isFiniteNumber(copyPerPage) || copyPerPage < 0)
       ) {
         return res.status(400).json({ error: "Invalid copyPerPage value." });
+      }
+      if (
+        scanDocument !== undefined &&
+        (!isFiniteNumber(scanDocument) || scanDocument < 0)
+      ) {
+        return res.status(400).json({ error: "Invalid scanDocument value." });
       }
       if (
         colorSurcharge !== undefined &&
@@ -199,6 +207,8 @@ export function registerAdminRoutes(
           db.data!.settings.pricing.printPerPage = printPerPage;
         if (copyPerPage !== undefined)
           db.data!.settings.pricing.copyPerPage = copyPerPage;
+        if (scanDocument !== undefined) 
+          db.data!.settings.pricing.scanDocument = scanDocument;
         if (colorSurcharge !== undefined)
           db.data!.settings.pricing.colorSurcharge = colorSurcharge;
       }

@@ -70,6 +70,7 @@ export type SettingsResponse = {
   pricing: {
     printPerPage: number;
     copyPerPage: number;
+    scanDocument: number;
     colorSurcharge: number;
   };
   idleTimeoutSeconds: number;

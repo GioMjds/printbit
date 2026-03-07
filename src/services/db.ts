@@ -7,6 +7,7 @@ export type ColorMode = "colored" | "grayscale";
 export interface PricingSettings {
   printPerPage: number;
   copyPerPage: number;
+  scanDocument: number;
   colorSurcharge: number;
 }
 
@@ -88,6 +89,7 @@ const DEFAULT_DATA: Schema = {
     pricing: {
       printPerPage: 5,
       copyPerPage: 3,
+      scanDocument: 5,
       colorSurcharge: 2,
     },
     idleTimeoutSeconds: 120,
@@ -148,6 +150,10 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
         copyPerPage: finiteOr(
           pricing?.copyPerPage,
           DEFAULT_DATA.settings.pricing.copyPerPage,
+        ),
+        scanDocument: finiteOr(
+          pricing?.scanDocument,
+          DEFAULT_DATA.settings.pricing.scanDocument,
         ),
         colorSurcharge: finiteOr(
           pricing?.colorSurcharge,
@@ -344,7 +350,8 @@ export function acquireIdempotencyKey(
 
   const completed = idempotencyStore.get(nk);
   if (completed) {
-    if (Date.now() <= completed.expiresAt) return { type: "hit", entry: completed };
+    if (Date.now() <= completed.expiresAt)
+      return { type: "hit", entry: completed };
     idempotencyStore.delete(nk);
   }
 
