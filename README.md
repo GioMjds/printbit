@@ -11,6 +11,55 @@ It is designed for campus usage (students, faculty, and staff) with phone-to-kio
 - Scan and scan-preview flow for copy mode.
 - Admin dashboard for earnings, logs, settings, and diagnostics.
 
+## End-user step-by-step guides
+
+### Print
+
+1. Open **Print** on the kiosk.
+2. Scan the QR code with your phone and upload a file.
+3. Wait for your file to appear in **Received files** and select it.
+4. Tap **Continue to settings**.
+5. Choose print settings (color, copies, orientation, paper size, page range) and continue.
+6. Insert coins on the confirm screen until your balance covers the total, then confirm.
+7. Collect your printed pages.
+
+Troubleshooting:
+
+- If no file appears, start a new session and upload again.
+- If balance is insufficient, insert more coins before confirming.
+
+### Copy
+
+1. Open **Copy** on the kiosk.
+2. Place the page face-down on the scanner glass.
+3. Tap **Check Document** and review the preview.
+4. If preview is correct, tap **Continue to Config**.
+5. Choose copy settings and continue to confirmation.
+6. Insert coins until the required amount is reached, then confirm.
+7. Collect your copied pages.
+
+Troubleshooting:
+
+- If no document is detected, reposition the page and tap **Retry**.
+- If preview looks incorrect, tap **Check Document** again before continuing.
+
+### Scan
+
+1. Open **Scan** on the kiosk.
+2. Choose scan source, color mode, and resolution.
+3. Place your document and tap **Scan Document**.
+4. Review the scanned preview. Tap **Rescan** if needed.
+5. Tap **Get Soft Copy**.
+6. Choose delivery:
+   - **Wireless (QR):** scan the generated QR code to download.
+   - **USB Flash Drive:** insert a USB drive, refresh, then export.
+
+Troubleshooting:
+
+- If scanner is unavailable, check scanner connection/power and retry.
+- If the QR link expires, refresh the wireless link.
+- If no USB is detected, insert/reinsert the drive and refresh.
+
 ## Tech stack
 
 - **Backend:** Node.js, Express, Socket.IO, TypeScript

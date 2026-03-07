@@ -14,6 +14,16 @@ const serialBadge = document.getElementById(
 const serialPortStatus = document.getElementById(
   "serialPortStatus",
 ) as HTMLElement;
+const hopperStatus = document.getElementById("hopperStatus") as HTMLElement;
+const hopperBadge = document.getElementById(
+  "hopperBadge",
+) as HTMLElement | null;
+const hopperPortStatus = document.getElementById(
+  "hopperPortStatus",
+) as HTMLElement;
+const hopperLastStatus = document.getElementById(
+  "hopperLastStatus",
+) as HTMLElement;
 
 const printerStatus = document.getElementById("printerStatus") as HTMLElement;
 const printerBadge = document.getElementById(
@@ -23,6 +33,7 @@ const printerNameEl = document.getElementById("printerName") as HTMLElement;
 const inkGrid = document.getElementById("inkGrid") as HTMLElement;
 
 const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
+const selfTestBtn = document.getElementById("selfTestBtn") as HTMLButtonElement;
 let refreshTimer: number | null = null;
 
 function applySystem(summary: SummaryResponse): void {
@@ -36,6 +47,21 @@ function applySystem(summary: SummaryResponse): void {
     : "Disconnected";
   serialBadge?.setAttribute("data-ok", String(summary.status.serial.connected));
   serialPortStatus.textContent = summary.status.serial.portPath ?? "—";
+
+  const hopper = summary.status.hopper;
+  const hopperHealthy = hopper.connected && !hopper.pending && !hopper.lastError;
+  hopperStatus.textContent = hopper.pending
+    ? "Busy"
+    : hopper.connected
+      ? "Ready"
+      : "Unavailable";
+  hopperBadge?.setAttribute("data-ok", String(hopperHealthy));
+  hopperPortStatus.textContent = hopper.portPath ?? "—";
+  hopperLastStatus.textContent = hopper.lastError
+    ? hopper.lastError
+    : hopper.lastSuccessAt
+      ? `Last OK: ${new Date(hopper.lastSuccessAt).toLocaleString()}`
+      : "No recent activity";
 
   // Printer status
   const p = summary.status.printer;
@@ -89,6 +115,27 @@ refreshBtn.addEventListener("click", () => {
     .catch((e: unknown) =>
       setMessage(e instanceof Error ? e.message : "Refresh failed."),
     );
+});
+
+selfTestBtn.addEventListener("click", () => {
+  selfTestBtn.disabled = true;
+  setMessage("Running hopper self-test...");
+  void apiFetch("/api/admin/hopper/self-test", { method: "POST" })
+    .then(async (res) => {
+      const payload = (await res.json()) as { ok: boolean; message: string };
+      if (!res.ok) {
+        setMessage(payload.message || "Hopper self-test failed.");
+      } else {
+        setMessage(payload.message || "Hopper self-test passed.");
+      }
+      await loadData();
+    })
+    .catch((e: unknown) => {
+      setMessage(e instanceof Error ? e.message : "Self-test failed.");
+    })
+    .finally(() => {
+      selfTestBtn.disabled = false;
+    });
 });
 
 initAuth(async () => {

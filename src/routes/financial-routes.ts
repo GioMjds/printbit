@@ -8,6 +8,7 @@ import {
   getPricingSettings,
   incrementJobStats,
 } from "../services/admin";
+import { dispenseChange } from "../services/hopper";
 import { printFile, type PrintJobOptions } from "../services/printer";
 import type { SessionStore } from "../services/session";
 
@@ -424,12 +425,70 @@ export function registerFinancialRoutes(
         };
       }
 
-      db.data!.balance -= requiredAmount;
+      const previousBalance = db.data!.balance;
+      const changeAmount = Number((previousBalance - requiredAmount).toFixed(2));
+      db.data!.balance = 0;
       db.data!.earnings += requiredAmount;
       await db.write();
-      const remainingBalance = db.data!.balance;
+      const remainingBalance = 0;
       const currentEarnings = db.data!.earnings;
       deps.io.emit("balance", remainingBalance);
+
+      if (changeAmount <= 0) {
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            chargedAmount: requiredAmount,
+            balance: remainingBalance,
+            earnings: currentEarnings,
+            change: {
+              requested: 0,
+              dispensed: 0,
+              state: "none",
+            },
+          },
+        };
+      }
+
+      deps.io.emit("changeDispenseStatus", {
+        state: "dispensing",
+        amount: changeAmount,
+      });
+
+      const dispenseResult = await dispenseChange(changeAmount);
+
+      if (dispenseResult.ok) {
+        deps.io.emit("changeDispenseStatus", {
+          state: "dispensed",
+          amount: changeAmount,
+          attempts: dispenseResult.attempts,
+        });
+
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            chargedAmount: requiredAmount,
+            balance: remainingBalance,
+            earnings: currentEarnings,
+            change: {
+              requested: changeAmount,
+              dispensed: changeAmount,
+              state: "dispensed",
+              attempts: dispenseResult.attempts,
+            },
+          },
+        };
+      }
+
+      deps.io.emit("changeDispenseStatus", {
+        state: "failed",
+        amount: changeAmount,
+        attempts: dispenseResult.attempts,
+        owedChangeId: dispenseResult.owedChangeId ?? null,
+        message: dispenseResult.message,
+      });
 
       return {
         status: 200,
@@ -438,6 +497,14 @@ export function registerFinancialRoutes(
           chargedAmount: requiredAmount,
           balance: remainingBalance,
           earnings: currentEarnings,
+          change: {
+            requested: changeAmount,
+            dispensed: 0,
+            state: "failed",
+            attempts: dispenseResult.attempts,
+            owedChangeId: dispenseResult.owedChangeId ?? null,
+            message: dispenseResult.message,
+          },
         },
       };
     });
@@ -445,6 +512,18 @@ export function registerFinancialRoutes(
     // Logging and stats updates happen outside the lock
     if (result.status === 200) {
       await incrementJobStats(mode);
+      const resultBody = result.body as {
+        balance: number;
+        change?: {
+          state?: string;
+          requested?: number;
+          dispensed?: number;
+          attempts?: number;
+          owedChangeId?: string | null;
+          message?: string;
+        };
+      };
+
       await appendAdminLog("payment_confirmed", "Payment confirmed.", {
         mode,
         amount: requiredAmount,
@@ -453,8 +532,29 @@ export function registerFinancialRoutes(
         pageRange: printOptions?.pageRange ?? null,
         sessionId: sessionId ?? null,
         filename: filename ?? null,
-        remainingBalance: (result.body as { balance: number }).balance,
+        remainingBalance: resultBody.balance,
+        changeState: resultBody.change?.state ?? "none",
+        changeRequested: resultBody.change?.requested ?? 0,
+        changeDispensed: resultBody.change?.dispensed ?? 0,
       });
+
+      if (resultBody.change?.state === "dispensed") {
+        await appendAdminLog("hopper_dispense_succeeded", "Coin change dispensed.", {
+          requested: resultBody.change.requested ?? 0,
+          dispensed: resultBody.change.dispensed ?? 0,
+          attempts: resultBody.change.attempts ?? 0,
+        });
+      }
+
+      if (resultBody.change?.state === "failed") {
+        await appendAdminLog("hopper_dispense_failed", "Coin change dispense failed.", {
+          requested: resultBody.change.requested ?? 0,
+          dispensed: resultBody.change.dispensed ?? 0,
+          attempts: resultBody.change.attempts ?? 0,
+          owedChangeId: resultBody.change.owedChangeId ?? null,
+          message: resultBody.change.message ?? null,
+        });
+      }
     }
 
     sendResponse(result.status, result.body);

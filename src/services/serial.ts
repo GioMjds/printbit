@@ -12,6 +12,23 @@ const MAX_RETRIES = 12; // ~60 seconds of retrying
 let serialConnected = false;
 let serialPortPath: string | null = null;
 let serialLastError: string | null = null;
+let activeSerialPort: SerialPort | null = null;
+
+let hopperCommandPending = false;
+let hopperLastError: string | null = null;
+let hopperLastSuccessAt: string | null = null;
+
+interface HopperCommandResult {
+  ok: boolean;
+  message: string;
+}
+
+interface PendingHopperCommand {
+  resolve: (result: HopperCommandResult) => void;
+  timer: NodeJS.Timeout;
+}
+
+let pendingHopperCommand: PendingHopperCommand | null = null;
 
 export function getSerialStatus() {
   return {
@@ -19,6 +36,94 @@ export function getSerialStatus() {
     portPath: serialPortPath,
     lastError: serialLastError,
   };
+}
+
+export function getHopperStatus() {
+  return {
+    connected: serialConnected,
+    pending: hopperCommandPending,
+    portPath: serialPortPath,
+    lastError: hopperLastError,
+    lastSuccessAt: hopperLastSuccessAt,
+  };
+}
+
+function completePendingHopperCommand(result: HopperCommandResult): boolean {
+  if (!pendingHopperCommand) return false;
+  const pending = pendingHopperCommand;
+  pendingHopperCommand = null;
+  clearTimeout(pending.timer);
+  hopperCommandPending = false;
+
+  if (result.ok) {
+    hopperLastError = null;
+    hopperLastSuccessAt = new Date().toISOString();
+  } else {
+    hopperLastError = result.message;
+  }
+
+  pending.resolve(result);
+  return true;
+}
+
+function tryHandleHopperResponse(rawLine: string): boolean {
+  const line = rawLine.trim();
+  if (!line || !line.toUpperCase().includes("HOPPER")) return false;
+
+  if (!pendingHopperCommand) {
+    hopperLastError = `Unsolicited hopper response: ${line}`;
+    return true;
+  }
+
+  const upper = line.toUpperCase();
+  if (upper.includes("ERR") || upper.includes("FAIL") || upper.includes("ERROR")) {
+    completePendingHopperCommand({ ok: false, message: line });
+    return true;
+  }
+
+  if (upper.includes("OK") || upper.includes("DONE") || upper.includes("SUCCESS")) {
+    completePendingHopperCommand({ ok: true, message: line });
+    return true;
+  }
+
+  return true;
+}
+
+export async function sendHopperCommand(
+  command: string,
+  timeoutMs: number,
+): Promise<HopperCommandResult> {
+  if (!serialConnected || !activeSerialPort) {
+    return { ok: false, message: "Serial port not connected." };
+  }
+
+  if (pendingHopperCommand) {
+    return { ok: false, message: "Hopper command already in progress." };
+  }
+
+  const normalizedTimeout = Number.isFinite(timeoutMs)
+    ? Math.max(1000, Math.floor(timeoutMs))
+    : 8000;
+
+  return await new Promise<HopperCommandResult>((resolve) => {
+    const timer = setTimeout(() => {
+      completePendingHopperCommand({
+        ok: false,
+        message: `Hopper timeout after ${normalizedTimeout}ms.`,
+      });
+    }, normalizedTimeout);
+
+    pendingHopperCommand = { resolve, timer };
+    hopperCommandPending = true;
+
+    activeSerialPort!.write(`${command.trim()}\n`, (error) => {
+      if (!error) return;
+      completePendingHopperCommand({
+        ok: false,
+        message: error.message,
+      });
+    });
+  });
 }
 
 export async function initSerial(io: Server) {
@@ -60,6 +165,7 @@ async function attemptSerialConnection(io: Server, attempt: number) {
       }, (err) => {
         if (err) return reject(err);
       });
+      activeSerialPort = port;
 
       const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
 
@@ -74,14 +180,24 @@ async function attemptSerialConnection(io: Server, attempt: number) {
       port.on("close", () => {
         console.log("[SERIAL] ✗ Port closed — Arduino disconnected");
         serialConnected = false;
+        activeSerialPort = null;
         io.emit("serialStatus", getSerialStatus());
+        completePendingHopperCommand({
+          ok: false,
+          message: "Serial port closed during hopper command.",
+        });
       });
 
       port.on("error", (error) => {
         serialConnected = false;
         serialLastError = error.message;
+        activeSerialPort = null;
         io.emit("serialStatus", getSerialStatus());
         console.error("[SERIAL] ✗ Port error:", error.message);
+        completePendingHopperCommand({
+          ok: false,
+          message: `Serial error: ${error.message}`,
+        });
       });
 
       let pendingPrefix: "1" | "2" | null = null;
@@ -198,6 +314,7 @@ async function attemptSerialConnection(io: Server, attempt: number) {
 
       parser.on("data", (rawLine: string) => {
         console.log(`[SERIAL] Raw data: "${rawLine}"`);
+        if (tryHandleHopperResponse(rawLine)) return;
         const token = rawLine.trim().replace(/[^0-9]/g, "");
         if (!token) return;
         void processToken(token);

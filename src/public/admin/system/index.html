@@ -250,6 +250,16 @@
               </svg>
               <span>Refresh</span>
             </button>
+            <button id="selfTestBtn" class="topbar-btn">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 5a1 1 0 112 0v4a1 1 0 11-2 0V5zm1 8a1.25 1.25 0 100 2.5A1.25 1.25 0 0010 13z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <span>Hopper Self-test</span>
+            </button>
           </div>
         </header>
 
@@ -344,6 +354,33 @@
                   >
                 </div>
                 <div class="sys-card__indicator" id="serialBadge" data-ok="">
+                  <span class="sys-card__dot" aria-hidden="true"></span>
+                </div>
+              </div>
+              <div class="sys-card">
+                <div
+                  class="sys-card__icon sys-card__icon--serial"
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path
+                      fill-rule="evenodd"
+                      d="M3 5a2 2 0 012-2h10a2 2 0 012 2v3a4 4 0 01-4 4h-1v3h1a1 1 0 110 2H7a1 1 0 010-2h1v-3H7a4 4 0 01-4-4V5zm4 3a1 1 0 102 0 1 1 0 00-2 0zm4-1a1 1 0 000 2h2a1 1 0 100-2h-2z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div class="sys-card__info">
+                  <span class="sys-card__name">Coin Hopper</span>
+                  <span class="sys-card__val" id="hopperStatus">—</span>
+                  <span
+                    class="sys-card__sub sys-card__val--mono"
+                    id="hopperPortStatus"
+                    >—</span
+                  >
+                  <span class="sys-card__sub" id="hopperLastStatus">—</span>
+                </div>
+                <div class="sys-card__indicator" id="hopperBadge" data-ok="">
                   <span class="sys-card__dot" aria-hidden="true"></span>
                 </div>
               </div>

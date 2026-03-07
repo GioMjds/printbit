@@ -260,6 +260,26 @@
 
         <!-- ── RIGHT: Controls panel ── -->
         <section class="controls-col" aria-label="Scan controls">
+          <div class="scan-guide" aria-label="Scan step-by-step guide">
+            <p class="scan-guide__title">How to scan</p>
+            <ol class="scan-guide__steps">
+              <li>Choose source, color mode, and resolution.</li>
+              <li>Place your document, then tap <strong>Scan Document</strong>.</li>
+              <li>Review the preview and tap <strong>Rescan</strong> if needed.</li>
+              <li>
+                Tap <strong>Get Soft Copy</strong>, then choose Wireless (QR) or
+                USB export.
+              </li>
+            </ol>
+            <ul class="scan-guide__tips">
+              <li>
+                Scanner unavailable? Check power/cable, then try scanning again.
+              </li>
+              <li>Wireless QR expired? Tap <strong>Refresh QR Link</strong>.</li>
+              <li>No USB detected? Insert drive and tap <strong>Refresh USB</strong>.</li>
+            </ul>
+          </div>
+
           <!-- Scanner status card -->
           <div class="status-card" id="scannerStatusCard" data-state="checking">
             <div class="status-card__icon" aria-hidden="true">

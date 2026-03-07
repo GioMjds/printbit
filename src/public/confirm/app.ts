@@ -41,7 +41,7 @@ const changeRow = document.getElementById("changeRow");
 const modalChange = document.getElementById("modalChange");
 const modalChangeRow = document.getElementById("modalChangeRow");
 const statusMessage = document.getElementById("statusMessage");
-const coinEventMessage = document.getElementById("coinEventMessage");
+const coinEventMessage = document.getElementById("coinToast");
 const confirmBtn = document.getElementById("confirmBtn") as HTMLButtonElement;
 const resetBalanceBtn = document.getElementById(
   "resetBalanceBtn",
@@ -140,6 +140,7 @@ function updateBalanceUI(balance: number): void {
   if (balanceValue) balanceValue.textContent = `₱ ${balance.toFixed(2)}`;
   updateChangeDisplay(balance);
   if (!statusMessage || !confirmBtn) return;
+  if (isProcessingPayment) return;
   if (!pricingLoaded) {
     statusMessage.textContent = "Loading pricing...";
     confirmBtn.disabled = true;
@@ -162,6 +163,46 @@ function updateBalanceUI(balance: number): void {
 
 function setCoinEventMessage(message: string): void {
   if (coinEventMessage) coinEventMessage.textContent = message;
+}
+
+function setPrintingPhase(phase: "printing" | "dispensing" | "failed" | "done"): void {
+  if (phase === "printing") {
+    if (printingSubtitle) {
+      printingSubtitle.textContent =
+        "Please wait while your document is being printed...";
+    }
+    if (printingHint) {
+      printingHint.textContent = "Do not turn off the machine.";
+    }
+    return;
+  }
+
+  if (phase === "dispensing") {
+    if (printingSubtitle) {
+      printingSubtitle.textContent = "Printing done. Dispensing your coin change...";
+    }
+    if (printingHint) {
+      printingHint.textContent = "Please wait until the dispenser completes.";
+    }
+    return;
+  }
+
+  if (phase === "failed") {
+    if (printingSubtitle) {
+      printingSubtitle.textContent = "Print completed, but coin change dispensing failed.";
+    }
+    if (printingHint) {
+      printingHint.textContent = "Please contact staff for manual change settlement.";
+    }
+    return;
+  }
+
+  if (printingSubtitle) {
+    printingSubtitle.textContent = "Print and change handling completed.";
+  }
+  if (printingHint) {
+    printingHint.textContent = "Thank you for using PrintBit.";
+  }
 }
 
 async function fetchInitialBalance(): Promise<void> {
@@ -246,10 +287,13 @@ const modalOrientation = document.getElementById("modalOrientation");
 const modalPaper = document.getElementById("modalPaper");
 const modalPrice = document.getElementById("modalPrice");
 const printingOverlay = document.getElementById("printingOverlay");
+const printingSubtitle = document.getElementById("printingSubtitle");
+const printingHint = document.getElementById("printingHint");
 const thankYouOverlay = document.getElementById("thankYouOverlay");
 const thankYouDoneBtn = document.getElementById(
   "thankYouDoneBtn",
 ) as HTMLButtonElement;
+let isProcessingPayment = false;
 
 if (config.mode === "copy") {
   modalPagesRow?.setAttribute("hidden", "");
@@ -317,8 +361,10 @@ modalConfirmBtn?.addEventListener("click", async () => {
   modalConfirmBtn.disabled = true;
   hideModal();
   confirmBtn.disabled = true;
+  isProcessingPayment = true;
 
   showOverlay(printingOverlay);
+  setPrintingPhase("printing");
   const MIN_OVERLAY_MS = 3_000;
   const overlayStart = Date.now();
 
@@ -330,6 +376,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
         statusMessage.textContent =
           "No checked document found. Please go back to /copy and tap Check for Document again.";
       }
+      isProcessingPayment = false;
       confirmBtn.disabled = false;
       modalConfirmBtn.disabled = false;
       return;
@@ -358,6 +405,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
         if (statusMessage)
           statusMessage.textContent =
             payload.error ?? "Failed to start copy job.";
+        isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
         return;
@@ -386,10 +434,12 @@ modalConfirmBtn?.addEventListener("click", async () => {
       } else if (pollResult === "failed") {
         if (statusMessage)
           statusMessage.textContent = "Copy job failed. Please try again.";
+        isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
       } else {
         if (statusMessage) statusMessage.textContent = "Copy was cancelled.";
+        isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
       }
@@ -397,6 +447,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
       hideOverlay(printingOverlay);
       if (statusMessage)
         statusMessage.textContent = "Network error during copy job.";
+      isProcessingPayment = false;
       confirmBtn.disabled = false;
       modalConfirmBtn.disabled = false;
     }
@@ -425,13 +476,37 @@ modalConfirmBtn?.addEventListener("click", async () => {
       if (statusMessage)
         statusMessage.textContent =
           payload.error ?? "Payment confirmation failed.";
+      isProcessingPayment = false;
       confirmBtn.disabled = false;
       modalConfirmBtn.disabled = false;
       return;
     }
 
-    // Brief "Document sent!" confirmation before transitioning
-    if (statusMessage) statusMessage.textContent = "Document sent to printer!";
+    const payload = (await response.json()) as {
+      change?: {
+        state?: "none" | "dispensed" | "failed";
+        requested?: number;
+        message?: string;
+      };
+    };
+
+    if (payload.change?.state === "failed") {
+      setPrintingPhase("failed");
+      if (statusMessage) {
+        statusMessage.textContent =
+          "Document printed. Change dispensing failed. Please contact staff.";
+      }
+      setCoinEventMessage(
+        `Change owed: ₱ ${(payload.change.requested ?? 0).toFixed(2)}. Staff assistance required.`,
+      );
+    } else if (payload.change?.state === "dispensed") {
+      setPrintingPhase("done");
+      if (statusMessage) {
+        statusMessage.textContent = "Document printed and change dispensed.";
+      }
+    } else if (statusMessage) {
+      statusMessage.textContent = "Document sent to printer!";
+    }
 
     // Ensure the printing overlay is visible for at least MIN_OVERLAY_MS
     const remaining = MIN_OVERLAY_MS - (Date.now() - overlayStart);
@@ -450,6 +525,7 @@ modalConfirmBtn?.addEventListener("click", async () => {
     sessionStorage.removeItem("printbit.uploadedFile");
     sessionStorage.removeItem("printbit.sessionId");
   }
+  isProcessingPayment = false;
 });
 
 async function pollCopyJob(jobId: string): Promise<string> {
@@ -569,6 +645,43 @@ if (typeof ioFactory === "function") {
       setCoinEventMessage(
         `Serial note: ${(payload as { message: string }).message}`,
       );
+    }
+  });
+
+  socket.on("changeDispenseStatus", (payload: unknown) => {
+    if (!payload || typeof payload !== "object") return;
+
+    const state =
+      "state" in payload && typeof (payload as { state: unknown }).state === "string"
+        ? (payload as { state: string }).state
+        : "";
+    const amount =
+      "amount" in payload && typeof (payload as { amount: unknown }).amount === "number"
+        ? (payload as { amount: number }).amount
+        : 0;
+
+    if (state === "dispensing") {
+      setPrintingPhase("dispensing");
+      if (statusMessage) {
+        statusMessage.textContent = `Dispensing change: ₱ ${amount.toFixed(2)}...`;
+      }
+      return;
+    }
+
+    if (state === "dispensed") {
+      setPrintingPhase("done");
+      if (statusMessage) {
+        statusMessage.textContent = `Change dispensed: ₱ ${amount.toFixed(2)}.`;
+      }
+      return;
+    }
+
+    if (state === "failed") {
+      setPrintingPhase("failed");
+      if (statusMessage) {
+        statusMessage.textContent =
+          "Change dispensing failed. Please contact staff for settlement.";
+      }
     }
   });
 }

@@ -485,6 +485,47 @@ body {
   color: var(--white);
 }
 
+.method-guide {
+  margin: 0 20px 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(167, 170, 225, 0.2);
+  background: rgba(105, 111, 199, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.method-guide__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lavender);
+}
+
+.method-guide__steps,
+.method-guide__tips {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.method-guide__steps li,
+.method-guide__tips li {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.method-guide__tips li strong {
+  color: var(--white);
+}
+
 /* ── Empty / waiting state ────────────────────────────────── */
 .files-empty {
   flex: 1;
@@ -798,6 +839,11 @@ body {
 
   .files-panel {
     min-height: 320px;
+  }
+
+  .method-guide {
+    margin: 0 14px 12px;
+    padding: 12px 14px;
   }
 
   .topbar {

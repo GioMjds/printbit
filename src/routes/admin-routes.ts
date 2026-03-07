@@ -22,6 +22,20 @@ interface RegisterAdminRoutesDeps {
     portPath: string | null;
     lastError: string | null;
   };
+  getHopperStatus: () => {
+    connected: boolean;
+    pending: boolean;
+    portPath: string | null;
+    lastError: string | null;
+    lastSuccessAt: string | null;
+  };
+  runHopperSelfTest: () => Promise<{
+    ok: boolean;
+    amount: number;
+    message: string;
+    attempts: number;
+    owedChangeId?: string;
+  }>;
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -61,11 +75,14 @@ export function registerAdminRoutes(
         earnings: computeEarningsBuckets(),
         coinStats: db.data!.coinStats,
         jobStats: db.data!.jobStats,
+        hopperStats: db.data!.hopperStats,
+        owedChangeOpenCount: db.data!.owedChanges.filter((entry) => entry.status === "open").length,
         storage,
         status: {
           serverRunning: true,
           uptimeSeconds: Math.floor(process.uptime()),
           serial: deps.getSerialStatus(),
+          hopper: deps.getHopperStatus(),
           printer,
           scanner,
           host,
@@ -90,12 +107,23 @@ export function registerAdminRoutes(
         serverRunning: true,
         uptimeSeconds: Math.floor(process.uptime()),
         serial: deps.getSerialStatus(),
+        hopper: deps.getHopperStatus(),
         printer,
         scanner,
         storage,
         host,
         wifiActive,
       });
+    },
+  );
+
+  app.post(
+    "/api/admin/hopper/self-test",
+    requireAdminLocalAccess,
+    requireAdminPin,
+    async (_req: Request, res: Response) => {
+      const result = await deps.runHopperSelfTest();
+      res.status(result.ok ? 200 : 503).json(result);
     },
   );
 

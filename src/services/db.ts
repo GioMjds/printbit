@@ -31,6 +31,34 @@ export interface JobStats {
   scan: number;
 }
 
+export interface HopperSettings {
+  enabled: boolean;
+  timeoutMs: number;
+  retryCount: number;
+  dispenseCommandPrefix: string;
+  selfTestCommand: string;
+}
+
+export interface HopperStats {
+  dispenseAttempts: number;
+  dispenseSuccess: number;
+  dispenseFailures: number;
+  totalDispensed: number;
+  lastDispensedAt: string | null;
+  lastError: string | null;
+  selfTestPassed: boolean | null;
+  lastSelfTestAt: string | null;
+}
+
+export interface OwedChangeEntry {
+  id: string;
+  timestamp: string;
+  amount: number;
+  reason: string;
+  status: "open" | "resolved";
+  meta?: LogMeta;
+}
+
 export type LogMeta = Record<string, string | number | boolean | null>;
 
 export interface AdminLogEntry {
@@ -47,6 +75,9 @@ export type Schema = {
   settings: AdminSettings;
   coinStats: CoinStats;
   jobStats: JobStats;
+  hopperSettings: HopperSettings;
+  hopperStats: HopperStats;
+  owedChanges: OwedChangeEntry[];
   logs: AdminLogEntry[];
 };
 
@@ -75,6 +106,24 @@ const DEFAULT_DATA: Schema = {
     copy: 0,
     scan: 0,
   },
+  hopperSettings: {
+    enabled: true,
+    timeoutMs: 8000,
+    retryCount: 1,
+    dispenseCommandPrefix: "HOPPER DISPENSE",
+    selfTestCommand: "HOPPER SELFTEST",
+  },
+  hopperStats: {
+    dispenseAttempts: 0,
+    dispenseSuccess: 0,
+    dispenseFailures: 0,
+    totalDispensed: 0,
+    lastDispensedAt: null,
+    lastError: null,
+    selfTestPassed: null,
+    lastSelfTestAt: null,
+  },
+  owedChanges: [],
   logs: [],
 };
 
@@ -84,6 +133,8 @@ function finiteOr(value: unknown, fallback: number): number {
 
 function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const pricing = data?.settings?.pricing;
+  const hopperSettings = data?.hopperSettings;
+  const hopperStats = data?.hopperStats;
 
   return {
     balance: finiteOr(data?.balance, DEFAULT_DATA.balance),
@@ -129,6 +180,67 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
       copy: finiteOr(data?.jobStats?.copy, DEFAULT_DATA.jobStats.copy),
       scan: finiteOr(data?.jobStats?.scan, DEFAULT_DATA.jobStats.scan),
     },
+    hopperSettings: {
+      enabled:
+        typeof hopperSettings?.enabled === "boolean"
+          ? hopperSettings.enabled
+          : DEFAULT_DATA.hopperSettings.enabled,
+      timeoutMs: finiteOr(
+        hopperSettings?.timeoutMs,
+        DEFAULT_DATA.hopperSettings.timeoutMs,
+      ),
+      retryCount: finiteOr(
+        hopperSettings?.retryCount,
+        DEFAULT_DATA.hopperSettings.retryCount,
+      ),
+      dispenseCommandPrefix:
+        typeof hopperSettings?.dispenseCommandPrefix === "string" &&
+        hopperSettings.dispenseCommandPrefix.trim()
+          ? hopperSettings.dispenseCommandPrefix
+          : DEFAULT_DATA.hopperSettings.dispenseCommandPrefix,
+      selfTestCommand:
+        typeof hopperSettings?.selfTestCommand === "string" &&
+        hopperSettings.selfTestCommand.trim()
+          ? hopperSettings.selfTestCommand
+          : DEFAULT_DATA.hopperSettings.selfTestCommand,
+    },
+    hopperStats: {
+      dispenseAttempts: finiteOr(
+        hopperStats?.dispenseAttempts,
+        DEFAULT_DATA.hopperStats.dispenseAttempts,
+      ),
+      dispenseSuccess: finiteOr(
+        hopperStats?.dispenseSuccess,
+        DEFAULT_DATA.hopperStats.dispenseSuccess,
+      ),
+      dispenseFailures: finiteOr(
+        hopperStats?.dispenseFailures,
+        DEFAULT_DATA.hopperStats.dispenseFailures,
+      ),
+      totalDispensed: finiteOr(
+        hopperStats?.totalDispensed,
+        DEFAULT_DATA.hopperStats.totalDispensed,
+      ),
+      lastDispensedAt:
+        typeof hopperStats?.lastDispensedAt === "string"
+          ? hopperStats.lastDispensedAt
+          : DEFAULT_DATA.hopperStats.lastDispensedAt,
+      lastError:
+        typeof hopperStats?.lastError === "string"
+          ? hopperStats.lastError
+          : DEFAULT_DATA.hopperStats.lastError,
+      selfTestPassed:
+        typeof hopperStats?.selfTestPassed === "boolean"
+          ? hopperStats.selfTestPassed
+          : DEFAULT_DATA.hopperStats.selfTestPassed,
+      lastSelfTestAt:
+        typeof hopperStats?.lastSelfTestAt === "string"
+          ? hopperStats.lastSelfTestAt
+          : DEFAULT_DATA.hopperStats.lastSelfTestAt,
+    },
+    owedChanges: Array.isArray(data?.owedChanges)
+      ? data.owedChanges
+      : DEFAULT_DATA.owedChanges,
     logs: Array.isArray(data?.logs) ? data.logs : DEFAULT_DATA.logs,
   };
 }
