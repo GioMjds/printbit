@@ -3,19 +3,20 @@ import { Server } from "socket.io";
 import path from "node:path";
 import fs from "node:fs";
 import { jobStore } from "../services/job-store";
-import {
-  appendAdminLog,
-  getPricingSettings,
-  incrementJobStats,
-} from "../services/admin";
-import { db, withBalanceLock } from "../services/db";
+import { appendAdminLog, incrementJobStats } from "../services/admin";
 import {
   getAdapter,
   getScannerStatus,
   type ScannerCapabilities,
 } from "../services/scanner";
-import { createScanDownloadLink, resolveScanDownload } from "../services/scan-delivery";
-import { exportScanToUsbDrive, listRemovableDrives } from "../services/usb-drives";
+import {
+  createScanDownloadLink,
+  resolveScanDownload,
+} from "../services/scan-delivery";
+import {
+  exportScanToUsbDrive,
+  listRemovableDrives,
+} from "../services/usb-drives";
 
 const VALID_SOURCES = new Set(["adf", "flatbed"]);
 const VALID_DPI = new Set([150, 300, 600]);
@@ -103,14 +104,19 @@ export function registerScanRoutes(
   // ── GET /api/scanner/status — UI compatibility status endpoint ──────
   app.get("/api/scanner/status", async (_req: Request, res: Response) => {
     const runtime = getScannerStatus();
-    const probeCaps = await getAdapter().probe().catch(() => null);
-    const capabilities = mapCapabilitiesForUi(probeCaps ?? runtime.capabilities);
+    const probeCaps = await getAdapter()
+      .probe()
+      .catch(() => null);
+    const capabilities = mapCapabilitiesForUi(
+      probeCaps ?? runtime.capabilities,
+    );
 
-    const connected = runtime.adapter === "naps2" && Boolean(probeCaps?.available);
+    const connected =
+      runtime.adapter === "naps2" && Boolean(probeCaps?.available);
     const error = connected
       ? undefined
-      : runtime.lastError ??
-        "Scanner unavailable. Check Epson driver, NAPS2 installation, and USB connection.";
+      : (runtime.lastError ??
+        "Scanner unavailable. Check Epson driver, NAPS2 installation, and USB connection.");
 
     res.json({
       connected,
@@ -155,9 +161,15 @@ export function registerScanRoutes(
     }
 
     const safeDpi =
-      typeof dpi === "number" ? dpi : typeof dpi === "string" ? Number(dpi) : NaN;
+      typeof dpi === "number"
+        ? dpi
+        : typeof dpi === "string"
+          ? Number(dpi)
+          : NaN;
     if (!VALID_DPI.has(safeDpi)) {
-      return res.status(400).json({ error: "Invalid dpi. Accepted: 150, 300, 600" });
+      return res
+        .status(400)
+        .json({ error: "Invalid dpi. Accepted: 150, 300, 600" });
     }
 
     const settings = {
@@ -179,6 +191,8 @@ export function registerScanRoutes(
         colorMode: settings.colorMode,
         filename,
       });
+
+      await incrementJobStats("scan");
 
       res.json({
         pages: [`/api/scan/preview/${encodeURIComponent(filename)}`],
@@ -306,7 +320,8 @@ export function registerScanRoutes(
       const drives = await listRemovableDrives();
       res.json({ drives });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not list USB drives.";
+      const message =
+        err instanceof Error ? err.message : "Could not list USB drives.";
       res.status(500).json({ error: message });
     }
   });
@@ -327,11 +342,15 @@ export function registerScanRoutes(
 
     try {
       const exported = await exportScanToUsbDrive(sourcePath, drive);
-      await appendAdminLog("scan_usb_exported", "Scanned file exported to USB.", {
-        filename: safeFilename,
-        drive: exported.drive,
-        exportPath: exported.exportPath,
-      });
+      await appendAdminLog(
+        "scan_usb_exported",
+        "Scanned file exported to USB.",
+        {
+          filename: safeFilename,
+          drive: exported.drive,
+          exportPath: exported.exportPath,
+        },
+      );
       res.json({
         ok: true,
         drive: exported.drive,
@@ -356,7 +375,10 @@ export function registerScanRoutes(
     }
 
     try {
-      const link = createScanDownloadLink(sourcePath, deps.resolvePublicBaseUrl(req));
+      const link = createScanDownloadLink(
+        sourcePath,
+        deps.resolvePublicBaseUrl(req),
+      );
       void appendAdminLog(
         "scan_wireless_link_created",
         "Wireless scan download link created.",
@@ -367,7 +389,8 @@ export function registerScanRoutes(
       );
       res.json(link);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create link.";
+      const message =
+        err instanceof Error ? err.message : "Failed to create link.";
       res.status(500).json({ error: message });
     }
   });
@@ -450,6 +473,7 @@ export function registerScanRoutes(
         jobStore.updateJobState(job.id, "succeeded", {
           resultPath: result.outputPath,
         });
+        await incrementJobStats("scan");
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         jobStore.updateJobState(job.id, "failed", {

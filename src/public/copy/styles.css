@@ -407,7 +407,6 @@ body {
 .step:nth-child(3) {
   animation-delay: 150ms;
 }
-
 @keyframes step-in {
   from {
     opacity: 0;

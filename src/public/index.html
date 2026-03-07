@@ -37,6 +37,7 @@
         <div class="action-grid">
           <!-- Print Card -->
           <button class="action-card" id="openPrintBtn" aria-label="Open Print">
+            <span class="action-card__help" data-guide="print" aria-label="How to print">?</span>
             <div class="action-card__glow"></div>
             <div class="action-card__icon-wrap">
               <svg
@@ -113,6 +114,7 @@
             id="openCopyBtn"
             aria-label="Open Copy"
           >
+            <span class="action-card__help" data-guide="copy" aria-label="How to copy">?</span>
             <div class="action-card__glow"></div>
             <div class="action-card__icon-wrap">
               <svg
@@ -180,6 +182,7 @@
             id="openScanBtn"
             aria-label="Open Scan"
           >
+            <span class="action-card__help" data-guide="scan" aria-label="How to scan">?</span>
             <div class="action-card__glow"></div>
             <div class="action-card__icon-wrap">
               <svg
@@ -271,6 +274,67 @@
       </main>
     </div>
 
+    <!-- Guide modals -->
+    <div class="guide-overlay" id="guideOverlay" aria-hidden="true">
+      <!-- Print guide -->
+      <div class="guide-card" id="guide-print" role="dialog" aria-labelledby="guideTitle-print" style="display:none">
+        <h3 class="guide-card__title" id="guideTitle-print">How to Print</h3>
+        <ol class="guide-card__steps">
+          <li>Scan the QR code with your phone and upload a file.</li>
+          <li>Select your file from the received list.</li>
+          <li>Tap <strong>Continue to settings</strong>.</li>
+          <li>Choose color mode, copies, orientation, paper size, and page range.</li>
+          <li>Insert coins until your balance covers the total, then confirm.</li>
+          <li>Collect your printed pages.</li>
+        </ol>
+        <p class="guide-card__section">Troubleshooting</p>
+        <ul class="guide-card__tips">
+          <li>File not showing? Tap <strong>New session</strong> and upload again.</li>
+          <li>Balance too low? Insert more coins before confirming.</li>
+        </ul>
+        <button class="guide-card__close" type="button" aria-label="Close guide">Got it</button>
+      </div>
+
+      <!-- Copy guide -->
+      <div class="guide-card" id="guide-copy" role="dialog" aria-labelledby="guideTitle-copy" style="display:none">
+        <h3 class="guide-card__title" id="guideTitle-copy">How to Copy</h3>
+        <ol class="guide-card__steps">
+          <li>Place your page face-down on the scanner glass.</li>
+          <li>Tap <strong>Check Document</strong> and review the preview.</li>
+          <li>If the preview is correct, tap <strong>Continue to Config</strong>.</li>
+          <li>Choose copy settings, then continue to confirmation.</li>
+          <li>Insert coins until the required amount is reached, then confirm.</li>
+          <li>Collect your copies from the output tray.</li>
+        </ol>
+        <p class="guide-card__section">Troubleshooting</p>
+        <ul class="guide-card__tips">
+          <li>No document detected? Reposition the page and tap <strong>Retry</strong>.</li>
+          <li>Preview looks wrong? Tap <strong>Check Document</strong> again.</li>
+          <li>Balance too low? Insert more coins before confirming.</li>
+        </ul>
+        <button class="guide-card__close" type="button" aria-label="Close guide">Got it</button>
+      </div>
+
+      <!-- Scan guide -->
+      <div class="guide-card" id="guide-scan" role="dialog" aria-labelledby="guideTitle-scan" style="display:none">
+        <h3 class="guide-card__title" id="guideTitle-scan">How to Scan</h3>
+        <ol class="guide-card__steps">
+          <li>Choose scan source, color mode, and resolution.</li>
+          <li>Place your document, then tap <strong>Scan Document</strong>.</li>
+          <li>Review the preview. Tap <strong>Rescan</strong> if needed.</li>
+          <li>Tap <strong>Get Soft Copy</strong>.</li>
+          <li>Choose delivery: <strong>Wireless (QR)</strong> to scan a code on your phone, or <strong>USB Flash Drive</strong> to export to a USB stick.</li>
+        </ol>
+        <p class="guide-card__section">Troubleshooting</p>
+        <ul class="guide-card__tips">
+          <li>Scanner unavailable? Check the cable/power and try again.</li>
+          <li>QR link expired? Tap <strong>Refresh QR Link</strong>.</li>
+          <li>No USB detected? Insert or reinsert the drive and tap <strong>Refresh USB</strong>.</li>
+        </ul>
+        <button class="guide-card__close" type="button" aria-label="Close guide">Got it</button>
+      </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="bundle.js"></script>
     <script>
@@ -319,6 +383,41 @@
       }
       updateClock();
       setInterval(updateClock, 1000);
+
+      // Guide overlay logic
+      (function () {
+        var overlay = document.getElementById("guideOverlay");
+        var cards = overlay.querySelectorAll(".guide-card");
+
+        function openGuide(name) {
+          cards.forEach(function (c) { c.style.display = "none"; });
+          var target = document.getElementById("guide-" + name);
+          if (target) target.style.display = "flex";
+          overlay.classList.add("is-visible");
+          overlay.setAttribute("aria-hidden", "false");
+        }
+
+        function closeGuide() {
+          overlay.classList.remove("is-visible");
+          overlay.setAttribute("aria-hidden", "true");
+        }
+
+        document.querySelectorAll(".action-card__help").forEach(function (btn) {
+          btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            openGuide(btn.dataset.guide);
+          });
+        });
+
+        overlay.querySelectorAll(".guide-card__close").forEach(function (btn) {
+          btn.addEventListener("click", closeGuide);
+        });
+
+        overlay.addEventListener("click", function (e) {
+          if (e.target === overlay) closeGuide();
+        });
+      })();
     </script>
   </body>
 </html>

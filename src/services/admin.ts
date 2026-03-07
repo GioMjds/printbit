@@ -61,8 +61,17 @@ export async function incrementCoinStats(coinValue: number): Promise<void> {
 
 export async function incrementJobStats(mode: PrintMode): Promise<void> {
   db.data!.jobStats.total += 1;
-  if (mode === "print") db.data!.jobStats.print += 1;
-  else db.data!.jobStats.copy += 1;
+  switch (mode) {
+    case "print":
+      db.data!.jobStats.print += 1;
+      break;
+    case "copy":
+      db.data!.jobStats.copy += 1;
+      break;
+    case "scan":
+      db.data!.jobStats.scan += 1;
+      break;
+  }
   await db.write();
 }
 

@@ -89,9 +89,7 @@ export async function runHopperSelfTest(): Promise<HopperDispenseResult> {
   };
 }
 
-export async function dispenseChange(
-  amount: number,
-): Promise<HopperDispenseResult> {
+export async function dispenseChange(amount: number): Promise<HopperDispenseResult> {
   const requestedAmount = safeAmount(amount);
   if (requestedAmount <= 0) {
     return {
@@ -106,10 +104,7 @@ export async function dispenseChange(
   const stats = db.data!.hopperStats;
 
   if (!settings.enabled) {
-    const owed = await recordOwedChange(
-      requestedAmount,
-      "Hopper disabled in settings.",
-    );
+    const owed = await recordOwedChange(requestedAmount, "Hopper disabled in settings.");
     stats.dispenseFailures += 1;
     stats.lastError = "Hopper is disabled in settings.";
     await db.write();
@@ -125,10 +120,7 @@ export async function dispenseChange(
 
   const serialStatus = getHopperStatus();
   if (!serialStatus.connected) {
-    const owed = await recordOwedChange(
-      requestedAmount,
-      "Serial port not connected.",
-    );
+    const owed = await recordOwedChange(requestedAmount, "Serial port not connected.");
     stats.dispenseFailures += 1;
     stats.lastError = "Serial port not connected.";
     await db.write();
@@ -152,9 +144,7 @@ export async function dispenseChange(
 
     if (result.ok) {
       stats.dispenseSuccess += 1;
-      stats.totalDispensed = Number(
-        (stats.totalDispensed + requestedAmount).toFixed(2),
-      );
+      stats.totalDispensed = Number((stats.totalDispensed + requestedAmount).toFixed(2));
       stats.lastDispensedAt = new Date().toISOString();
       stats.lastError = null;
       await db.write();
@@ -170,13 +160,9 @@ export async function dispenseChange(
     lastMessage = result.message;
   }
 
-  const owed = await recordOwedChange(
-    requestedAmount,
-    "Hopper dispense failed.",
-    {
-      message: lastMessage,
-    },
-  );
+  const owed = await recordOwedChange(requestedAmount, "Hopper dispense failed.", {
+    message: lastMessage,
+  });
 
   stats.dispenseFailures += 1;
   stats.lastError = lastMessage;

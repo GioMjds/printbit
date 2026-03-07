@@ -354,6 +354,7 @@
                 </div>
                 <div class="panel__body">
                   <div class="breakdown">
+                    <!-- Print -->
                     <div class="breakdown__row">
                       <div class="breakdown__meta">
                         <span
@@ -371,6 +372,7 @@
                         ></div>
                       </div>
                     </div>
+                    <!-- Copy -->
                     <div class="breakdown__row">
                       <div class="breakdown__meta">
                         <span
@@ -384,6 +386,24 @@
                         <div
                           class="breakdown__fill breakdown__fill--copy"
                           id="barCopy"
+                          style="width: 0%"
+                        ></div>
+                      </div>
+                    </div>
+                    <!-- Scan -->
+                    <div class="breakdown__row">
+                      <div class="breakdown__meta">
+                        <span
+                          class="breakdown__dot breakdown__dot--scan"
+                          aria-hidden="true"
+                        ></span>
+                        <span class="breakdown__name">Scan</span>
+                        <span class="breakdown__count" id="jobsScan">0</span>
+                      </div>
+                      <div class="breakdown__track">
+                        <div
+                          class="breakdown__fill breakdown__fill--scan"
+                          id="barScan"
                           style="width: 0%"
                         ></div>
                       </div>

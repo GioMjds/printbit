@@ -200,6 +200,10 @@
   background: var(--peach);
 }
 
+.breakdown__dot--scan {
+  background: var(--green);
+}
+
 .breakdown__name {
   font-size: 13px;
   font-weight: 600;
@@ -231,6 +235,10 @@
 
 .breakdown__fill--copy {
   background: linear-gradient(90deg, var(--peach), #f7e0d4);
+}
+
+.breakdown__fill--scan {
+  background: linear-gradient(90deg, var(--green), #a8e6cf);
 }
 
 /* ── Control buttons ─────────────────────────────────────── */

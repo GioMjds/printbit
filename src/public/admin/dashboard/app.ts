@@ -1,18 +1,31 @@
-import { SummaryResponse, apiFetch, setMessage, initAuth, peso, formatBytes } from "../shared";
+import {
+  SummaryResponse,
+  apiFetch,
+  setMessage,
+  initAuth,
+  peso,
+  formatBytes,
+} from "../shared";
 
 const metricBalance = document.getElementById("metricBalance") as HTMLElement;
 const earningsToday = document.getElementById("earningsToday") as HTMLElement;
 const jobsTotal = document.getElementById("jobsTotal") as HTMLElement;
 const jobsPrint = document.getElementById("jobsPrint") as HTMLElement;
 const jobsCopy = document.getElementById("jobsCopy") as HTMLElement;
+const jobsScan = document.getElementById("jobsScan") as HTMLElement;
 const storageFiles = document.getElementById("storageFiles") as HTMLElement;
 const storageBytes = document.getElementById("storageBytes") as HTMLElement;
 const barPrint = document.getElementById("barPrint") as HTMLElement | null;
 const barCopy = document.getElementById("barCopy") as HTMLElement | null;
+const barScan = document.getElementById("barScan") as HTMLElement | null;
 
 const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
-const resetBalanceBtn = document.getElementById("resetBalanceBtn") as HTMLButtonElement;
-const clearStorageBtn = document.getElementById("clearStorageBtn") as HTMLButtonElement;
+const resetBalanceBtn = document.getElementById(
+  "resetBalanceBtn",
+) as HTMLButtonElement;
+const clearStorageBtn = document.getElementById(
+  "clearStorageBtn",
+) as HTMLButtonElement;
 
 let refreshTimer: number | null = null;
 
@@ -22,12 +35,17 @@ function applySummary(summary: SummaryResponse): void {
   jobsTotal.textContent = String(summary.jobStats.total);
   jobsPrint.textContent = String(summary.jobStats.print);
   jobsCopy.textContent = String(summary.jobStats.copy);
+  jobsScan.textContent = String(summary.jobStats.scan);
   storageFiles.textContent = String(summary.storage.fileCount);
   storageBytes.textContent = formatBytes(summary.storage.bytes);
 
   const total = summary.jobStats.total || 1;
-  if (barPrint) barPrint.style.width = `${Math.round((summary.jobStats.print / total) * 100)}%`;
-  if (barCopy) barCopy.style.width = `${Math.round((summary.jobStats.copy / total) * 100)}%`;
+  if (barPrint)
+    barPrint.style.width = `${Math.round((summary.jobStats.print / total) * 100)}%`;
+  if (barCopy)
+    barCopy.style.width = `${Math.round((summary.jobStats.copy / total) * 100)}%`;
+  if (barScan)
+    barScan.style.width = `${Math.round((summary.jobStats.scan / total) * 100)}%`;
 }
 
 async function loadData(): Promise<void> {
@@ -44,7 +62,9 @@ refreshBtn.addEventListener("click", () => {
   setMessage("Refreshing...");
   void loadData()
     .then(() => setMessage("Dashboard refreshed."))
-    .catch((e: unknown) => setMessage(e instanceof Error ? e.message : "Refresh failed."));
+    .catch((e: unknown) =>
+      setMessage(e instanceof Error ? e.message : "Refresh failed."),
+    );
 });
 
 resetBalanceBtn.addEventListener("click", () => {
@@ -56,7 +76,9 @@ resetBalanceBtn.addEventListener("click", () => {
       await loadData();
       setMessage("Balance reset.");
     })
-    .catch((e: unknown) => setMessage(e instanceof Error ? e.message : "Failed to reset balance."));
+    .catch((e: unknown) =>
+      setMessage(e instanceof Error ? e.message : "Failed to reset balance."),
+    );
 });
 
 clearStorageBtn.addEventListener("click", () => {
@@ -68,7 +90,9 @@ clearStorageBtn.addEventListener("click", () => {
       await loadData();
       setMessage("Storage cleared.");
     })
-    .catch((e: unknown) => setMessage(e instanceof Error ? e.message : "Failed to clear storage."));
+    .catch((e: unknown) =>
+      setMessage(e instanceof Error ? e.message : "Failed to clear storage."),
+    );
 });
 
 initAuth(async () => {

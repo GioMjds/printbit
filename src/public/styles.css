@@ -316,6 +316,132 @@ html, body {
   height: 100%;
 }
 
+/* ── Help button on each card ─────────────────────────────── */
+.action-card__help {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.30);
+  background: rgba(255,255,255,.14);
+  color: rgba(255,255,255,.85);
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 150ms, border-color 150ms, color 150ms;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.action-card__help:hover {
+  background: rgba(255,255,255,.26);
+  border-color: rgba(255,255,255,.55);
+  color: var(--white);
+}
+
+/* ── Guide overlay ───────────────────────────────────────── */
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14,13,31,.85);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.guide-overlay.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.guide-card {
+  flex-direction: column;
+  gap: 20px;
+  width: 660px;
+  max-width: 94vw;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 44px 40px 36px;
+  background: #181730;
+  border: 2px solid rgba(167,170,225,.25);
+  border-radius: 28px;
+  box-shadow: 0 28px 72px rgba(0,0,0,.65);
+  transform: translateY(18px) scale(.97);
+  transition: transform 220ms cubic-bezier(.22,1,.36,1);
+}
+
+.guide-overlay.is-visible .guide-card {
+  transform: translateY(0) scale(1);
+}
+
+.guide-card__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -.4px;
+  color: var(--white);
+}
+
+.guide-card__section {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--lavender);
+}
+
+.guide-card__steps,
+.guide-card__tips {
+  margin: 0;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-card__steps li,
+.guide-card__tips li {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+
+.guide-card__steps li strong,
+.guide-card__tips li strong {
+  color: var(--white);
+}
+
+.guide-card__close {
+  align-self: flex-end;
+  margin-top: 12px;
+  padding: 16px 44px;
+  border: none;
+  border-radius: 18px;
+  background: var(--indigo);
+  color: var(--white);
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.guide-card__close:hover {
+  background: #7c82d6;
+}
+
 /* ── Footer ───────────────────────────────────────────────── */
 .footer {
   padding: 16px 0 20px;

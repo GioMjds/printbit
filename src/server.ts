@@ -27,7 +27,12 @@ import { detectDefaultPrinter } from "./services/printer";
 import { detectScanner } from "./services/scanner";
 import { startScanStorageCleanup } from "./services/scan-storage";
 import { convertToPdfPreview } from "./services/preview";
-import { getSerialStatus, initSerial } from "./services/serial";
+import {
+  getHopperStatus,
+  getSerialStatus,
+  initSerial,
+} from "./services/serial";
+import { runHopperSelfTest } from "./services/hopper";
 import {
   startHotspot,
   stopHotspot,
@@ -122,6 +127,8 @@ registerStaticAssets(app);
 registerAdminRoutes(app, {
   uploadDir: UPLOAD_DIR,
   getSerialStatus,
+  getHopperStatus,
+  runHopperSelfTest,
 });
 registerFinancialRoutes(app, {
   io,
@@ -156,7 +163,8 @@ async function start() {
   await detectDefaultPrinter();
   await detectScanner();
   startScanStorageCleanup();
-  initSerial(io);
+  await initSerial(io);
+  await runHopperSelfTest();
 
   // Launch MyPublicWiFi hotspot on startup (idempotent — Print page can re-call safely)
   await startHotspot();

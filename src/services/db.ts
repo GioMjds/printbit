@@ -1,7 +1,7 @@
 import { Low } from "lowdb";
 import { JSONFile } from "lowdb/node";
 
-export type PrintMode = "print" | "copy";
+export type PrintMode = "print" | "copy" | "scan";
 export type ColorMode = "colored" | "grayscale";
 
 export interface PricingSettings {

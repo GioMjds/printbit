@@ -15,7 +15,19 @@ export type SummaryResponse = {
     total: number;
     print: number;
     copy: number;
+    scan: number;
   };
+  hopperStats: {
+    dispenseAttempts: number;
+    dispenseSuccess: number;
+    dispenseFailures: number;
+    totalDispensed: number;
+    lastDispensedAt: string | null;
+    lastError: string | null;
+    selfTestPassed: boolean | null;
+    lastSelfTestAt: string | null;
+  };
+  owedChangeOpenCount: number;
   storage: {
     fileCount: number;
     bytes: number;
@@ -29,6 +41,13 @@ export type SummaryResponse = {
       connected: boolean;
       portPath: string | null;
       lastError: string | null;
+    };
+    hopper: {
+      connected: boolean;
+      pending: boolean;
+      portPath: string | null;
+      lastError: string | null;
+      lastSuccessAt: string | null;
     };
     printer: {
       connected: boolean;
