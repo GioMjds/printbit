@@ -1,8 +1,8 @@
-import os from "os";
-import express from "express";
-import http from "http";
-import { Server } from "socket.io";
-import multer from "multer";
+import os from 'os';
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import multer from 'multer';
 import {
   PORT,
   PORTAL_ASSETS,
@@ -12,37 +12,37 @@ import {
   HOTSPOT_SSID,
   HOTSPOT_PASSWORD,
   CAPTIVE_PORTAL_ENABLED,
-} from "./config/http";
-import { registerStaticAssets } from "./middleware/static-assets";
-import { createCaptivePortalMiddleware } from "./middleware/captive-portal";
-import { registerFinancialRoutes } from "./routes/financial-routes";
-import { registerPageRoutes } from "./routes/page-routes";
-import { registerAdminRoutes } from "./routes/admin-routes";
-import { registerUploadPortalRoutes } from "./routes/upload-portal-routes";
-import { registerWirelessSessionRoutes } from "./routes/wireless-session-routes";
-import { registerScanRoutes } from "./routes/scan-routes";
-import { registerCopyRoutes } from "./routes/copy-routes";
-import { initDB } from "./services/db";
-import { detectDefaultPrinter } from "./services/printer";
-import { detectScanner } from "./services/scanner";
-import { startScanStorageCleanup } from "./services/scan-storage";
-import { convertToPdfPreview } from "./services/preview";
+} from '@/config';
 import {
+  registerStaticAssets,
+  createCaptivePortalMiddleware,
+} from '@/middleware';
+import {
+  registerFinancialRoutes,
+  registerPageRoutes,
+  registerAdminRoutes,
+  registerUploadPortalRoutes,
+  registerWirelessSessionRoutes,
+  registerScanRoutes,
+  registerCopyRoutes,
+} from '@/routes';
+import {
+  initDB,
+  detectDefaultPrinter,
+  detectScanner,
+  startScanStorageCleanup,
+  convertToPdfPreview,
   getHopperStatus,
   getSerialStatus,
   initSerial,
-} from "./services/serial";
-import { runHopperSelfTest } from "./services/hopper";
-import {
+  runHopperSelfTest,
   startHotspot,
   stopHotspot,
   isHotspotRunning,
-} from "./services/hotspot";
-import {
   SessionStore,
   renderUploadPortal,
   resolvePublicBaseUrl,
-} from "./services/session";
+} from '@/services';
 
 const app = express();
 const server = http.createServer(app);
@@ -54,13 +54,13 @@ function getLocalIPv4(): string | null {
 
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]!) {
-      if (iface.family !== "IPv4" || iface.internal) continue;
+      if (iface.family !== 'IPv4' || iface.internal) continue;
 
       // Prefer hotspot adapter: MyPublicWiFi (192.168.5.x) or Windows Mobile Hotspot (192.168.137.x)
       const isHotspot =
         /Wi-Fi Direct|Local Area Connection\*/i.test(name) ||
-        iface.address.startsWith("192.168.5.") ||
-        iface.address.startsWith("192.168.137.");
+        iface.address.startsWith('192.168.5.') ||
+        iface.address.startsWith('192.168.137.');
       if (isHotspot) return iface.address;
 
       if (!fallback) fallback = iface.address;
@@ -86,12 +86,12 @@ if (CAPTIVE_PORTAL_ENABLED) {
 }
 
 // Hotspot config API (used by print page to generate Wi-Fi QR)
-app.get("/api/config/hotspot", (_req, res) => {
+app.get('/api/config/hotspot', (_req, res) => {
   res.json({ ssid: HOTSPOT_SSID, password: HOTSPOT_PASSWORD });
 });
 
 // On-demand hotspot control (called by print page when session starts)
-app.post("/api/hotspot/start", async (_req, res) => {
+app.post('/api/hotspot/start', async (_req, res) => {
   try {
     await startHotspot();
     res.json({ ok: true, running: isHotspotRunning() });
@@ -101,20 +101,20 @@ app.post("/api/hotspot/start", async (_req, res) => {
   }
 });
 
-app.post("/api/hotspot/stop", (_req, res) => {
+app.post('/api/hotspot/stop', (_req, res) => {
   stopHotspot();
   res.json({ ok: true });
 });
 
 // Active session API
-app.get("/api/session/active", (_req, res) => {
+app.get('/api/session/active', (_req, res) => {
   const token = sessionStore.getActiveSessionToken();
   if (token) {
-    const localIP = getLocalIPv4() ?? "192.168.5.1";
+    const localIP = getLocalIPv4() ?? '192.168.5.1';
     const uploadUrl = `http://${localIP}:${PORT}/upload/${encodeURIComponent(token)}`;
     res.json({ token, uploadUrl });
   } else {
-    res.status(404).json({ error: "No active session" });
+    res.status(404).json({ error: 'No active session' });
   }
 });
 
@@ -133,7 +133,7 @@ registerAdminRoutes(app, {
 registerFinancialRoutes(app, {
   io,
   sessionStore,
-  uploadSingle: upload.single("file"),
+  uploadSingle: upload.single('file'),
   resolvePublicBaseUrl,
 });
 registerUploadPortalRoutes(app, {
@@ -145,15 +145,15 @@ registerUploadPortalRoutes(app, {
 registerWirelessSessionRoutes(app, {
   io,
   sessionStore,
-  wirelessUploadSingle: wirelessUpload.single("file"),
+  wirelessUploadSingle: wirelessUpload.single('file'),
   resolvePublicBaseUrl,
   convertToPdfPreview,
 });
 registerScanRoutes(app, { io, resolvePublicBaseUrl });
 registerCopyRoutes(app, { io });
 
-io.on("connection", (socket) => {
-  socket.on("joinSession", (sessionId: string) => {
+io.on('connection', (socket) => {
+  socket.on('joinSession', (sessionId: string) => {
     socket.join(`session:${sessionId}`);
   });
 });
@@ -169,12 +169,12 @@ async function start() {
   // Launch MyPublicWiFi hotspot on startup (idempotent — Print page can re-call safely)
   await startHotspot();
 
-  server.listen(PORT, "0.0.0.0", () => {
+  server.listen(PORT, '0.0.0.0', () => {
     const localIP = getLocalIPv4();
     if (localIP) {
       console.log(`→ Network: http://${localIP}:${PORT}`);
     } else {
-      console.log("→ Network IP not detected");
+      console.log('→ Network IP not detected');
     }
   });
 }
