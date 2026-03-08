@@ -1,4 +1,8 @@
 onlyBuiltDependencies:
+  - '@nestjs/core'
   - '@parcel/watcher'
+  - '@prisma/engines'
   - '@serialport/bindings-cpp'
+  - '@swc/core'
   - esbuild
+  - prisma

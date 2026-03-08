@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ── Singleton tables (id = 1 always) ─────────────────────────────────────────
+
+model KioskState {
+  id       Int @id @default(1)
+  balance  Int @default(0)   // stored as cents (Int) — no floating point money
+  earnings Int @default(0)
+}
+
+model CoinStats {
+  id     Int @id @default(1)
+  one    Int @default(0)
+  five   Int @default(0)
+  ten    Int @default(0)
+  twenty Int @default(0)
+}
+
+model JobStats {
+  id    Int @id @default(1)
+  total Int @default(0)
+  print Int @default(0)
+  copy  Int @default(0)
+  scan  Int @default(0)
+}
+
+model AdminSettings {
+  id                   Int     @id @default(1)
+  // Pricing (flattened — no nested object in SQLite)
+  printPerPage         Int     @default(5)
+  copyPerPage          Int     @default(3)
+  scanDocument         Int     @default(5)
+  colorSurcharge       Int     @default(2)
+  // General
+  idleTimeoutSeconds   Int     @default(120)
+  adminPin             String  @default("1234")
+  adminLocalOnly       Boolean @default(true)
+}
+
+model HopperSettings {
+  id                     Int     @id @default(1)
+  enabled                Boolean @default(true)
+  timeoutMs              Int     @default(8000)
+  retryCount             Int     @default(1)
+  dispenseCommandPrefix  String  @default("HOPPER DISPENSE")
+  selfTestCommand        String  @default("HOPPER SELFTEST")
+}
+
+model HopperStats {
+  id                 Int      @id @default(1)
+  dispenseAttempts   Int      @default(0)
+  dispenseSuccess    Int      @default(0)
+  dispenseFailures   Int      @default(0)
+  totalDispensed     Int      @default(0)
+  lastDispensedAt    DateTime?
+  lastError          String?
+  selfTestPassed     Boolean?
+  lastSelfTestAt     DateTime?
+}
+
+// ── Append-only / collection tables ──────────────────────────────────────────
+
+model Log {
+  id        String   @id @default(uuid())
+  timestamp DateTime @default(now())
+  type      String
+  message   String
+  meta      String?  // JSON string — LogMeta (Record<string, string|number|boolean|null>)
+}
+
+model OwedChange {
+  id        String   @id @default(uuid())
+  timestamp DateTime @default(now())
+  amount    Int      // cents
+  reason    String
+  status    String   @default("open")  // "open" | "resolved"
+  meta      String?  // JSON string
+}
+
+// ── Idempotency cache (was pure in-memory in db.ts) ──────────────────────────
+
+model IdempotencyRecord {
+  key        String   @id        // namespacedKey = "namespace\x00key"
+  response   String              // JSON string of the response body
+  statusCode Int
+  expiresAt  DateTime
+}
+
+// ── Upload sessions (was in-memory in session.ts) ────────────────────────────
+
+model UploadSession {
+  id        String         @id @default(uuid())
+  token     String         @unique @default(uuid())
+  uploadUrl String
+  status    String         @default("pending")  // "pending" | "uploaded"
+  createdAt DateTime       @default(now())
+  expiresAt DateTime       // createdAt + 15 min, set at creation
+  files     UploadFile[]
+}
+
+model UploadFile {
+  id           String        @id @default(uuid())
+  session      UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId    String
+  filename     String        // UUID filename on disk
+  originalName String
+  contentType  String
+  sizeBytes    Int
+  filePath     String
+  uploadedAt   DateTime      @default(now())
+}
+
+// ── Scan download tokens (was in-memory in scan-delivery.ts) ─────────────────
+
+model ScanDeliveryToken {
+  id        String   @id @default(uuid())
+  token     String   @unique @default(uuid())
+  filePath  String
+  filename  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}

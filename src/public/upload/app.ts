@@ -237,7 +237,7 @@ function addFilesToQueue(files: FileList | File[]): void {
 function refreshUploadBtn(): void {
   const pendingCount = queue.filter((q) => q.status === "pending").length;
   if (appState !== "session-ready" && appState !== "all-done") return;
-  uploadButton.disabled = pendingCount === 0 || appState === "session-loading";
+  uploadButton.disabled = pendingCount === 0;
   uploadBtnLabel.textContent =
     pendingCount > 1 ? `Send ${pendingCount} files to Kiosk` : "Send to Kiosk";
 }
