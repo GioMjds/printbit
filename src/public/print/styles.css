@@ -23,7 +23,7 @@ body {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.28;
+  opacity: 0.22;
   animation: drift 18s ease-in-out infinite alternate;
 }
 
@@ -92,26 +92,26 @@ body {
   gap: 8px;
   color: var(--lavender);
   text-decoration: none;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  padding: 10px 16px;
+  padding: 9px 16px;
   border-radius: 40px;
   border: 1.5px solid rgba(167, 170, 225, 0.2);
-  background: rgba(167, 170, 225, 0.07);
+  background: rgba(167, 170, 225, 0.06);
   transition:
-    background 160ms ease,
-    border-color 160ms ease;
+    background 150ms,
+    border-color 150ms;
   width: fit-content;
 }
 
 .back-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 
 .back-btn:hover {
-  background: rgba(167, 170, 225, 0.14);
-  border-color: rgba(167, 170, 225, 0.4);
+  background: rgba(167, 170, 225, 0.13);
+  border-color: rgba(167, 170, 225, 0.38);
 }
 
 .back-btn:active {
@@ -127,15 +127,15 @@ body {
 }
 
 .page-title-icon {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   color: var(--lavender);
   flex-shrink: 0;
 }
 
 .page-title-block h1 {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   letter-spacing: -0.4px;
   margin: 0;
   color: var(--white);
@@ -182,7 +182,7 @@ body {
 .print-layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 1fr 340px;
   gap: 24px;
   padding: 20px 0 8px;
   min-height: 0;
