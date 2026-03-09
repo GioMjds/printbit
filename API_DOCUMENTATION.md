@@ -75,9 +75,17 @@ Response:
   "ok": true,
   "chargedAmount": 5,
   "balance": 0,
-  "earnings": 100
+  "earnings": 100,
+  "change": {
+    "requested": 2,
+    "dispensed": 2,
+    "state": "dispensed",
+    "attempts": 1
+  }
 }
 ```
+
+The `change` object is always present. `state` is one of `"none"`, `"dispensed"`, or `"failed"`. When `state` is `"failed"`, an `owedChangeId` and `message` are included — the owed change is recorded for admin resolution.
 
 ### Legacy endpoints
 
@@ -163,7 +171,7 @@ Downloads a scanned file using a temporary tokenized link.
 ## Copy APIs
 
 ### `POST /api/copy/jobs`
-Creates a copy job from validated preview file and charges required amount.
+Creates a copy job from validated preview file. After successful print dispatch, charges balance and dispenses coin change via hopper (same settlement flow as print). The job `payment` field includes `chargedAmount` and `remainingBalance`.
 
 ### `GET /api/copy/jobs/:id`
 Gets copy job status.
@@ -207,11 +215,14 @@ Each `ink` entry has:
 ### `GET /api/admin/status`
 Returns system/runtime status (includes `printer` telemetry with the same shape as above).
 
+### `POST /api/admin/hopper/self-test`
+Triggers a coin hopper self-test. Returns `{ ok, amount, message, attempts }`.
+
 ### `GET /api/admin/settings`
-Returns settings.
+Returns settings. All pricing values are whole-peso integers.
 
 ### `PUT /api/admin/settings`
-Updates pricing, timeout, PIN, and local-only guard.
+Updates pricing, timeout, PIN, and local-only guard. Pricing fields (`printPerPage`, `copyPerPage`, `scanDocument`, `colorSurcharge`) must be non-negative integers (whole pesos). Fractional values are rejected with `400`.
 
 ### `GET /api/admin/logs`
 Returns logs (`?limit=1..1000`, default 200).
@@ -227,3 +238,12 @@ Resets balance to `0`.
 
 ### `POST /api/admin/storage/clear`
 Clears top-level files under upload directory.
+
+### `GET /api/admin/owed-changes`
+Returns all owed change entries with counts: `{ total, openCount, resolvedCount, entries[] }`. Each entry has `id`, `timestamp`, `amount`, `reason`, `status` ("open"|"resolved"), and optional `meta`.
+
+### `POST /api/admin/owed-changes/:id/resolve`
+Marks a single owed change entry as resolved. Returns `{ ok, entry }`. Returns `404` if not found, `409` if already resolved.
+
+### `POST /api/admin/owed-changes/resolve-all`
+Bulk-resolves all open owed change entries. Returns `{ ok, resolvedCount }`.

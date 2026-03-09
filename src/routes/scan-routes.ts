@@ -230,9 +230,7 @@ export function registerScanRoutes(
         return res.status(404).json({ error: "Scanned file not found." });
       }
 
-      const requiredAmount = Number(
-        getPricingSettings().scanDocument.toFixed(2),
-      );
+      const requiredAmount = getPricingSettings().scanDocument;
       if (requiredAmount <= 0 || isSoftCopyPaid(safeFilename)) {
         return res.json({
           ok: true,
@@ -265,12 +263,8 @@ export function registerScanRoutes(
           };
         }
 
-        db.data!.balance = Number(
-          (db.data!.balance - requiredAmount).toFixed(2),
-        );
-        db.data!.earnings = Number(
-          (db.data!.earnings + requiredAmount).toFixed(2),
-        );
+        db.data!.balance -= requiredAmount;
+        db.data!.earnings += requiredAmount;
         await db.write();
         markSoftCopyPaid(safeFilename);
 

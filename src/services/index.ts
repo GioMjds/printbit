@@ -1,6 +1,7 @@
 export * from "./admin";
 export * from "./db";
 export * from "./hopper";
+export * from "./hopper-protocol";
 export * from "./hotspot";
 export * from "./job-store";
 export * from "./preview";
@@ -12,4 +13,5 @@ export * from "./scan-storage";
 export * from "./scanner";
 export * from "./serial";
 export * from "./session";
+export * from "./settlement";
 export * from "./usb-drives";

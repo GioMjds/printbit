@@ -30,7 +30,10 @@ The backend serves pages, exposes APIs, and coordinates print/copy/scan/payment 
 ## 3) Service layer (`src/services`)
 
 - `db.ts`: LowDB persistence (`db.json`) for balance, earnings, settings, stats, logs.
-- `serial.ts`: coin input parsing and balance mutation.
+- `serial.ts`: coin input parsing, balance mutation, and hopper command transport (shared 9600-baud serial line).
+- `hopper.ts`: coin hopper orchestration — dispense with retries, stats tracking, owed-change fallback.
+- `hopper-protocol.ts`: Arduino hopper serial protocol contract (command builders, response parser, error codes).
+- `settlement.ts`: shared payment settlement logic (charge balance + dispense change) used by print and copy flows.
 - `printer.ts`: SumatraPDF-based print dispatch.
 - `session.ts`: in-memory wireless upload session domain.
 - `hotspot.ts`: MyPublicWiFi process/config integration.
@@ -79,7 +82,8 @@ Ephemeral (process memory):
 3. Kiosk polls/receives upload completion.
 4. User selects print settings.
 5. Confirm endpoint validates funds and dispatches print.
-6. Balance/earnings updated and emitted via Socket.IO.
+6. Settlement: balance zeroed, earnings updated, change dispensed via coin hopper.
+7. Socket.IO emits balance update and change dispense status events.
 
 ## B) Copy flow
 
@@ -87,18 +91,29 @@ Ephemeral (process memory):
 2. User confirms copy settings.
 3. Copy job endpoint validates preview + funds.
 4. Print dispatch runs asynchronously via job state updates.
+5. Settlement: same as print — balance zeroed, change dispensed via hopper.
 
-## C) Admin flow
+## C) Change dispensing (coin hopper)
+
+1. Settlement logic computes `changeAmount = previousBalance - requiredAmount`.
+2. If `changeAmount > 0`, sends `HOPPER DISPENSE <requestId> <coinCount>` to Arduino via serial.
+3. Arduino acknowledges with `HOPPER ACK`, sends `HOPPER PROGRESS` updates, then `HOPPER DONE` or `HOPPER ERR`.
+4. Protocol defined in `hopper-protocol.ts`; request IDs are 4-char hex for Arduino memory efficiency.
+5. Hopper only dispenses **1-peso coins** — all pricing enforced as whole-peso integers.
+6. On dispense failure, owed change is recorded for admin resolution (`owedChanges` in db.json).
+7. Retries happen only for retryable error codes (JAM, MOTOR_TIMEOUT, PARTIAL).
+
+## D) Admin flow
 
 1. Admin authenticates with PIN.
 2. UI reads summary/status/settings/logs.
-3. Maintenance actions can reset balance, clear storage, update settings, and export logs.
+3. Maintenance actions can reset balance, clear storage, update settings, export logs, and resolve owed changes.
 
 ## External dependencies
 
 - MyPublicWiFi (hotspot + captive behavior)
 - SumatraPDF executable for print dispatch
-- Serial device for coin input
+- Serial device for coin input + coin hopper (shared 9600-baud line via Arduino Uno)
 - Scanner hardware adapter
 
 ## Design considerations

@@ -1,14 +1,14 @@
 import type { Express, Request, RequestHandler, Response } from "express";
 import path from "node:path";
 import type { Server } from "socket.io";
-import { db, withBalanceLock, acquireIdempotencyKey, storeIdempotencyKey, releaseIdempotencyKey } from "../services/db";
+import { db, acquireIdempotencyKey, storeIdempotencyKey, releaseIdempotencyKey } from "../services/db";
 import {
   appendAdminLog,
   calculateJobAmount,
   getPricingSettings,
   incrementJobStats,
 } from "../services/admin";
-import { dispenseChange } from "../services/hopper";
+import { settlePayment } from "../services/settlement";
 import { printFile, type PrintJobOptions } from "../services/printer";
 import type { SessionStore } from "../services/session";
 
@@ -407,156 +407,69 @@ export function registerFinancialRoutes(
       }
     }
 
-    // ── Balance lock: minimal critical section — mutation + db.write only ─────
-    const result = await withBalanceLock(async () => {
-      if ((db.data?.balance ?? 0) < requiredAmount) {
-        void appendAdminLog(
-          "payment_failed",
-          "Confirm payment failed: insufficient balance after print.",
-          { balance: db.data?.balance ?? 0, requiredAmount },
-        );
-        return {
-          status: 400,
-          body: {
-            error: "Insufficient balance",
-            balance: db.data?.balance ?? 0,
-            requiredAmount,
-          },
-        };
-      }
-
-      const previousBalance = db.data!.balance;
-      const changeAmount = Number((previousBalance - requiredAmount).toFixed(2));
-      db.data!.balance = 0;
-      db.data!.earnings += requiredAmount;
-      await db.write();
-      const remainingBalance = 0;
-      const currentEarnings = db.data!.earnings;
-      deps.io.emit("balance", remainingBalance);
-
-      if (changeAmount <= 0) {
-        return {
-          status: 200,
-          body: {
-            ok: true,
-            chargedAmount: requiredAmount,
-            balance: remainingBalance,
-            earnings: currentEarnings,
-            change: {
-              requested: 0,
-              dispensed: 0,
-              state: "none",
-            },
-          },
-        };
-      }
-
-      deps.io.emit("changeDispenseStatus", {
-        state: "dispensing",
-        amount: changeAmount,
-      });
-
-      const dispenseResult = await dispenseChange(changeAmount);
-
-      if (dispenseResult.ok) {
-        deps.io.emit("changeDispenseStatus", {
-          state: "dispensed",
-          amount: changeAmount,
-          attempts: dispenseResult.attempts,
-        });
-
-        return {
-          status: 200,
-          body: {
-            ok: true,
-            chargedAmount: requiredAmount,
-            balance: remainingBalance,
-            earnings: currentEarnings,
-            change: {
-              requested: changeAmount,
-              dispensed: changeAmount,
-              state: "dispensed",
-              attempts: dispenseResult.attempts,
-            },
-          },
-        };
-      }
-
-      deps.io.emit("changeDispenseStatus", {
-        state: "failed",
-        amount: changeAmount,
-        attempts: dispenseResult.attempts,
-        owedChangeId: dispenseResult.owedChangeId ?? null,
-        message: dispenseResult.message,
-      });
-
-      return {
-        status: 200,
-        body: {
-          ok: true,
-          chargedAmount: requiredAmount,
-          balance: remainingBalance,
-          earnings: currentEarnings,
-          change: {
-            requested: changeAmount,
-            dispensed: 0,
-            state: "failed",
-            attempts: dispenseResult.attempts,
-            owedChangeId: dispenseResult.owedChangeId ?? null,
-            message: dispenseResult.message,
-          },
-        },
-      };
-    });
-
-    // Logging and stats updates happen outside the lock
-    if (result.status === 200) {
-      await incrementJobStats(mode);
-      const resultBody = result.body as {
-        balance: number;
-        change?: {
-          state?: string;
-          requested?: number;
-          dispensed?: number;
-          attempts?: number;
-          owedChangeId?: string | null;
-          message?: string;
-        };
-      };
-
-      await appendAdminLog("payment_confirmed", "Payment confirmed.", {
+    // ── Settlement: charge balance + dispense change via shared logic ───────
+    const settlement = await settlePayment({
+      requiredAmount,
+      io: deps.io,
+      jobContext: {
         mode,
-        amount: requiredAmount,
         copies,
         colorMode,
-        pageRange: printOptions?.pageRange ?? null,
         sessionId: sessionId ?? null,
         filename: filename ?? null,
-        remainingBalance: resultBody.balance,
-        changeState: resultBody.change?.state ?? "none",
-        changeRequested: resultBody.change?.requested ?? 0,
-        changeDispensed: resultBody.change?.dispensed ?? 0,
+      },
+    });
+
+    if (!settlement.ok) {
+      sendResponse(400, {
+        error: settlement.error ?? "Insufficient balance",
+        balance: settlement.remainingBalance,
+        requiredAmount,
       });
-
-      if (resultBody.change?.state === "dispensed") {
-        await appendAdminLog("hopper_dispense_succeeded", "Coin change dispensed.", {
-          requested: resultBody.change.requested ?? 0,
-          dispensed: resultBody.change.dispensed ?? 0,
-          attempts: resultBody.change.attempts ?? 0,
-        });
-      }
-
-      if (resultBody.change?.state === "failed") {
-        await appendAdminLog("hopper_dispense_failed", "Coin change dispense failed.", {
-          requested: resultBody.change.requested ?? 0,
-          dispensed: resultBody.change.dispensed ?? 0,
-          attempts: resultBody.change.attempts ?? 0,
-          owedChangeId: resultBody.change.owedChangeId ?? null,
-          message: resultBody.change.message ?? null,
-        });
-      }
+      return;
     }
 
-    sendResponse(result.status, result.body);
+    // Logging and stats updates happen outside the lock
+    await incrementJobStats(mode);
+
+    await appendAdminLog("payment_confirmed", "Payment confirmed.", {
+      mode,
+      amount: requiredAmount,
+      copies,
+      colorMode,
+      pageRange: printOptions?.pageRange ?? null,
+      sessionId: sessionId ?? null,
+      filename: filename ?? null,
+      remainingBalance: settlement.remainingBalance,
+      changeState: settlement.change.state,
+      changeRequested: settlement.change.requested,
+      changeDispensed: settlement.change.dispensed,
+    });
+
+    if (settlement.change.state === "dispensed") {
+      await appendAdminLog("hopper_dispense_succeeded", "Coin change dispensed.", {
+        requested: settlement.change.requested,
+        dispensed: settlement.change.dispensed,
+        attempts: settlement.change.attempts ?? 0,
+      });
+    }
+
+    if (settlement.change.state === "failed") {
+      await appendAdminLog("hopper_dispense_failed", "Coin change dispense failed.", {
+        requested: settlement.change.requested,
+        dispensed: settlement.change.dispensed,
+        attempts: settlement.change.attempts ?? 0,
+        owedChangeId: settlement.change.owedChangeId ?? null,
+        message: settlement.change.message ?? null,
+      });
+    }
+
+    sendResponse(200, {
+      ok: true,
+      chargedAmount: settlement.chargedAmount,
+      balance: settlement.remainingBalance,
+      earnings: settlement.earnings,
+      change: settlement.change,
+    });
   });
 }
