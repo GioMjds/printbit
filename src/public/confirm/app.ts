@@ -266,6 +266,70 @@ async function showScanQrOverlay(downloadUrl: string, expiresAt?: string): Promi
   }
 
   showOverlay(scanQrOverlay);
+
+  // Accessibility: move focus into the scan QR overlay and trap focus while it is active.
+  // Try to focus the dedicated "Done" button if present; otherwise, fall back to the first focusable element.
+  const getFocusableElements = (): HTMLElement[] => {
+    const focusableSelector =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(
+      scanQrOverlay.querySelectorAll<HTMLElement>(focusableSelector),
+    ).filter((el) => !el.hasAttribute("disabled") && !el.getAttribute("aria-hidden"));
+  };
+
+  const focusInitialElement = (): void => {
+    // Prefer a specific Done button if the markup provides one.
+    const doneButton =
+      scanQrOverlay.querySelector<HTMLButtonElement>("#scanQrDoneButton") ??
+      scanQrOverlay.querySelector<HTMLButtonElement>('button[data-scan-qr-done]');
+
+    if (doneButton) {
+      doneButton.focus();
+      return;
+    }
+
+    const focusable = getFocusableElements();
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    }
+  };
+
+  // Use requestAnimationFrame to ensure the overlay is visible before moving focus.
+  if (typeof window !== "undefined" && "requestAnimationFrame" in window) {
+    window.requestAnimationFrame(focusInitialElement);
+  } else {
+    focusInitialElement();
+  }
+
+  // Initialize a simple focus trap once per overlay element.
+  if (!(scanQrOverlay as HTMLElement).dataset.focusTrapInitialized) {
+    (scanQrOverlay as HTMLElement).dataset.focusTrapInitialized = "true";
+
+    scanQrOverlay.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusableElements();
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        // Shift+Tab: cycle from first to last.
+        if (activeElement === first || !scanQrOverlay.contains(activeElement)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else {
+        // Tab: cycle from last to first.
+        if (activeElement === last || !scanQrOverlay.contains(activeElement)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    });
+  }
 }
 
 async function fetchInitialBalance(): Promise<void> {
