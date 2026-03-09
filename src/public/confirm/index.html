@@ -660,6 +660,54 @@
       </div>
     </div>
 
+    <!-- Scan QR Download Overlay (scan mode only) -->
+    <div
+      class="modal-overlay"
+      id="scanQrOverlay"
+      aria-hidden="true"
+      role="dialog"
+      aria-labelledby="scanQrTitle"
+      aria-modal="true"
+    >
+      <div class="modal-card modal-card--qr">
+        <div class="status-icon status-icon--check" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="22" fill="rgba(58,158,82,0.15)" />
+            <circle
+              cx="24"
+              cy="24"
+              r="22"
+              stroke="#3a9e52"
+              stroke-width="2.5"
+              fill="none"
+            />
+            <path
+              d="M15 24l6 6 12-12"
+              stroke="#6ac47a"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <h2 class="modal-title" id="scanQrTitle">Scan is Ready!</h2>
+        <p class="modal-subtitle">
+          Point your phone camera at the QR code to download your scanned
+          document.
+        </p>
+        <canvas id="scanQrCanvas" class="scan-qr-canvas"></canvas>
+        <p class="scan-qr-link" id="scanQrLinkText"></p>
+        <p class="scan-qr-expiry" id="scanQrExpiry"></p>
+        <button
+          id="scanQrDoneBtn"
+          type="button"
+          class="modal-btn modal-btn--confirm modal-btn--wide"
+        >
+          <span>Done</span>
+        </button>
+      </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="/confirm/app.js"></script>
   </body>
