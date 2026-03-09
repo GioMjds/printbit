@@ -434,6 +434,12 @@ modalConfirmBtn?.addEventListener('click', async () => {
   isProcessingPayment = true;
 
   showOverlay(printingOverlay);
+
+  const printingTitle = document.querySelector('.printingTitle');
+  if (printingTitle && config.mode === "scan") {
+    printingTitle.textContent = "Your file is preparing...";
+  }
+
   if (config.mode === "scan") {
     if (printingSubtitle) printingSubtitle.textContent = "Processing your payment...";
     if (printingHint) printingHint.textContent = "Please wait while we secure your download link.";

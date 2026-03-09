@@ -1,8 +1,8 @@
 export {};
 
-type ScanSource = "feeder" | "glass";
-type ScanColor = "color" | "grayscale";
-type ScanDpi = "150" | "300" | "600";
+type ScanSource = 'feeder' | 'glass';
+type ScanColor = 'color' | 'grayscale';
+type ScanDpi = '150' | '300' | '600';
 
 interface ScanResponse {
   pages: string[];
@@ -16,40 +16,40 @@ interface PricingResponse {
   colorSurcharge: number;
 }
 
-const previewHint = document.getElementById("previewHint") as HTMLElement;
-const stateIdle = document.getElementById("stateIdle") as HTMLElement;
-const stateScanning = document.getElementById("stateScanning") as HTMLElement;
-const stateResult = document.getElementById("stateResult") as HTMLElement;
-const stateError = document.getElementById("stateError") as HTMLElement;
-const scanProgress = document.getElementById("scanProgress") as HTMLElement;
-const errorText = document.getElementById("errorText") as HTMLElement;
+const previewHint = document.getElementById('previewHint') as HTMLElement;
+const stateIdle = document.getElementById('stateIdle') as HTMLElement;
+const stateScanning = document.getElementById('stateScanning') as HTMLElement;
+const stateResult = document.getElementById('stateResult') as HTMLElement;
+const stateError = document.getElementById('stateError') as HTMLElement;
+const scanProgress = document.getElementById('scanProgress') as HTMLElement;
+const errorText = document.getElementById('errorText') as HTMLElement;
 
 const scannedImage = document.getElementById(
-  "scannedImage",
+  'scannedImage',
 ) as HTMLImageElement;
-const pageCountBadge = document.getElementById("pageCountBadge") as HTMLElement;
-const pageCountText = document.getElementById("pageCountText") as HTMLElement;
+const pageCountBadge = document.getElementById('pageCountBadge') as HTMLElement;
+const pageCountText = document.getElementById('pageCountText') as HTMLElement;
 
 const previewControls = document.getElementById(
-  "previewControls",
+  'previewControls',
 ) as HTMLElement;
-const pagePrev = document.getElementById("pagePrev") as HTMLButtonElement;
-const pageNext = document.getElementById("pageNext") as HTMLButtonElement;
-const pagerLabel = document.getElementById("pagerLabel") as HTMLElement;
+const pagePrev = document.getElementById('pagePrev') as HTMLButtonElement;
+const pageNext = document.getElementById('pageNext') as HTMLButtonElement;
+const pagerLabel = document.getElementById('pagerLabel') as HTMLElement;
 
-const scanBtn = document.getElementById("scanBtn") as HTMLButtonElement;
-const scanBtnLabel = document.getElementById("scanBtnLabel") as HTMLElement;
-const rescanBtn = document.getElementById("rescanBtn") as HTMLButtonElement;
-const proceedBtn = document.getElementById("proceedBtn") as HTMLButtonElement;
+const scanBtn = document.getElementById('scanBtn') as HTMLButtonElement;
+const scanBtnLabel = document.getElementById('scanBtnLabel') as HTMLElement;
+const rescanBtn = document.getElementById('rescanBtn') as HTMLButtonElement;
+const proceedBtn = document.getElementById('proceedBtn') as HTMLButtonElement;
 const proceedBtnLabel = document.getElementById(
-  "proceedBtnLabel",
+  'proceedBtnLabel',
 ) as HTMLElement;
 const softCopyFeeText = document.getElementById(
-  "softCopyFeeText",
+  'softCopyFeeText',
 ) as HTMLElement;
 
 const PREVIEW_STATES: Record<
-  "idle" | "scanning" | "result" | "error",
+  'idle' | 'scanning' | 'result' | 'error',
   HTMLElement
 > = {
   idle: stateIdle,
@@ -63,16 +63,16 @@ let currentPage = 0;
 let scanFilename: string | null = null;
 let scanDocumentPrice = 5;
 
-const SCAN_SOURCE: ScanSource = "feeder";
-const SCAN_COLOR: ScanColor = "grayscale";
-const SCAN_DPI: ScanDpi = "300";
+const SCAN_SOURCE: ScanSource = 'feeder';
+const SCAN_COLOR: ScanColor = 'color';
+const SCAN_DPI: ScanDpi = '600';
 
 function showPreview(
-  name: "idle" | "scanning" | "result" | "error",
+  name: 'idle' | 'scanning' | 'result' | 'error',
   hint?: string,
 ): void {
   for (const [key, el] of Object.entries(PREVIEW_STATES)) {
-    el.classList.toggle("hidden", key !== name);
+    el.classList.toggle('hidden', key !== name);
   }
   if (hint !== undefined) previewHint.textContent = hint;
 }
@@ -82,19 +82,19 @@ function goToPage(n: number): void {
   currentPage = n;
   scannedImage.src = scannedPages[n];
 
-  scannedImage.setAttribute("data-gray", "");
+  scannedImage.setAttribute('data-gray', '');
 
   const total = scannedPages.length;
   pagerLabel.textContent = `${n + 1} / ${total}`;
   pagePrev.disabled = n <= 0;
   pageNext.disabled = n >= total - 1;
-  pageCountText.textContent = `${total} page${total !== 1 ? "s" : ""}`;
+  pageCountText.textContent = `${total} page${total !== 1 ? 's' : ''}`;
 }
 
 function updatePager(): void {
   const multi = scannedPages.length > 1;
-  previewControls.style.display = multi ? "flex" : "none";
-  pageCountBadge.style.display = multi ? "inline-flex" : "none";
+  previewControls.style.display = multi ? 'flex' : 'none';
+  pageCountBadge.style.display = multi ? 'inline-flex' : 'none';
   if (scannedPages.length > 0) goToPage(currentPage);
 }
 
@@ -109,12 +109,12 @@ function updateSoftCopyPricingUi(): void {
 
 async function loadPricing(): Promise<void> {
   try {
-    const response = await fetch("/api/pricing");
-    if (!response.ok) throw new Error("Failed to load pricing information.");
+    const response = await fetch('/api/pricing');
+    if (!response.ok) throw new Error('Failed to load pricing information.');
 
     const payload = (await response.json()) as Partial<PricingResponse>;
     if (
-      typeof payload.scanDocument === "number" &&
+      typeof payload.scanDocument === 'number' &&
       Number.isFinite(payload.scanDocument)
     ) {
       scanDocumentPrice = Number(payload.scanDocument.toFixed(2));
@@ -127,18 +127,18 @@ async function loadPricing(): Promise<void> {
 }
 
 async function startScan(): Promise<void> {
-  showPreview("scanning", "Scanning your document…");
+  showPreview('scanning', 'Scanning your document…');
   scanBtn.disabled = true;
-  scanBtn.setAttribute("aria-disabled", "true");
-  rescanBtn.style.display = "none";
-  proceedBtn.style.display = "none";
-  scanProgress.textContent = "Feeding document…";
+  scanBtn.setAttribute('aria-disabled', 'true');
+  rescanBtn.style.display = 'none';
+  proceedBtn.style.display = 'none';
+  scanProgress.textContent = 'Feeding document…';
 
   const progressMessages = [
-    "Feeding document…",
-    "Scanning page…",
-    "Processing image",
-    "Finalising…",
+    'Feeding document…',
+    'Scanning page…',
+    'Processing image',
+    'Finalising…',
   ];
   let progIdx = 0;
   const progTimer = window.setInterval(() => {
@@ -147,44 +147,48 @@ async function startScan(): Promise<void> {
   }, 1200);
 
   try {
-    const res = await fetch("/api/scanner/scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: SCAN_SOURCE, color: SCAN_COLOR, dpi: SCAN_DPI }),
+    const res = await fetch('/api/scanner/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: SCAN_SOURCE,
+        color: SCAN_COLOR,
+        dpi: SCAN_DPI,
+      }),
     });
 
     clearInterval(progTimer);
 
     const data = (await res.json()) as ScanResponse & { error?: string };
     if (!res.ok) {
-      throw new Error(data.error ?? "Scan failed");
+      throw new Error(data.error ?? 'Scan failed');
     }
 
     if (!data.pages || data.pages.length === 0 || !data.filename) {
-      throw new Error("No pages returned from scanner");
+      throw new Error('No pages returned from scanner');
     }
 
     scannedPages = data.pages;
     scanFilename = data.filename;
     currentPage = 0;
 
-    showPreview("result", `Page 1 of ${data.pages.length}`);
+    showPreview('result', `Page 1 of ${data.pages.length}`);
     updatePager();
     updateSoftCopyPricingUi();
 
-    rescanBtn.style.display = "flex";
-    proceedBtn.style.display = "flex";
+    rescanBtn.style.display = 'flex';
+    proceedBtn.style.display = 'flex';
     proceedBtn.disabled = false;
-    proceedBtn.setAttribute("aria-disabled", "false");
-    scanBtnLabel.textContent = "Scan Document";
+    proceedBtn.setAttribute('aria-disabled', 'false');
+    scanBtnLabel.textContent = 'Scan Document';
   } catch (err) {
     clearInterval(progTimer);
-    const msg = err instanceof Error ? err.message : "Scan failed";
+    const msg = err instanceof Error ? err.message : 'Scan failed';
     errorText.textContent = msg;
-    showPreview("error", msg);
+    showPreview('error', msg);
     scanBtn.disabled = false;
-    scanBtn.setAttribute("aria-disabled", "false");
-    rescanBtn.style.display = "none";
+    scanBtn.setAttribute('aria-disabled', 'false');
+    rescanBtn.style.display = 'none';
   }
 }
 
@@ -193,46 +197,46 @@ function resetToIdle(): void {
   scanFilename = null;
   currentPage = 0;
 
-  showPreview("idle", "Insert document into the feeder and press Scan");
-  previewControls.style.display = "none";
-  pageCountBadge.style.display = "none";
-  rescanBtn.style.display = "none";
-  proceedBtn.style.display = "none";
+  showPreview('idle', 'Insert document into the feeder and press Scan');
+  previewControls.style.display = 'none';
+  pageCountBadge.style.display = 'none';
+  rescanBtn.style.display = 'none';
+  proceedBtn.style.display = 'none';
   proceedBtn.disabled = true;
 
   scanBtn.disabled = false;
-  scanBtn.setAttribute("aria-disabled", "false");
-  scanBtnLabel.textContent = "Scan Document";
+  scanBtn.setAttribute('aria-disabled', 'false');
+  scanBtnLabel.textContent = 'Scan Document';
 }
 
-pagePrev.addEventListener("click", () => goToPage(currentPage - 1));
-pageNext.addEventListener("click", () => goToPage(currentPage + 1));
+pagePrev.addEventListener('click', () => goToPage(currentPage - 1));
+pageNext.addEventListener('click', () => goToPage(currentPage + 1));
 
-scanBtn.addEventListener("click", () => {
+scanBtn.addEventListener('click', () => {
   if (!scanBtn.disabled) void startScan();
 });
 
-rescanBtn.addEventListener("click", resetToIdle);
+rescanBtn.addEventListener('click', resetToIdle);
 
-proceedBtn.addEventListener("click", () => {
+proceedBtn.addEventListener('click', () => {
   if (!scannedPages.length || !scanFilename) return;
 
   sessionStorage.setItem(
-    "printbit.config",
+    'printbit.config',
     JSON.stringify({
-      mode: "scan",
+      mode: 'scan',
       scanFilename,
       sessionId: null,
-      colorMode: "grayscale",
+      colorMode: 'colored',
       copies: 1,
-      orientation: "portrait",
-      paperSize: "A4",
+      orientation: 'portrait',
+      paperSize: 'A4',
     }),
   );
-  window.location.href = "/confirm";
+  window.location.href = '/confirm';
 });
 
 void loadPricing();
-showPreview("idle", "Insert document into the feeder and press Scan");
+showPreview('idle', 'Insert document into the feeder and press Scan');
 scanBtn.disabled = false;
-scanBtn.setAttribute("aria-disabled", "false");
+scanBtn.setAttribute('aria-disabled', 'false');
