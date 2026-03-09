@@ -9,7 +9,7 @@ import {
   releaseIdempotencyKey,
 } from "../services/db";
 import { adminService } from "../services/admin";
-import { settlePayment } from "../services/settlement";
+import { settlementService } from "../services/settlement";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -170,7 +170,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
         await printFile(relPath, printOptions);
 
         // Print succeeded — settle payment (charge + change dispense)
-        const settlement = await settlePayment({
+        const settlement = await settlementService.settle({
           requiredAmount,
           io: deps.io,
           jobContext: {

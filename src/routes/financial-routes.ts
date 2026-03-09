@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Server } from "socket.io";
 import { db, acquireIdempotencyKey, storeIdempotencyKey, releaseIdempotencyKey } from "../services/db";
 import { adminService } from "../services/admin";
-import { settlePayment } from "../services/settlement";
+import { settlementService } from "../services/settlement";
 import { printFile, type PrintJobOptions } from "../services/printer";
 import type { SessionStore } from "../services/session";
 
@@ -403,7 +403,7 @@ export function registerFinancialRoutes(
     }
 
     // ── Settlement: charge balance + dispense change via shared logic ───────
-    const settlement = await settlePayment({
+    const settlement = await settlementService.settle({
       requiredAmount,
       io: deps.io,
       jobContext: {
