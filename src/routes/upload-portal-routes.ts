@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { Express, Request, Response } from "express";
 import type { SessionStore } from "../services/session";
-import { appendAdminLog } from "../services/admin";
+import { adminService } from "../services/admin";
 
 interface RegisterUploadPortalRoutesDeps {
   portalDir: string;
@@ -34,7 +34,7 @@ export function registerUploadPortalRoutes(
 
       // Validate token before rendering the upload page
       if (!deps.sessionStore.isTokenValid(token)) {
-        void appendAdminLog("upload_page_rejected", "Upload page hit with invalid/expired token.", {
+        void adminService.appendAdminLog("upload_page_rejected", "Upload page hit with invalid/expired token.", {
           tokenPrefix: token.slice(0, 8),
         });
         res.status(410).type("html").send(EXPIRED_HTML);

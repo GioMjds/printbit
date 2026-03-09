@@ -4,11 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { jobStore } from "../services/job-store";
 import { db, withBalanceLock } from "../services/db";
-import {
-  appendAdminLog,
-  incrementJobStats,
-  getPricingSettings,
-} from "../services/admin";
+import { adminService } from "../services/admin";
 import {
   getAdapter,
   getScannerStatus,
@@ -190,14 +186,14 @@ export function registerScanRoutes(
       const filename = path.basename(result.outputPath);
       clearSoftCopyPaid(filename);
 
-      void appendAdminLog("scan_completed", "Interactive scan completed.", {
+      void adminService.appendAdminLog("scan_completed", "Interactive scan completed.", {
         source: settings.source,
         dpi: settings.dpi,
         colorMode: settings.colorMode,
         filename,
       });
 
-      await incrementJobStats("scan");
+      await adminService.incrementJobStats("scan");
 
       res.json({
         pages: [`/api/scan/preview/${encodeURIComponent(filename)}`],
@@ -206,7 +202,7 @@ export function registerScanRoutes(
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown scan error";
-      void appendAdminLog("scan_failed", "Interactive scan failed.", {
+      void adminService.appendAdminLog("scan_failed", "Interactive scan failed.", {
         error: message,
         source: settings.source,
         dpi: settings.dpi,
@@ -230,7 +226,7 @@ export function registerScanRoutes(
         return res.status(404).json({ error: "Scanned file not found." });
       }
 
-      const requiredAmount = getPricingSettings().scanDocument;
+      const requiredAmount = adminService.getPricingSettings().scanDocument;
       if (requiredAmount <= 0 || isSoftCopyPaid(safeFilename)) {
         return res.json({
           ok: true,
@@ -279,7 +275,7 @@ export function registerScanRoutes(
       });
 
       if (!result.ok) {
-        await appendAdminLog(
+        await adminService.appendAdminLog(
           "scan_soft_copy_charge_failed",
           "Failed to charge for soft copy access.",
           {
@@ -297,7 +293,7 @@ export function registerScanRoutes(
 
       if (result.charged) {
         deps.io.emit("balance", result.balance);
-        await appendAdminLog(
+        await adminService.appendAdminLog(
           "scan_soft_copy_charged",
           "Soft copy access charged.",
           {
@@ -341,7 +337,7 @@ export function registerScanRoutes(
 
     try {
       const exported = await exportScanToUsbDrive(sourcePath, drive);
-      await appendAdminLog(
+      await adminService.appendAdminLog(
         "scan_usb_exported",
         "Scanned file exported to USB.",
         {
@@ -378,7 +374,7 @@ export function registerScanRoutes(
         sourcePath,
         deps.resolvePublicBaseUrl(req),
       );
-      void appendAdminLog(
+      void adminService.appendAdminLog(
         "scan_wireless_link_created",
         "Wireless scan download link created.",
         {
@@ -456,7 +452,7 @@ export function registerScanRoutes(
 
     const job = jobStore.createScanJob(settings);
 
-    void appendAdminLog("scan_job_created", "Scan job created.", {
+    void adminService.appendAdminLog("scan_job_created", "Scan job created.", {
       jobId: job.id,
       source,
       dpi,
@@ -472,7 +468,7 @@ export function registerScanRoutes(
         jobStore.updateJobState(job.id, "succeeded", {
           resultPath: result.outputPath,
         });
-        await incrementJobStats("scan");
+        await adminService.incrementJobStats("scan");
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         jobStore.updateJobState(job.id, "failed", {
@@ -556,7 +552,7 @@ export function registerScanRoutes(
       const message = err instanceof Error ? err.message : "Unknown error";
       console.error(`[SCAN-PREVIEW] ✗ Preview scan failed: ${message}`);
 
-      void appendAdminLog("scan_preview_failed", "Preview scan failed.", {
+      void adminService.appendAdminLog("scan_preview_failed", "Preview scan failed.", {
         error: message,
       });
       res.json({

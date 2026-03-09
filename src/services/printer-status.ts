@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { runPowerShell } from "@/utils";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -156,24 +156,6 @@ function colorHintFromName(name: string): string | undefined {
   }
   return undefined;
 }
-
-// ── PowerShell helpers ──────────────────────────────────────────
-
-function runPowerShell(command: string, timeoutMs = 14_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command", command],
-      { timeout: timeoutMs, windowsHide: true },
-      (error, stdout) => {
-        if (error) return reject(error);
-        resolve(stdout.trim());
-      },
-    );
-  });
-}
-
-// ── Background-refreshed cache ──────────────────────────────────
 
 const REFRESH_INTERVAL_MS = 30_000;
 let cached: PrinterTelemetry = {

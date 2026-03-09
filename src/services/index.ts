@@ -1,4 +1,4 @@
-export * from "./admin";
+export { adminService } from "./admin";
 export * from "./db";
 export * from "./hopper";
 export * from "./hopper-protocol";

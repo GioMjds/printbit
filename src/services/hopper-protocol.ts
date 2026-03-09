@@ -22,13 +22,13 @@
 
 // ── Protocol prefix ──────────────────────────────────────────────────────────
 
-export const HOPPER_PREFIX = "HOPPER";
+export const HOPPER_PREFIX = 'HOPPER';
 
 // ── Command verbs ────────────────────────────────────────────────────────────
 
 export const HopperCommand = {
-  DISPENSE: "DISPENSE",
-  SELFTEST: "SELFTEST",
+  DISPENSE: 'DISPENSE',
+  SELFTEST: 'SELFTEST',
 } as const;
 
 export type HopperCommandVerb =
@@ -37,10 +37,10 @@ export type HopperCommandVerb =
 // ── Response types ───────────────────────────────────────────────────────────
 
 export const HopperResponseKind = {
-  ACK: "ACK",
-  PROGRESS: "PROGRESS",
-  DONE: "DONE",
-  ERR: "ERR",
+  ACK: 'ACK',
+  PROGRESS: 'PROGRESS',
+  DONE: 'DONE',
+  ERR: 'ERR',
 } as const;
 
 export type HopperResponseKindValue =
@@ -50,17 +50,17 @@ export type HopperResponseKindValue =
 
 export const HopperErrorCode = {
   /** Coin hopper mechanism is jammed */
-  JAM: "JAM",
+  JAM: 'JAM',
   /** Hopper coin reservoir is empty */
-  EMPTY: "EMPTY",
+  EMPTY: 'EMPTY',
   /** Motor did not complete within expected time */
-  MOTOR_TIMEOUT: "MOTOR_TIMEOUT",
+  MOTOR_TIMEOUT: 'MOTOR_TIMEOUT',
   /** Only some coins were dispensed before failure */
-  PARTIAL: "PARTIAL",
+  PARTIAL: 'PARTIAL',
   /** Optical/mechanical sensor fault */
-  SENSOR: "SENSOR",
+  SENSOR: 'SENSOR',
   /** Catch-all for unrecognised errors */
-  UNKNOWN: "UNKNOWN",
+  UNKNOWN: 'UNKNOWN',
 } as const;
 
 export type HopperErrorCodeValue =
@@ -69,25 +69,25 @@ export type HopperErrorCodeValue =
 // ── Parsed response types ────────────────────────────────────────────────────
 
 export interface HopperAckResponse {
-  kind: "ACK";
+  kind: 'ACK';
   requestId: string;
 }
 
 export interface HopperProgressResponse {
-  kind: "PROGRESS";
+  kind: 'PROGRESS';
   requestId: string;
   dispensed: number;
   total: number;
 }
 
 export interface HopperDoneResponse {
-  kind: "DONE";
+  kind: 'DONE';
   requestId: string;
   dispensedCount: number;
 }
 
 export interface HopperErrorResponse {
-  kind: "ERR";
+  kind: 'ERR';
   requestId: string;
   code: HopperErrorCodeValue;
   detail: string;
@@ -119,7 +119,7 @@ export function isRetryableError(code: HopperErrorCodeValue): boolean {
 export function generateRequestId(): string {
   return Math.floor(Math.random() * 0xffff)
     .toString(16)
-    .padStart(4, "0");
+    .padStart(4, '0');
 }
 
 // ── Command builders ─────────────────────────────────────────────────────────
@@ -159,31 +159,31 @@ export function parseHopperResponse(rawLine: string): HopperResponse | null {
   if (tokens[0].toUpperCase() !== HOPPER_PREFIX) return null;
 
   const verb = tokens[1].toUpperCase();
-  const requestId = tokens[2] ?? "";
+  const requestId = tokens[2] ?? '';
 
   if (!requestId) return null;
 
   switch (verb) {
     case HopperResponseKind.ACK:
-      return { kind: "ACK", requestId };
+      return { kind: 'ACK', requestId };
 
     case HopperResponseKind.PROGRESS: {
-      const dispensed = parseInt(tokens[3] ?? "", 10);
-      const total = parseInt(tokens[4] ?? "", 10);
+      const dispensed = parseInt(tokens[3] ?? '', 10);
+      const total = parseInt(tokens[4] ?? '', 10);
       if (!Number.isFinite(dispensed) || !Number.isFinite(total)) return null;
-      return { kind: "PROGRESS", requestId, dispensed, total };
+      return { kind: 'PROGRESS', requestId, dispensed, total };
     }
 
     case HopperResponseKind.DONE: {
-      const dispensedCount = parseInt(tokens[3] ?? "", 10);
+      const dispensedCount = parseInt(tokens[3] ?? '', 10);
       if (!Number.isFinite(dispensedCount)) return null;
-      return { kind: "DONE", requestId, dispensedCount };
+      return { kind: 'DONE', requestId, dispensedCount };
     }
 
     case HopperResponseKind.ERR: {
-      const code = normalizeErrorCode(tokens[3] ?? "UNKNOWN");
-      const detail = tokens.slice(4).join(" ") || code;
-      return { kind: "ERR", requestId, code, detail };
+      const code = normalizeErrorCode(tokens[3] ?? 'UNKNOWN');
+      const detail = tokens.slice(4).join(' ') || code;
+      return { kind: 'ERR', requestId, code, detail };
     }
 
     default:
@@ -215,27 +215,27 @@ export function parseLegacyHopperResponse(
   if (
     tokens.length >= 3 &&
     tokens[0] === HOPPER_PREFIX &&
-    (tokens[1] === "ACK" ||
-      tokens[1] === "PROGRESS" ||
-      tokens[1] === "DONE" ||
-      tokens[1] === "ERR")
+    (tokens[1] === 'ACK' ||
+      tokens[1] === 'PROGRESS' ||
+      tokens[1] === 'DONE' ||
+      tokens[1] === 'ERR')
   ) {
     return null;
   }
 
   // Legacy: match loose keywords
   if (
-    upper.includes("ERR") ||
-    upper.includes("FAIL") ||
-    upper.includes("ERROR")
+    upper.includes('ERR') ||
+    upper.includes('FAIL') ||
+    upper.includes('ERROR')
   ) {
     return { ok: false, message: line };
   }
 
   if (
-    upper.includes("OK") ||
-    upper.includes("DONE") ||
-    upper.includes("SUCCESS")
+    upper.includes('OK') ||
+    upper.includes('DONE') ||
+    upper.includes('SUCCESS')
   ) {
     return { ok: true, message: line };
   }

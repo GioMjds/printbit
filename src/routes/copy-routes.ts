@@ -8,11 +8,7 @@ import {
   storeIdempotencyKey,
   releaseIdempotencyKey,
 } from "../services/db";
-import {
-  appendAdminLog,
-  calculateJobAmount,
-  incrementJobStats,
-} from "../services/admin";
+import { adminService } from "../services/admin";
 import { settlePayment } from "../services/settlement";
 import path from "node:path";
 import fs from "node:fs";
@@ -101,7 +97,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       return res.status(409).json(errorBody);
     }
 
-    const requiredAmount = calculateJobAmount(
+    const requiredAmount = adminService.calculateJobAmount(
       "copy",
       safeColorMode,
       safeCopies,
@@ -114,7 +110,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
         balance: db.data?.balance ?? 0,
         requiredAmount,
       };
-      void appendAdminLog(
+      void adminService.appendAdminLog(
         "payment_failed",
         "Copy job failed: insufficient balance.",
         {
@@ -132,7 +128,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       Number.isFinite(amount) &&
       amount !== requiredAmount
     ) {
-      void appendAdminLog(
+      void adminService.appendAdminLog(
         "payment_amount_mismatch",
         "Client amount differed from server pricing.",
         {
@@ -152,7 +148,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
     // Create job with payment pending (charged after successful dispatch)
     const job = jobStore.createCopyJob(settings, null);
 
-    void appendAdminLog("copy_job_created", "Copy job created.", {
+    void adminService.appendAdminLog("copy_job_created", "Copy job created.", {
       jobId: job.id,
       copies: safeCopies,
       colorMode: safeColorMode,
@@ -191,8 +187,8 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
             remainingBalance: settlement.remainingBalance,
           };
           jobStore.updateJobState(job.id, "succeeded");
-          await incrementJobStats("copy");
-          void appendAdminLog(
+          await adminService.incrementJobStats("copy");
+          void adminService.appendAdminLog(
             "copy_job_completed",
             "Copy job completed and charged.",
             {
@@ -224,7 +220,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
             stage: "running",
           },
         });
-        void appendAdminLog(
+        void adminService.appendAdminLog(
           "copy_job_failed",
           "Copy job failed — balance NOT charged.",
           {

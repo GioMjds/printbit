@@ -1,26 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { runPowerShell } from "@/utils";
 
 export interface RemovableDrive {
   drive: string;
   label: string | null;
   freeBytes: number;
   totalBytes: number;
-}
-
-function runPowerShell(command: string, timeoutMs = 12_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command", command],
-      { timeout: timeoutMs, windowsHide: true },
-      (error, stdout) => {
-        if (error) return reject(error);
-        resolve(stdout.trim());
-      },
-    );
-  });
 }
 
 function parseDriveValue(value: unknown): number {
@@ -59,14 +45,6 @@ function normalizeDrives(raw: unknown): RemovableDrive[] {
   return drives.sort((a, b) => a.drive.localeCompare(b.drive));
 }
 
-export async function listRemovableDrives(): Promise<RemovableDrive[]> {
-  const command =
-    "Get-CimInstance Win32_LogicalDisk -Filter \"DriveType = 2\" | Select-Object DeviceID, VolumeName, FreeSpace, Size | ConvertTo-Json -Compress";
-  const raw = await runPowerShell(command);
-  if (!raw) return [];
-  return normalizeDrives(JSON.parse(raw) as unknown);
-}
-
 function ensureSafeDrive(drive: string): string {
   const normalized = drive.toUpperCase().trim();
   if (!/^[A-Z]:$/.test(normalized)) {
@@ -75,13 +53,9 @@ function ensureSafeDrive(drive: string): string {
   return normalized;
 }
 
-async function uniqueDestinationPath(
-  directory: string,
-  filename: string,
-): Promise<string> {
+async function uniqueDestinationPath(directory: string, filename: string): Promise<string> {
   const ext = path.extname(filename);
   const base = path.basename(filename, ext);
-
   let candidate = path.join(directory, filename);
   let index = 1;
   while (fs.existsSync(candidate)) {
@@ -91,28 +65,45 @@ async function uniqueDestinationPath(
   return candidate;
 }
 
-export async function exportScanToUsbDrive(
-  sourcePath: string,
-  drive: string,
-): Promise<{ exportPath: string; drive: string }> {
-  const sourceAbsPath = path.resolve(sourcePath);
-  if (!fs.existsSync(sourceAbsPath)) {
-    throw new Error("Source scan file not found");
+class UsbDriveService {
+  async listRemovable(): Promise<RemovableDrive[]> {
+    const command =
+      "Get-CimInstance Win32_LogicalDisk -Filter \"DriveType = 2\" | Select-Object DeviceID, VolumeName, FreeSpace, Size | ConvertTo-Json -Compress";
+    const raw = await runPowerShell(command);
+    if (!raw) return [];
+    return normalizeDrives(JSON.parse(raw) as unknown);
   }
 
-  const safeDrive = ensureSafeDrive(drive);
-  const drives = await listRemovableDrives();
-  const selected = drives.find((item) => item.drive === safeDrive);
-  if (!selected) {
-    throw new Error("USB drive not found. Please reinsert and refresh.");
+  async exportScanTo(sourcePath: string, drive: string): Promise<{ exportPath: string; drive: string }> {
+    const sourceAbsPath = path.resolve(sourcePath);
+    if (!fs.existsSync(sourceAbsPath)) {
+      throw new Error("Source scan file not found");
+    }
+
+    const safeDrive = ensureSafeDrive(drive);
+    const drives = await this.listRemovable();
+    const selected = drives.find((item) => item.drive === safeDrive);
+    if (!selected) {
+      throw new Error("USB drive not found. Please reinsert and refresh.");
+    }
+
+    const targetDir = path.join(`${safeDrive}\\`, "PrintBit", "Scans");
+    await fs.promises.mkdir(targetDir, { recursive: true });
+
+    const fileName = path.basename(sourceAbsPath);
+    const targetPath = await uniqueDestinationPath(targetDir, fileName);
+    await fs.promises.copyFile(sourceAbsPath, targetPath);
+
+    return { exportPath: targetPath, drive: safeDrive };
   }
+}
 
-  const targetDir = path.join(`${safeDrive}\\`, "PrintBit", "Scans");
-  await fs.promises.mkdir(targetDir, { recursive: true });
+export const usbDriveService = new UsbDriveService();
 
-  const fileName = path.basename(sourceAbsPath);
-  const targetPath = await uniqueDestinationPath(targetDir, fileName);
-  await fs.promises.copyFile(sourceAbsPath, targetPath);
+export async function listRemovableDrives(): Promise<RemovableDrive[]> {
+  return usbDriveService.listRemovable();
+}
 
-  return { exportPath: targetPath, drive: safeDrive };
+export async function exportScanToUsbDrive(sourcePath: string, drive: string): Promise<{ exportPath: string; drive: string }> {
+  return usbDriveService.exportScanTo(sourcePath, drive);
 }

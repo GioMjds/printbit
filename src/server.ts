@@ -35,13 +35,13 @@ import {
   getHopperStatus,
   getSerialStatus,
   initSerial,
-  runHopperSelfTest,
   startHotspot,
   stopHotspot,
   isHotspotRunning,
   SessionStore,
   renderUploadPortal,
   resolvePublicBaseUrl,
+  runHopperSelfTest,
 } from '@/services';
 
 const app = express();

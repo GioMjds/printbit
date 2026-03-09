@@ -1,8 +1,9 @@
-import { Low } from "lowdb";
-import { JSONFile } from "lowdb/node";
+import { Low } from 'lowdb';
+import { JSONFile } from 'lowdb/node';
+import { finiteOr } from '@/utils';
 
-export type PrintMode = "print" | "copy" | "scan";
-export type ColorMode = "colored" | "grayscale";
+export type PrintMode = 'print' | 'copy' | 'scan';
+export type ColorMode = 'colored' | 'grayscale';
 
 export interface PricingSettings {
   printPerPage: number;
@@ -56,7 +57,7 @@ export interface OwedChangeEntry {
   timestamp: string;
   amount: number;
   reason: string;
-  status: "open" | "resolved";
+  status: 'open' | 'resolved';
   meta?: LogMeta;
 }
 
@@ -93,7 +94,7 @@ const DEFAULT_DATA: Schema = {
       colorSurcharge: 2,
     },
     idleTimeoutSeconds: 120,
-    adminPin: "1234",
+    adminPin: '1234',
     adminLocalOnly: true,
   },
   coinStats: {
@@ -112,8 +113,8 @@ const DEFAULT_DATA: Schema = {
     enabled: true,
     timeoutMs: 8000,
     retryCount: 1,
-    dispenseCommandPrefix: "HOPPER DISPENSE",
-    selfTestCommand: "HOPPER SELFTEST",
+    dispenseCommandPrefix: 'HOPPER DISPENSE',
+    selfTestCommand: 'HOPPER SELFTEST',
   },
   hopperStats: {
     dispenseAttempts: 0,
@@ -129,17 +130,14 @@ const DEFAULT_DATA: Schema = {
   logs: [],
 };
 
-function finiteOr(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
 /**
  * Round a pricing value to a whole peso. The hopper only dispenses 1-peso
  * coins so all prices must be integers. Legacy fractional values in db.json
  * are silently rounded up on startup so the operator never under-charges.
  */
 function wholePeso(value: number): number {
-  const rounded = Math.ceil(value);
+  const nonNegative = Math.max(0, value);
+  const rounded = Math.ceil(nonNegative);
   if (rounded !== value) {
     console.warn(
       `[DB] ⚠ Pricing value ${value} is not a whole peso — rounded to ${rounded}. Update admin settings to remove this warning.`,
@@ -158,34 +156,42 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
     earnings: finiteOr(data?.earnings, DEFAULT_DATA.earnings),
     settings: {
       pricing: {
-        printPerPage: wholePeso(finiteOr(
-          pricing?.printPerPage,
-          DEFAULT_DATA.settings.pricing.printPerPage,
-        )),
-        copyPerPage: wholePeso(finiteOr(
-          pricing?.copyPerPage,
-          DEFAULT_DATA.settings.pricing.copyPerPage,
-        )),
-        scanDocument: wholePeso(finiteOr(
-          pricing?.scanDocument,
-          DEFAULT_DATA.settings.pricing.scanDocument,
-        )),
-        colorSurcharge: wholePeso(finiteOr(
-          pricing?.colorSurcharge,
-          DEFAULT_DATA.settings.pricing.colorSurcharge,
-        )),
+        printPerPage: wholePeso(
+          finiteOr(
+            pricing?.printPerPage,
+            DEFAULT_DATA.settings.pricing.printPerPage,
+          ),
+        ),
+        copyPerPage: wholePeso(
+          finiteOr(
+            pricing?.copyPerPage,
+            DEFAULT_DATA.settings.pricing.copyPerPage,
+          ),
+        ),
+        scanDocument: wholePeso(
+          finiteOr(
+            pricing?.scanDocument,
+            DEFAULT_DATA.settings.pricing.scanDocument,
+          ),
+        ),
+        colorSurcharge: wholePeso(
+          finiteOr(
+            pricing?.colorSurcharge,
+            DEFAULT_DATA.settings.pricing.colorSurcharge,
+          ),
+        ),
       },
       idleTimeoutSeconds: finiteOr(
         data?.settings?.idleTimeoutSeconds,
         DEFAULT_DATA.settings.idleTimeoutSeconds,
       ),
       adminPin:
-        typeof data?.settings?.adminPin === "string" &&
+        typeof data?.settings?.adminPin === 'string' &&
         data.settings.adminPin.trim()
           ? data.settings.adminPin
           : DEFAULT_DATA.settings.adminPin,
       adminLocalOnly:
-        typeof data?.settings?.adminLocalOnly === "boolean"
+        typeof data?.settings?.adminLocalOnly === 'boolean'
           ? data.settings.adminLocalOnly
           : DEFAULT_DATA.settings.adminLocalOnly,
     },
@@ -203,7 +209,7 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
     },
     hopperSettings: {
       enabled:
-        typeof hopperSettings?.enabled === "boolean"
+        typeof hopperSettings?.enabled === 'boolean'
           ? hopperSettings.enabled
           : DEFAULT_DATA.hopperSettings.enabled,
       timeoutMs: finiteOr(
@@ -215,12 +221,12 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
         DEFAULT_DATA.hopperSettings.retryCount,
       ),
       dispenseCommandPrefix:
-        typeof hopperSettings?.dispenseCommandPrefix === "string" &&
+        typeof hopperSettings?.dispenseCommandPrefix === 'string' &&
         hopperSettings.dispenseCommandPrefix.trim()
           ? hopperSettings.dispenseCommandPrefix
           : DEFAULT_DATA.hopperSettings.dispenseCommandPrefix,
       selfTestCommand:
-        typeof hopperSettings?.selfTestCommand === "string" &&
+        typeof hopperSettings?.selfTestCommand === 'string' &&
         hopperSettings.selfTestCommand.trim()
           ? hopperSettings.selfTestCommand
           : DEFAULT_DATA.hopperSettings.selfTestCommand,
@@ -243,19 +249,19 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
         DEFAULT_DATA.hopperStats.totalDispensed,
       ),
       lastDispensedAt:
-        typeof hopperStats?.lastDispensedAt === "string"
+        typeof hopperStats?.lastDispensedAt === 'string'
           ? hopperStats.lastDispensedAt
           : DEFAULT_DATA.hopperStats.lastDispensedAt,
       lastError:
-        typeof hopperStats?.lastError === "string"
+        typeof hopperStats?.lastError === 'string'
           ? hopperStats.lastError
           : DEFAULT_DATA.hopperStats.lastError,
       selfTestPassed:
-        typeof hopperStats?.selfTestPassed === "boolean"
+        typeof hopperStats?.selfTestPassed === 'boolean'
           ? hopperStats.selfTestPassed
           : DEFAULT_DATA.hopperStats.selfTestPassed,
       lastSelfTestAt:
-        typeof hopperStats?.lastSelfTestAt === "string"
+        typeof hopperStats?.lastSelfTestAt === 'string'
           ? hopperStats.lastSelfTestAt
           : DEFAULT_DATA.hopperStats.lastSelfTestAt,
     },
@@ -266,7 +272,7 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   };
 }
 
-const adapter = new JSONFile<Schema>("db.json");
+const adapter = new JSONFile<Schema>('db.json');
 export const db = new Low(adapter, DEFAULT_DATA);
 
 export async function initDB() {
@@ -358,25 +364,25 @@ export function acquireIdempotencyKey(
   key: string,
   namespace: string,
 ):
-  | { type: "hit"; entry: IdempotencyEntry }
-  | { type: "inflight"; promise: Promise<IdempotencyEntry | null> }
-  | { type: "claimed" } {
+  | { type: 'hit'; entry: IdempotencyEntry }
+  | { type: 'inflight'; promise: Promise<IdempotencyEntry | null> }
+  | { type: 'claimed' } {
   const nk = namespacedKey(key, namespace);
 
   const completed = idempotencyStore.get(nk);
   if (completed) {
     if (Date.now() <= completed.expiresAt)
-      return { type: "hit", entry: completed };
+      return { type: 'hit', entry: completed };
     idempotencyStore.delete(nk);
   }
 
   const inFlight = idempotencyInFlight.get(nk);
-  if (inFlight) return { type: "inflight", promise: inFlight.promise };
+  if (inFlight) return { type: 'inflight', promise: inFlight.promise };
 
   // Reserve the slot with a deferred promise so concurrent duplicates wait.
   const deferred = makeDeferred();
   idempotencyInFlight.set(nk, deferred);
-  return { type: "claimed" };
+  return { type: 'claimed' };
 }
 
 /** Finalise a claimed slot with the actual response. */

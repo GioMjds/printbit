@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import type { SessionStore } from "../services/session";
 import { CAPTIVE_PORTAL_ENABLED } from "../config/http";
-import { appendAdminLog } from "../services/admin";
+import { adminService } from "../services/admin";
 
 const CAPTIVE_PATHS = new Set([
   "/hotspot-detect.html",
@@ -54,7 +54,7 @@ export function createCaptivePortalMiddleware(_sessionStore: SessionStore) {
     // Exclude /portal itself to prevent an infinite redirect loop when Apple hosts
     // proxy the request (common with DNS-hijack captive portals).
     if ((IOS_PROBE_PATHS.has(pathname) || APPLE_HOSTS.has(host)) && pathname !== "/portal") {
-      void appendAdminLog("captive_ios_redirect", "iOS captive probe redirected to /portal.", {
+      void adminService.appendAdminLog("captive_ios_redirect", "iOS captive probe redirected to /portal.", {
         path: pathname,
         host,
       });

@@ -1,19 +1,14 @@
-import fs from "node:fs";
-import path from "node:path";
-import type { Express, Request, Response } from "express";
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Express, Request, Response } from 'express';
 import {
   requireAdminLocalAccess,
   requireAdminPin,
-} from "../middleware/admin-auth";
-import {
-  appendAdminLog,
-  computeEarningsBuckets,
-  getStorageUsage,
-  logsToCsv,
-} from "../services/admin";
-import { db } from "../services/db";
-import { getPrinterTelemetry } from "../services/printer-status";
-import { getScannerStatus } from "../services/scanner";
+} from '../middleware/admin-auth';
+import { adminService } from '../services/admin';
+import { db } from '../services/db';
+import { getPrinterTelemetry } from '../services/printer-status';
+import { getScannerStatus } from '../services/scanner';
 
 interface RegisterAdminRoutesDeps {
   uploadDir: string;
@@ -39,7 +34,7 @@ interface RegisterAdminRoutesDeps {
 }
 
 function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function isWholePeso(value: number): boolean {
@@ -51,12 +46,12 @@ export function registerAdminRoutes(
   deps: RegisterAdminRoutesDeps,
 ) {
   app.post(
-    "/api/admin/auth",
+    '/api/admin/auth',
     requireAdminLocalAccess,
     (req: Request, res: Response) => {
-      const pin = typeof req.body?.pin === "string" ? req.body.pin : "";
+      const pin = typeof req.body?.pin === 'string' ? req.body.pin : '';
       if (!pin || pin !== db.data!.settings.adminPin) {
-        return res.status(401).json({ ok: false, error: "Invalid admin PIN." });
+        return res.status(401).json({ ok: false, error: 'Invalid admin PIN.' });
       }
 
       return res.json({ ok: true });
@@ -64,23 +59,25 @@ export function registerAdminRoutes(
   );
 
   app.get(
-    "/api/admin/summary",
+    '/api/admin/summary',
     requireAdminLocalAccess,
     requireAdminPin,
     (req: Request, res: Response) => {
-      const storage = getStorageUsage(deps.uploadDir);
-      const host = req.get("host") ?? "unknown";
+      const storage = adminService.getStorageUsage(deps.uploadDir);
+      const host = req.get('host') ?? 'unknown';
       const wifiActive =
-        !host.startsWith("localhost") && !host.startsWith("127.0.0.1");
+        !host.startsWith('localhost') && !host.startsWith('127.0.0.1');
       const printer = getPrinterTelemetry();
       const scanner = getScannerStatus();
       res.json({
         balance: db.data!.balance,
-        earnings: computeEarningsBuckets(),
+        earnings: adminService.computeEarningsBuckets(),
         coinStats: db.data!.coinStats,
         jobStats: db.data!.jobStats,
         hopperStats: db.data!.hopperStats,
-        owedChangeOpenCount: db.data!.owedChanges.filter((entry) => entry.status === "open").length,
+        owedChangeOpenCount: db.data!.owedChanges.filter(
+          (entry) => entry.status === 'open',
+        ).length,
         storage,
         status: {
           serverRunning: true,
@@ -97,14 +94,14 @@ export function registerAdminRoutes(
   );
 
   app.get(
-    "/api/admin/status",
+    '/api/admin/status',
     requireAdminLocalAccess,
     requireAdminPin,
     (req: Request, res: Response) => {
-      const storage = getStorageUsage(deps.uploadDir);
-      const host = req.get("host") ?? "unknown";
+      const storage = adminService.getStorageUsage(deps.uploadDir);
+      const host = req.get('host') ?? 'unknown';
       const wifiActive =
-        !host.startsWith("localhost") && !host.startsWith("127.0.0.1");
+        !host.startsWith('localhost') && !host.startsWith('127.0.0.1');
       const printer = getPrinterTelemetry();
       const scanner = getScannerStatus();
       res.json({
@@ -122,7 +119,7 @@ export function registerAdminRoutes(
   );
 
   app.post(
-    "/api/admin/hopper/self-test",
+    '/api/admin/hopper/self-test',
     requireAdminLocalAccess,
     requireAdminPin,
     async (_req: Request, res: Response) => {
@@ -132,7 +129,7 @@ export function registerAdminRoutes(
   );
 
   app.get(
-    "/api/admin/settings",
+    '/api/admin/settings',
     requireAdminLocalAccess,
     requireAdminPin,
     (_req: Request, res: Response) => {
@@ -141,7 +138,7 @@ export function registerAdminRoutes(
   );
 
   app.put(
-    "/api/admin/settings",
+    '/api/admin/settings',
     requireAdminLocalAccess,
     requireAdminPin,
     async (req: Request, res: Response) => {
@@ -166,25 +163,41 @@ export function registerAdminRoutes(
         printPerPage !== undefined &&
         (!isFiniteNumber(printPerPage) || !isWholePeso(printPerPage))
       ) {
-        return res.status(400).json({ error: "printPerPage must be a whole peso value (no decimals)." });
+        return res
+          .status(400)
+          .json({
+            error: 'printPerPage must be a whole peso value (no decimals).',
+          });
       }
       if (
         copyPerPage !== undefined &&
         (!isFiniteNumber(copyPerPage) || !isWholePeso(copyPerPage))
       ) {
-        return res.status(400).json({ error: "copyPerPage must be a whole peso value (no decimals)." });
+        return res
+          .status(400)
+          .json({
+            error: 'copyPerPage must be a whole peso value (no decimals).',
+          });
       }
       if (
         scanDocument !== undefined &&
         (!isFiniteNumber(scanDocument) || !isWholePeso(scanDocument))
       ) {
-        return res.status(400).json({ error: "scanDocument must be a whole peso value (no decimals)." });
+        return res
+          .status(400)
+          .json({
+            error: 'scanDocument must be a whole peso value (no decimals).',
+          });
       }
       if (
         colorSurcharge !== undefined &&
         (!isFiniteNumber(colorSurcharge) || !isWholePeso(colorSurcharge))
       ) {
-        return res.status(400).json({ error: "colorSurcharge must be a whole peso value (no decimals)." });
+        return res
+          .status(400)
+          .json({
+            error: 'colorSurcharge must be a whole peso value (no decimals).',
+          });
       }
 
       if (
@@ -194,16 +207,16 @@ export function registerAdminRoutes(
       ) {
         return res
           .status(400)
-          .json({ error: "Invalid idleTimeoutSeconds value." });
+          .json({ error: 'Invalid idleTimeoutSeconds value.' });
       }
 
       if (
         body.adminPin !== undefined &&
-        (typeof body.adminPin !== "string" || body.adminPin.trim().length < 4)
+        (typeof body.adminPin !== 'string' || body.adminPin.trim().length < 4)
       ) {
         return res
           .status(400)
-          .json({ error: "Admin PIN must be at least 4 characters." });
+          .json({ error: 'Admin PIN must be at least 4 characters.' });
       }
 
       if (body.pricing) {
@@ -211,7 +224,7 @@ export function registerAdminRoutes(
           db.data!.settings.pricing.printPerPage = printPerPage;
         if (copyPerPage !== undefined)
           db.data!.settings.pricing.copyPerPage = copyPerPage;
-        if (scanDocument !== undefined) 
+        if (scanDocument !== undefined)
           db.data!.settings.pricing.scanDocument = scanDocument;
         if (colorSurcharge !== undefined)
           db.data!.settings.pricing.colorSurcharge = colorSurcharge;
@@ -232,14 +245,17 @@ export function registerAdminRoutes(
       }
 
       await db.write();
-      await appendAdminLog("admin_settings_updated", "Admin settings updated.");
+      await adminService.appendAdminLog(
+        'admin_settings_updated',
+        'Admin settings updated.',
+      );
 
       res.json(db.data!.settings);
     },
   );
 
   app.get(
-    "/api/admin/logs",
+    '/api/admin/logs',
     requireAdminLocalAccess,
     requireAdminPin,
     (req: Request, res: Response) => {
@@ -252,14 +268,14 @@ export function registerAdminRoutes(
   );
 
   app.get(
-    "/api/admin/logs/export.csv",
+    '/api/admin/logs/export.csv',
     requireAdminLocalAccess,
     requireAdminPin,
     (_req: Request, res: Response) => {
-      const csv = logsToCsv(db.data!.logs);
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      const csv = adminService.logsToCsv(db.data!.logs);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader(
-        "Content-Disposition",
+        'Content-Disposition',
         `attachment; filename="printbit-admin-logs-${new Date().toISOString().slice(0, 10)}.csv"`,
       );
       res.send(csv);
@@ -267,7 +283,7 @@ export function registerAdminRoutes(
   );
 
   app.delete(
-    "/api/admin/logs",
+    '/api/admin/logs',
     requireAdminLocalAccess,
     requireAdminPin,
     async (_req: Request, res: Response) => {
@@ -278,16 +294,16 @@ export function registerAdminRoutes(
   );
 
   app.post(
-    "/api/admin/balance/reset",
+    '/api/admin/balance/reset',
     requireAdminLocalAccess,
     requireAdminPin,
     async (_req: Request, res: Response) => {
       const previousBalance = db.data!.balance;
       db.data!.balance = 0;
       await db.write();
-      await appendAdminLog(
-        "admin_balance_reset",
-        "Admin reset machine balance.",
+      await adminService.appendAdminLog(
+        'admin_balance_reset',
+        'Admin reset machine balance.',
         {
           previousBalance,
           newBalance: 0,
@@ -303,7 +319,7 @@ export function registerAdminRoutes(
   );
 
   app.post(
-    "/api/admin/storage/clear",
+    '/api/admin/storage/clear',
     requireAdminLocalAccess,
     requireAdminPin,
     async (_req: Request, res: Response) => {
@@ -321,9 +337,9 @@ export function registerAdminRoutes(
         removedFiles += 1;
       }
 
-      await appendAdminLog(
-        "admin_storage_cleared",
-        "Admin cleared upload storage.",
+      await adminService.appendAdminLog(
+        'admin_storage_cleared',
+        'Admin cleared upload storage.',
         {
           removedFiles,
         },
@@ -335,13 +351,13 @@ export function registerAdminRoutes(
   // ── Owed change management ─────────────────────────────────────────────────
 
   app.get(
-    "/api/admin/owed-changes",
+    '/api/admin/owed-changes',
     requireAdminLocalAccess,
     requireAdminPin,
     (_req: Request, res: Response) => {
       const entries = db.data!.owedChanges ?? [];
-      const open = entries.filter((e) => e.status === "open");
-      const resolved = entries.filter((e) => e.status === "resolved");
+      const open = entries.filter((e) => e.status === 'open');
+      const resolved = entries.filter((e) => e.status === 'resolved');
       res.json({
         total: entries.length,
         openCount: open.length,
@@ -352,24 +368,24 @@ export function registerAdminRoutes(
   );
 
   app.post(
-    "/api/admin/owed-changes/:id/resolve",
+    '/api/admin/owed-changes/:id/resolve',
     requireAdminLocalAccess,
     requireAdminPin,
     async (req: Request, res: Response) => {
       const entryId = req.params.id as string;
       const entry = db.data!.owedChanges.find((e) => e.id === entryId);
       if (!entry) {
-        return res.status(404).json({ error: "Owed change entry not found." });
+        return res.status(404).json({ error: 'Owed change entry not found.' });
       }
-      if (entry.status === "resolved") {
-        return res.status(409).json({ error: "Already resolved." });
+      if (entry.status === 'resolved') {
+        return res.status(409).json({ error: 'Already resolved.' });
       }
 
-      entry.status = "resolved";
+      entry.status = 'resolved';
       await db.write();
 
-      await appendAdminLog(
-        "owed_change_resolved",
+      await adminService.appendAdminLog(
+        'owed_change_resolved',
         `Owed change ₱${entry.amount} resolved by admin.`,
         { entryId, amount: entry.amount, reason: entry.reason },
       );
@@ -379,22 +395,22 @@ export function registerAdminRoutes(
   );
 
   app.post(
-    "/api/admin/owed-changes/resolve-all",
+    '/api/admin/owed-changes/resolve-all',
     requireAdminLocalAccess,
     requireAdminPin,
     async (_req: Request, res: Response) => {
       let count = 0;
       for (const entry of db.data!.owedChanges) {
-        if (entry.status === "open") {
-          entry.status = "resolved";
+        if (entry.status === 'open') {
+          entry.status = 'resolved';
           count += 1;
         }
       }
       await db.write();
 
       if (count > 0) {
-        await appendAdminLog(
-          "owed_changes_bulk_resolved",
+        await adminService.appendAdminLog(
+          'owed_changes_bulk_resolved',
           `Admin resolved ${count} owed change entries.`,
           { count },
         );

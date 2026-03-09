@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
-import path from "node:path";
-import fs from "node:fs";
-import type { Request } from "express";
-import { PUBLIC_URL } from "../config/http";
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import fs from 'node:fs';
+import type { Request } from 'express';
+import { PUBLIC_URL } from '../config/http';
 
 export interface UploadedDocument {
   documentId: string;
@@ -20,7 +20,7 @@ export interface Session {
   token: string;
   // Full URL the phone should open to upload a file
   uploadUrl: string;
-  status: "pending" | "uploaded";
+  status: 'pending' | 'uploaded';
   documents?: UploadedDocument[];
   document?: UploadedDocument;
   createdAt: Date;
@@ -34,31 +34,31 @@ export interface StoreUploadResult {
 }
 
 const ALLOWED_TYPES = new Map<string, string>([
-  ["application/pdf", ".pdf"],
-  ["application/msword", ".doc"],
+  ['application/pdf', '.pdf'],
+  ['application/msword', '.doc'],
   [
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".docx",
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.docx',
   ],
-  ["application/vnd.ms-excel", ".xls"],
+  ['application/vnd.ms-excel', '.xls'],
   [
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".xlsx",
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.xlsx',
   ],
-  ["application/vnd.ms-powerpoint", ".ppt"],
+  ['application/vnd.ms-powerpoint', '.ppt'],
   [
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ".pptx",
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.pptx',
   ],
 ]);
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB
 
 // Session limits
-const SESSION_TTL_MS = 15 * 60 * 1000;          // 15 minutes
+const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_FILES_PER_SESSION = 10;
-const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024;   // 50MB total per session
-const CLEANUP_INTERVAL_MS = 2 * 60 * 1000;       // run cleanup every 2 minutes
+const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024; // 50MB total per session
+const CLEANUP_INTERVAL_MS = 2 * 60 * 1000; // run cleanup every 2 minutes
 
 export class SessionStore {
   private readonly sessions = new Map<string, Session>();
@@ -67,10 +67,13 @@ export class SessionStore {
   private readonly uploadDir: string;
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(uploadDir = "uploads") {
+  constructor(uploadDir = 'uploads') {
     this.uploadDir = uploadDir;
     fs.mkdirSync(uploadDir, { recursive: true });
-    this.cleanupTimer = setInterval(() => this.cleanupExpired(), CLEANUP_INTERVAL_MS);
+    this.cleanupTimer = setInterval(
+      () => this.cleanupExpired(),
+      CLEANUP_INTERVAL_MS,
+    );
   }
 
   /** Check whether a session is still within its TTL window. */
@@ -96,7 +99,7 @@ export class SessionStore {
       sessionId,
       token,
       uploadUrl,
-      status: "pending",
+      status: 'pending',
       createdAt: new Date(),
     };
 
@@ -128,24 +131,25 @@ export class SessionStore {
     if (!session) {
       return {
         isSuccess: false,
-        errorMsg: "Session not found",
-        errorCode: "SESSION_NOT_FOUND",
+        errorMsg: 'Session not found',
+        errorCode: 'SESSION_NOT_FOUND',
       };
     }
 
     if (this.isSessionExpired(session)) {
       return {
         isSuccess: false,
-        errorMsg: "Session has expired. Please start a new session from the kiosk.",
-        errorCode: "SESSION_EXPIRED",
+        errorMsg:
+          'Session has expired. Please start a new session from the kiosk.',
+        errorCode: 'SESSION_EXPIRED',
       };
     }
 
     if (session.token !== token) {
       return {
         isSuccess: false,
-        errorMsg: "Invalid token for session",
-        errorCode: "INVALID_TOKEN",
+        errorMsg: 'Invalid token for session',
+        errorCode: 'INVALID_TOKEN',
       };
     }
 
@@ -153,27 +157,31 @@ export class SessionStore {
       return {
         isSuccess: false,
         errorMsg: `File size exceeds limit of ${MAX_BYTES} bytes`,
-        errorCode: "FILE_TOO_LARGE",
+        errorCode: 'FILE_TOO_LARGE',
       };
     }
 
     // Per-session file count limit
-    const existingDocs = session.documents ?? (session.document ? [session.document] : []);
+    const existingDocs =
+      session.documents ?? (session.document ? [session.document] : []);
     if (existingDocs.length >= MAX_FILES_PER_SESSION) {
       return {
         isSuccess: false,
         errorMsg: `Maximum of ${MAX_FILES_PER_SESSION} files per session reached.`,
-        errorCode: "MAX_FILES_REACHED",
+        errorCode: 'MAX_FILES_REACHED',
       };
     }
 
     // Per-session cumulative size limit
-    const cumulativeBytes = existingDocs.reduce((sum, d) => sum + d.sizeBytes, 0);
+    const cumulativeBytes = existingDocs.reduce(
+      (sum, d) => sum + d.sizeBytes,
+      0,
+    );
     if (cumulativeBytes + file.size > MAX_CUMULATIVE_BYTES) {
       return {
         isSuccess: false,
         errorMsg: `Total upload size would exceed ${MAX_CUMULATIVE_BYTES / (1024 * 1024)}MB session limit.`,
-        errorCode: "SESSION_SIZE_LIMIT",
+        errorCode: 'SESSION_SIZE_LIMIT',
       };
     }
 
@@ -182,7 +190,7 @@ export class SessionStore {
       return {
         isSuccess: false,
         errorMsg: `Unsupported file type: ${file.mimetype}. Use PDF, Word, Excel, or PowerPoint documents.`,
-        errorCode: "UNSUPPORTED_TYPE",
+        errorCode: 'UNSUPPORTED_TYPE',
       };
     }
 
@@ -209,14 +217,17 @@ export class SessionStore {
 
     documents.push(document);
     session.documents = documents;
-    session.status = "uploaded";
+    session.status = 'uploaded';
     session.document = document;
 
-    return { isSuccess: true, document, errorCode: "", errorMsg: "" };
+    return { isSuccess: true, document, errorCode: '', errorMsg: '' };
   }
 
   private withFreshUrl(session: Session, publicBaseUrl: URL): Session {
-    const freshUrl = new URL(`/upload/${encodeURIComponent(session.token)}`, publicBaseUrl).toString();
+    const freshUrl = new URL(
+      `/upload/${encodeURIComponent(session.token)}`,
+      publicBaseUrl,
+    ).toString();
     return { ...session, uploadUrl: freshUrl };
   }
 
@@ -239,7 +250,8 @@ export class SessionStore {
       if (now - session.createdAt.getTime() <= SESSION_TTL_MS) continue;
 
       // Delete uploaded files asynchronously to avoid blocking the event loop
-      const docs = session.documents ?? (session.document ? [session.document] : []);
+      const docs =
+        session.documents ?? (session.document ? [session.document] : []);
       void Promise.allSettled(
         docs.map((doc) => fs.promises.unlink(doc.filePath)),
       );
@@ -263,18 +275,15 @@ export function renderUploadPortal(token: string, portalHtmlPath: string) {
     throw new Error(`Upload portal HTML not found at: ${portalHtmlPath}`);
   }
 
-  let template = fs.readFileSync(portalHtmlPath, "utf-8");
+  let template = fs.readFileSync(portalHtmlPath, 'utf-8');
 
   // Inject <base href> so relative asset URLs resolve under /upload/{token}/
   const safeToken = encodeURIComponent(token);
   const assetBase = `/upload/${safeToken}/`;
-  template = template.replace(
-    "<head>",
-    `<head>\n  <base href="${assetBase}">`,
-  );
+  template = template.replace('<head>', `<head>\n  <base href="${assetBase}">`);
 
   // Inject token into the placeholder used by app.ts
-  template = template.replace("{{token}}", token.replace(/"/g, "&quot;"));
+  template = template.replace('{{token}}', token.replace(/"/g, '&quot;'));
 
   return template;
 }
@@ -283,7 +292,7 @@ export function resolvePublicBaseUrl(req: Request): URL {
   if (PUBLIC_URL) return new URL(PUBLIC_URL);
 
   const protocol = req.protocol;
-  const host = req.get("host") ?? "localhost";
+  const host = req.get('host') ?? 'localhost';
 
   return new URL(`${protocol}://${host}`);
 }

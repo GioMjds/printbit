@@ -2,12 +2,7 @@ import type { Express, Request, RequestHandler, Response } from "express";
 import path from "node:path";
 import type { Server } from "socket.io";
 import { db, acquireIdempotencyKey, storeIdempotencyKey, releaseIdempotencyKey } from "../services/db";
-import {
-  appendAdminLog,
-  calculateJobAmount,
-  getPricingSettings,
-  incrementJobStats,
-} from "../services/admin";
+import { adminService } from "../services/admin";
 import { settlePayment } from "../services/settlement";
 import { printFile, type PrintJobOptions } from "../services/printer";
 import type { SessionStore } from "../services/session";
@@ -100,7 +95,7 @@ export function registerFinancialRoutes(
   });
 
   app.get("/api/pricing", (_req: Request, res: Response) => {
-    res.json(getPricingSettings());
+    res.json(adminService.getPricingSettings());
   });
 
   app.post("/api/balance/reset", async (_req: Request, res: Response) => {
@@ -108,7 +103,7 @@ export function registerFinancialRoutes(
     db.data!.balance = 0;
     await db.write();
     deps.io.emit("balance", 0);
-    await appendAdminLog("balance_reset", "Balance reset from admin/testing.", {
+    await adminService.appendAdminLog("balance_reset", "Balance reset from admin/testing.", {
       previousBalance,
       newBalance: 0,
     });
@@ -134,7 +129,7 @@ export function registerFinancialRoutes(
     db.data!.balance += coinValue;
     await db.write();
 
-    await appendAdminLog("coin_accepted", `Test coin inserted: ${coinValue}`, {
+    await adminService.appendAdminLog("coin_accepted", `Test coin inserted: ${coinValue}`, {
       coinValue,
       balance: db.data!.balance,
       source: "test-ui",
@@ -153,11 +148,11 @@ export function registerFinancialRoutes(
 
   app.post("/upload", deps.uploadSingle, (req: Request, res: Response) => {
     if (!req.file) {
-      void appendAdminLog("upload_failed", "Upload failed: no file provided.");
+      void adminService.appendAdminLog("upload_failed", "Upload failed: no file provided.");
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    void appendAdminLog("upload_completed", "Upload completed via /upload.", {
+    void adminService.appendAdminLog("upload_completed", "Upload completed via /upload.", {
       filename: req.file.originalname,
       storedFilename: req.file.filename,
       sizeBytes: req.file.size,
@@ -169,13 +164,13 @@ export function registerFinancialRoutes(
     const { filename } = req.body as { filename?: string };
 
     if (!filename) {
-      void appendAdminLog("print_failed", "Legacy print failed: filename missing.");
+      void adminService.appendAdminLog("print_failed", "Legacy print failed: filename missing.");
       return res.status(400).json({ error: "Filename is required" });
     }
 
-    const minimumAmount = calculateJobAmount("print", "grayscale", 1);
+    const minimumAmount = adminService.calculateJobAmount("print", "grayscale", 1);
     if ((db.data?.balance ?? 0) < minimumAmount) {
-      void appendAdminLog(
+      void adminService.appendAdminLog(
         "print_failed",
         "Legacy print failed: insufficient balance.",
         { balance: db.data?.balance ?? 0, required: minimumAmount },
@@ -193,7 +188,7 @@ export function registerFinancialRoutes(
     try {
       await printFile(filename, defaultOptions);
     } catch (err) {
-      void appendAdminLog("print_failed", "Legacy print failed: printer error.", {
+      void adminService.appendAdminLog("print_failed", "Legacy print failed: printer error.", {
         filename,
         error: err instanceof Error ? err.message : "Unknown error",
       });
@@ -204,11 +199,11 @@ export function registerFinancialRoutes(
     db.data!.earnings += chargedAmount;
     db.data!.balance = 0;
     await db.write();
-    await appendAdminLog("print_completed", "Legacy print completed and charged.", {
+    await adminService.appendAdminLog("print_completed", "Legacy print completed and charged.", {
       filename,
       chargedAmount,
     });
-    await incrementJobStats("print");
+    await adminService.incrementJobStats("print");
 
     deps.io.emit("balance", 0);
     res.sendStatus(200);
@@ -265,7 +260,7 @@ export function registerFinancialRoutes(
     };
 
     if (mode !== "print" && mode !== "copy") {
-      void appendAdminLog("payment_failed", "Confirm payment failed: invalid mode.", {
+      void adminService.appendAdminLog("payment_failed", "Confirm payment failed: invalid mode.", {
         mode: mode ?? null,
       });
       return sendResponse(400, { error: "Invalid mode" });
@@ -287,10 +282,10 @@ export function registerFinancialRoutes(
       req.body?.paperSize === "A4" || req.body?.paperSize === "Letter" || req.body?.paperSize === "Legal"
         ? req.body.paperSize
         : "A4";
-    const requiredAmount = calculateJobAmount(mode, colorMode, copies);
+    const requiredAmount = adminService.calculateJobAmount(mode, colorMode, copies);
 
     if (typeof amount === "number" && Number.isFinite(amount) && amount !== requiredAmount) {
-      void appendAdminLog("payment_amount_mismatch", "Client amount differed from server pricing.", {
+      void adminService.appendAdminLog("payment_amount_mismatch", "Client amount differed from server pricing.", {
         amount,
         requiredAmount,
       });
@@ -304,7 +299,7 @@ export function registerFinancialRoutes(
 
     if (mode === "print") {
       if (!sessionId) {
-        void appendAdminLog(
+        void adminService.appendAdminLog(
           "payment_failed",
           "Confirm payment failed: missing print session.",
         );
@@ -316,7 +311,7 @@ export function registerFinancialRoutes(
         deps.resolvePublicBaseUrl(req),
       );
       if (!session) {
-        void appendAdminLog(
+        void adminService.appendAdminLog(
           "payment_failed",
           "Confirm payment failed: session not found.",
           { sessionId },
@@ -332,7 +327,7 @@ export function registerFinancialRoutes(
             : [];
 
       if (allDocs.length === 0) {
-        void appendAdminLog(
+        void adminService.appendAdminLog(
           "payment_failed",
           "Confirm payment failed: no uploaded document in session.",
           { sessionId },
@@ -345,7 +340,7 @@ export function registerFinancialRoutes(
         : allDocs[allDocs.length - 1];
 
       if (!target) {
-        void appendAdminLog(
+        void adminService.appendAdminLog(
           "payment_failed",
           "Confirm payment failed: target document not found.",
           { sessionId, filename: filename ?? null },
@@ -355,7 +350,7 @@ export function registerFinancialRoutes(
 
       const parsedPageRange = parsePageRange(req.body?.pageRange);
       if (parsedPageRange.error) {
-        void appendAdminLog(
+        void adminService.appendAdminLog(
           "payment_failed",
           "Confirm payment failed: invalid page range.",
           {
@@ -379,7 +374,7 @@ export function registerFinancialRoutes(
 
     // ── Pre-check balance (will re-verify inside lock) ────────────────────────
     if ((db.data?.balance ?? 0) < requiredAmount) {
-      void appendAdminLog(
+      void adminService.appendAdminLog(
         "payment_failed",
         "Confirm payment failed: insufficient balance.",
         { balance: db.data?.balance ?? 0, requiredAmount },
@@ -398,7 +393,7 @@ export function registerFinancialRoutes(
       try {
         await printFile(serverFilename, printOptions);
       } catch (err) {
-        void appendAdminLog("print_failed", "Print failed: printer error.", {
+        void adminService.appendAdminLog("print_failed", "Print failed: printer error.", {
           sessionId: sessionId ?? null,
           filename: serverFilename,
           error: err instanceof Error ? err.message : "Unknown error",
@@ -430,9 +425,9 @@ export function registerFinancialRoutes(
     }
 
     // Logging and stats updates happen outside the lock
-    await incrementJobStats(mode);
+    await adminService.incrementJobStats(mode);
 
-    await appendAdminLog("payment_confirmed", "Payment confirmed.", {
+    await adminService.appendAdminLog("payment_confirmed", "Payment confirmed.", {
       mode,
       amount: requiredAmount,
       copies,
@@ -447,7 +442,7 @@ export function registerFinancialRoutes(
     });
 
     if (settlement.change.state === "dispensed") {
-      await appendAdminLog("hopper_dispense_succeeded", "Coin change dispensed.", {
+      await adminService.appendAdminLog("hopper_dispense_succeeded", "Coin change dispensed.", {
         requested: settlement.change.requested,
         dispensed: settlement.change.dispensed,
         attempts: settlement.change.attempts ?? 0,
@@ -455,7 +450,7 @@ export function registerFinancialRoutes(
     }
 
     if (settlement.change.state === "failed") {
-      await appendAdminLog("hopper_dispense_failed", "Coin change dispense failed.", {
+      await adminService.appendAdminLog("hopper_dispense_failed", "Coin change dispense failed.", {
         requested: settlement.change.requested,
         dispensed: settlement.change.dispensed,
         attempts: settlement.change.attempts ?? 0,

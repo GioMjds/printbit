@@ -1,15 +1,15 @@
-import { SerialPort } from "serialport";
-import { ReadlineParser } from "@serialport/parser-readline";
-import { db } from "./db";
-import { Server } from "socket.io";
-import { appendAdminLog, incrementCoinStats } from "./admin";
+import { SerialPort } from 'serialport';
+import { ReadlineParser } from '@serialport/parser-readline';
+import { db } from './db';
+import { Server } from 'socket.io';
+import { adminService } from './admin';
 import {
   parseHopperResponse,
   parseLegacyHopperResponse,
   type HopperResponse,
   type HopperErrorCodeValue,
   HopperErrorCode,
-} from "./hopper-protocol";
+} from './hopper-protocol';
 
 const ACCEPTED_COINS = new Set([1, 5, 10, 20]);
 const FRAGMENT_WINDOW_MS = 140;
@@ -129,24 +129,24 @@ function handleParsedResponse(
   rawLine: string,
 ): boolean {
   switch (response.kind) {
-    case "ACK":
+    case 'ACK':
       // Arduino acknowledged the command — keep waiting for DONE/ERR
       console.log(
         `[SERIAL] Hopper ACK received for request ${response.requestId}`,
       );
       return true;
 
-    case "PROGRESS":
+    case 'PROGRESS':
       console.log(
         `[SERIAL] Hopper progress: ${response.dispensed}/${response.total} coins`,
       );
-      socketIo?.emit("changeDispenseProgress", {
+      socketIo?.emit('changeDispenseProgress', {
         dispensed: response.dispensed,
         total: response.total,
       });
       return true;
 
-    case "DONE":
+    case 'DONE':
       completePendingHopperCommand({
         ok: true,
         message: rawLine,
@@ -154,7 +154,7 @@ function handleParsedResponse(
       });
       return true;
 
-    case "ERR":
+    case 'ERR':
       completePendingHopperCommand({
         ok: false,
         message: `${response.code}: ${response.detail}`,
@@ -170,11 +170,11 @@ export async function sendHopperCommand(
   requestId?: string,
 ): Promise<HopperCommandResult> {
   if (!serialConnected || !activeSerialPort) {
-    return { ok: false, message: "Serial port not connected." };
+    return { ok: false, message: 'Serial port not connected.' };
   }
 
   if (pendingHopperCommand) {
-    return { ok: false, message: "Hopper command already in progress." };
+    return { ok: false, message: 'Hopper command already in progress.' };
   }
 
   const normalizedTimeout = Number.isFinite(timeoutMs)
@@ -190,7 +190,7 @@ export async function sendHopperCommand(
       });
     }, normalizedTimeout);
 
-    pendingHopperCommand = { requestId: requestId ?? "", resolve, timer };
+    pendingHopperCommand = { requestId: requestId ?? '', resolve, timer };
     hopperCommandPending = true;
 
     activeSerialPort!.write(`${command.trim()}\n`, (error) => {
@@ -205,7 +205,7 @@ export async function sendHopperCommand(
 
 export async function initSerial(io: Server) {
   socketIo = io;
-  console.log("[SERIAL] ── Initializing serial connection ──────────────");
+  console.log('[SERIAL] ── Initializing serial connection ──────────────');
   await attemptSerialConnection(io, 0);
 }
 
@@ -217,7 +217,7 @@ async function attemptSerialConnection(io: Server, attempt: number) {
       console.log(`[SERIAL] Found ${ports.length} serial port(s):`);
       for (const p of ports) {
         console.log(
-          `[SERIAL]   → ${p.path} (manufacturer: ${p.manufacturer ?? "unknown"}, vendorId: ${p.vendorId ?? "unknown"}, productId: ${p.productId ?? "unknown"}, serialNumber: ${p.serialNumber ?? "unknown"})`,
+          `[SERIAL]   → ${p.path} (manufacturer: ${p.manufacturer ?? 'unknown'}, vendorId: ${p.vendorId ?? 'unknown'}, productId: ${p.productId ?? 'unknown'}, serialNumber: ${p.serialNumber ?? 'unknown'})`,
         );
       }
     }
@@ -225,60 +225,67 @@ async function attemptSerialConnection(io: Server, attempt: number) {
     if (!ports.length) {
       serialConnected = false;
       serialPortPath = null;
-      serialLastError = "No serial ports found.";
+      serialLastError = 'No serial ports found.';
       console.warn(
-        "[SERIAL] ✗ No serial ports found. Continuing without serial connection.",
+        '[SERIAL] ✗ No serial ports found. Continuing without serial connection.',
       );
       return;
     }
 
     const portPath = ports[0].path;
     serialPortPath = portPath;
-    console.log(`[SERIAL] Selected port: ${portPath} (baud: 9600)${attempt > 0 ? ` — retry #${attempt}` : ""}`);
+    console.log(
+      `[SERIAL] Selected port: ${portPath} (baud: 9600)${attempt > 0 ? ` — retry #${attempt}` : ''}`,
+    );
 
     await new Promise<void>((resolve, reject) => {
-      const port = new SerialPort({
-        path: portPath,
-        baudRate: 9600,
-      }, (err) => {
-        if (err) return reject(err);
-      });
+      const port = new SerialPort(
+        {
+          path: portPath,
+          baudRate: 9600,
+        },
+        (err) => {
+          if (err) return reject(err);
+        },
+      );
       activeSerialPort = port;
 
-      const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
+      const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
 
-      port.on("open", () => {
-        console.log(`[SERIAL] ✓ Port opened — Arduino connected on ${portPath}`);
+      port.on('open', () => {
+        console.log(
+          `[SERIAL] ✓ Port opened — Arduino connected on ${portPath}`,
+        );
         serialConnected = true;
         serialLastError = null;
-        io.emit("serialStatus", getSerialStatus());
+        io.emit('serialStatus', getSerialStatus());
         resolve();
       });
 
-      port.on("close", () => {
-        console.log("[SERIAL] ✗ Port closed — Arduino disconnected");
+      port.on('close', () => {
+        console.log('[SERIAL] ✗ Port closed — Arduino disconnected');
         serialConnected = false;
         activeSerialPort = null;
-        io.emit("serialStatus", getSerialStatus());
+        io.emit('serialStatus', getSerialStatus());
         completePendingHopperCommand({
           ok: false,
-          message: "Serial port closed during hopper command.",
+          message: 'Serial port closed during hopper command.',
         });
       });
 
-      port.on("error", (error) => {
+      port.on('error', (error) => {
         serialConnected = false;
         serialLastError = error.message;
         activeSerialPort = null;
-        io.emit("serialStatus", getSerialStatus());
-        console.error("[SERIAL] ✗ Port error:", error.message);
+        io.emit('serialStatus', getSerialStatus());
+        console.error('[SERIAL] ✗ Port error:', error.message);
         completePendingHopperCommand({
           ok: false,
           message: `Serial error: ${error.message}`,
         });
       });
 
-      let pendingPrefix: "1" | "2" | null = null;
+      let pendingPrefix: '1' | '2' | null = null;
       let pendingTimer: NodeJS.Timeout | null = null;
 
       const clearPending = () => {
@@ -289,62 +296,75 @@ async function attemptSerialConnection(io: Server, attempt: number) {
 
       const persistBalance = async (coinValue: number) => {
         db.data!.balance += coinValue;
-        await incrementCoinStats(coinValue);
-        await appendAdminLog("coin_accepted", `Accepted coin: ${coinValue}`, {
-          coinValue,
+        await adminService.incrementCoinStats(coinValue);
+        await adminService.appendAdminLog(
+          'coin_accepted',
+          `Accepted coin: ${coinValue}`,
+          {
+            coinValue,
+            balance: db.data!.balance,
+          },
+        );
+        console.log(
+          `[SERIAL] ✓ Coin accepted: ₱${coinValue} → new balance: ₱${db.data!.balance}`,
+        );
+        io.emit('balance', db.data!.balance);
+        io.emit('coinAccepted', {
+          value: coinValue,
           balance: db.data!.balance,
         });
-        console.log(`[SERIAL] ✓ Coin accepted: ₱${coinValue} → new balance: ₱${db.data!.balance}`);
-        io.emit("balance", db.data!.balance);
-        io.emit("coinAccepted", { value: coinValue, balance: db.data!.balance });
       };
 
-      const flushPending = async (reason: "timeout" | "interrupted") => {
+      const flushPending = async (reason: 'timeout' | 'interrupted') => {
         if (!pendingPrefix) return;
         const prefix = pendingPrefix;
-        console.log(`[SERIAL] Flushing pending "${prefix}" (reason: ${reason})`);
+        console.log(
+          `[SERIAL] Flushing pending "${prefix}" (reason: ${reason})`,
+        );
         clearPending();
 
-        if (prefix === "1") {
+        if (prefix === '1') {
           await persistBalance(1);
           return;
         }
 
-        io.emit("coinParserWarning", {
-          code: "INVALID_FRAGMENT",
+        io.emit('coinParserWarning', {
+          code: 'INVALID_FRAGMENT',
           message: `Ignored fragment '${prefix}' (${reason}).`,
         });
-        void appendAdminLog(
-          "coin_parser_warning",
+        void adminService.appendAdminLog(
+          'coin_parser_warning',
           `Ignored fragment '${prefix}' (${reason}).`,
           { reason },
         );
       };
 
-      const armPending = (prefix: "1" | "2") => {
-        console.log(`[SERIAL] Pending fragment: "${prefix}" (waiting ${FRAGMENT_WINDOW_MS}ms)`);
+      const armPending = (prefix: '1' | '2') => {
+        console.log(
+          `[SERIAL] Pending fragment: "${prefix}" (waiting ${FRAGMENT_WINDOW_MS}ms)`,
+        );
         clearPending();
         pendingPrefix = prefix;
         pendingTimer = setTimeout(() => {
-          void flushPending("timeout");
+          void flushPending('timeout');
         }, FRAGMENT_WINDOW_MS);
       };
 
       const processToken = async (token: string) => {
         console.log(`[SERIAL] Token: "${token}"`);
         if (pendingPrefix) {
-          if (token === "0") {
+          if (token === '0') {
             const combined = Number(`${pendingPrefix}${token}`);
             clearPending();
             if (ACCEPTED_COINS.has(combined)) {
               await persistBalance(combined);
             } else {
-              io.emit("coinParserWarning", {
-                code: "INVALID_COMBINATION",
+              io.emit('coinParserWarning', {
+                code: 'INVALID_COMBINATION',
                 message: `Ignored invalid coin '${combined}'.`,
               });
-              void appendAdminLog(
-                "coin_parser_warning",
+              void adminService.appendAdminLog(
+                'coin_parser_warning',
                 `Ignored invalid coin '${combined}'.`,
                 { combined },
               );
@@ -352,22 +372,22 @@ async function attemptSerialConnection(io: Server, attempt: number) {
             return;
           }
 
-          await flushPending("interrupted");
+          await flushPending('interrupted');
         }
 
-        if (token === "1" || token === "2") {
+        if (token === '1' || token === '2') {
           armPending(token);
           return;
         }
 
         const value = Number(token);
         if (!Number.isInteger(value)) {
-          io.emit("coinParserWarning", {
-            code: "NON_NUMERIC",
+          io.emit('coinParserWarning', {
+            code: 'NON_NUMERIC',
             message: `Ignored serial token '${token}'.`,
           });
-          void appendAdminLog(
-            "coin_parser_warning",
+          void adminService.appendAdminLog(
+            'coin_parser_warning',
             `Ignored non-numeric serial token '${token}'.`,
             { token },
           );
@@ -375,12 +395,12 @@ async function attemptSerialConnection(io: Server, attempt: number) {
         }
 
         if (!ACCEPTED_COINS.has(value)) {
-          io.emit("coinParserWarning", {
-            code: "UNSUPPORTED_COIN",
+          io.emit('coinParserWarning', {
+            code: 'UNSUPPORTED_COIN',
             message: `Ignored unsupported coin '${value}'.`,
           });
-          void appendAdminLog(
-            "coin_parser_warning",
+          void adminService.appendAdminLog(
+            'coin_parser_warning',
             `Ignored unsupported coin '${value}'.`,
             { value },
           );
@@ -390,44 +410,76 @@ async function attemptSerialConnection(io: Server, attempt: number) {
         await persistBalance(value);
       };
 
-      parser.on("data", (rawLine: string) => {
+      parser.on('data', (rawLine: string) => {
         console.log(`[SERIAL] Raw data: "${rawLine}"`);
         if (tryHandleHopperResponse(rawLine)) return;
-        const token = rawLine.trim().replace(/[^0-9]/g, "");
+        const token = rawLine.trim().replace(/[^0-9]/g, '');
         if (!token) return;
         void processToken(token);
       });
     });
 
     console.log(`[SERIAL] ✓ Serial port initialized on ${portPath}`);
-    void appendAdminLog("serial_connected", `Serial port initialized on ${portPath}`, {
-      portPath,
-    });
+    void adminService.appendAdminLog(
+      'serial_connected',
+      `Serial port initialized on ${portPath}`,
+      {
+        portPath,
+      },
+    );
   } catch (error) {
     serialConnected = false;
-    serialLastError = error instanceof Error ? error.message : "Unknown serial error.";
+    serialLastError =
+      error instanceof Error ? error.message : 'Unknown serial error.';
 
-    const isAccessDenied = serialLastError.toLowerCase().includes("access denied");
+    const isAccessDenied = serialLastError
+      .toLowerCase()
+      .includes('access denied');
 
     if (isAccessDenied && attempt < MAX_RETRIES) {
       console.warn(
         `[SERIAL] ⚠ Port access denied — retrying in ${RETRY_INTERVAL_MS / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES}). Close Arduino IDE Serial Monitor if open.`,
       );
-      setTimeout(() => void attemptSerialConnection(io, attempt + 1), RETRY_INTERVAL_MS);
+      setTimeout(
+        () => void attemptSerialConnection(io, attempt + 1),
+        RETRY_INTERVAL_MS,
+      );
       return;
     }
 
-    console.error(
-      "[SERIAL] ✗ Init error:",
-      serialLastError,
-    );
+    console.error('[SERIAL] ✗ Init error:', serialLastError);
     if (isAccessDenied) {
-      console.error("[SERIAL] ✗ Gave up after retries. Close Arduino IDE Serial Monitor or any app using the port, then restart the server.");
+      console.error(
+        '[SERIAL] ✗ Gave up after retries. Close Arduino IDE Serial Monitor or any app using the port, then restart the server.',
+      );
     }
-    void appendAdminLog(
-      "serial_init_error",
-      "Error initializing serial port. Continuing without serial connection.",
+    void adminService.appendAdminLog(
+      'serial_init_error',
+      'Error initializing serial port. Continuing without serial connection.',
       { message: serialLastError },
     );
   }
 }
+class SerialService {
+  getStatus() {
+    return getSerialStatus();
+  }
+
+  getHopperStatus() {
+    return getHopperStatus();
+  }
+
+  async sendHopperCommand(
+    command: string,
+    timeoutMs: number,
+    requestId?: string,
+  ): Promise<HopperCommandResult> {
+    return sendHopperCommand(command, timeoutMs, requestId);
+  }
+
+  async init(io: Server): Promise<void> {
+    return initSerial(io);
+  }
+}
+
+export const serialService = new SerialService();
