@@ -1,19 +1,30 @@
 import { randomUUID } from "node:crypto";
 import { appendAdminLog } from "./admin";
 import { db, type LogMeta, type OwedChangeEntry } from "./db";
-import { getHopperStatus, sendHopperCommand } from "./serial";
+import { getHopperStatus, sendHopperCommand, type HopperCommandResult } from "./serial";
+import {
+  buildDispenseCommand,
+  buildSelfTestCommand,
+  computeDispenseCoins,
+  generateRequestId,
+  isRetryableError,
+  type HopperErrorCodeValue,
+} from "./hopper-protocol";
 
 export type HopperDispenseResult = {
   ok: boolean;
   amount: number;
+  requestedCoins: number;
+  dispensedCoins: number;
   message: string;
   attempts: number;
   owedChangeId?: string;
+  errorCode?: HopperErrorCodeValue;
 };
 
 function safeAmount(amount: number): number {
   if (!Number.isFinite(amount)) return 0;
-  return Number(Math.max(0, amount).toFixed(2));
+  return Math.max(0, Math.round(amount));
 }
 
 export async function recordOwedChange(
@@ -36,7 +47,6 @@ export async function recordOwedChange(
 }
 
 export async function runHopperSelfTest(): Promise<HopperDispenseResult> {
-  const command = db.data!.hopperSettings.selfTestCommand;
   const timeoutMs = db.data!.hopperSettings.timeoutMs;
 
   if (!db.data!.hopperSettings.enabled) {
@@ -47,6 +57,8 @@ export async function runHopperSelfTest(): Promise<HopperDispenseResult> {
     return {
       ok: false,
       amount: 0,
+      requestedCoins: 0,
+      dispensedCoins: 0,
       message: "Hopper is disabled in settings.",
       attempts: 0,
     };
@@ -61,12 +73,17 @@ export async function runHopperSelfTest(): Promise<HopperDispenseResult> {
     return {
       ok: false,
       amount: 0,
+      requestedCoins: 0,
+      dispensedCoins: 0,
       message: "Serial port not connected.",
       attempts: 0,
     };
   }
 
-  const result = await sendHopperCommand(command, timeoutMs);
+  const requestId = generateRequestId();
+  const command = buildSelfTestCommand(requestId);
+  const result = await sendHopperCommand(command, timeoutMs, requestId);
+
   db.data!.hopperStats.selfTestPassed = result.ok;
   db.data!.hopperStats.lastSelfTestAt = new Date().toISOString();
   db.data!.hopperStats.lastError = result.ok ? null : result.message;
@@ -78,12 +95,15 @@ export async function runHopperSelfTest(): Promise<HopperDispenseResult> {
     {
       message: result.message,
       command,
+      requestId,
     },
   );
 
   return {
     ok: result.ok,
     amount: 0,
+    requestedCoins: 0,
+    dispensedCoins: 0,
     message: result.message,
     attempts: 1,
   };
@@ -95,7 +115,27 @@ export async function dispenseChange(amount: number): Promise<HopperDispenseResu
     return {
       ok: true,
       amount: 0,
+      requestedCoins: 0,
+      dispensedCoins: 0,
       message: "No change to dispense.",
+      attempts: 0,
+    };
+  }
+
+  const { coins, isWholeAmount } = computeDispenseCoins(requestedAmount);
+  if (!isWholeAmount) {
+    console.warn(
+      `[HOPPER] ⚠ Change amount ₱${requestedAmount} is not a whole peso — this indicates a pricing configuration issue.`,
+    );
+  }
+
+  if (coins <= 0) {
+    return {
+      ok: true,
+      amount: requestedAmount,
+      requestedCoins: 0,
+      dispensedCoins: 0,
+      message: "No coins to dispense (amount below 1 peso).",
       attempts: 0,
     };
   }
@@ -104,7 +144,9 @@ export async function dispenseChange(amount: number): Promise<HopperDispenseResu
   const stats = db.data!.hopperStats;
 
   if (!settings.enabled) {
-    const owed = await recordOwedChange(requestedAmount, "Hopper disabled in settings.");
+    const owed = await recordOwedChange(requestedAmount, "Hopper disabled in settings.", {
+      requestedCoins: coins,
+    });
     stats.dispenseFailures += 1;
     stats.lastError = "Hopper is disabled in settings.";
     await db.write();
@@ -112,6 +154,8 @@ export async function dispenseChange(amount: number): Promise<HopperDispenseResu
     return {
       ok: false,
       amount: requestedAmount,
+      requestedCoins: coins,
+      dispensedCoins: 0,
       message: "Hopper is disabled in settings.",
       attempts: 0,
       owedChangeId: owed.id,
@@ -120,7 +164,9 @@ export async function dispenseChange(amount: number): Promise<HopperDispenseResu
 
   const serialStatus = getHopperStatus();
   if (!serialStatus.connected) {
-    const owed = await recordOwedChange(requestedAmount, "Serial port not connected.");
+    const owed = await recordOwedChange(requestedAmount, "Serial port not connected.", {
+      requestedCoins: coins,
+    });
     stats.dispenseFailures += 1;
     stats.lastError = "Serial port not connected.";
     await db.write();
@@ -128,6 +174,8 @@ export async function dispenseChange(amount: number): Promise<HopperDispenseResu
     return {
       ok: false,
       amount: requestedAmount,
+      requestedCoins: coins,
+      dispensedCoins: 0,
       message: "Serial port not connected.",
       attempts: 0,
       owedChangeId: owed.id,
@@ -136,15 +184,19 @@ export async function dispenseChange(amount: number): Promise<HopperDispenseResu
 
   const maxAttempts = Math.max(1, Math.floor(settings.retryCount) + 1);
   let lastMessage = "Unknown hopper failure.";
+  let lastResult: HopperCommandResult | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     stats.dispenseAttempts += 1;
-    const command = `${settings.dispenseCommandPrefix} ${requestedAmount.toFixed(2)}`;
-    const result = await sendHopperCommand(command, settings.timeoutMs);
+    const requestId = generateRequestId();
+    const command = buildDispenseCommand(requestId, coins);
+    const result = await sendHopperCommand(command, settings.timeoutMs, requestId);
+    lastResult = result;
 
     if (result.ok) {
+      const dispensed = result.dispensedCoins ?? coins;
       stats.dispenseSuccess += 1;
-      stats.totalDispensed = Number((stats.totalDispensed + requestedAmount).toFixed(2));
+      stats.totalDispensed += dispensed;
       stats.lastDispensedAt = new Date().toISOString();
       stats.lastError = null;
       await db.write();
@@ -152,16 +204,25 @@ export async function dispenseChange(amount: number): Promise<HopperDispenseResu
       return {
         ok: true,
         amount: requestedAmount,
+        requestedCoins: coins,
+        dispensedCoins: dispensed,
         message: result.message,
         attempts: attempt,
       };
     }
 
     lastMessage = result.message;
+
+    // Only retry on retryable error codes; abort immediately for non-retryable
+    if (result.errorCode && !isRetryableError(result.errorCode)) {
+      break;
+    }
   }
 
   const owed = await recordOwedChange(requestedAmount, "Hopper dispense failed.", {
     message: lastMessage,
+    requestedCoins: coins,
+    errorCode: lastResult?.errorCode ?? null,
   });
 
   stats.dispenseFailures += 1;
@@ -171,8 +232,11 @@ export async function dispenseChange(amount: number): Promise<HopperDispenseResu
   return {
     ok: false,
     amount: requestedAmount,
+    requestedCoins: coins,
+    dispensedCoins: 0,
     message: lastMessage,
     attempts: maxAttempts,
     owedChangeId: owed.id,
+    errorCode: lastResult?.errorCode,
   };
 }

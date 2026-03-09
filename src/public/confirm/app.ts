@@ -96,14 +96,12 @@ function pageRangeLabel(sel?: PageRangeSelection): string {
 
 function calculateTotalPrice(pricing: PricingResponse): number {
   if (config.mode === 'scan') {
-    return Number(
-      (pricing.scanDocument ?? DEFAULT_PRICING.scanDocument).toFixed(2),
-    );
+    return pricing.scanDocument ?? DEFAULT_PRICING.scanDocument;
   }
   const base =
     config.mode === 'copy' ? pricing.copyPerPage : pricing.printPerPage;
   const color = config.colorMode === 'colored' ? pricing.colorSurcharge : 0;
-  return Number(((base + color) * Math.max(1, config.copies)).toFixed(2));
+  return (base + color) * Math.max(1, config.copies);
 }
 
 if (confirmBtn) {
@@ -162,13 +160,13 @@ function updateChangeDisplay(balance: number): void {
     }
   }
   if (changeValue) {
-    changeValue.textContent = hasChange ? `₱ ${change.toFixed(2)}` : '—';
+    changeValue.textContent = hasChange ? `₱ ${change}` : '—';
   }
 }
 
 function updateBalanceUI(balance: number): void {
   currentBalance = balance;
-  if (balanceValue) balanceValue.textContent = `₱ ${balance.toFixed(2)}`;
+  if (balanceValue) balanceValue.textContent = `₱ ${balance}`;
   updateChangeDisplay(balance);
   if (!statusMessage || !confirmBtn) return;
   if (isProcessingPayment) return;
@@ -186,7 +184,7 @@ function updateBalanceUI(balance: number): void {
     confirmBtn.setAttribute('aria-disabled', 'false');
   } else {
     const needed = totalPrice - balance;
-    statusMessage.textContent = `Insert more coins: ₱ ${needed.toFixed(2)} remaining.`;
+    statusMessage.textContent = `Insert more coins: ₱ ${needed} remaining.`;
     confirmBtn.disabled = true;
     confirmBtn.setAttribute('aria-disabled', 'true');
   }
@@ -199,10 +197,13 @@ function setCoinEventMessage(message: string): void {
 function setPrintingPhase(
   phase: 'printing' | 'dispensing' | 'failed' | 'done',
 ): void {
+  const modeLabel = config.mode === 'copy' ? 'Copying' : 'Printing';
+  const modePast = config.mode === 'copy' ? 'Copy' : 'Print';
+
   if (phase === 'printing') {
     if (printingSubtitle) {
       printingSubtitle.textContent =
-        'Please wait while your document is being printed...';
+        `Please wait while your document is being ${modeLabel.toLowerCase()}...`;
     }
     if (printingHint) {
       printingHint.textContent = 'Do not turn off the machine.';
@@ -213,7 +214,7 @@ function setPrintingPhase(
   if (phase === 'dispensing') {
     if (printingSubtitle) {
       printingSubtitle.textContent =
-        'Printing done. Dispensing your coin change...';
+        `${modeLabel} done. Dispensing your coin change...`;
     }
     if (printingHint) {
       printingHint.textContent = 'Please wait until the dispenser completes.';
@@ -224,7 +225,7 @@ function setPrintingPhase(
   if (phase === 'failed') {
     if (printingSubtitle) {
       printingSubtitle.textContent =
-        'Print completed, but coin change dispensing failed.';
+        `${modePast} completed, but coin change dispensing failed.`;
     }
     if (printingHint) {
       printingHint.textContent =
@@ -234,7 +235,7 @@ function setPrintingPhase(
   }
 
   if (printingSubtitle) {
-    printingSubtitle.textContent = 'Print and change handling completed.';
+    printingSubtitle.textContent = `${modePast} and change handling completed.`;
   }
   if (printingHint) {
     printingHint.textContent = 'Thank you for using PrintBit.';
@@ -376,7 +377,7 @@ async function loadPricing(): Promise<void> {
 
   totalPrice = calculateTotalPrice(pricing);
   pricingLoaded = true;
-  if (priceValue) priceValue.textContent = `₱ ${totalPrice.toFixed(2)}`;
+  if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
 }
 
 async function resetBalanceForTesting(): Promise<void> {
@@ -446,12 +447,12 @@ function showModal(): void {
   if (modalPages) modalPages.textContent = pageRangeLabel(config.pageRange);
   if (modalOrientation) modalOrientation.textContent = config.orientation;
   if (modalPaper) modalPaper.textContent = config.paperSize;
-  if (modalPrice) modalPrice.textContent = `₱ ${totalPrice.toFixed(2)}`;
+  if (modalPrice) modalPrice.textContent = `₱ ${totalPrice}`;
   const change = currentBalance - totalPrice;
   if (modalChangeRow && modalChange) {
     if (change > 0) {
       modalChangeRow.removeAttribute('hidden');
-      modalChange.textContent = `₱ ${change.toFixed(2)}`;
+      modalChange.textContent = `₱ ${change}`;
     } else {
       modalChangeRow.setAttribute('hidden', '');
       modalChange.textContent = '—';
@@ -705,7 +706,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
           'Document printed. Change dispensing failed. Please contact staff.';
       }
       setCoinEventMessage(
-        `Change owed: ₱ ${(payload.change.requested ?? 0).toFixed(2)}. Staff assistance required.`,
+        `Change owed: ₱ ${payload.change.requested ?? 0}. Staff assistance required.`,
       );
     } else if (payload.change?.state === 'dispensed') {
       setPrintingPhase('done');
@@ -842,7 +843,7 @@ if (typeof ioFactory === 'function') {
       typeof (payload as { value: unknown }).value === 'number'
     ) {
       const value = (payload as { value: number }).value;
-      setCoinEventMessage(`Last accepted coin: ₱ ${value.toFixed(2)}`);
+      setCoinEventMessage(`Last accepted coin: ₱ ${value}`);
     }
   });
 
@@ -876,7 +877,7 @@ if (typeof ioFactory === 'function') {
     if (state === 'dispensing') {
       setPrintingPhase('dispensing');
       if (statusMessage) {
-        statusMessage.textContent = `Dispensing change: ₱ ${amount.toFixed(2)}...`;
+        statusMessage.textContent = `Dispensing change: ₱ ${amount}...`;
       }
       return;
     }
@@ -884,7 +885,7 @@ if (typeof ioFactory === 'function') {
     if (state === 'dispensed') {
       setPrintingPhase('done');
       if (statusMessage) {
-        statusMessage.textContent = `Change dispensed: ₱ ${amount.toFixed(2)}.`;
+        statusMessage.textContent = `Change dispensed: ₱ ${amount}.`;
       }
       return;
     }

@@ -133,6 +133,21 @@ function finiteOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+/**
+ * Round a pricing value to a whole peso. The hopper only dispenses 1-peso
+ * coins so all prices must be integers. Legacy fractional values in db.json
+ * are silently rounded up on startup so the operator never under-charges.
+ */
+function wholePeso(value: number): number {
+  const rounded = Math.ceil(value);
+  if (rounded !== value) {
+    console.warn(
+      `[DB] ⚠ Pricing value ${value} is not a whole peso — rounded to ${rounded}. Update admin settings to remove this warning.`,
+    );
+  }
+  return rounded;
+}
+
 function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const pricing = data?.settings?.pricing;
   const hopperSettings = data?.hopperSettings;
@@ -143,22 +158,22 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
     earnings: finiteOr(data?.earnings, DEFAULT_DATA.earnings),
     settings: {
       pricing: {
-        printPerPage: finiteOr(
+        printPerPage: wholePeso(finiteOr(
           pricing?.printPerPage,
           DEFAULT_DATA.settings.pricing.printPerPage,
-        ),
-        copyPerPage: finiteOr(
+        )),
+        copyPerPage: wholePeso(finiteOr(
           pricing?.copyPerPage,
           DEFAULT_DATA.settings.pricing.copyPerPage,
-        ),
-        scanDocument: finiteOr(
+        )),
+        scanDocument: wholePeso(finiteOr(
           pricing?.scanDocument,
           DEFAULT_DATA.settings.pricing.scanDocument,
-        ),
-        colorSurcharge: finiteOr(
+        )),
+        colorSurcharge: wholePeso(finiteOr(
           pricing?.colorSurcharge,
           DEFAULT_DATA.settings.pricing.colorSurcharge,
-        ),
+        )),
       },
       idleTimeoutSeconds: finiteOr(
         data?.settings?.idleTimeoutSeconds,

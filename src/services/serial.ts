@@ -3,6 +3,13 @@ import { ReadlineParser } from "@serialport/parser-readline";
 import { db } from "./db";
 import { Server } from "socket.io";
 import { appendAdminLog, incrementCoinStats } from "./admin";
+import {
+  parseHopperResponse,
+  parseLegacyHopperResponse,
+  type HopperResponse,
+  type HopperErrorCodeValue,
+  HopperErrorCode,
+} from "./hopper-protocol";
 
 const ACCEPTED_COINS = new Set([1, 5, 10, 20]);
 const FRAGMENT_WINDOW_MS = 140;
@@ -13,17 +20,21 @@ let serialConnected = false;
 let serialPortPath: string | null = null;
 let serialLastError: string | null = null;
 let activeSerialPort: SerialPort | null = null;
+let socketIo: Server | null = null;
 
 let hopperCommandPending = false;
 let hopperLastError: string | null = null;
 let hopperLastSuccessAt: string | null = null;
 
-interface HopperCommandResult {
+export interface HopperCommandResult {
   ok: boolean;
   message: string;
+  dispensedCoins?: number;
+  errorCode?: HopperErrorCodeValue;
 }
 
 interface PendingHopperCommand {
+  requestId: string;
   resolve: (result: HopperCommandResult) => void;
   timer: NodeJS.Timeout;
 }
@@ -68,30 +79,95 @@ function completePendingHopperCommand(result: HopperCommandResult): boolean {
 
 function tryHandleHopperResponse(rawLine: string): boolean {
   const line = rawLine.trim();
-  if (!line || !line.toUpperCase().includes("HOPPER")) return false;
 
-  if (!pendingHopperCommand) {
-    hopperLastError = `Unsolicited hopper response: ${line}`;
+  // ── Try structured protocol first ──────────────────────────────────────────
+  const parsed = parseHopperResponse(line);
+  if (parsed) {
+    if (!pendingHopperCommand) {
+      hopperLastError = `Unsolicited hopper response: ${line}`;
+      console.warn(`[SERIAL] ⚠ ${hopperLastError}`);
+      return true;
+    }
+
+    // Ignore responses for a different request ID
+    if (parsed.requestId !== pendingHopperCommand.requestId) {
+      console.warn(
+        `[SERIAL] ⚠ Hopper response requestId mismatch: expected ${pendingHopperCommand.requestId}, got ${parsed.requestId}`,
+      );
+      return true;
+    }
+
+    return handleParsedResponse(parsed, line);
+  }
+
+  // ── Fall back to legacy format ("HOPPER OK" / "HOPPER ERROR …") ───────────
+  const legacy = parseLegacyHopperResponse(line);
+  if (legacy) {
+    if (!pendingHopperCommand) {
+      hopperLastError = `Unsolicited hopper response: ${line}`;
+      console.warn(`[SERIAL] ⚠ ${hopperLastError}`);
+      return true;
+    }
+
+    console.warn(
+      `[SERIAL] ⚠ Legacy hopper response detected — consider upgrading Arduino firmware: "${line}"`,
+    );
+    completePendingHopperCommand(
+      legacy.ok
+        ? { ok: true, message: legacy.message }
+        : { ok: false, message: legacy.message },
+    );
     return true;
   }
 
-  const upper = line.toUpperCase();
-  if (upper.includes("ERR") || upper.includes("FAIL") || upper.includes("ERROR")) {
-    completePendingHopperCommand({ ok: false, message: line });
-    return true;
-  }
+  // Not a hopper message
+  return false;
+}
 
-  if (upper.includes("OK") || upper.includes("DONE") || upper.includes("SUCCESS")) {
-    completePendingHopperCommand({ ok: true, message: line });
-    return true;
-  }
+function handleParsedResponse(
+  response: HopperResponse,
+  rawLine: string,
+): boolean {
+  switch (response.kind) {
+    case "ACK":
+      // Arduino acknowledged the command — keep waiting for DONE/ERR
+      console.log(
+        `[SERIAL] Hopper ACK received for request ${response.requestId}`,
+      );
+      return true;
 
-  return true;
+    case "PROGRESS":
+      console.log(
+        `[SERIAL] Hopper progress: ${response.dispensed}/${response.total} coins`,
+      );
+      socketIo?.emit("changeDispenseProgress", {
+        dispensed: response.dispensed,
+        total: response.total,
+      });
+      return true;
+
+    case "DONE":
+      completePendingHopperCommand({
+        ok: true,
+        message: rawLine,
+        dispensedCoins: response.dispensedCount,
+      });
+      return true;
+
+    case "ERR":
+      completePendingHopperCommand({
+        ok: false,
+        message: `${response.code}: ${response.detail}`,
+        errorCode: response.code,
+      });
+      return true;
+  }
 }
 
 export async function sendHopperCommand(
   command: string,
   timeoutMs: number,
+  requestId?: string,
 ): Promise<HopperCommandResult> {
   if (!serialConnected || !activeSerialPort) {
     return { ok: false, message: "Serial port not connected." };
@@ -110,10 +186,11 @@ export async function sendHopperCommand(
       completePendingHopperCommand({
         ok: false,
         message: `Hopper timeout after ${normalizedTimeout}ms.`,
+        errorCode: HopperErrorCode.MOTOR_TIMEOUT,
       });
     }, normalizedTimeout);
 
-    pendingHopperCommand = { resolve, timer };
+    pendingHopperCommand = { requestId: requestId ?? "", resolve, timer };
     hopperCommandPending = true;
 
     activeSerialPort!.write(`${command.trim()}\n`, (error) => {
@@ -127,6 +204,7 @@ export async function sendHopperCommand(
 }
 
 export async function initSerial(io: Server) {
+  socketIo = io;
   console.log("[SERIAL] ── Initializing serial connection ──────────────");
   await attemptSerialConnection(io, 0);
 }

@@ -99,7 +99,7 @@ function updatePager(): void {
 }
 
 function formatPeso(value: number): string {
-  return `₱${value.toFixed(2)}`;
+  return `₱${value}`;
 }
 
 function updateSoftCopyPricingUi(): void {
@@ -117,7 +117,7 @@ async function loadPricing(): Promise<void> {
       typeof payload.scanDocument === 'number' &&
       Number.isFinite(payload.scanDocument)
     ) {
-      scanDocumentPrice = Number(payload.scanDocument.toFixed(2));
+      scanDocumentPrice = payload.scanDocument;
     }
   } catch {
     scanDocumentPrice = 5;

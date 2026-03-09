@@ -42,6 +42,10 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isWholePeso(value: number): boolean {
+  return Number.isInteger(value) && value >= 0;
+}
+
 export function registerAdminRoutes(
   app: Express,
   deps: RegisterAdminRoutesDeps,
@@ -160,27 +164,27 @@ export function registerAdminRoutes(
 
       if (
         printPerPage !== undefined &&
-        (!isFiniteNumber(printPerPage) || printPerPage < 0)
+        (!isFiniteNumber(printPerPage) || !isWholePeso(printPerPage))
       ) {
-        return res.status(400).json({ error: "Invalid printPerPage value." });
+        return res.status(400).json({ error: "printPerPage must be a whole peso value (no decimals)." });
       }
       if (
         copyPerPage !== undefined &&
-        (!isFiniteNumber(copyPerPage) || copyPerPage < 0)
+        (!isFiniteNumber(copyPerPage) || !isWholePeso(copyPerPage))
       ) {
-        return res.status(400).json({ error: "Invalid copyPerPage value." });
+        return res.status(400).json({ error: "copyPerPage must be a whole peso value (no decimals)." });
       }
       if (
         scanDocument !== undefined &&
-        (!isFiniteNumber(scanDocument) || scanDocument < 0)
+        (!isFiniteNumber(scanDocument) || !isWholePeso(scanDocument))
       ) {
-        return res.status(400).json({ error: "Invalid scanDocument value." });
+        return res.status(400).json({ error: "scanDocument must be a whole peso value (no decimals)." });
       }
       if (
         colorSurcharge !== undefined &&
-        (!isFiniteNumber(colorSurcharge) || colorSurcharge < 0)
+        (!isFiniteNumber(colorSurcharge) || !isWholePeso(colorSurcharge))
       ) {
-        return res.status(400).json({ error: "Invalid colorSurcharge value." });
+        return res.status(400).json({ error: "colorSurcharge must be a whole peso value (no decimals)." });
       }
 
       if (
@@ -325,6 +329,78 @@ export function registerAdminRoutes(
         },
       );
       res.json({ ok: true, removedFiles });
+    },
+  );
+
+  // ── Owed change management ─────────────────────────────────────────────────
+
+  app.get(
+    "/api/admin/owed-changes",
+    requireAdminLocalAccess,
+    requireAdminPin,
+    (_req: Request, res: Response) => {
+      const entries = db.data!.owedChanges ?? [];
+      const open = entries.filter((e) => e.status === "open");
+      const resolved = entries.filter((e) => e.status === "resolved");
+      res.json({
+        total: entries.length,
+        openCount: open.length,
+        resolvedCount: resolved.length,
+        entries,
+      });
+    },
+  );
+
+  app.post(
+    "/api/admin/owed-changes/:id/resolve",
+    requireAdminLocalAccess,
+    requireAdminPin,
+    async (req: Request, res: Response) => {
+      const entryId = req.params.id as string;
+      const entry = db.data!.owedChanges.find((e) => e.id === entryId);
+      if (!entry) {
+        return res.status(404).json({ error: "Owed change entry not found." });
+      }
+      if (entry.status === "resolved") {
+        return res.status(409).json({ error: "Already resolved." });
+      }
+
+      entry.status = "resolved";
+      await db.write();
+
+      await appendAdminLog(
+        "owed_change_resolved",
+        `Owed change ₱${entry.amount} resolved by admin.`,
+        { entryId, amount: entry.amount, reason: entry.reason },
+      );
+
+      res.json({ ok: true, entry });
+    },
+  );
+
+  app.post(
+    "/api/admin/owed-changes/resolve-all",
+    requireAdminLocalAccess,
+    requireAdminPin,
+    async (_req: Request, res: Response) => {
+      let count = 0;
+      for (const entry of db.data!.owedChanges) {
+        if (entry.status === "open") {
+          entry.status = "resolved";
+          count += 1;
+        }
+      }
+      await db.write();
+
+      if (count > 0) {
+        await appendAdminLog(
+          "owed_changes_bulk_resolved",
+          `Admin resolved ${count} owed change entries.`,
+          { count },
+        );
+      }
+
+      res.json({ ok: true, resolvedCount: count });
     },
   );
 }

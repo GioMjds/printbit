@@ -23,9 +23,14 @@ export function calculateJobAmount(
 ): number {
   const safeCopies = Math.max(1, Math.floor(copies));
   const pricing = getPricingSettings();
+
+  if (mode === "scan") {
+    return pricing.scanDocument;
+  }
+
   const base = mode === "print" ? pricing.printPerPage : pricing.copyPerPage;
   const color = colorMode === "colored" ? pricing.colorSurcharge : 0;
-  return Number(((base + color) * safeCopies).toFixed(2));
+  return (base + color) * safeCopies;
 }
 
 export async function appendAdminLog(

@@ -31,10 +31,10 @@ const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
 let refreshTimer: number | null = null;
 
 function applySettings(settings: SettingsResponse): void {
-  settingPrintPerPage.value = settings.pricing.printPerPage.toFixed(2);
-  settingCopyPerPage.value = settings.pricing.copyPerPage.toFixed(2);
-  settingScanDocument.value = settings.pricing.scanDocument.toFixed(2);
-  settingColorSurcharge.value = settings.pricing.colorSurcharge.toFixed(2);
+  settingPrintPerPage.value = String(settings.pricing.printPerPage);
+  settingCopyPerPage.value = String(settings.pricing.copyPerPage);
+  settingScanDocument.value = String(settings.pricing.scanDocument);
+  settingColorSurcharge.value = String(settings.pricing.colorSurcharge);
   settingIdleTimeout.value = String(settings.idleTimeoutSeconds);
   settingAdminPin.value = settings.adminPin;
   settingAdminLocalOnly.checked = settings.adminLocalOnly;

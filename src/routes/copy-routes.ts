@@ -4,7 +4,6 @@ import { jobStore } from "../services/job-store";
 import { printFile, type PrintJobOptions } from "../services/printer";
 import {
   db,
-  withBalanceLock,
   acquireIdempotencyKey,
   storeIdempotencyKey,
   releaseIdempotencyKey,
@@ -14,6 +13,7 @@ import {
   calculateJobAmount,
   incrementJobStats,
 } from "../services/admin";
+import { settlePayment } from "../services/settlement";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -173,32 +173,22 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
         const relPath = path.join("scans", previewFilename);
         await printFile(relPath, printOptions);
 
-        // Print succeeded — charge balance inside the lock, capturing the new balance
-        const chargedBalance = await withBalanceLock(async () => {
-          if ((db.data?.balance ?? 0) < requiredAmount) {
-            // Rare edge: balance was spent between pre-check and print completion
-            void appendAdminLog(
-              "payment_failed",
-              "Copy charge failed post-print: balance drained.",
-              {
-                jobId: job.id,
-                balance: db.data?.balance ?? 0,
-                requiredAmount,
-              },
-            );
-            return null;
-          }
-          db.data!.balance -= requiredAmount;
-          db.data!.earnings += requiredAmount;
-          await db.write();
-          deps.io.emit("balance", db.data!.balance);
-          return db.data!.balance; // captured inside the lock
+        // Print succeeded — settle payment (charge + change dispense)
+        const settlement = await settlePayment({
+          requiredAmount,
+          io: deps.io,
+          jobContext: {
+            mode: "copy",
+            jobId: job.id,
+            copies: safeCopies,
+            colorMode: safeColorMode,
+          },
         });
 
-        if (chargedBalance !== null) {
+        if (settlement.ok) {
           job.payment = {
-            chargedAmount: requiredAmount,
-            remainingBalance: chargedBalance,
+            chargedAmount: settlement.chargedAmount,
+            remainingBalance: settlement.remainingBalance,
           };
           jobStore.updateJobState(job.id, "succeeded");
           await incrementJobStats("copy");
@@ -207,15 +197,18 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
             "Copy job completed and charged.",
             {
               jobId: job.id,
-              chargedAmount: requiredAmount,
-              remainingBalance: chargedBalance,
+              chargedAmount: settlement.chargedAmount,
+              remainingBalance: settlement.remainingBalance,
+              changeState: settlement.change.state,
+              changeRequested: settlement.change.requested,
+              changeDispensed: settlement.change.dispensed,
             },
           );
         } else {
           jobStore.updateJobState(job.id, "failed", {
             failure: {
               code: "COPY_ERROR",
-              message: "Balance drained before charge could complete.",
+              message: settlement.error ?? "Balance drained before charge could complete.",
               retryable: false,
               stage: "running",
             },
