@@ -3,6 +3,8 @@ node_modules
 dist
 *bundle.js
 db.json
+dev.db
 *app.js
 *uploads
 bin/
+/src/generated/prisma
