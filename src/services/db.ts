@@ -104,6 +104,53 @@ export interface FeedbackSessionEntry {
   submittedAt: string | null;
 }
 
+export type ReportIssueCategory =
+  | 'hardware'
+  | 'software'
+  | 'print'
+  | 'copy'
+  | 'scan'
+  | 'payment'
+  | 'network'
+  | 'other';
+
+export type ReportIssueStatus = 'open' | 'acknowledged' | 'resolved';
+
+export interface ReportIssueSessionEntry {
+  id: string;
+  token: string;
+  reportUrl: string;
+  createdAt: string;
+  expiresAt: string;
+  submittedAt: string | null;
+}
+
+export interface ReportIssueAttachmentEntry {
+  id: string;
+  sessionId: string;
+  reportIssueId: string | null;
+  timestamp: string;
+  originalName: string;
+  storedName: string;
+  contentType: string;
+  sizeBytes: number;
+  filePath: string;
+}
+
+export interface ReportIssueEntry {
+  id: string;
+  sessionId: string;
+  timestamp: string;
+  title: string;
+  description: string;
+  category: ReportIssueCategory;
+  status: ReportIssueStatus;
+  attachmentIds: string[];
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+  meta?: LogMeta;
+}
+
 export type Schema = {
   balance: number;
   earnings: number;
@@ -116,6 +163,9 @@ export type Schema = {
   logs: AdminLogEntry[];
   feedback: FeedbackEntry[];
   feedbackSessions: FeedbackSessionEntry[];
+  reportIssues: ReportIssueEntry[];
+  reportIssueSessions: ReportIssueSessionEntry[];
+  reportIssueAttachments: ReportIssueAttachmentEntry[];
 };
 
 const DEFAULT_DATA: Schema = {
@@ -165,6 +215,9 @@ const DEFAULT_DATA: Schema = {
   logs: [],
   feedback: [],
   feedbackSessions: [],
+  reportIssues: [],
+  reportIssueSessions: [],
+  reportIssueAttachments: [],
 };
 
 /**
@@ -312,6 +365,15 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
     feedbackSessions: Array.isArray(data?.feedbackSessions)
       ? data.feedbackSessions
       : DEFAULT_DATA.feedbackSessions,
+    reportIssues: Array.isArray(data?.reportIssues)
+      ? data.reportIssues
+      : DEFAULT_DATA.reportIssues,
+    reportIssueSessions: Array.isArray(data?.reportIssueSessions)
+      ? data.reportIssueSessions
+      : DEFAULT_DATA.reportIssueSessions,
+    reportIssueAttachments: Array.isArray(data?.reportIssueAttachments)
+      ? data.reportIssueAttachments
+      : DEFAULT_DATA.reportIssueAttachments,
   };
 }
 

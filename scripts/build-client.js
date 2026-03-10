@@ -16,6 +16,8 @@ const builds = [
   'esbuild src/public/admin/settings/app.ts --bundle --outfile=src/public/admin/settings/app.js',
   'esbuild src/public/admin/logs/app.ts --bundle --outfile=src/public/admin/logs/app.js',
   'esbuild src/public/admin/feedback/app.ts --bundle --outfile=src/public/admin/feedback/app.js',
+  'esbuild src/public/report/app.ts --bundle --outfile=src/public/report/app.js',
+  'esbuild src/public/admin/report/app.ts --bundle --outfile=src/public/admin/report/app.js',
 ];
 
 try {

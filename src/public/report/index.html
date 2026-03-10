@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/globals.css" />
+    <title>Report an Issue · PrintBit</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="rp-shell">
+      <!-- Loading -->
+      <div id="stateLoading" class="rp-state">
+        <div class="rp-spinner" aria-hidden="true"></div>
+        <p>Setting up your session…</p>
+      </div>
+
+      <!-- Error / expired -->
+      <div id="stateError" class="rp-state hidden">
+        <div class="rp-state__icon">⏰</div>
+        <h2>Session Expired</h2>
+        <p>
+          This link is no longer valid. Please scan a new QR code from the
+          kiosk.
+        </p>
+      </div>
+
+      <!-- Form -->
+      <section id="stateForm" class="rp-card hidden">
+        <header class="rp-card__header">
+          <div class="rp-card__brand" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="rp-card__title">Report an Issue</h1>
+            <p class="rp-card__sub">Attach up to 5 images. Max 10 MB each.</p>
+          </div>
+        </header>
+
+        <form id="reportForm" novalidate>
+          <!-- Title -->
+          <div class="rp-field">
+            <label class="rp-label" for="titleInput"
+              >Title <span class="rp-required">*</span></label
+            >
+            <input
+              id="titleInput"
+              class="rp-input"
+              type="text"
+              maxlength="120"
+              placeholder="Brief summary of the issue"
+              required
+            />
+          </div>
+
+          <!-- Category chips -->
+          <div class="rp-field">
+            <span class="rp-label">Category</span>
+            <div
+              id="categoryChips"
+              class="rp-chips"
+              role="group"
+              aria-label="Issue category"
+            ></div>
+          </div>
+
+          <!-- Description -->
+          <div class="rp-field">
+            <label class="rp-label" for="descriptionInput">
+              Description <span class="rp-required">*</span>
+            </label>
+            <textarea
+              id="descriptionInput"
+              class="rp-textarea"
+              rows="5"
+              maxlength="1200"
+              placeholder="Describe what happened in detail…"
+              required
+              aria-describedby="descCounter"
+            ></textarea>
+            <span id="descCounter" class="rp-counter">0 / 1200</span>
+          </div>
+
+          <!-- Image upload -->
+          <div class="rp-field">
+            <span class="rp-label">Image Proof</span>
+            <label id="dropZone" class="rp-dropzone" for="imageInput">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                />
+              </svg>
+              <span>Tap to choose images</span>
+              <small>JPEG, PNG, WebP — up to 5 files, 10 MB each</small>
+              <input
+                id="imageInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                class="rp-file-hidden"
+              />
+            </label>
+            <div id="attachmentList" class="rp-attachments"></div>
+          </div>
+
+          <p id="formMsg" class="rp-msg" role="alert" aria-live="polite"></p>
+
+          <button id="submitBtn" class="rp-btn" type="submit">
+            Submit Report
+          </button>
+        </form>
+      </section>
+
+      <!-- Done -->
+      <div id="stateDone" class="rp-state hidden">
+        <div class="rp-state__icon rp-state__icon--ok">✓</div>
+        <h2>Report Submitted</h2>
+        <p>Thank you. The operator will review your report shortly.</p>
+      </div>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

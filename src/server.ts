@@ -1,3 +1,4 @@
+import path from 'node:path';
 import os from 'os';
 import express from 'express';
 import http from 'http';
@@ -22,6 +23,7 @@ import {
   registerPageRoutes,
   registerAdminRoutes,
   registerFeedbackRoutes,
+  registerReportRoutes,
   registerUploadPortalRoutes,
   registerWirelessSessionRoutes,
   registerScanRoutes,
@@ -75,6 +77,16 @@ const upload = multer({ dest: UPLOAD_DIR });
 const wirelessUpload = multer({
   dest: UPLOAD_DIR,
   limits: { fileSize: 25 * 1024 * 1024 },
+});
+
+const ALLOWED_REPORT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const reportIssueUpload = multer({
+  dest: path.join(UPLOAD_DIR, 'report-issues'),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    cb(null, ALLOWED_REPORT_IMAGE_TYPES.has(file.mimetype));
+  },
 });
 
 const sessionStore = new SessionStore(UPLOAD_DIR);
@@ -132,6 +144,10 @@ registerAdminRoutes(app, {
   runHopperSelfTest,
 });
 registerFeedbackRoutes(app, { resolvePublicBaseUrl });
+registerReportRoutes(app, {
+  resolvePublicBaseUrl,
+  reportIssueUploadSingle: reportIssueUpload.single('file'),
+});
 registerFinancialRoutes(app, {
   io,
   sessionStore,
