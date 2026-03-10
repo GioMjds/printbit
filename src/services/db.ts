@@ -111,6 +111,7 @@ export type ReportIssueCategory =
   | 'copy'
   | 'scan'
   | 'payment'
+  | 'network'
   | 'other';
 
 export type ReportIssueStatus = 'open' | 'acknowledged' | 'resolved';

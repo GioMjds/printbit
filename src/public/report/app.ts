@@ -1,7 +1,12 @@
 export {};
 
 function escHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function formatBytes(bytes: number): string {
@@ -125,7 +130,7 @@ function buildCategoryChips(): void {
 // ── Counter ───────────────────────────────────────────────────────────────────
 
 descriptionInput.addEventListener('input', () => {
-  descCounter.textContent = `${descriptionInput.value.length} / 2500`;
+  descCounter.textContent = `${descriptionInput.value.length} / 1200`;
 });
 
 // ── Attachment list rendering ─────────────────────────────────────────────────

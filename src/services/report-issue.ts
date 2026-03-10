@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
 import {
   db,
   type LogMeta,
@@ -14,6 +15,7 @@ const REPORT_SESSION_TTL_MS = 15 * 60 * 1000;
 const REPORT_SESSION_RETENTION_MS = 24 * 60 * 60 * 1000;
 const MAX_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 1200;
+const MAX_ATTACHMENTS_PER_SESSION = 5;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 1000;
 
@@ -113,6 +115,13 @@ class ReportIssueService {
     if (!session) throw new Error('Invalid session');
     if (this.isExpired(session.expiresAt))
       throw new Error('Session has expired');
+    if (session.submittedAt) throw new Error('Session already submitted');
+
+    const existingCount = db.data!.reportIssueAttachments.filter(
+      (a) => a.sessionId === session.id,
+    ).length;
+    if (existingCount >= MAX_ATTACHMENTS_PER_SESSION)
+      throw new Error('Attachment limit reached');
 
     const attachment: ReportIssueAttachmentEntry = {
       id: randomUUID(),
@@ -152,6 +161,7 @@ class ReportIssueService {
     if (!session) throw new Error('Invalid session');
     if (this.isExpired(session.expiresAt))
       throw new Error('Session has expired');
+    if (session.submittedAt) throw new Error('Session already submitted');
 
     const title = this.sanitizeTitle(input.title);
     if (!title) throw new Error('Title is required');
@@ -317,17 +327,43 @@ class ReportIssueService {
     const retentionCutoff = nowMs - REPORT_SESSION_RETENTION_MS;
     const before = db.data!.reportIssueSessions.length;
 
+    const removedSessionIds = new Set<string>();
+
     db.data!.reportIssueSessions = db.data!.reportIssueSessions.filter(
       (session) => {
         const expiresAtMs = Date.parse(session.expiresAt);
         const createdAtMs = Date.parse(session.createdAt);
 
-        if (!Number.isFinite(expiresAtMs)) return false;
+        if (!Number.isFinite(expiresAtMs)) {
+          removedSessionIds.add(session.id);
+          return false;
+        }
         if (expiresAtMs >= nowMs) return true;
-        if (!Number.isFinite(createdAtMs)) return false;
-        return createdAtMs >= retentionCutoff;
+        if (!Number.isFinite(createdAtMs)) {
+          removedSessionIds.add(session.id);
+          return false;
+        }
+        const keep = createdAtMs >= retentionCutoff;
+        if (!keep) removedSessionIds.add(session.id);
+        return keep;
       },
     );
+
+    if (removedSessionIds.size > 0) {
+      const orphaned = db.data!.reportIssueAttachments.filter(
+        (a) => removedSessionIds.has(a.sessionId) && !a.reportIssueId,
+      );
+
+      for (const att of orphaned) {
+        try {
+          fs.unlinkSync(att.filePath);
+        } catch {}
+      }
+
+      db.data!.reportIssueAttachments = db.data!.reportIssueAttachments.filter(
+        (a) => !(removedSessionIds.has(a.sessionId) && !a.reportIssueId),
+      );
+    }
 
     if (before !== db.data!.reportIssueSessions.length) {
       await db.write();
@@ -380,6 +416,7 @@ class ReportIssueService {
       'copy',
       'scan',
       'payment',
+      'network',
       'other',
     ];
     return (

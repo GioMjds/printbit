@@ -1,7 +1,12 @@
 import { apiFetch, setMessage, initAuth } from '../shared';
 
 function escHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 interface ReportIssueEntry {
@@ -46,7 +51,10 @@ const statTotal = document.getElementById('statTotal') as HTMLElement;
 const statOpen = document.getElementById('statOpen') as HTMLElement;
 const statAck = document.getElementById('statAck') as HTMLElement;
 const statResolved = document.getElementById('statResolved') as HTMLElement;
-const openBadge = document.getElementById('openBadge') as HTMLElement;
+const openBadge = document.getElementById('openReportBadge') as HTMLElement;
+const openBadgeMob = document.getElementById(
+  'openReportBadgeMob',
+) as HTMLElement | null;
 
 const detailOverlay = document.getElementById('detailOverlay') as HTMLElement;
 const detailTitle = document.getElementById('detailTitle') as HTMLElement;
@@ -68,13 +76,14 @@ const PAGE_SIZE = 10;
 let currentPage = 1;
 let allItems: ReportIssueEntry[] = [];
 let displayItems: ReportIssueEntry[] = [];
+let totalItems = 0;
 let activeFilter: 'all' | 'open' | 'acknowledged' | 'resolved' = 'all';
 let activeDetailId: string | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function totalPages(): number {
-  return Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE));
+  return Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
 }
 
 function updatePagination(): void {
@@ -92,6 +101,8 @@ function updateStats(): void {
   statAck.textContent = String(ackCount);
   statResolved.textContent = String(resolvedCount);
   openBadge.textContent = openCount > 0 ? String(openCount) : '';
+  if (openBadgeMob)
+    openBadgeMob.textContent = openCount > 0 ? String(openCount) : '';
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -101,8 +112,7 @@ function statusBadgeHtml(status: string): string {
 }
 
 function renderPage(): void {
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const slice = displayItems.slice(start, start + PAGE_SIZE);
+  const slice = displayItems;
   reportList.innerHTML = '';
 
   if (slice.length === 0) {
@@ -150,28 +160,39 @@ function renderPage(): void {
 
 async function loadReports(): Promise<void> {
   try {
-    const res = await apiFetch('/api/admin/report-issues?limit=1000');
+    const offset = (currentPage - 1) * PAGE_SIZE;
+    const statusParam = activeFilter !== 'all' ? `&status=${activeFilter}` : '';
+    const res = await apiFetch(
+      `/api/admin/report-issues?limit=${PAGE_SIZE}&offset=${offset}${statusParam}`,
+    );
     if (!res.ok) {
       setMessage('Failed to load reports.');
       return;
     }
 
     const data = (await res.json()) as ListResponse;
-    allItems = data.items;
-    applyFilter();
-    updateStats();
+    displayItems = data.items;
+    totalItems = data.total;
+    renderPage();
+    await loadAllForStats();
   } catch {
     setMessage('Network error loading reports.');
   }
 }
 
+async function loadAllForStats(): Promise<void> {
+  try {
+    const res = await apiFetch('/api/admin/report-issues?limit=1000');
+    if (!res.ok) return;
+    const data = (await res.json()) as ListResponse;
+    allItems = data.items;
+    updateStats();
+  } catch {}
+}
+
 function applyFilter(): void {
-  displayItems =
-    activeFilter === 'all'
-      ? allItems
-      : allItems.filter((e) => e.status === activeFilter);
   currentPage = 1;
-  renderPage();
+  void loadReports();
 }
 
 // ── Detail modal ──────────────────────────────────────────────────────────────
@@ -245,8 +266,7 @@ async function updateDetailStatus(
 
     const entry = allItems.find((e) => e.id === activeDetailId);
     if (entry) entry.status = status;
-    applyFilter();
-    updateStats();
+    void loadReports();
     closeDetailModal();
     setMessage('Status updated.');
   } catch {
@@ -270,13 +290,13 @@ filterBar.querySelectorAll<HTMLButtonElement>('.filter-btn').forEach((btn) => {
 prevPageBtn.addEventListener('click', () => {
   if (currentPage > 1) {
     currentPage--;
-    renderPage();
+    void loadReports();
   }
 });
 nextPageBtn.addEventListener('click', () => {
   if (currentPage < totalPages()) {
     currentPage++;
-    renderPage();
+    void loadReports();
   }
 });
 

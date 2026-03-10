@@ -44,7 +44,7 @@ const REPORT_PORTAL_TEMPLATE = fs.readFileSync(
 function renderReportPortal(token: string): string {
   return REPORT_PORTAL_TEMPLATE.replace(
     '</head>',
-    `<base href="/report/${encodeURIComponent(token)}/"><script>window.reportIssueToken="${token}";</script></head>`,
+    `<base href="/report/${encodeURIComponent(token)}/"><script>window.reportIssueToken=${JSON.stringify(token)};</script></head>`,
   );
 }
 
@@ -220,6 +220,7 @@ export function registerReportRoutes(
         'copy',
         'scan',
         'payment',
+        'network',
         'other',
       ];
       const category: ReportIssueCategory | undefined =
@@ -339,7 +340,8 @@ export function registerReportRoutes(
         return res.status(404).json({ error: 'Attachment not found.' });
 
       const absolute = path.resolve(attachment.filePath);
-      if (!absolute.startsWith(REPORT_IMAGE_DIR)) {
+      const rel = path.relative(REPORT_IMAGE_DIR, absolute);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) {
         return res.status(403).json({ error: 'Forbidden.' });
       }
 
