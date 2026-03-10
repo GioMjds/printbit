@@ -21,6 +21,7 @@ type ConfirmConfig = {
   orientation: 'portrait' | 'landscape';
   paperSize: 'A4' | 'Letter' | 'Legal';
   pageRange?: PageRangeSelection;
+  totalPages?: number;
 };
 
 type PricingResponse = {
@@ -94,6 +95,27 @@ function pageRangeLabel(sel?: PageRangeSelection): string {
   return sel.range ? `Pages ${sel.range}` : 'Pages (custom)';
 }
 
+function countPrintPages(): number {
+  const total = config.totalPages ?? 1;
+  const range = config.pageRange;
+  if (!range || range.type === "all") return total;
+  if (range.type === "single") return 1;
+  let count = 0;
+  for (const part of range.range.split(",")) {
+    const trimmed = part.trim();
+    const m = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) {
+      const from = Math.max(1, parseInt(m[1], 10));
+      const to = Math.min(total, parseInt(m[2], 10));
+      if (from <= to) count += to - from + 1;
+    } else {
+      const p = parseInt(trimmed, 10);
+      if (!isNaN(p) && p >= 1 && p <= total) count += 1;
+    }
+  }
+  return Math.max(1, count);
+}
+
 function calculateTotalPrice(pricing: PricingResponse): number {
   if (config.mode === 'scan') {
     return pricing.scanDocument ?? DEFAULT_PRICING.scanDocument;
@@ -101,7 +123,8 @@ function calculateTotalPrice(pricing: PricingResponse): number {
   const base =
     config.mode === 'copy' ? pricing.copyPerPage : pricing.printPerPage;
   const color = config.colorMode === 'colored' ? pricing.colorSurcharge : 0;
-  return (base + color) * Math.max(1, config.copies);
+  const pages = config.mode === "print" ? countPrintPages() : 1;
+  return (base + color) * pages * Math.max(1, config.copies);
 }
 
 if (confirmBtn) {

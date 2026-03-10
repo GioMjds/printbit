@@ -19,6 +19,7 @@ interface PrintConfig {
   orientation: Orientation;
   paperSize: PaperSize;
   pageRange: PageRangeSelection;
+  totalPages: number;
 }
 
 interface PreviewConfig {
@@ -776,6 +777,7 @@ continueBtn?.addEventListener("click", () => {
     orientation: cfg.orientation,
     paperSize: cfg.paperSize,
     pageRange: getPageRange(),
+    totalPages: preview.pageCount,
   };
 
   sessionStorage.setItem("printbit.mode", mode);
