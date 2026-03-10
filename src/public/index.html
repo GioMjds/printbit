@@ -408,6 +408,66 @@
       </div>
     </div>
 
+    <!-- Report floating button -->
+    <button
+      class="report-fab"
+      id="openReportBtn"
+      aria-label="Report an issue"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        width="20"
+        height="20"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <span>Report Issue</span>
+    </button>
+
+    <!-- Report QR modal -->
+    <div class="report-overlay" id="reportOverlay" aria-hidden="true">
+      <div
+        class="report-modal"
+        role="dialog"
+        aria-labelledby="reportModalTitle"
+        aria-modal="true"
+      >
+        <h3 class="report-modal__title" id="reportModalTitle">
+          Report an Issue
+        </h3>
+        <p class="report-modal__sub">
+          Scan with your phone to describe the problem and attach photos as evidence.
+        </p>
+        <div class="report-modal__qr-wrap" id="reportQrWrap">
+          <canvas id="reportQrCanvas"></canvas>
+        </div>
+        <p class="report-modal__status" id="reportModalStatus">
+          Generating QR code…
+        </p>
+        <p
+          class="report-modal__timer"
+          id="reportModalTimer"
+          style="display: none"
+        >
+          Expires in <span id="reportTimerCount">15:00</span>
+        </p>
+        <button
+          class="report-modal__close"
+          type="button"
+          id="closeReportBtn"
+          aria-label="Close report modal"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
     <!-- Feedback floating button -->
     <button
       class="feedback-fab"

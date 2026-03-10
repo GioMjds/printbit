@@ -3,12 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Logs · Admin · PrintBit</title>
+    <title>Issue Reports · Admin · PrintBit</title>
     <link rel="stylesheet" href="/globals.css" />
     <link rel="stylesheet" href="/admin/shared.css" />
-    <link rel="stylesheet" href="/admin/logs/styles.css" />
+    <link rel="stylesheet" href="/admin/report/styles.css" />
   </head>
   <body>
+    <!-- ── Auth gate ─────────────────────────────────────────────────────── -->
     <div id="adminAuthView" class="auth-gate">
       <div class="auth-card">
         <div class="auth-card__brand" aria-hidden="true">
@@ -59,12 +60,10 @@
             <div class="auth-card__tag">Admin Console</div>
           </div>
         </div>
-
         <h1 class="auth-card__heading">Secure Access</h1>
         <p class="auth-card__desc">
           Enter your administrator PIN to unlock machine controls and analytics.
         </p>
-
         <form
           id="adminAuthForm"
           class="auth-form"
@@ -76,9 +75,7 @@
               <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <path
                   fill-rule="evenodd"
-                  d="M5 7V5a3 3 0 016 0v2h.5A1.5 1.5 0 0113
-              8.5v5A1.5 1.5 0 0111.5 15h-7A1.5 1.5 0 013 13.5v-5A1.5 1.5 0 014.5 7H5zm2-2a1
-              1 0 112 0v2H7V5z"
+                  d="M5 7V5a3 3 0 016 0v2h.5A1.5 1.5 0 0113 8.5v5A1.5 1.5 0 0111.5 15h-7A1.5 1.5 0 013 13.5v-5A1.5 1.5 0 014.5 7H5zm2-2a1 1 0 112 0v2H7V5z"
                   clip-rule="evenodd"
                 />
               </svg>
@@ -99,16 +96,13 @@
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
-                d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1
-            1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012
-            2 1 1 0 102 0 4 4 0 00-4-4z"
+                d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z"
                 clip-rule="evenodd"
               />
             </svg>
             Unlock Panel
           </button>
         </form>
-
         <p
           id="adminMessage"
           class="auth-msg"
@@ -118,8 +112,8 @@
       </div>
     </div>
 
+    <!-- ── Dashboard shell ───────────────────────────────────────────────── -->
     <div id="adminDashboard" class="shell hidden">
-      <!-- Sidebar -->
       <aside class="sidebar" role="navigation" aria-label="Admin sections">
         <div class="sidebar__brand">
           <div class="sidebar__logomark" aria-hidden="true">
@@ -168,89 +162,64 @@
             <div class="sidebar__env">Admin Console</div>
           </div>
         </div>
-
         <nav class="sidebar__nav">
           <a href="/admin/" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
-                d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1
-            1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0
-            011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"
+                d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"
               />
             </svg>
-            Overview
+            <span>Overview</span>
           </a>
           <a href="/admin/earnings/" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 6a1 1 0 000
-            2h1v1H7a1 1 0 100 2h1v3a1 1 0 102 0v-3h.5a2.5 2.5 0 000-5H10V6a1 1 0
-            00-1-1H7z"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 6a1 1 0 000 2h1v1H7a1 1 0 100 2h1v3a1 1 0 102 0v-3h.5a2.5 2.5 0 000-5H10V6a1 1 0 00-1-1H7z"
                 clip-rule="evenodd"
               />
             </svg>
-            Earnings
+            <span>Earnings</span>
           </a>
           <a href="/admin/coin-stats/" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
-                d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0
-            01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zm1.567.267v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582s-.07.34-.433.582a2.305
-            2.305 0 01-.567.267z"
-              />
-              <path
                 fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0
-            10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602
-            1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1
-            1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535
-            4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535
-            4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z"
                 clip-rule="evenodd"
               />
             </svg>
-            Coin Stats
+            <span>Coin Stats</span>
           </a>
           <a href="/admin/system/" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
-                d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2
-            2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2
-            0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z"
+                d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z"
                 clip-rule="evenodd"
               />
             </svg>
-            System
+            <span>System</span>
           </a>
           <a href="/admin/settings/" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
-                d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532
-            1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947
-            2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734
-            2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533
-            1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379
-            1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532
-            1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
                 clip-rule="evenodd"
               />
             </svg>
-            Settings
+            <span>Settings</span>
           </a>
-          <a href="/admin/logs/" class="nav-btn nav-btn--active">
+          <a href="/admin/logs/" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
-                d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1
-            1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0
-            01-1-1v-2zm0 6a1 1 0 011-1h6a1 1 0 010 2H4a1 1 0 01-1-1z"
+                d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h6a1 1 0 010 2H4a1 1 0 01-1-1z"
                 clip-rule="evenodd"
               />
             </svg>
-            Logs
+            <span>Logs</span>
           </a>
           <a href="/admin/feedback/" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -267,7 +236,7 @@
               aria-label="open feedback count"
             ></span>
           </a>
-          <a href="/admin/report" class="nav-btn">
+          <a href="/admin/report" class="nav-btn nav-btn--active">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
@@ -278,27 +247,24 @@
             <span>Reports</span>
           </a>
         </nav>
-
         <div class="sidebar__foot">
           <button id="logoutBtn" class="lock-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
-                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2
-            2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
                 clip-rule="evenodd"
               />
             </svg>
-            Lock Panel
+            <span>Lock Panel</span>
           </button>
         </div>
       </aside>
 
-      <!-- Main area -->
       <div class="main">
         <header class="topbar">
           <div class="topbar__left">
-            <h2 class="topbar__title">Logs</h2>
+            <h2 class="topbar__title">Issue Reports</h2>
           </div>
           <div class="topbar__right">
             <p
@@ -307,74 +273,106 @@
               role="alert"
               aria-live="polite"
             ></p>
-            <button id="refreshBtn" class="topbar-btn">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                  fill-rule="evenodd"
-                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <span>Refresh</span>
-            </button>
-            <button id="exportLogsBtn" class="topbar-btn topbar-btn--accent">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                  fill-rule="evenodd"
-                  d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <span>Export CSV</span>
-            </button>
-            <button id="clearLogsBtn" class="topbar-btn topbar-btn--danger">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                  fill-rule="evenodd"
-                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <span>Clear All</span>
-            </button>
           </div>
         </header>
 
         <div class="content">
           <section class="page">
-            <div class="logs-panel">
-              <div class="logs-scroll">
-                <table class="logs-table">
-                  <thead>
-                    <tr>
-                      <th class="logs-th logs-th--ts">Timestamp</th>
-                      <th class="logs-th">Message</th>
-                      <th class="logs-th logs-th--action"></th>
-                    </tr>
-                  </thead>
-                  <tbody id="logsBody"></tbody>
-                </table>
+            <!-- Stats -->
+            <div class="ri-stats-row">
+              <div class="ri-stat">
+                <div class="ri-stat__value" id="statTotal">—</div>
+                <div class="ri-stat__label">Total</div>
               </div>
-              <div class="logs-pagination">
-                <button id="prevPageBtn" class="logs-pagination__btn" disabled>
-                  ← Prev
+              <div class="ri-stat ri-stat--open">
+                <div class="ri-stat__value" id="statOpen">—</div>
+                <div class="ri-stat__label">Open</div>
+              </div>
+              <div class="ri-stat ri-stat--ack">
+                <div class="ri-stat__value" id="statAck">—</div>
+                <div class="ri-stat__label">Acknowledged</div>
+              </div>
+              <div class="ri-stat ri-stat--resolved">
+                <div class="ri-stat__value" id="statResolved">—</div>
+                <div class="ri-stat__label">Resolved</div>
+              </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="ri-toolbar">
+              <div
+                id="filterBar"
+                class="ri-filters"
+                role="group"
+                aria-label="Filter by status"
+              >
+                <button class="filter-btn filter-btn--active" data-filter="all">
+                  All
                 </button>
-                <span id="pageInfo" class="logs-pagination__info"
-                  >Page 1 of 1</span
-                >
-                <button id="nextPageBtn" class="logs-pagination__btn" disabled>
-                  Next →
+                <button class="filter-btn" data-filter="open">Open</button>
+                <button class="filter-btn" data-filter="acknowledged">
+                  Acknowledged
+                </button>
+                <button class="filter-btn" data-filter="resolved">
+                  Resolved
+                </button>
+              </div>
+              <div id="paginationBar" class="ri-pagination">
+                <button id="prevPageBtn" class="page-btn" disabled>
+                  ‹ Prev
+                </button>
+                <span id="pageInfo" class="page-info">Page 1 of 1</span>
+                <button id="nextPageBtn" class="page-btn" disabled>
+                  Next ›
                 </button>
               </div>
             </div>
+
+            <!-- List -->
+            <div id="reportList" class="ri-list"></div>
           </section>
         </div>
       </div>
     </div>
 
-    <!-- Mobile navigation -->
+    <!-- ── Detail modal ───────────────────────────────────────────────────── -->
+    <div
+      id="detailOverlay"
+      class="ri-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="detailTitle"
+    >
+      <div class="ri-modal">
+        <div class="ri-modal__header">
+          <h3 id="detailTitle" class="ri-modal__title">Issue Details</h3>
+          <button id="closeDetail" class="ri-modal__close" aria-label="Close">
+            &times;
+          </button>
+        </div>
+        <div id="detailBody" class="ri-modal__body"></div>
+        <div class="ri-modal__actions">
+          <button id="detailAckBtn" class="ri-action-btn ri-action-btn--ack">
+            Mark Acknowledged
+          </button>
+          <button
+            id="detailResolveBtn"
+            class="ri-action-btn ri-action-btn--resolve"
+          >
+            Mark Resolved
+          </button>
+          <button
+            id="detailReopenBtn"
+            class="ri-action-btn ri-action-btn--reopen"
+          >
+            Reopen
+          </button>
+        </div>
+      </div>
+    </div>
+
     <nav class="mob-nav" aria-label="Mobile navigation">
-      <a href="/admin/" class="mob-nav__btn">
+      <a href="/admin/dashboard" class="mob-nav__btn">
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"
@@ -382,7 +380,7 @@
         </svg>
         <span>Overview</span>
       </a>
-      <a href="/admin/earnings/" class="mob-nav__btn">
+      <a href="/admin/earnings" class="mob-nav__btn">
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
@@ -392,7 +390,7 @@
         </svg>
         <span>Earnings</span>
       </a>
-      <a href="/admin/coin-stats/" class="mob-nav__btn">
+      <a href="/admin/coins" class="mob-nav__btn">
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
@@ -402,7 +400,7 @@
         </svg>
         <span>Coins</span>
       </a>
-      <a href="/admin/system/" class="mob-nav__btn">
+      <a href="/admin/system" class="mob-nav__btn">
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
@@ -412,7 +410,7 @@
         </svg>
         <span>System</span>
       </a>
-      <a href="/admin/settings/" class="mob-nav__btn">
+      <a href="/admin/settings" class="mob-nav__btn">
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
@@ -422,7 +420,7 @@
         </svg>
         <span>Settings</span>
       </a>
-      <a href="/admin/logs/" class="mob-nav__btn mob-nav__btn--active">
+      <a href="/admin/logs/" class="mob-nav__btn">
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
@@ -441,13 +439,8 @@
           />
         </svg>
         <span>Feedback</span>
-        <span
-          class="nav-count-badge"
-          id="openBadgeMob"
-          aria-label="open feedback count"
-        ></span>
       </a>
-      <a href="/admin/report" class="mob-nav__btn">
+      <a href="/admin/report" class="mob-nav__btn mob-nav__btn--active">
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
@@ -456,9 +449,13 @@
           />
         </svg>
         <span>Reports</span>
+        <span
+          class="nav-count-badge"
+          id="openBadgeMob"
+          aria-label="open reports count"
+        ></span>
       </a>
     </nav>
-
-    <script src="/admin/logs/app.js"></script>
+    <script src="/admin/report/app.js"></script>
   </body>
 </html>

@@ -1,0 +1,351 @@
+.rp-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem 4rem;
+  background: var(--bg, #f0f2f5);
+}
+
+.rp-card,
+.rp-state {
+  width: 100%;
+  max-width: 640px;
+}
+
+/* ── State panels (loading / error / done) ───────────────────────────────── */
+
+.rp-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 2rem;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  color: #1a1f2b;
+}
+
+.rp-state__icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.rp-state__icon--ok {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 1.5rem;
+}
+
+.rp-state h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.rp-state p {
+  margin: 0;
+  color: #555;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+
+.rp-spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid #e2e6f3;
+  border-top-color: var(--indigo, #4f46e5);
+  border-radius: 50%;
+  animation: rp-spin 0.75s linear infinite;
+}
+
+@keyframes rp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+
+.rp-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.rp-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.4rem 1.5rem;
+  border-bottom: 1px solid #edf0f8;
+  background: #f7f8fc;
+}
+
+.rp-card__brand {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--indigo, #4f46e5);
+}
+
+.rp-card__brand svg {
+  width: 100%;
+  height: 100%;
+}
+
+.rp-card__title {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #1a1f2b;
+}
+
+.rp-card__sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: #777;
+}
+
+/* ── Form ────────────────────────────────────────────────────────────────── */
+
+#reportForm {
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.rp-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rp-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.rp-required {
+  color: #dc2626;
+  margin-left: 2px;
+}
+
+.rp-input,
+.rp-textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-size: 1rem;
+  color: #111;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  box-sizing: border-box;
+  appearance: none;
+}
+
+.rp-input:focus,
+.rp-textarea:focus {
+  outline: none;
+  border-color: var(--indigo, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.rp-textarea {
+  resize: vertical;
+  min-height: 8rem;
+}
+
+.rp-counter {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  justify-self: end;
+}
+
+/* ── Category chips ──────────────────────────────────────────────────────── */
+
+.rp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.rp-chip {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.85rem;
+  min-height: 2.75rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 999px;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+
+.rp-chip:hover {
+  border-color: var(--indigo, #4f46e5);
+}
+
+.rp-chip--active {
+  border-color: var(--indigo, #4f46e5);
+  background: var(--indigo, #4f46e5);
+  color: #fff;
+}
+
+/* ── Drop zone ───────────────────────────────────────────────────────────── */
+
+.rp-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.25rem;
+  border: 2px dashed #d1d5db;
+  border-radius: 10px;
+  background: #f9fafb;
+  cursor: pointer;
+  text-align: center;
+  color: #4b5563;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.rp-dropzone:hover {
+  border-color: var(--indigo, #4f46e5);
+  background: #eef2ff;
+}
+
+.rp-dropzone svg {
+  width: 2rem;
+  height: 2rem;
+  color: #9ca3af;
+}
+
+.rp-dropzone span {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.rp-dropzone small {
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+.rp-file-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* ── Attachment list ─────────────────────────────────────────────────────── */
+
+.rp-attachments {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.rp-attachment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.rp-attachment--uploading {
+  background: #fef9c3;
+  border: 1px solid #fde68a;
+  color: #713f12;
+}
+.rp-attachment--done {
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  color: #14532d;
+}
+.rp-attachment--error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #7f1d1d;
+}
+
+.rp-attachment__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Message ─────────────────────────────────────────────────────────────── */
+
+.rp-msg {
+  min-height: 1.1rem;
+  font-size: 0.88rem;
+  color: #16a34a;
+}
+
+.rp-msg--error {
+  color: #dc2626;
+}
+
+/* ── Submit button ───────────────────────────────────────────────────────── */
+
+.rp-btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.85rem 1rem;
+  min-height: 3rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--indigo, #4f46e5);
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
+}
+
+.rp-btn:hover:not(:disabled) {
+  background: #4338ca;
+}
+.rp-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Utility ─────────────────────────────────────────────────────────────── */
+
+.hidden {
+  display: none !important;
+}
