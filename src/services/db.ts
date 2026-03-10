@@ -71,6 +71,39 @@ export interface AdminLogEntry {
   meta?: LogMeta;
 }
 
+export type FeedbackCategory =
+  | 'service'
+  | 'hardware'
+  | 'software'
+  | 'print'
+  | 'scan'
+  | 'copy'
+  | 'payment'
+  | 'other';
+
+export type FeedbackStatus = 'open' | 'resolved';
+
+export interface FeedbackEntry {
+  id: string;
+  sessionId: string;
+  timestamp: string;
+  comment: string;
+  category: FeedbackCategory | null;
+  rating: number | null;
+  status: FeedbackStatus;
+  resolvedAt?: string | null;
+  meta?: LogMeta;
+}
+
+export interface FeedbackSessionEntry {
+  id: string;
+  token: string;
+  feedbackUrl: string;
+  createdAt: string;
+  expiresAt: string;
+  submittedAt: string | null;
+}
+
 export type Schema = {
   balance: number;
   earnings: number;
@@ -81,6 +114,8 @@ export type Schema = {
   hopperStats: HopperStats;
   owedChanges: OwedChangeEntry[];
   logs: AdminLogEntry[];
+  feedback: FeedbackEntry[];
+  feedbackSessions: FeedbackSessionEntry[];
 };
 
 const DEFAULT_DATA: Schema = {
@@ -128,6 +163,8 @@ const DEFAULT_DATA: Schema = {
   },
   owedChanges: [],
   logs: [],
+  feedback: [],
+  feedbackSessions: [],
 };
 
 /**
@@ -269,6 +306,12 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
       ? data.owedChanges
       : DEFAULT_DATA.owedChanges,
     logs: Array.isArray(data?.logs) ? data.logs : DEFAULT_DATA.logs,
+    feedback: Array.isArray(data?.feedback)
+      ? data.feedback
+      : DEFAULT_DATA.feedback,
+    feedbackSessions: Array.isArray(data?.feedbackSessions)
+      ? data.feedbackSessions
+      : DEFAULT_DATA.feedbackSessions,
   };
 }
 
