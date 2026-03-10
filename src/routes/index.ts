@@ -1,5 +1,6 @@
 export { registerAdminRoutes } from "./admin-routes";
 export { registerCopyRoutes } from "./copy-routes";
+export { registerFeedbackRoutes } from "./feedback-routes";
 export { registerFinancialRoutes } from "./financial-routes";
 export { registerPageRoutes } from "./page-routes";
 export { registerScanRoutes } from "./scan-routes";

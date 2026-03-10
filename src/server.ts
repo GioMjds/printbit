@@ -21,6 +21,7 @@ import {
   registerFinancialRoutes,
   registerPageRoutes,
   registerAdminRoutes,
+  registerFeedbackRoutes,
   registerUploadPortalRoutes,
   registerWirelessSessionRoutes,
   registerScanRoutes,
@@ -130,6 +131,7 @@ registerAdminRoutes(app, {
   getHopperStatus,
   runHopperSelfTest,
 });
+registerFeedbackRoutes(app, { resolvePublicBaseUrl });
 registerFinancialRoutes(app, {
   io,
   sessionStore,
