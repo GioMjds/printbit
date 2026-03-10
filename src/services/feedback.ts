@@ -120,7 +120,7 @@ class FeedbackService {
     await db.write();
 
     await adminService.appendAdminLog(
-      'feedbac_submitted',
+      'feedback_submitted',
       'User feedback submitted',
       {
         feedbackId: entry.id,
@@ -201,6 +201,10 @@ class FeedbackService {
     );
 
     return removed;
+  }
+
+  listAllFeedback(): FeedbackEntry[] {
+    return db.data!.feedback.slice();
   }
 
   feedbackToCsv(entries: FeedbackEntry[]): string {
@@ -309,7 +313,7 @@ class FeedbackService {
     if (number < 1) return 1;
     if (number > MAX_LIST_LIMIT) return MAX_LIST_LIMIT;
     return number;
-  };
+  }
 
   private isExpired(expiresAtIso: string): boolean {
     const expiresAtMs = Date.parse(expiresAtIso);

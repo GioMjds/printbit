@@ -1,6 +1,6 @@
 export { adminService } from "./admin";
 export * from "./db";
-export * from './feedback';
+export * from "./feedback";
 export * from "./hopper";
 export * from "./hopper-protocol";
 export * from "./hotspot";

@@ -31,6 +31,7 @@ const statTotal = document.getElementById('statTotal') as HTMLElement;
 const statOpen = document.getElementById('statOpen') as HTMLElement;
 const statResolved = document.getElementById('statResolved') as HTMLElement;
 const openBadge = document.getElementById('openBadge') as HTMLElement;
+const openBadgeMob = document.getElementById('openBadgeMob') as HTMLElement;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ const PAGE_SIZE = 10;
 let currentPage = 1;
 let totalItems = 0;
 let allItems: FeedbackEntry[] = [];
+let displayItems: FeedbackEntry[] = [];
 let activeFilter: 'all' | 'open' | 'resolved' = 'all';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -72,14 +74,16 @@ function updateStats(): void {
   statTotal.textContent = String(allItems.length);
   statOpen.textContent = String(openCount);
   statResolved.textContent = String(resolvedCount);
-  openBadge.textContent = openCount > 0 ? String(openCount) : '';
+  const badgeText = openCount > 0 ? String(openCount) : '';
+  openBadge.textContent = badgeText;
+  openBadgeMob.textContent = badgeText;
 }
 
 // ── Rendering ───────────────────────────────────────────────────────────────
 
 function renderPage(): void {
   const start = (currentPage - 1) * PAGE_SIZE;
-  const slice = allItems.slice(start, start + PAGE_SIZE);
+  const slice = displayItems.slice(start, start + PAGE_SIZE);
   renderItems(slice);
   updatePagination();
 }
@@ -147,7 +151,6 @@ function renderItems(items: FeedbackEntry[]): void {
 
 async function loadFeedback(): Promise<void> {
   const params = new URLSearchParams({ limit: '1000' });
-  if (activeFilter !== 'all') params.set('status', activeFilter);
 
   try {
     const res = await apiFetch(`/api/admin/feedback?${params.toString()}`);
@@ -157,7 +160,11 @@ async function loadFeedback(): Promise<void> {
     }
     const data = (await res.json()) as FeedbackListResponse;
     allItems = data.items;
-    totalItems = data.total;
+    displayItems =
+      activeFilter === 'all'
+        ? allItems
+        : allItems.filter((e) => e.status === activeFilter);
+    totalItems = displayItems.length;
     currentPage = 1;
     updateStats();
     renderPage();
@@ -186,6 +193,11 @@ async function handleToggleResolved(id: string): Promise<void> {
     }
     entry.status = resolved ? 'resolved' : 'open';
     entry.resolvedAt = resolved ? new Date().toISOString() : null;
+    displayItems =
+      activeFilter === 'all'
+        ? allItems
+        : allItems.filter((e) => e.status === activeFilter);
+    totalItems = displayItems.length;
     updateStats();
     renderPage();
     setMessage(resolved ? 'Marked as resolved.' : 'Reopened.');
@@ -208,7 +220,11 @@ async function handleDelete(id: string): Promise<void> {
       return;
     }
     allItems = allItems.filter((e) => e.id !== id);
-    totalItems = allItems.length;
+    displayItems =
+      activeFilter === 'all'
+        ? allItems
+        : allItems.filter((e) => e.status === activeFilter);
+    totalItems = displayItems.length;
     if (currentPage > totalPages()) currentPage = totalPages();
     updateStats();
     renderPage();
@@ -227,6 +243,7 @@ async function handleClearAll(): Promise<void> {
       return;
     }
     allItems = [];
+    displayItems = [];
     totalItems = 0;
     currentPage = 1;
     updateStats();
