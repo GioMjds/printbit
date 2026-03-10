@@ -27,7 +27,7 @@ if (-not $isAdmin) {
 # ── 2. RESOLVE PATHS ─────────────────────────────────────────────────────────
 $ScriptsDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir  = Split-Path -Parent $ScriptsDir
-$Port        = if ($env:PORT) { $env:PORT } else { "3000" }
+$Port        = "3000"
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Cyan
@@ -75,16 +75,18 @@ $elapsed  = 0
 $ready    = $false
 
 while ($elapsed -lt $maxWait) {
+    $conn = $null
     try {
         $conn = New-Object System.Net.Sockets.TcpClient
         $conn.Connect("127.0.0.1", [int]$Port)
-        $conn.Close()
         $ready = $true
         break
     } catch {
         Start-Sleep -Seconds $interval
         $elapsed += $interval
         Write-Host "  ...still waiting ($elapsed/$maxWait s)" -ForegroundColor DarkGray
+    } finally {
+        if ($conn) { $conn.Dispose() }
     }
 }
 
@@ -93,11 +95,17 @@ if (-not $ready) {
 }
 
 # ── 6. RESOLVE LOCAL IP ──────────────────────────────────────────────────────
-$localIP = (
-    Get-NetIPAddress -AddressFamily IPv4 |
-    Where-Object { $_.IPAddress -notmatch "^127\." -and $_.PrefixOrigin -ne "WellKnown" } |
+# Prefer hotspot-style ranges (e.g. 192.168.5.x / 192.168.137.x) so the
+# kiosk URL matches what clients on the Wi‑Fi hotspot can actually reach.
+$ipCandidates = Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object { $_.IPAddress -notmatch "^127\." -and $_.PrefixOrigin -ne "WellKnown" }
+$preferred = $ipCandidates |
+    Where-Object { $_.IPAddress -like "192.168.5.*" -or $_.IPAddress -like "192.168.137.*" } |
     Select-Object -First 1
-).IPAddress
+if (-not $preferred) {
+    $preferred = $ipCandidates | Select-Object -First 1
+}
+$localIP = if ($preferred) { $preferred.IPAddress } else { $null }
 
 $kioskUrl = if ($localIP) { "http://${localIP}:${Port}" } else { "http://localhost:${Port}" }
 Write-Host "[PrintBit] Kiosk URL: $kioskUrl" -ForegroundColor Cyan

@@ -35,7 +35,11 @@ for /f "tokens=2 delims=:" %%A in ('ipconfig ^| findstr /R "IPv4.*[0-9][0-9]*\.[
 )
 :got_ip
 :: Strip leading space left by the "delims=:" split
-set "LOCAL_IP=%LOCAL_IP: =%"
+
+for /f "tokens=1 delims= (" %%A in ("%LOCAL_IP%") do set "LOCAL_IP=%%A"
+
+:: Exclude link-local addresses (fallback to localhost)
+if "%LOCAL_IP:~0,8%"=="169.254." set "LOCAL_IP="
 
 if "%LOCAL_IP%"=="" (
     echo [PrintBit] WARNING: Could not detect local IP. Falling back to localhost.
