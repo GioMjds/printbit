@@ -7,7 +7,7 @@
     "dev": "ts-node-dev -r tsconfig-paths/register src/server.ts",
     "build": "node scripts/build-client.js",
     "kiosk": "node ./scripts/launch-kiosk.js",
-    "start": "node ./scripts/start-kiosk.bat"
+    "start": "cmd /c ./scripts/start-kiosk.bat"
   },
   "keywords": [],
   "author": "GioMjds",
