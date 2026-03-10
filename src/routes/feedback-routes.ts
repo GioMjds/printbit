@@ -1,4 +1,5 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import type { Express, Request, Response } from 'express';
 import {
   requireAdminLocalAccess,
@@ -24,12 +25,15 @@ p{color:#666;font-size:.9rem;line-height:1.5;margin-bottom:.25rem}</style></head
 <p>Please go back to the kiosk and scan a new QR code to leave your feedback.</p>
 </div></body></html>`;
 
-function renderFeedbackPortal(token: string, htmlPath: string): string {
-  const fs = require('node:fs') as typeof import('node:fs');
-  const raw = fs.readFileSync(htmlPath, 'utf-8');
-  return raw.replace(
+const FEEDBACK_PORTAL_TEMPLATE = fs.readFileSync(
+  path.join(FEEDBACK_PORTAL_DIR, 'index.html'),
+  'utf-8',
+);
+
+function renderFeedbackPortal(token: string): string {
+  return FEEDBACK_PORTAL_TEMPLATE.replace(
     '</head>',
-    `<script>window.feedbackToken="${token}";</script></head>`,
+    `<base href="/feedback/${encodeURIComponent(token)}/"><script>window.feedbackToken="${token}";</script></head>`,
   );
 }
 
@@ -37,7 +41,7 @@ export function registerFeedbackRoutes(
   app: Express,
   deps: { resolvePublicBaseUrl: (req: Request) => URL },
 ) {
-  app.get('/api/feedback/sessions', async (req: Request, res: Response) => {
+  app.post('/api/feedback/sessions', async (req: Request, res: Response) => {
     try {
       const baseUrl = deps.resolvePublicBaseUrl(req);
       const session = await feedbackService.createSession(baseUrl);
@@ -99,10 +103,7 @@ export function registerFeedbackRoutes(
       return;
     }
     try {
-      const html = renderFeedbackPortal(
-        token,
-        path.join(FEEDBACK_PORTAL_DIR, 'index.html'),
-      );
+      const html = renderFeedbackPortal(token);
       res.send(html);
     } catch {
       res.status(500).send('Error loading feedback portal.');
@@ -189,7 +190,7 @@ export function registerFeedbackRoutes(
     requireAdminLocalAccess,
     requireAdminPin,
     (req: Request, res: Response) => {
-      const { items } = feedbackService.listFeedback({ limit: 10000 });
+      const items = feedbackService.listAllFeedback();
       const csv = feedbackService.feedbackToCsv(items);
       const date = new Date().toISOString().slice(0, 10);
       res

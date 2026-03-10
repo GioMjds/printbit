@@ -104,7 +104,7 @@ function startExpiryCountdown(expiresAt: string): void {
 async function loadFeedbackSession(): Promise<void> {
   setFeedbackStatus("Generating QR code\u2026");
   try {
-    const res = await fetch("/api/feedback/sessions");
+    const res = await fetch("/api/feedback/sessions", { method: "POST" });
     if (!res.ok) {
       setFeedbackStatus("Failed to create session. Please try again.");
       return;
