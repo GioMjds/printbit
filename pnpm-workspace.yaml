@@ -1,4 +1,6 @@
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - '@serialport/bindings-cpp'
+  - canvas
   - esbuild
+  - sharp
