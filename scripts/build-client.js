@@ -8,12 +8,16 @@ const builds = [
   'esbuild src/public/confirm/app.ts --bundle --outfile=src/public/confirm/app.js',
   'esbuild src/public/upload/app.ts --bundle --outfile=src/public/upload/app.js',
   'esbuild src/public/scan/app.ts --bundle --outfile=src/public/scan/app.js',
+  'esbuild src/public/feedback/app.ts --bundle --outfile=src/public/feedback/app.js',
   'esbuild src/public/admin/dashboard/app.ts --bundle --outfile=src/public/admin/dashboard/app.js',
   'esbuild src/public/admin/earnings/app.ts --bundle --outfile=src/public/admin/earnings/app.js',
   'esbuild src/public/admin/coin-stats/app.ts --bundle --outfile=src/public/admin/coin-stats/app.js',
   'esbuild src/public/admin/system/app.ts --bundle --outfile=src/public/admin/system/app.js',
   'esbuild src/public/admin/settings/app.ts --bundle --outfile=src/public/admin/settings/app.js',
   'esbuild src/public/admin/logs/app.ts --bundle --outfile=src/public/admin/logs/app.js',
+  'esbuild src/public/admin/feedback/app.ts --bundle --outfile=src/public/admin/feedback/app.js',
+  'esbuild src/public/report/app.ts --bundle --outfile=src/public/report/app.js',
+  'esbuild src/public/admin/report/app.ts --bundle --outfile=src/public/admin/report/app.js',
 ];
 
 try {

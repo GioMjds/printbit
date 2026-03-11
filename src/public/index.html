@@ -37,7 +37,12 @@
         <div class="action-grid">
           <!-- Print Card -->
           <button class="action-card" id="openPrintBtn" aria-label="Open Print">
-            <span class="action-card__help" data-guide="print" aria-label="How to print">?</span>
+            <span
+              class="action-card__help"
+              data-guide="print"
+              aria-label="How to print"
+              >?</span
+            >
             <div class="action-card__glow"></div>
             <div class="action-card__icon-wrap">
               <svg
@@ -114,7 +119,12 @@
             id="openCopyBtn"
             aria-label="Open Copy"
           >
-            <span class="action-card__help" data-guide="copy" aria-label="How to copy">?</span>
+            <span
+              class="action-card__help"
+              data-guide="copy"
+              aria-label="How to copy"
+              >?</span
+            >
             <div class="action-card__glow"></div>
             <div class="action-card__icon-wrap">
               <svg
@@ -182,7 +192,12 @@
             id="openScanBtn"
             aria-label="Open Scan"
           >
-            <span class="action-card__help" data-guide="scan" aria-label="How to scan">?</span>
+            <span
+              class="action-card__help"
+              data-guide="scan"
+              aria-label="How to scan"
+              >?</span
+            >
             <div class="action-card__glow"></div>
             <div class="action-card__icon-wrap">
               <svg
@@ -277,61 +292,239 @@
     <!-- Guide modals -->
     <div class="guide-overlay" id="guideOverlay" aria-hidden="true">
       <!-- Print guide -->
-      <div class="guide-card" id="guide-print" role="dialog" aria-labelledby="guideTitle-print" style="display:none">
+      <div
+        class="guide-card"
+        id="guide-print"
+        role="dialog"
+        aria-labelledby="guideTitle-print"
+        style="display: none"
+      >
         <h3 class="guide-card__title" id="guideTitle-print">How to Print</h3>
         <ol class="guide-card__steps">
           <li>Scan the QR code with your phone and upload a file.</li>
           <li>Select your file from the received list.</li>
           <li>Tap <strong>Continue to settings</strong>.</li>
-          <li>Choose color mode, copies, orientation, paper size, and page range.</li>
-          <li>Insert coins until your balance covers the total, then confirm.</li>
+          <li>
+            Choose color mode, copies, orientation, paper size, and page range.
+          </li>
+          <li>
+            Insert coins until your balance covers the total, then confirm.
+          </li>
           <li>Collect your printed pages.</li>
         </ol>
         <p class="guide-card__section">Troubleshooting</p>
         <ul class="guide-card__tips">
-          <li>File not showing? Tap <strong>New session</strong> and upload again.</li>
+          <li>
+            File not showing? Tap <strong>New session</strong> and upload again.
+          </li>
           <li>Balance too low? Insert more coins before confirming.</li>
         </ul>
-        <button class="guide-card__close" type="button" aria-label="Close guide">Got it</button>
+        <button
+          class="guide-card__close"
+          type="button"
+          aria-label="Close guide"
+        >
+          Got it
+        </button>
       </div>
 
       <!-- Copy guide -->
-      <div class="guide-card" id="guide-copy" role="dialog" aria-labelledby="guideTitle-copy" style="display:none">
+      <div
+        class="guide-card"
+        id="guide-copy"
+        role="dialog"
+        aria-labelledby="guideTitle-copy"
+        style="display: none"
+      >
         <h3 class="guide-card__title" id="guideTitle-copy">How to Copy</h3>
         <ol class="guide-card__steps">
           <li>Place your page face-down on the scanner glass.</li>
           <li>Tap <strong>Check Document</strong> and review the preview.</li>
-          <li>If the preview is correct, tap <strong>Continue to Config</strong>.</li>
+          <li>
+            If the preview is correct, tap <strong>Continue to Config</strong>.
+          </li>
           <li>Choose copy settings, then continue to confirmation.</li>
-          <li>Insert coins until the required amount is reached, then confirm.</li>
+          <li>
+            Insert coins until the required amount is reached, then confirm.
+          </li>
           <li>Collect your copies from the output tray.</li>
         </ol>
         <p class="guide-card__section">Troubleshooting</p>
         <ul class="guide-card__tips">
-          <li>No document detected? Reposition the page and tap <strong>Retry</strong>.</li>
-          <li>Preview looks wrong? Tap <strong>Check Document</strong> again.</li>
+          <li>
+            No document detected? Reposition the page and tap
+            <strong>Retry</strong>.
+          </li>
+          <li>
+            Preview looks wrong? Tap <strong>Check Document</strong> again.
+          </li>
           <li>Balance too low? Insert more coins before confirming.</li>
         </ul>
-        <button class="guide-card__close" type="button" aria-label="Close guide">Got it</button>
+        <button
+          class="guide-card__close"
+          type="button"
+          aria-label="Close guide"
+        >
+          Got it
+        </button>
       </div>
 
       <!-- Scan guide -->
-      <div class="guide-card" id="guide-scan" role="dialog" aria-labelledby="guideTitle-scan" style="display:none">
+      <div
+        class="guide-card"
+        id="guide-scan"
+        role="dialog"
+        aria-labelledby="guideTitle-scan"
+        style="display: none"
+      >
         <h3 class="guide-card__title" id="guideTitle-scan">How to Scan</h3>
         <ol class="guide-card__steps">
           <li>Choose scan source, color mode, and resolution.</li>
           <li>Place your document, then tap <strong>Scan Document</strong>.</li>
           <li>Review the preview. Tap <strong>Rescan</strong> if needed.</li>
           <li>Tap <strong>Get Soft Copy</strong>.</li>
-          <li>Choose delivery: <strong>Wireless (QR)</strong> to scan a code on your phone, or <strong>USB Flash Drive</strong> to export to a USB stick.</li>
+          <li>
+            Choose delivery: <strong>Wireless (QR)</strong> to scan a code on
+            your phone, or <strong>USB Flash Drive</strong> to export to a USB
+            stick.
+          </li>
         </ol>
         <p class="guide-card__section">Troubleshooting</p>
         <ul class="guide-card__tips">
           <li>Scanner unavailable? Check the cable/power and try again.</li>
           <li>QR link expired? Tap <strong>Refresh QR Link</strong>.</li>
-          <li>No USB detected? Insert or reinsert the drive and tap <strong>Refresh USB</strong>.</li>
+          <li>
+            No USB detected? Insert or reinsert the drive and tap
+            <strong>Refresh USB</strong>.
+          </li>
         </ul>
-        <button class="guide-card__close" type="button" aria-label="Close guide">Got it</button>
+        <button
+          class="guide-card__close"
+          type="button"
+          aria-label="Close guide"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+
+    <!-- Report floating button -->
+    <button
+      class="report-fab"
+      id="openReportBtn"
+      aria-label="Report an issue"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        width="20"
+        height="20"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <span>Report Issue</span>
+    </button>
+
+    <!-- Report QR modal -->
+    <div class="report-overlay" id="reportOverlay" aria-hidden="true">
+      <div
+        class="report-modal"
+        role="dialog"
+        aria-labelledby="reportModalTitle"
+        aria-modal="true"
+      >
+        <h3 class="report-modal__title" id="reportModalTitle">
+          Report an Issue
+        </h3>
+        <p class="report-modal__sub">
+          Scan with your phone to describe the problem and attach photos as evidence.
+        </p>
+        <div class="report-modal__qr-wrap" id="reportQrWrap">
+          <canvas id="reportQrCanvas"></canvas>
+        </div>
+        <p class="report-modal__status" id="reportModalStatus">
+          Generating QR code…
+        </p>
+        <p
+          class="report-modal__timer"
+          id="reportModalTimer"
+          style="display: none"
+        >
+          Expires in <span id="reportTimerCount">15:00</span>
+        </p>
+        <button
+          class="report-modal__close"
+          type="button"
+          id="closeReportBtn"
+          aria-label="Close report modal"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Feedback floating button -->
+    <button
+      class="feedback-fab"
+      id="openFeedbackBtn"
+      aria-label="Send feedback or report an issue"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        width="20"
+        height="20"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 010 2H6a1 1 0 01-1-1zm1 3a1 1 0 000 2h3a1 1 0 000-2H6z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <span>Feedback</span>
+    </button>
+
+    <!-- Feedback QR modal -->
+    <div class="feedback-overlay" id="feedbackOverlay" aria-hidden="true">
+      <div
+        class="feedback-modal"
+        role="dialog"
+        aria-labelledby="feedbackModalTitle"
+        aria-modal="true"
+      >
+        <h3 class="feedback-modal__title" id="feedbackModalTitle">
+          Leave Feedback
+        </h3>
+        <p class="feedback-modal__sub">
+          Scan with your phone to share your experience or report an issue.
+        </p>
+        <div class="feedback-modal__qr-wrap" id="feedbackQrWrap">
+          <canvas id="feedbackQrCanvas"></canvas>
+        </div>
+        <p class="feedback-modal__status" id="feedbackModalStatus">
+          Generating QR code…
+        </p>
+        <p
+          class="feedback-modal__timer"
+          id="feedbackModalTimer"
+          style="display: none"
+        >
+          Expires in <span id="feedbackTimerCount">15:00</span>
+        </p>
+        <button
+          class="feedback-modal__close"
+          type="button"
+          id="closeFeedbackBtn"
+          aria-label="Close feedback modal"
+        >
+          Close
+        </button>
       </div>
     </div>
 
@@ -340,45 +533,45 @@
     <script>
       function updateClock() {
         const now = new Date();
-        const timeEl = document.getElementById("clockTime");
-        const dateEl = document.getElementById("clockDate");
+        const timeEl = document.getElementById('clockTime');
+        const dateEl = document.getElementById('clockDate');
 
         const hours = now.getHours();
-        const minutes = String(now.getMinutes()).padStart(2, "0");
-        const ampm = hours >= 12 ? "PM" : "AM";
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
         const h12 = hours % 12 || 12;
-        timeEl.textContent = h12 + ":" + minutes + " " + ampm;
+        timeEl.textContent = h12 + ':' + minutes + ' ' + ampm;
 
         const days = [
-          "Sunday",
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
+          'Sunday',
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
         ];
         const months = [
-          "Jan",
-          "Feb",
-          "Mar",
-          "Apr",
-          "May",
-          "Jun",
-          "Jul",
-          "Aug",
-          "Sep",
-          "Oct",
-          "Nov",
-          "Dec",
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
         ];
         dateEl.textContent =
           days[now.getDay()] +
-          ", " +
+          ', ' +
           months[now.getMonth()] +
-          " " +
+          ' ' +
           now.getDate() +
-          ", " +
+          ', ' +
           now.getFullYear();
       }
       updateClock();
@@ -386,35 +579,37 @@
 
       // Guide overlay logic
       (function () {
-        var overlay = document.getElementById("guideOverlay");
-        var cards = overlay.querySelectorAll(".guide-card");
+        var overlay = document.getElementById('guideOverlay');
+        var cards = overlay.querySelectorAll('.guide-card');
 
         function openGuide(name) {
-          cards.forEach(function (c) { c.style.display = "none"; });
-          var target = document.getElementById("guide-" + name);
-          if (target) target.style.display = "flex";
-          overlay.classList.add("is-visible");
-          overlay.setAttribute("aria-hidden", "false");
+          cards.forEach(function (c) {
+            c.style.display = 'none';
+          });
+          var target = document.getElementById('guide-' + name);
+          if (target) target.style.display = 'flex';
+          overlay.classList.add('is-visible');
+          overlay.setAttribute('aria-hidden', 'false');
         }
 
         function closeGuide() {
-          overlay.classList.remove("is-visible");
-          overlay.setAttribute("aria-hidden", "true");
+          overlay.classList.remove('is-visible');
+          overlay.setAttribute('aria-hidden', 'true');
         }
 
-        document.querySelectorAll(".action-card__help").forEach(function (btn) {
-          btn.addEventListener("click", function (e) {
+        document.querySelectorAll('.action-card__help').forEach(function (btn) {
+          btn.addEventListener('click', function (e) {
             e.stopPropagation();
             e.preventDefault();
             openGuide(btn.dataset.guide);
           });
         });
 
-        overlay.querySelectorAll(".guide-card__close").forEach(function (btn) {
-          btn.addEventListener("click", closeGuide);
+        overlay.querySelectorAll('.guide-card__close').forEach(function (btn) {
+          btn.addEventListener('click', closeGuide);
         });
 
-        overlay.addEventListener("click", function (e) {
+        overlay.addEventListener('click', function (e) {
           if (e.target === overlay) closeGuide();
         });
       })();

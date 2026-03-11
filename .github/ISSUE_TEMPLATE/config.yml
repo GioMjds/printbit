@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: 📖 PrintBit Documentation
+    url: https://github.com/GioMjds/printbit/blob/main/README.md
+    about: Read the README before opening an issue.
+
+  - name: 🗂️ PrintBit Printing Flow
+    url: https://github.com/GioMjds/printbit/blob/main/PRINTBIT_PRINTING_FLOW.md
+    about: Review the printing flow documentation for context.
+
+  - name: 📋 Full Gaps & Requirements Document
+    url: https://github.com/GioMjds/printbit/blob/main/PRINTBIT_NOTES.txt
+    about: See all 33 identified system gaps and their requirements before filing.
