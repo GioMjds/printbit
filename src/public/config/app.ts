@@ -1,16 +1,16 @@
 export {};
 
-type ColorMode = "colored" | "grayscale";
-type Orientation = "portrait" | "landscape";
-type PaperSize = "A4" | "Letter" | "Legal";
+type ColorMode = 'colored' | 'grayscale';
+type Orientation = 'portrait' | 'landscape';
+type PaperSize = 'A4' | 'Letter' | 'Legal';
 
 type PageRangeSelection =
-  | { type: "all" }
-  | { type: "custom"; range: string }
-  | { type: "single"; page: number };
+  | { type: 'all' }
+  | { type: 'custom'; range: string }
+  | { type: 'single'; page: number };
 
 interface PrintConfig {
-  mode: "print" | "copy";
+  mode: 'print' | 'copy';
   sessionId: string | null;
   filename: string | null;
   copyPreviewPath?: string | null;
@@ -67,7 +67,7 @@ const PAPER_MM: Record<PaperSize, [number, number]> = {
 function paperPx(size: PaperSize, orientation: Orientation): [number, number] {
   const MM_TO_PX = 96 / 25.4;
   let [wMM, hMM] = PAPER_MM[size];
-  if (orientation === "landscape") [wMM, hMM] = [hMM, wMM];
+  if (orientation === 'landscape') [wMM, hMM] = [hMM, wMM];
   return [Math.round(wMM * MM_TO_PX), Math.round(hMM * MM_TO_PX)];
 }
 
@@ -105,48 +105,48 @@ class PrintPreview {
   private resizeObserver: ResizeObserver;
 
   constructor() {
-    this.viewport = document.getElementById("paperViewport")! as HTMLElement;
-    this.sheet = document.getElementById("paperSheet")! as HTMLElement;
+    this.viewport = document.getElementById('paperViewport')! as HTMLElement;
+    this.sheet = document.getElementById('paperSheet')! as HTMLElement;
     this.canvas = document.getElementById(
-      "previewCanvas",
+      'previewCanvas',
     )! as HTMLCanvasElement;
-    this.img = document.getElementById("previewImg")! as HTMLImageElement;
-    this.iframe = document.getElementById("previewFrame")! as HTMLIFrameElement;
+    this.img = document.getElementById('previewImg')! as HTMLImageElement;
+    this.iframe = document.getElementById('previewFrame')! as HTMLIFrameElement;
     this.placeholder = document.getElementById(
-      "paperPlaceholder",
+      'paperPlaceholder',
     )! as HTMLElement;
-    this.loading = document.getElementById("paperLoading")! as HTMLElement;
-    this.controls = document.getElementById("previewControls")! as HTMLElement;
-    this.hintEl = document.getElementById("previewHint")! as HTMLElement;
-    this.pagerLabel = document.getElementById("pagerLabel")! as HTMLElement;
-    this.pagePrev = document.getElementById("pagePrev")! as HTMLButtonElement;
-    this.pageNext = document.getElementById("pageNext")! as HTMLButtonElement;
+    this.loading = document.getElementById('paperLoading')! as HTMLElement;
+    this.controls = document.getElementById('previewControls')! as HTMLElement;
+    this.hintEl = document.getElementById('previewHint')! as HTMLElement;
+    this.pagerLabel = document.getElementById('pagerLabel')! as HTMLElement;
+    this.pagePrev = document.getElementById('pagePrev')! as HTMLButtonElement;
+    this.pageNext = document.getElementById('pageNext')! as HTMLButtonElement;
 
-    this.pagePrev.addEventListener("click", () =>
+    this.pagePrev.addEventListener('click', () =>
       this.goToPage(this.currentPage - 1),
     );
-    this.pageNext.addEventListener("click", () =>
+    this.pageNext.addEventListener('click', () =>
       this.goToPage(this.currentPage + 1),
     );
 
     const zoomInBtn = document.getElementById(
-      "zoomIn",
+      'zoomIn',
     ) as HTMLButtonElement | null;
     const zoomOutBtn = document.getElementById(
-      "zoomOut",
+      'zoomOut',
     ) as HTMLButtonElement | null;
     const zoomResetBtn = document.getElementById(
-      "zoomReset",
+      'zoomReset',
     ) as HTMLButtonElement | null;
-    zoomInBtn?.addEventListener("click", () => this.zoomIn());
-    zoomOutBtn?.addEventListener("click", () => this.zoomOut());
-    zoomResetBtn?.addEventListener("click", () => this.zoomReset());
+    zoomInBtn?.addEventListener('click', () => this.zoomIn());
+    zoomOutBtn?.addEventListener('click', () => this.zoomOut());
+    zoomResetBtn?.addEventListener('click', () => this.zoomReset());
 
     // Observe viewport resize → refit sheet, re-render PDF / recalc HTML pages
     this.resizeObserver = new ResizeObserver(() => {
       this.resizeSheet();
       if (this.pdfDoc) void this.renderPage(this.currentPage);
-      else if (this.iframe.style.display !== "none") this.recalcHtmlPages();
+      else if (this.iframe.style.display !== 'none') this.recalcHtmlPages();
     });
     this.resizeObserver.observe(this.viewport);
   }
@@ -172,10 +172,10 @@ class PrintPreview {
     this.resizeSheet();
 
     // Grayscale filter via data attribute → CSS handles the transition
-    if (cfg.colorMode === "grayscale") {
-      this.sheet.setAttribute("data-gray", "");
+    if (cfg.colorMode === 'grayscale') {
+      this.sheet.setAttribute('data-gray', '');
     } else {
-      this.sheet.removeAttribute("data-gray");
+      this.sheet.removeAttribute('data-gray');
     }
   }
 
@@ -184,7 +184,7 @@ class PrintPreview {
     this.showLoading(true);
     this.showCanvas(false);
     this.showImg(false);
-    this.setHint("Loading preview…");
+    this.setHint('Loading preview…');
 
     let url = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/preview`;
     if (filename) url += `?filename=${encodeURIComponent(filename)}`;
@@ -193,22 +193,22 @@ class PrintPreview {
     try {
       response = await fetch(url);
     } catch {
-      this.showError("Network error — could not reach the server.");
+      this.showError('Network error — could not reach the server.');
       return;
     }
 
     if (!response.ok) {
-      let reason = "Preview unavailable.";
+      let reason = 'Preview unavailable.';
       try {
         const body = (await response.json()) as {
           error?: string;
           code?: string;
         };
-        if (body.code === "UNSUPPORTED_PREVIEW")
+        if (body.code === 'UNSUPPORTED_PREVIEW')
           reason = `No preview for this file type.`;
-        else if (body.code === "PREVIEW_CONVERSION_FAILED")
+        else if (body.code === 'PREVIEW_CONVERSION_FAILED')
           reason =
-            "Conversion failed — ensure Microsoft Word or LibreOffice is installed on this machine.";
+            'Conversion failed — ensure Microsoft Word or LibreOffice is installed on this machine.';
         else if (body.error) reason = body.error;
       } catch {
         /* plain text response */
@@ -217,18 +217,18 @@ class PrintPreview {
       return;
     }
 
-    const contentType = response.headers.get("Content-Type") ?? "";
+    const contentType = response.headers.get('Content-Type') ?? '';
 
-    if (contentType.startsWith("image/")) {
+    if (contentType.startsWith('image/')) {
       await this.loadImage(url);
-    } else if (contentType.includes("application/pdf")) {
+    } else if (contentType.includes('application/pdf')) {
       const buf = await response.arrayBuffer();
       await this.loadPdf(buf);
-    } else if (contentType.includes("text/html")) {
+    } else if (contentType.includes('text/html')) {
       const html = await response.text();
       this.loadHtml(html);
     } else {
-      this.showError("Unsupported preview format.");
+      this.showError('Unsupported preview format.');
     }
   }
 
@@ -240,15 +240,15 @@ class PrintPreview {
 
     let pdfjs: PdfjsLib;
     try {
-      const dynImport = new Function("u", "return import(u)") as (
+      const dynImport = new Function('u', 'return import(u)') as (
         u: string,
       ) => Promise<Record<string, unknown>>;
-      const mod = await dynImport("/libs/pdfjs/pdf.min.mjs");
+      const mod = await dynImport('/libs/pdfjs/pdf.min.mjs');
       pdfjs = (mod.default ?? mod) as PdfjsLib;
       pdfjs.GlobalWorkerOptions.workerSrc = `${window.location.origin}/libs/pdfjs/pdf.worker.min.mjs`;
     } catch (e) {
-      console.error("PDF.js load error:", e);
-      this.showError("PDF renderer not loaded.");
+      console.error('PDF.js load error:', e);
+      this.showError('PDF renderer not loaded.');
       return;
     }
 
@@ -259,8 +259,8 @@ class PrintPreview {
       this.updatePager();
       await this.renderPage(1);
     } catch (e) {
-      console.error("PDF load error:", e);
-      this.showError("Could not parse PDF.");
+      console.error('PDF load error:', e);
+      this.showError('Could not parse PDF.');
     }
   }
 
@@ -290,7 +290,7 @@ class PrintPreview {
         this.canvas.width = viewport.width;
         this.canvas.height = viewport.height;
 
-        const ctx = this.canvas.getContext("2d")!;
+        const ctx = this.canvas.getContext('2d')!;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         await page.render({ canvasContext: ctx, viewport }).promise;
@@ -300,8 +300,8 @@ class PrintPreview {
         this.showLoading(false);
         this.setHint(`Page ${pageNum} of ${this.totalPages}`);
       } catch (e) {
-        console.error("Render error:", e);
-        this.showError("Render failed.");
+        console.error('Render error:', e);
+        this.showError('Render failed.');
       } finally {
         this.renderTask = null;
       }
@@ -317,15 +317,15 @@ class PrintPreview {
         this.showImg(true);
         this.showCanvas(false);
         this.showLoading(false);
-        this.setHint("Image preview");
+        this.setHint('Image preview');
         resolve();
       };
       this.img.onerror = () => {
-        this.showError("Could not load image.");
+        this.showError('Could not load image.');
         resolve();
       };
       this.img.src = url;
-      this.img.style.display = "block";
+      this.img.style.display = 'block';
     });
   }
 
@@ -336,7 +336,7 @@ class PrintPreview {
     this.updatePager();
     if (this.pdfDoc) {
       await this.renderPage(n);
-    } else if (this.iframe.style.display !== "none") {
+    } else if (this.iframe.style.display !== 'none') {
       const viewH = this.iframe.clientHeight || 1;
       this.iframe.contentWindow?.scrollTo(0, (n - 1) * viewH);
     }
@@ -344,7 +344,7 @@ class PrintPreview {
 
   private updatePager(): void {
     const multi = this.totalPages > 1;
-    this.controls.style.display = multi ? "flex" : "none";
+    this.controls.style.display = multi ? 'flex' : 'none';
     this.pagerLabel.textContent = `${this.currentPage} / ${this.totalPages}`;
     this.pagePrev.disabled = this.currentPage <= 1;
     this.pageNext.disabled = this.currentPage >= this.totalPages;
@@ -359,7 +359,7 @@ class PrintPreview {
     this.iframe.onload = () => {
       this.recalcHtmlPages();
       this.showLoading(false);
-      this.setHint("Document preview");
+      this.setHint('Document preview');
     };
     this.iframe.srcdoc = html;
   }
@@ -375,25 +375,25 @@ class PrintPreview {
   }
 
   private showFrame(on: boolean): void {
-    this.iframe.style.display = on ? "block" : "none";
-    this.placeholder.classList.toggle("hidden", on);
+    this.iframe.style.display = on ? 'block' : 'none';
+    this.placeholder.classList.toggle('hidden', on);
   }
 
   private showLoading(on: boolean): void {
-    this.loading.classList.toggle("hidden", !on);
+    this.loading.classList.toggle('hidden', !on);
   }
 
   private showCanvas(on: boolean): void {
-    this.canvas.style.display = on ? "block" : "none";
-    if (on) this.iframe.style.display = "none";
-    this.placeholder.classList.toggle("hidden", on);
+    this.canvas.style.display = on ? 'block' : 'none';
+    if (on) this.iframe.style.display = 'none';
+    this.placeholder.classList.toggle('hidden', on);
   }
 
   private showImg(on: boolean): void {
-    this.img.style.display = on ? "block" : "none";
+    this.img.style.display = on ? 'block' : 'none';
     if (on) {
-      this.iframe.style.display = "none";
-      this.placeholder.classList.add("hidden");
+      this.iframe.style.display = 'none';
+      this.placeholder.classList.add('hidden');
     }
   }
 
@@ -401,10 +401,10 @@ class PrintPreview {
     this.showLoading(false);
     this.showCanvas(false);
     this.showImg(false);
-    this.iframe.style.display = "none";
-    const text = document.getElementById("placeholderText");
+    this.iframe.style.display = 'none';
+    const text = document.getElementById('placeholderText');
     if (text) text.textContent = msg;
-    this.placeholder.classList.remove("hidden");
+    this.placeholder.classList.remove('hidden');
     this.setHint(msg);
   }
 
@@ -445,142 +445,142 @@ class PrintPreview {
   }
 
   private updateZoomDisplay(): void {
-    const el = document.getElementById("zoomLevel");
+    const el = document.getElementById('zoomLevel');
     if (el) el.textContent = `${Math.round(this.zoomScale * 100)}%`;
   }
 
   /** Load from a raw ArrayBuffer (used by copy preview) */
   async loadFromBuffer(buf: ArrayBuffer, mime: string): Promise<void> {
-    if (mime === "application/pdf") {
+    if (mime === 'application/pdf') {
       await this.loadPdf(buf);
-    } else if (mime.startsWith("image/")) {
+    } else if (mime.startsWith('image/')) {
       const blob = new Blob([buf], { type: mime });
       const url = URL.createObjectURL(blob);
       await this.loadImage(url);
     } else {
-      this.showError("Unsupported preview format.");
+      this.showError('Unsupported preview format.');
     }
   }
 }
 
 const params = new URLSearchParams(window.location.search);
 const mode =
-  (params.get("mode") as "print" | "copy" | null) ??
-  (sessionStorage.getItem("printbit.mode") as "print" | "copy" | null) ??
-  "print";
+  (params.get('mode') as 'print' | 'copy' | null) ??
+  (sessionStorage.getItem('printbit.mode') as 'print' | 'copy' | null) ??
+  'print';
 const sessionId =
-  params.get("sessionId") ?? sessionStorage.getItem("printbit.sessionId");
+  params.get('sessionId') ?? sessionStorage.getItem('printbit.sessionId');
 const selectedFile =
-  params.get("file") ?? sessionStorage.getItem("printbit.uploadedFile");
-const copyPreviewPath = sessionStorage.getItem("printbit.copyPreviewPath");
+  params.get('file') ?? sessionStorage.getItem('printbit.uploadedFile');
+const copyPreviewPath = sessionStorage.getItem('printbit.copyPreviewPath');
 
 const backLink = document.getElementById(
-  "backLink",
+  'backLink',
 ) as HTMLAnchorElement | null;
 const continueBtn = document.getElementById(
-  "continueBtn",
+  'continueBtn',
 ) as HTMLButtonElement | null;
 const filePillLabel = document.getElementById(
-  "filePillLabel",
+  'filePillLabel',
 ) as HTMLElement | null;
 const footerSummary = document.getElementById(
-  "footerSummary",
+  'footerSummary',
 ) as HTMLElement | null;
 const copiesInput = document.getElementById(
-  "copies",
+  'copies',
 ) as HTMLInputElement | null;
 const copiesDec = document.getElementById(
-  "copiesDec",
+  'copiesDec',
 ) as HTMLButtonElement | null;
 const copiesInc = document.getElementById(
-  "copiesInc",
+  'copiesInc',
 ) as HTMLButtonElement | null;
 
 const pageModeAll = document.getElementById(
-  "pageModeAll",
+  'pageModeAll',
 ) as HTMLInputElement | null;
 const pageModeCustom = document.getElementById(
-  "pageModeCustom",
+  'pageModeCustom',
 ) as HTMLInputElement | null;
 const pageModeSingle = document.getElementById(
-  "pageModeSingle",
+  'pageModeSingle',
 ) as HTMLInputElement | null;
 const pageRangeGroup = document.getElementById(
-  "pageRangeGroup",
+  'pageRangeGroup',
 ) as HTMLElement | null;
 const pageRangeCustomWrap = document.getElementById(
-  "pageRangeCustomWrap",
+  'pageRangeCustomWrap',
 ) as HTMLElement | null;
 const pageRangeSingleWrap = document.getElementById(
-  "pageRangeSingleWrap",
+  'pageRangeSingleWrap',
 ) as HTMLElement | null;
 const pageRangeInput = document.getElementById(
-  "pageRangeInput",
+  'pageRangeInput',
 ) as HTMLInputElement | null;
 const singlePageInput = document.getElementById(
-  "singlePageInput",
+  'singlePageInput',
 ) as HTMLInputElement | null;
 const singlePageDec = document.getElementById(
-  "singlePageDec",
+  'singlePageDec',
 ) as HTMLButtonElement | null;
 const singlePageInc = document.getElementById(
-  "singlePageInc",
+  'singlePageInc',
 ) as HTMLButtonElement | null;
 
 if (backLink) {
-  backLink.href = mode === "copy" ? "/copy" : "/print";
+  backLink.href = mode === 'copy' ? '/copy' : '/print';
 }
-if (filePillLabel) filePillLabel.textContent = selectedFile ?? "—";
+if (filePillLabel) filePillLabel.textContent = selectedFile ?? '—';
 
-if (mode === "print" && continueBtn) {
+if (mode === 'print' && continueBtn) {
   continueBtn.disabled = true;
-  continueBtn.setAttribute("aria-disabled", "true");
+  continueBtn.setAttribute('aria-disabled', 'true');
 }
 
-if (mode === "copy" && continueBtn) {
-  pageRangeGroup?.classList.add("hidden");
+if (mode === 'copy' && continueBtn) {
+  pageRangeGroup?.classList.add('hidden');
   const hasCopyPreview = Boolean(copyPreviewPath);
   continueBtn.disabled = !hasCopyPreview;
-  continueBtn.setAttribute("aria-disabled", hasCopyPreview ? "false" : "true");
+  continueBtn.setAttribute('aria-disabled', hasCopyPreview ? 'false' : 'true');
   if (footerSummary)
     footerSummary.textContent = hasCopyPreview
-      ? "Copy mode — checked document ready."
-      : "No checked document found — go back to /copy first.";
+      ? 'Copy mode — checked document ready.'
+      : 'No checked document found — go back to /copy first.';
 }
 
 [pageModeAll, pageModeCustom, pageModeSingle].forEach((el) => {
-  el?.addEventListener("change", () => {
+  el?.addEventListener('change', () => {
     syncPageRangeUI();
     syncCustomRangeValidity();
     updateSummary();
   });
 });
 
-pageRangeInput?.addEventListener("input", () => updateSummary());
-pageRangeInput?.addEventListener("input", () => syncCustomRangeValidity());
+pageRangeInput?.addEventListener('input', () => updateSummary());
+pageRangeInput?.addEventListener('input', () => syncCustomRangeValidity());
 
-singlePageDec?.addEventListener("click", () => {
+singlePageDec?.addEventListener('click', () => {
   if (!singlePageInput) return;
   singlePageInput.value = String(Math.max(1, clampSinglePage() - 1));
   clampSinglePage();
   updateSummary();
 });
 
-singlePageInc?.addEventListener("click", () => {
+singlePageInc?.addEventListener('click', () => {
   if (!singlePageInput) return;
   singlePageInput.value = String(clampSinglePage() + 1);
   clampSinglePage();
   updateSummary();
 });
 
-singlePageInput?.addEventListener("change", () => {
+singlePageInput?.addEventListener('change', () => {
   clampSinglePage();
   updateSummary();
 });
 
 function clampSinglePage(): number {
   const max = Math.max(1, preview.pageCount || 1);
-  const raw = parseInt(singlePageInput?.value ?? "1", 10) || 1;
+  const raw = parseInt(singlePageInput?.value ?? '1', 10) || 1;
   const next = Math.max(1, Math.min(max, raw));
   if (singlePageInput) {
     singlePageInput.max = String(max);
@@ -598,78 +598,78 @@ function isValidCustomRange(raw: string): boolean {
 function syncCustomRangeValidity(): void {
   if (!pageRangeInput) return;
   if (!pageModeCustom?.checked) {
-    pageRangeInput.setCustomValidity("");
+    pageRangeInput.setCustomValidity('');
     return;
   }
 
   const raw = pageRangeInput.value;
   if (isValidCustomRange(raw)) {
-    pageRangeInput.setCustomValidity("");
+    pageRangeInput.setCustomValidity('');
     return;
   }
 
   pageRangeInput.setCustomValidity(
-    "Use formats like 1-3, 5, 7-9 or a single page number.",
+    'Use formats like 1-3, 5, 7-9 or a single page number.',
   );
 }
 
 function getPageRange(): PageRangeSelection {
   if (pageModeCustom?.checked) {
-    const range = (pageRangeInput?.value ?? "").trim();
-    return { type: "custom", range };
+    const range = (pageRangeInput?.value ?? '').trim();
+    return { type: 'custom', range };
   }
   if (pageModeSingle?.checked) {
-    return { type: "single", page: clampSinglePage() };
+    return { type: 'single', page: clampSinglePage() };
   }
-  return { type: "all" };
+  return { type: 'all' };
 }
 
 function pageRangeLabel(sel: PageRangeSelection): string {
-  if (sel.type === "single") return `Page ${sel.page}`;
-  if (sel.type === "custom")
-    return sel.range ? `Pages ${sel.range}` : "Pages (custom)";
-  return "All pages";
+  if (sel.type === 'single') return `Page ${sel.page}`;
+  if (sel.type === 'custom')
+    return sel.range ? `Pages ${sel.range}` : 'Pages (custom)';
+  return 'All pages';
 }
 
 function syncPageRangeUI(): void {
   const isCustom = Boolean(pageModeCustom?.checked);
   const isSingle = Boolean(pageModeSingle?.checked);
-  pageRangeCustomWrap?.classList.toggle("hidden", !isCustom);
-  pageRangeSingleWrap?.classList.toggle("hidden", !isSingle);
+  pageRangeCustomWrap?.classList.toggle('hidden', !isCustom);
+  pageRangeSingleWrap?.classList.toggle('hidden', !isSingle);
 }
 
 function getRadio(name: string): string {
   return (
     document.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)
-      ?.value ?? ""
+      ?.value ?? ''
   );
 }
 
 function getCopies(): number {
   return Math.max(
     1,
-    Math.min(99, parseInt(copiesInput?.value ?? "1", 10) || 1),
+    Math.min(99, parseInt(copiesInput?.value ?? '1', 10) || 1),
   );
 }
 
 function currentPreviewConfig(): PreviewConfig {
   return {
-    colorMode: (getRadio("colorMode") as ColorMode) || "colored",
-    orientation: (getRadio("orientation") as Orientation) || "portrait",
-    paperSize: (getRadio("paperSize") as PaperSize) || "A4",
+    colorMode: (getRadio('colorMode') as ColorMode) || 'colored',
+    orientation: (getRadio('orientation') as Orientation) || 'portrait',
+    paperSize: (getRadio('paperSize') as PaperSize) || 'A4',
   };
 }
 
 function updateSummary(): void {
-  if (!footerSummary || mode === "copy") return;
+  if (!footerSummary || mode === 'copy') return;
   const cfg = currentPreviewConfig();
   const n = getCopies();
   const pages = pageRangeLabel(getPageRange());
   footerSummary.textContent =
-    `${n} cop${n === 1 ? "y" : "ies"} · ${pages} · ${cfg.paperSize} · ` +
-    `${cfg.orientation === "portrait" ? "Portrait" : "Landscape"} · ` +
-    `${cfg.colorMode === "colored" ? "Colour" : "Grayscale"}`;
-  footerSummary.classList.add("ready");
+    `${n} cop${n === 1 ? 'y' : 'ies'} · ${pages} · ${cfg.paperSize} · ` +
+    `${cfg.orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ` +
+    `${cfg.colorMode === 'colored' ? 'Colour' : 'Grayscale'}`;
+  footerSummary.classList.add('ready');
 }
 
 const preview = new PrintPreview();
@@ -677,30 +677,30 @@ const preview = new PrintPreview();
 preview.applyConfig(currentPreviewConfig());
 
 document
-  .querySelectorAll<HTMLInputElement>("input[type=radio]")
+  .querySelectorAll<HTMLInputElement>('input[type=radio]')
   .forEach((el) => {
-    el.addEventListener("change", () => {
+    el.addEventListener('change', () => {
       const cfg = currentPreviewConfig();
       preview.applyConfig(cfg);
       updateSummary();
     });
   });
 
-copiesDec?.addEventListener("click", () => {
+copiesDec?.addEventListener('click', () => {
   const v = getCopies();
   if (v > 1 && copiesInput) {
     copiesInput.value = String(v - 1);
     updateSummary();
   }
 });
-copiesInc?.addEventListener("click", () => {
+copiesInc?.addEventListener('click', () => {
   const v = getCopies();
   if (v < 99 && copiesInput) {
     copiesInput.value = String(v + 1);
     updateSummary();
   }
 });
-copiesInput?.addEventListener("change", () => {
+copiesInput?.addEventListener('change', () => {
   if (copiesInput) {
     copiesInput.value = String(getCopies());
     updateSummary();
@@ -713,7 +713,7 @@ clampSinglePage();
 syncCustomRangeValidity();
 
 async function loadPreview(): Promise<void> {
-  if (mode === "copy") {
+  if (mode === 'copy') {
     const copyPreview = copyPreviewPath;
     if (!copyPreview) return;
 
@@ -722,42 +722,87 @@ async function loadPreview(): Promise<void> {
       const resp = await fetch(url);
       if (!resp.ok) return;
       const buf = await resp.arrayBuffer();
-      await preview.loadFromBuffer(buf, "application/pdf");
+      await preview.loadFromBuffer(buf, 'application/pdf');
     } catch {
       // Preview not critical for copy mode
     }
 
     if (footerSummary)
       footerSummary.textContent =
-        "Copy preview loaded — adjust settings above.";
+        'Copy preview loaded — adjust settings above.';
     return;
   }
 
-  if (mode !== "print") return;
+  if (mode !== 'print') return;
 
   if (!sessionId) {
     // Show error state in the paper placeholder
-    const text = document.getElementById("placeholderText");
-    if (text) text.textContent = "No session — go back to /print";
-    document.getElementById("paperLoading")?.classList.add("hidden");
+    const text = document.getElementById('placeholderText');
+    if (text) text.textContent = 'No session — go back to /print';
+    document.getElementById('paperLoading')?.classList.add('hidden');
     return;
   }
 
   await preview.load(sessionId, selectedFile ?? undefined);
+  if (sessionId) await applyColorAnalysis(sessionId);
   clampSinglePage();
   updateSummary();
 
   // Enable continue now that preview has loaded successfully
   if (continueBtn) {
     continueBtn.disabled = false;
-    continueBtn.setAttribute("aria-disabled", "false");
+    continueBtn.setAttribute('aria-disabled', 'false');
   }
 }
 
-continueBtn?.addEventListener("click", () => {
-  if (mode === "print" && !sessionId) return;
-  if (mode === "copy" && !copyPreviewPath) return;
-  if (mode === "print" && pageModeCustom?.checked) {
+async function applyColorAnalysis(sessionId: string): Promise<void> {
+  try {
+    const resp = await fetch(
+      `/api/wireless/sessions/${encodeURIComponent(sessionId)}/color-analysis`,
+    );
+    if (!resp.ok) return;
+
+    const { isGrayscale } = (await resp.json()) as { isGrayscale: boolean };
+    if (!isGrayscale) return;
+
+    const grayRadio = document.querySelector<HTMLInputElement>(
+      'input[name="colorMode"][value="grayscale"]',
+    );
+    if (grayRadio) {
+      grayRadio.checked = true;
+      grayRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // 2. Disable both color mode cards
+    document
+      .querySelectorAll<HTMLInputElement>('input[name="colorMode"]')
+      .forEach((radio) => {
+        radio.disabled = true;
+        radio
+          .closest<HTMLElement>('.option-card')
+          ?.setAttribute('data-locked', 'true');
+      });
+
+    // 3. Show explanatory notice
+    const colorGroup = document.querySelector<HTMLElement>(
+      '.option-group:has(input[name="colorMode"])',
+    );
+    if (colorGroup && !colorGroup.querySelector('.color-lock-notice')) {
+      const notice = document.createElement('p');
+      notice.className = 'color-lock-notice';
+      notice.textContent =
+        'Color printing is unavailable — this document contains only black & white content.';
+      colorGroup.appendChild(notice);
+    }
+  } catch (error) {
+    // Detection failed silently - leave UI unlocked
+  }
+}
+
+continueBtn?.addEventListener('click', () => {
+  if (mode === 'print' && !sessionId) return;
+  if (mode === 'copy' && !copyPreviewPath) return;
+  if (mode === 'print' && pageModeCustom?.checked) {
     syncCustomRangeValidity();
     if (pageRangeInput && !pageRangeInput.checkValidity()) {
       pageRangeInput.reportValidity();
@@ -771,7 +816,7 @@ continueBtn?.addEventListener("click", () => {
     mode,
     sessionId,
     filename: selectedFile,
-    copyPreviewPath: mode === "copy" ? copyPreviewPath : null,
+    copyPreviewPath: mode === 'copy' ? copyPreviewPath : null,
     colorMode: cfg.colorMode,
     copies: getCopies(),
     orientation: cfg.orientation,
@@ -780,13 +825,13 @@ continueBtn?.addEventListener("click", () => {
     totalPages: preview.pageCount,
   };
 
-  sessionStorage.setItem("printbit.mode", mode);
-  if (sessionId) sessionStorage.setItem("printbit.sessionId", sessionId);
+  sessionStorage.setItem('printbit.mode', mode);
+  if (sessionId) sessionStorage.setItem('printbit.sessionId', sessionId);
   if (selectedFile)
-    sessionStorage.setItem("printbit.uploadedFile", selectedFile);
-  sessionStorage.setItem("printbit.config", JSON.stringify(config));
+    sessionStorage.setItem('printbit.uploadedFile', selectedFile);
+  sessionStorage.setItem('printbit.config', JSON.stringify(config));
 
-  window.location.href = "/confirm";
+  window.location.href = '/confirm';
 });
 
 void loadPreview();
