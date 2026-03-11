@@ -3,7 +3,8 @@ name: "🟡 Medium Gap"
 about: "A system gap that is important for production quality but acceptable to defer to a post-launch sprint."
 title: "[MEDIUM] "
 labels: ["medium", "gap", "enhancement"]
-assignees: []
+projects: ["PrintBit Potential Gaps"]
+assignees: ["GioMjds"]
 ---
 
 ## 📌 Gap Title

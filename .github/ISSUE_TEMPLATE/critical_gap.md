@@ -3,6 +3,7 @@ name: "🔴 Critical Gap"
 about: "A system gap that must be resolved before public deployment. Carries risk of financial loss, data loss, or system failure."
 title: "[CRITICAL] "
 labels: ["critical", "gap", "needs-triage"]
+projects: ["PrintBit Potential Gaps"]
 assignees: ["GioMjds"]
 ---
 

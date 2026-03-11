@@ -3,6 +3,7 @@ name: "🟠 High Gap"
 about: "A system gap that should be addressed before or immediately after launch. Affects reliability, security, or user trust."
 title: "[HIGH] "
 labels: ["high", "gap", "needs-triage"]
+projects: ["PrintBit Potential Gaps"]
 assignees: ["GioMjds"]
 ---
 
