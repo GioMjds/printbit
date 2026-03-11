@@ -188,7 +188,7 @@ export function registerWirelessSessionRoutes(
         const result = await detectPdfColorContent(pdfPath);
         return res.json({
           hasColor: result.hasColor,
-          isGrayscale: !result.hasColor,
+          isGrayscale: result.isGrayscale,
           sampledPages: result.sampledPages,
         });
       } catch (err) {
