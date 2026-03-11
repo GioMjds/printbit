@@ -727,6 +727,24 @@ async function loadPreview(): Promise<void> {
       // Preview not critical for copy mode
     }
 
+    try {
+      const analysisResp = await fetch(
+        `/api/scan/color-analysis/${encodeURIComponent(copyPreview)}`,
+      );
+      if (analysisResp.ok) {
+        const { isGrayscale } = (await analysisResp.json()) as {
+          isGrayscale: boolean;
+        };
+        if (isGrayscale) {
+          resetColorLock(); // ensure clean state
+          // reuse same lock logic — extract into shared helper
+          lockColorMode();
+        }
+      }
+    } catch {
+      // non-fatal
+    }
+
     if (footerSummary)
       footerSummary.textContent =
         'Copy preview loaded — adjust settings above.';
@@ -744,7 +762,7 @@ async function loadPreview(): Promise<void> {
   }
 
   await preview.load(sessionId, selectedFile ?? undefined);
-  if (sessionId) await applyColorAnalysis(sessionId);
+  if (sessionId) await applyColorAnalysis(sessionId, selectedFile);
   clampSinglePage();
   updateSummary();
 
@@ -755,11 +773,60 @@ async function loadPreview(): Promise<void> {
   }
 }
 
-async function applyColorAnalysis(sessionId: string): Promise<void> {
+function lockColorMode(): void {
+  const grayRadio = document.querySelector<HTMLInputElement>(
+    'input[name="colorMode"][value="grayscale"]',
+  );
+  if (grayRadio) {
+    grayRadio.checked = true;
+    grayRadio.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  document
+    .querySelectorAll<HTMLInputElement>('input[name="colorMode"]')
+    .forEach((radio) => {
+      radio.disabled = true;
+      radio
+        .closest<HTMLElement>('.option-card')
+        ?.setAttribute('data-locked', 'true');
+    });
+
+  const colorGroup = document.querySelector<HTMLElement>(
+    '.option-group:has(input[name="colorMode"])',
+  );
+  if (colorGroup && !colorGroup.querySelector('.color-lock-notice')) {
+    const notice = document.createElement('p');
+    notice.className = 'color-lock-notice';
+    notice.textContent =
+      'Color printing is unavailable — this document contains only black & white content.';
+    colorGroup.appendChild(notice);
+  }
+}
+
+function resetColorLock(): void {
+  document
+    .querySelectorAll<HTMLInputElement>('input[name="colorMode"]')
+    .forEach((radio) => {
+      radio.disabled = false;
+      radio
+        .closest<HTMLElement>('.option-card')
+        ?.removeAttribute('data-locked');
+    });
+
+  document.querySelector('.color-lock-notice')?.remove();
+}
+
+async function applyColorAnalysis(
+  sessionId: string,
+  filename?: string | null,
+): Promise<void> {
+  resetColorLock();
+
+  let url = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/color-analysis`;
+  if (filename) url += `?filename=${encodeURIComponent(filename)}`;
+
   try {
-    const resp = await fetch(
-      `/api/wireless/sessions/${encodeURIComponent(sessionId)}/color-analysis`,
-    );
+    const resp = await fetch(url);
     if (!resp.ok) return;
 
     const { isGrayscale } = (await resp.json()) as { isGrayscale: boolean };

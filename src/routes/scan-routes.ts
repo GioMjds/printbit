@@ -1,34 +1,35 @@
-import type { Express, Request, Response } from "express";
-import { Server } from "socket.io";
-import path from "node:path";
-import fs from "node:fs";
-import { jobStore } from "../services/job-store";
-import { db, withBalanceLock } from "../services/db";
-import { adminService } from "../services/admin";
+import type { Express, Request, Response } from 'express';
+import { Server } from 'socket.io';
+import path from 'node:path';
+import fs from 'node:fs';
+import { jobStore } from '../services/job-store';
+import { db, withBalanceLock } from '../services/db';
+import { adminService } from '../services/admin';
 import {
   getAdapter,
   getScannerStatus,
   type ScannerCapabilities,
-} from "../services/scanner";
+} from '../services/scanner';
 import {
   createScanDownloadLink,
   resolveScanDownload,
-} from "../services/scan-delivery";
+} from '../services/scan-delivery';
 import {
   exportScanToUsbDrive,
   listRemovableDrives,
-} from "../services/usb-drives";
+} from '../services/usb-drives';
+import { detectPdfColorContent } from '@/services/config';
 
-const VALID_SOURCES = new Set(["adf", "flatbed"]);
+const VALID_SOURCES = new Set(['adf', 'flatbed']);
 const VALID_DPI = new Set([150, 300, 600]);
-const VALID_COLOR_MODES = new Set(["colored", "grayscale"]);
-const VALID_FORMATS = new Set(["pdf", "jpg", "png"]);
+const VALID_COLOR_MODES = new Set(['colored', 'grayscale']);
+const VALID_FORMATS = new Set(['pdf', 'jpg', 'png']);
 
 const FORMAT_CONTENT_TYPES: Record<string, string> = {
-  pdf: "application/pdf",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
+  pdf: 'application/pdf',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
 };
 
 const CHARGED_SCAN_TTL_MS = 30 * 60 * 1000;
@@ -39,23 +40,23 @@ interface RegisterScanRoutesDeps {
   resolvePublicBaseUrl: (req: Request) => URL;
 }
 
-type ScannerPageSource = "feeder" | "glass";
-type ScannerPageColor = "color" | "grayscale";
+type ScannerPageSource = 'feeder' | 'glass';
+type ScannerPageColor = 'color' | 'grayscale';
 
 function toSafeScanFilename(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
+  if (typeof raw !== 'string') return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
   const safe = path.basename(trimmed);
   return safe === trimmed ? safe : null;
 }
 
-function toScanSource(source: ScannerPageSource): "flatbed" | "adf" {
-  return source === "feeder" ? "adf" : "flatbed";
+function toScanSource(source: ScannerPageSource): 'flatbed' | 'adf' {
+  return source === 'feeder' ? 'adf' : 'flatbed';
 }
 
-function toColorMode(color: ScannerPageColor): "colored" | "grayscale" {
-  return color === "grayscale" ? "grayscale" : "colored";
+function toColorMode(color: ScannerPageColor): 'colored' | 'grayscale' {
+  return color === 'grayscale' ? 'grayscale' : 'colored';
 }
 
 function markSoftCopyPaid(filename: string): void {
@@ -103,7 +104,7 @@ export function registerScanRoutes(
   deps: RegisterScanRoutesDeps,
 ): void {
   // ── GET /api/scanner/status — UI compatibility status endpoint ──────
-  app.get("/api/scanner/status", async (_req: Request, res: Response) => {
+  app.get('/api/scanner/status', async (_req: Request, res: Response) => {
     const runtime = getScannerStatus();
     const probeCaps = await getAdapter()
       .probe()
@@ -113,11 +114,11 @@ export function registerScanRoutes(
     );
 
     const connected =
-      runtime.adapter === "naps2" && Boolean(probeCaps?.available);
+      runtime.adapter === 'naps2' && Boolean(probeCaps?.available);
     const error = connected
       ? undefined
       : (runtime.lastError ??
-        "Scanner unavailable. Check Epson driver, NAPS2 installation, and USB connection.");
+        'Scanner unavailable. Check Epson driver, NAPS2 installation, and USB connection.');
 
     res.json({
       connected,
@@ -134,7 +135,7 @@ export function registerScanRoutes(
   });
 
   // ── POST /api/scanner/scan — UI compatibility scan endpoint ────────
-  app.post("/api/scanner/scan", async (req: Request, res: Response) => {
+  app.post('/api/scanner/scan', async (req: Request, res: Response) => {
     const { source, color, dpi } = req.body as {
       source?: ScannerPageSource;
       color?: ScannerPageColor;
@@ -142,35 +143,35 @@ export function registerScanRoutes(
     };
 
     const runtime = getScannerStatus();
-    if (runtime.adapter !== "naps2") {
+    if (runtime.adapter !== 'naps2') {
       return res.status(409).json({
         error:
           runtime.lastError ??
-          "No scanner device is currently available. Please check your Epson scanner connection.",
+          'No scanner device is currently available. Please check your Epson scanner connection.',
       });
     }
 
-    if (!source || (source !== "feeder" && source !== "glass")) {
+    if (!source || (source !== 'feeder' && source !== 'glass')) {
       return res
         .status(400)
         .json({ error: 'Invalid source. Accepted: "feeder", "glass"' });
     }
-    if (!color || (color !== "color" && color !== "grayscale")) {
+    if (!color || (color !== 'color' && color !== 'grayscale')) {
       return res
         .status(400)
         .json({ error: 'Invalid color. Accepted: "color", "grayscale"' });
     }
 
     const safeDpi =
-      typeof dpi === "number"
+      typeof dpi === 'number'
         ? dpi
-        : typeof dpi === "string"
+        : typeof dpi === 'string'
           ? Number(dpi)
           : NaN;
     if (!VALID_DPI.has(safeDpi)) {
       return res
         .status(400)
-        .json({ error: "Invalid dpi. Accepted: 150, 300, 600" });
+        .json({ error: 'Invalid dpi. Accepted: 150, 300, 600' });
     }
 
     const settings = {
@@ -178,22 +179,26 @@ export function registerScanRoutes(
       dpi: safeDpi,
       colorMode: toColorMode(color),
       duplex: false,
-      format: "jpg" as const,
+      format: 'jpg' as const,
     };
 
     try {
-      const result = await getAdapter().scan(settings, "uploads/scans");
+      const result = await getAdapter().scan(settings, 'uploads/scans');
       const filename = path.basename(result.outputPath);
       clearSoftCopyPaid(filename);
 
-      void adminService.appendAdminLog("scan_completed", "Interactive scan completed.", {
-        source: settings.source,
-        dpi: settings.dpi,
-        colorMode: settings.colorMode,
-        filename,
-      });
+      void adminService.appendAdminLog(
+        'scan_completed',
+        'Interactive scan completed.',
+        {
+          source: settings.source,
+          dpi: settings.dpi,
+          colorMode: settings.colorMode,
+          filename,
+        },
+      );
 
-      await adminService.incrementJobStats("scan");
+      await adminService.incrementJobStats('scan');
 
       res.json({
         pages: [`/api/scan/preview/${encodeURIComponent(filename)}`],
@@ -201,29 +206,33 @@ export function registerScanRoutes(
         pageCount: result.pageCount,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown scan error";
-      void adminService.appendAdminLog("scan_failed", "Interactive scan failed.", {
-        error: message,
-        source: settings.source,
-        dpi: settings.dpi,
-        colorMode: settings.colorMode,
-      });
+      const message = err instanceof Error ? err.message : 'Unknown scan error';
+      void adminService.appendAdminLog(
+        'scan_failed',
+        'Interactive scan failed.',
+        {
+          error: message,
+          source: settings.source,
+          dpi: settings.dpi,
+          colorMode: settings.colorMode,
+        },
+      );
       res.status(500).json({ error: message });
     }
   });
 
   // ── POST /api/scanner/soft-copy/charge — Charge for soft copy access ───
   app.post(
-    "/api/scanner/soft-copy/charge",
+    '/api/scanner/soft-copy/charge',
     async (req: Request, res: Response) => {
       const safeFilename = toSafeScanFilename(req.body?.filename);
       if (!safeFilename) {
-        return res.status(400).json({ error: "Invalid filename." });
+        return res.status(400).json({ error: 'Invalid filename.' });
       }
 
-      const sourcePath = path.resolve("uploads", "scans", safeFilename);
+      const sourcePath = path.resolve('uploads', 'scans', safeFilename);
       if (!fs.existsSync(sourcePath)) {
-        return res.status(404).json({ error: "Scanned file not found." });
+        return res.status(404).json({ error: 'Scanned file not found.' });
       }
 
       const requiredAmount = adminService.getPricingSettings().scanDocument;
@@ -276,8 +285,8 @@ export function registerScanRoutes(
 
       if (!result.ok) {
         await adminService.appendAdminLog(
-          "scan_soft_copy_charge_failed",
-          "Failed to charge for soft copy access.",
+          'scan_soft_copy_charge_failed',
+          'Failed to charge for soft copy access.',
           {
             filename: safeFilename,
             requiredAmount,
@@ -292,10 +301,10 @@ export function registerScanRoutes(
       }
 
       if (result.charged) {
-        deps.io.emit("balance", result.balance);
+        deps.io.emit('balance', result.balance);
         await adminService.appendAdminLog(
-          "scan_soft_copy_charged",
-          "Soft copy access charged.",
+          'scan_soft_copy_charged',
+          'Soft copy access charged.',
           {
             filename: safeFilename,
             amount: result.amount,
@@ -310,36 +319,36 @@ export function registerScanRoutes(
   );
 
   // ── GET /api/scanner/wired/drives — Detect removable USB drives ─────
-  app.get("/api/scanner/wired/drives", async (_req: Request, res: Response) => {
+  app.get('/api/scanner/wired/drives', async (_req: Request, res: Response) => {
     try {
       const drives = await listRemovableDrives();
       res.json({ drives });
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not list USB drives.";
+        err instanceof Error ? err.message : 'Could not list USB drives.';
       res.status(500).json({ error: message });
     }
   });
 
   // ── POST /api/scanner/wired/export — Copy scan to USB drive ─────────
-  app.post("/api/scanner/wired/export", async (req: Request, res: Response) => {
+  app.post('/api/scanner/wired/export', async (req: Request, res: Response) => {
     const safeFilename = toSafeScanFilename(req.body?.filename);
-    const drive = typeof req.body?.drive === "string" ? req.body.drive : "";
+    const drive = typeof req.body?.drive === 'string' ? req.body.drive : '';
 
     if (!safeFilename) {
-      return res.status(400).json({ error: "Invalid filename." });
+      return res.status(400).json({ error: 'Invalid filename.' });
     }
 
-    const sourcePath = path.resolve("uploads", "scans", safeFilename);
+    const sourcePath = path.resolve('uploads', 'scans', safeFilename);
     if (!fs.existsSync(sourcePath)) {
-      return res.status(404).json({ error: "Scanned file not found." });
+      return res.status(404).json({ error: 'Scanned file not found.' });
     }
 
     try {
       const exported = await exportScanToUsbDrive(sourcePath, drive);
       await adminService.appendAdminLog(
-        "scan_usb_exported",
-        "Scanned file exported to USB.",
+        'scan_usb_exported',
+        'Scanned file exported to USB.',
         {
           filename: safeFilename,
           drive: exported.drive,
@@ -352,21 +361,21 @@ export function registerScanRoutes(
         exportPath: exported.exportPath,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "USB export failed.";
+      const message = err instanceof Error ? err.message : 'USB export failed.';
       res.status(400).json({ error: message });
     }
   });
 
   // ── POST /api/scanner/wireless-link — Create temporary download link ─
-  app.post("/api/scanner/wireless-link", (req: Request, res: Response) => {
+  app.post('/api/scanner/wireless-link', (req: Request, res: Response) => {
     const safeFilename = toSafeScanFilename(req.body?.filename);
     if (!safeFilename) {
-      return res.status(400).json({ error: "Invalid filename." });
+      return res.status(400).json({ error: 'Invalid filename.' });
     }
 
-    const sourcePath = path.resolve("uploads", "scans", safeFilename);
+    const sourcePath = path.resolve('uploads', 'scans', safeFilename);
     if (!fs.existsSync(sourcePath)) {
-      return res.status(404).json({ error: "Scanned file not found." });
+      return res.status(404).json({ error: 'Scanned file not found.' });
     }
 
     try {
@@ -375,8 +384,8 @@ export function registerScanRoutes(
         deps.resolvePublicBaseUrl(req),
       );
       void adminService.appendAdminLog(
-        "scan_wireless_link_created",
-        "Wireless scan download link created.",
+        'scan_wireless_link_created',
+        'Wireless scan download link created.',
         {
           filename: safeFilename,
           expiresAt: link.expiresAt,
@@ -385,31 +394,31 @@ export function registerScanRoutes(
       res.json(link);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to create link.";
+        err instanceof Error ? err.message : 'Failed to create link.';
       res.status(500).json({ error: message });
     }
   });
 
   // ── GET /scan/download/:token — Download scanned file by token ──────
-  app.get("/scan/download/:token", (req: Request, res: Response) => {
-    const token = String(req.params.token ?? "");
+  app.get('/scan/download/:token', (req: Request, res: Response) => {
+    const token = String(req.params.token ?? '');
     const session = resolveScanDownload(token);
     if (!session) {
-      return res.status(410).send("This scan download link has expired.");
+      return res.status(410).send('This scan download link has expired.');
     }
 
     const ext = path.extname(session.filename).slice(1).toLowerCase();
-    const contentType = FORMAT_CONTENT_TYPES[ext] ?? "application/octet-stream";
-    res.setHeader("Content-Type", contentType);
+    const contentType = FORMAT_CONTENT_TYPES[ext] ?? 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
     res.setHeader(
-      "Content-Disposition",
+      'Content-Disposition',
       `attachment; filename="${session.filename}"`,
     );
     res.sendFile(path.resolve(session.filePath));
   });
 
   // ── POST /api/scan/jobs — Start a scan job ─────────────────────────
-  app.post("/api/scan/jobs", async (req: Request, res: Response) => {
+  app.post('/api/scan/jobs', async (req: Request, res: Response) => {
     const { source, dpi, colorMode, duplex, format } = req.body as {
       source?: string;
       dpi?: number;
@@ -423,18 +432,18 @@ export function registerScanRoutes(
         .status(400)
         .json({ error: 'Invalid source. Accepted: "adf", "flatbed"' });
     }
-    if (typeof dpi !== "number" || !VALID_DPI.has(dpi)) {
+    if (typeof dpi !== 'number' || !VALID_DPI.has(dpi)) {
       return res
         .status(400)
-        .json({ error: "Invalid dpi. Accepted: 150, 300, 600" });
+        .json({ error: 'Invalid dpi. Accepted: 150, 300, 600' });
     }
     if (!colorMode || !VALID_COLOR_MODES.has(colorMode)) {
       return res
         .status(400)
         .json({ error: 'Invalid colorMode. Accepted: "colored", "grayscale"' });
     }
-    if (typeof duplex !== "boolean") {
-      return res.status(400).json({ error: "duplex must be a boolean" });
+    if (typeof duplex !== 'boolean') {
+      return res.status(400).json({ error: 'duplex must be a boolean' });
     }
     if (!format || !VALID_FORMATS.has(format)) {
       return res
@@ -443,16 +452,16 @@ export function registerScanRoutes(
     }
 
     const settings = {
-      source: source as "adf" | "flatbed",
+      source: source as 'adf' | 'flatbed',
       dpi,
-      colorMode: colorMode as "colored" | "grayscale",
+      colorMode: colorMode as 'colored' | 'grayscale',
       duplex,
-      format: format as "pdf" | "jpg" | "png",
+      format: format as 'pdf' | 'jpg' | 'png',
     };
 
     const job = jobStore.createScanJob(settings);
 
-    void adminService.appendAdminLog("scan_job_created", "Scan job created.", {
+    void adminService.appendAdminLog('scan_job_created', 'Scan job created.', {
       jobId: job.id,
       source,
       dpi,
@@ -462,21 +471,21 @@ export function registerScanRoutes(
 
     // Start scan asynchronously
     void (async () => {
-      jobStore.updateJobState(job.id, "running");
+      jobStore.updateJobState(job.id, 'running');
       try {
-        const result = await getAdapter().scan(settings, "uploads/scans");
-        jobStore.updateJobState(job.id, "succeeded", {
+        const result = await getAdapter().scan(settings, 'uploads/scans');
+        jobStore.updateJobState(job.id, 'succeeded', {
           resultPath: result.outputPath,
         });
-        await adminService.incrementJobStats("scan");
+        await adminService.incrementJobStats('scan');
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        jobStore.updateJobState(job.id, "failed", {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        jobStore.updateJobState(job.id, 'failed', {
           failure: {
-            code: "SCAN_ERROR",
+            code: 'SCAN_ERROR',
             message,
             retryable: true,
-            stage: "running",
+            stage: 'running',
           },
         });
       }
@@ -486,53 +495,53 @@ export function registerScanRoutes(
   });
 
   // ── GET /api/scan/jobs/:id — Get scan job status ───────────────────
-  app.get("/api/scan/jobs/:id", (req: Request, res: Response) => {
+  app.get('/api/scan/jobs/:id', (req: Request, res: Response) => {
     const job = jobStore.getJob(req.params.id as string);
     if (!job) {
-      return res.status(404).json({ error: "Job not found" });
+      return res.status(404).json({ error: 'Job not found' });
     }
     res.json(job);
   });
 
   // ── GET /api/scan/jobs/:id/result — Download scan result ───────────
-  app.get("/api/scan/jobs/:id/result", (req: Request, res: Response) => {
+  app.get('/api/scan/jobs/:id/result', (req: Request, res: Response) => {
     const job = jobStore.getJob(req.params.id as string);
-    if (!job || job.type !== "scan") {
-      return res.status(404).json({ error: "Job not found" });
+    if (!job || job.type !== 'scan') {
+      return res.status(404).json({ error: 'Job not found' });
     }
 
-    if (job.state !== "succeeded" || !job.resultPath) {
-      return res.status(409).json({ error: "Scan result is not ready" });
+    if (job.state !== 'succeeded' || !job.resultPath) {
+      return res.status(409).json({ error: 'Scan result is not ready' });
     }
 
     const absPath = path.resolve(job.resultPath);
     if (!fs.existsSync(absPath)) {
-      return res.status(404).json({ error: "Result file not found on disk" });
+      return res.status(404).json({ error: 'Result file not found on disk' });
     }
 
     const contentType =
-      FORMAT_CONTENT_TYPES[job.settings.format] ?? "application/octet-stream";
+      FORMAT_CONTENT_TYPES[job.settings.format] ?? 'application/octet-stream';
     const filename = path.basename(absPath);
 
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     fs.createReadStream(absPath).pipe(res);
   });
 
   // ── POST /api/scan/preview — Quick preview scan for document detection ──
-  app.post("/api/scan/preview", async (_req: Request, res: Response) => {
-    console.log("[SCAN-PREVIEW] Starting copy pre-scan (300 DPI color)…");
+  app.post('/api/scan/preview', async (_req: Request, res: Response) => {
+    console.log('[SCAN-PREVIEW] Starting copy pre-scan (300 DPI color)…');
 
     const previewSettings = {
-      source: "flatbed" as const,
+      source: 'flatbed' as const,
       dpi: 300,
-      colorMode: "colored" as const,
+      colorMode: 'colored' as const,
       duplex: false,
-      format: "pdf" as const,
+      format: 'pdf' as const,
     };
 
     try {
-      const result = await getAdapter().scan(previewSettings, "uploads/scans");
+      const result = await getAdapter().scan(previewSettings, 'uploads/scans');
 
       // Check the output file has meaningful content (> 1 KB suggests a real scan)
       const absPath = path.resolve(result.outputPath);
@@ -549,51 +558,82 @@ export function registerScanRoutes(
         pageCount: result.pageCount,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
+      const message = err instanceof Error ? err.message : 'Unknown error';
       console.error(`[SCAN-PREVIEW] ✗ Preview scan failed: ${message}`);
 
-      void adminService.appendAdminLog("scan_preview_failed", "Preview scan failed.", {
-        error: message,
-      });
+      void adminService.appendAdminLog(
+        'scan_preview_failed',
+        'Preview scan failed.',
+        {
+          error: message,
+        },
+      );
       res.json({
         detected: false,
         error:
-          "No document detected. Place your document face-down on the scanner glass and try again.",
+          'No document detected. Place your document face-down on the scanner glass and try again.',
       });
     }
   });
 
   // ── GET /api/scan/preview/:filename — Serve preview scan files ─────
-  app.get("/api/scan/preview/:filename", (req: Request, res: Response) => {
+  app.get('/api/scan/preview/:filename', (req: Request, res: Response) => {
     const filename = path.basename(req.params.filename as string);
-    const absPath = path.resolve("uploads", "scans", filename);
+    const absPath = path.resolve('uploads', 'scans', filename);
 
     if (!fs.existsSync(absPath)) {
-      return res.status(404).json({ error: "Preview file not found" });
+      return res.status(404).json({ error: 'Preview file not found' });
     }
 
-    const ext = path.extname(filename).toLowerCase().replace(".", "");
-    const contentType = FORMAT_CONTENT_TYPES[ext] ?? "application/octet-stream";
+    const ext = path.extname(filename).toLowerCase().replace('.', '');
+    const contentType = FORMAT_CONTENT_TYPES[ext] ?? 'application/octet-stream';
 
-    res.setHeader("Content-Type", contentType);
+    res.setHeader('Content-Type', contentType);
     fs.createReadStream(absPath).pipe(res);
   });
 
+  app.get(
+    '/api/scan/color-analysis/:filename',
+    async (req: Request, res: Response) => {
+      const filename = path.basename(req.params.filename as string);
+      const absPath = path.resolve('uploads', 'scans', filename);
+
+      if (!fs.existsSync(absPath)) {
+        return res.json({
+          hasColor: true,
+          isGrayscale: false,
+          sampledPages: 0,
+        });
+      }
+
+      try {
+        const result = await detectPdfColorContent(absPath);
+        res.json({
+          hasColor: result.hasColor,
+          isGrayscale: !result.hasColor,
+          sampledPages: result.sampledPages,
+        });
+      } catch {
+        res.json({ hasColor: true, isGrayscale: false, sampledPages: 0 });
+      }
+    },
+  );
+
   // ── POST /api/scan/jobs/:id/cancel — Cancel a scan job ────────────
-  app.post("/api/scan/jobs/:id/cancel", (req: Request, res: Response) => {
+  app.post('/api/scan/jobs/:id/cancel', (req: Request, res: Response) => {
     const job = jobStore.getJob(req.params.id as string);
     if (!job) {
-      return res.status(404).json({ error: "Job not found" });
+      return res.status(404).json({ error: 'Job not found' });
     }
 
     const cancelled = jobStore.requestCancel(job.id);
     if (!cancelled) {
       return res
         .status(409)
-        .json({ error: "Job is already in a terminal state" });
+        .json({ error: 'Job is already in a terminal state' });
     }
 
     getAdapter().cancel();
-    res.status(202).json({ ok: true, state: "cancel_requested" });
+    res.status(202).json({ ok: true, state: 'cancel_requested' });
   });
 }
