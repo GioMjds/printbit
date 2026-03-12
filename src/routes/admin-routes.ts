@@ -612,7 +612,7 @@ export function registerAdminRoutes(
           : true;
 
       entry.status = 'refunded';
-      entry.refundedAt = new Date().toISOString();
+      entry.closedAt = new Date().toISOString();
 
       if (restoreBalance) {
         db.data!.balance += entry.chargedAmount;
@@ -670,7 +670,7 @@ export function registerAdminRoutes(
       }
 
       entry.status = 'dismissed';
-      entry.refundedAt = new Date().toISOString();
+      entry.closedAt = new Date().toISOString();
       await db.write();
 
       await adminService.appendAdminLog(

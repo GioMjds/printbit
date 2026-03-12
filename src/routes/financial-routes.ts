@@ -14,6 +14,7 @@ import { printFile, type PrintJobOptions } from '../services/printer';
 import { monitorSpoolerJob } from '../services/print-spooler';
 import type { SessionStore } from '../services/session';
 import { randomUUID } from 'node:crypto';
+import { BLOCKED_STATUSES } from '@/utils';
 
 interface RegisterFinancialRoutesDeps {
   io: Server;
@@ -470,14 +471,6 @@ export function registerFinancialRoutes(
     let jobDispatchedAt: string | null = null;
 
     if (mode === 'print' && serverFilename && printOptions) {
-      const BLOCKED_STATUSES = new Set([
-        'Offline',
-        'Error',
-        'Paper Jam',
-        'Paper Out',
-        'Door Open',
-        'User Intervention Required',
-      ]);
       if (!telemetry.connected || BLOCKED_STATUSES.has(telemetry.status)) {
         void adminService.appendAdminLog(
           'print_preflight_failed',
@@ -613,6 +606,11 @@ export function registerFinancialRoutes(
           filename: serverFilename ?? filename ?? null,
           pageRange: printOptions?.pageRange ?? null,
         },
+      }).catch((err) => {
+        console.error(
+          '[SPOOLER-MONITOR] monitorSpoolerJob failed:',
+          err instanceof Error ? err.message : err,
+        );
       });
     }
   });

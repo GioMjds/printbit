@@ -16,6 +16,7 @@ import {
   settlementService,
   watchJobForMalfunction,
 } from '@/services';
+import { BLOCKED_STATUSES } from '@/utils';
 
 const VALID_COLOR_MODES = new Set(['colored', 'grayscale']);
 const VALID_ORIENTATIONS = new Set(['portrait', 'landscape']);
@@ -191,14 +192,6 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       try {
         // Preflight: verify printer is ready before dispatching the copy job
         const telemetry = getPrinterTelemetry();
-        const BLOCKED_STATUSES = new Set([
-          'Offline',
-          'Error',
-          'Paper Jam',
-          'Paper Out',
-          'Door Open',
-          'User Intervention Required',
-        ]);
         if (!telemetry.connected || BLOCKED_STATUSES.has(telemetry.status)) {
           void adminService.appendAdminLog(
             'copy_preflight_failed',

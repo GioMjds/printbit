@@ -12,10 +12,13 @@
  * Escapes backslashes, open/close parentheses, and strips non-Latin1 chars.
  */
 function pdfStr(text: string): string {
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
+  let latin1only = "";
+
+  for (const ch of text) {
+    if (ch.charCodeAt(0) <= 0xff) latin1only += ch;
+  }
+
+  return latin1only;
 }
 
 /**

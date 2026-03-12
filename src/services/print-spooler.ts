@@ -57,7 +57,7 @@ async function queryRecentPrintJobs(
   printerName: string,
 ): Promise<SpoolerJobRow[]> {
   try {
-    const escaped = printerName.replace(/'/g, "''");
+    const escaped = printerName.replace(/'/g, "''").replace(/`/g, '``');
     const script =
       `$cutoff = (Get-Date).AddMinutes(-${JOB_LOOKBACK_MINUTES}); ` +
       `Get-PrintJob -PrinterName '${escaped}' -ErrorAction SilentlyContinue ` +
@@ -83,6 +83,7 @@ async function queryRecentPrintJobs(
         pagesPrinted: Number(item.PagesPrinted ?? 0),
       }));
   } catch {
+    console.warn('[SPOOLER-MONITOR] Failed to query print jobs');
     return [];
   }
 }
@@ -168,7 +169,7 @@ export async function monitorSpoolerJob(
         chargedAmount,
         reason: `Print spooler reported failure: ${job.status}`,
         status: 'open' as const,
-        refundedAt: null as string | null,
+        closedAt: null as string | null,
         jobContext: {
           ...Object.fromEntries(
             Object.entries(jobContext).map(([k, v]) => [k, v ?? null]),

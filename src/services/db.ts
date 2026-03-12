@@ -157,7 +157,7 @@ export interface PendingRefundEntry {
   chargedAmount: number;
   reason: string;
   status: 'open' | 'refunded' | 'dismissed';
-  refundedAt: string | null;
+  closedAt: string | null;
   jobContext: Record<string, string | number | boolean | null>;
 }
 

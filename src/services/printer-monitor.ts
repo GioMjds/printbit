@@ -5,20 +5,9 @@ import {
   type PrinterTelemetry,
 } from './printer-status';
 import { adminService } from './admin';
+import { BLOCKED_STATUSES } from '@/utils';
 
 // ── Blocked printer statuses ─────────────────────────────────────────────────
-// Must stay in sync with the BLOCKED_STATUSES sets in financial-routes.ts and
-// copy-routes.ts so that the monitor fires on exactly the same conditions that
-// would block a new job from being dispatched.
-
-const BLOCKED_STATUSES = new Set([
-  'Offline',
-  'Error',
-  'Paper Jam',
-  'Paper Out',
-  'Door Open',
-  'User Intervention Required',
-]);
 
 export interface PrinterMalfunctionEvent {
   status: string;
@@ -353,21 +342,7 @@ export async function watchJobForMalfunction(
     await sleep(pollIntervalMs);
     if (Date.now() >= deadline) break;
 
-    let liveStatus: {
-      connected: boolean;
-      status: string;
-      statusFlags: string[];
-    };
-    try {
-      liveStatus = await queryLivePrinterStatus();
-    } catch (err) {
-      // Poll failure (e.g. PowerShell timeout) — log and keep watching.
-      console.warn(
-        '[PRINTER-MONITOR] Watchdog poll error:',
-        err instanceof Error ? err.message : err,
-      );
-      continue;
-    }
+    const liveStatus = await queryLivePrinterStatus();
 
     const { connected, status, statusFlags } = liveStatus;
 

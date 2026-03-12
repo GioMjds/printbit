@@ -172,10 +172,22 @@ function applySystem(summary: SummaryResponse): void {
           ? 'N/A'
           : ink.status;
 
-    bar.innerHTML =
-      `<span class="ink-item__name">${ink.name}</span>` +
-      `<div class="ink-bar"><div class="ink-bar__fill ${statusCls}" style="width:${pct}%"></div></div>` +
-      `<span class="ink-item__label ink-item__label--${ink.status}">${label}</span>`;
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'ink-item__name';
+    nameSpan.textContent = ink.name;
+
+    const barDiv = document.createElement('div');
+    barDiv.className = 'ink-bar';
+    const fillDiv = document.createElement('div');
+    fillDiv.className = `ink-bar__fill ${statusCls}`;
+    fillDiv.style.width = `${pct}%`;
+    barDiv.appendChild(fillDiv);
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = `ink-item__label ink-item__label--${ink.status}`;
+    labelSpan.textContent = label;
+
+    bar.append(nameSpan, barDiv, labelSpan);
 
     inkGrid.appendChild(bar);
   }

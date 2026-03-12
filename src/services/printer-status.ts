@@ -872,5 +872,16 @@ export async function refreshPrinterTelemetry(): Promise<PrinterTelemetry> {
     refreshing = false;
   }
 
+  for (const cb of refreshCallbacks) {
+    try {
+      cb(cached);
+    } catch (error) {
+      console.warn(
+        '[PRINTER-STATUS] refresh callback threw:',
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
   return cached;
 }
