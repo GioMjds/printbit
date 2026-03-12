@@ -2,8 +2,9 @@ import type { Express, Request, Response } from 'express';
 import { Server } from 'socket.io';
 import path from 'node:path';
 import fs from 'node:fs';
+import { settlementService } from '@/services';
 import { jobStore } from '../services/job-store';
-import { db, withBalanceLock } from '../services/db';
+import { db } from '../services/db';
 import { adminService } from '../services/admin';
 import {
   getAdapter,
@@ -236,6 +237,7 @@ export function registerScanRoutes(
       }
 
       const requiredAmount = adminService.getPricingSettings().scanDocument;
+
       if (requiredAmount <= 0 || isSoftCopyPaid(safeFilename)) {
         return res.json({
           ok: true,
@@ -247,74 +249,72 @@ export function registerScanRoutes(
         });
       }
 
-      const result = await withBalanceLock(async () => {
-        if (isSoftCopyPaid(safeFilename)) {
-          return {
-            ok: true,
-            charged: false,
-            alreadyPaid: true,
-            requiredAmount,
-            amount: 0,
-            balance: db.data!.balance,
-          };
-        }
-
-        if (db.data!.balance < requiredAmount) {
-          return {
-            ok: false,
-            error: `Insufficient balance. Please add P${requiredAmount.toFixed(2)} to access this scan.`,
-            requiredAmount,
-            balance: db.data!.balance,
-          };
-        }
-
-        db.data!.balance -= requiredAmount;
-        db.data!.earnings += requiredAmount;
-        await db.write();
-        markSoftCopyPaid(safeFilename);
-
-        return {
-          ok: true,
-          charged: true,
-          alreadyPaid: false,
-          requiredAmount,
-          amount: requiredAmount,
-          balance: db.data!.balance,
-        };
+      // Route through settlementService so change is dispensed on overpayment,
+      // the balance lock is held atomically, and earnings are recorded correctly.
+      const settlement = await settlementService.settle({
+        requiredAmount,
+        io: deps.io,
+        jobContext: { mode: 'scan', filename: safeFilename },
       });
 
-      if (!result.ok) {
+      if (!settlement.ok) {
         await adminService.appendAdminLog(
           'scan_soft_copy_charge_failed',
           'Failed to charge for soft copy access.',
           {
             filename: safeFilename,
             requiredAmount,
-            balance: result.balance,
+            balance: settlement.remainingBalance,
           },
         );
         return res.status(402).json({
-          error: result.error,
+          error: `Insufficient balance. Please add ₱${requiredAmount} to access this scan.`,
           requiredAmount,
-          balance: result.balance,
+          balance: settlement.remainingBalance,
         });
       }
 
-      if (result.charged) {
-        deps.io.emit('balance', result.balance);
+      markSoftCopyPaid(safeFilename);
+      deps.io.emit('balance', settlement.remainingBalance);
+
+      await adminService.appendAdminLog(
+        'scan_soft_copy_charged',
+        'Soft copy access charged.',
+        {
+          filename: safeFilename,
+          amount: settlement.chargedAmount,
+          requiredAmount,
+          balance: settlement.remainingBalance,
+          changeState: settlement.change.state,
+          changeRequested: settlement.change.requested,
+          changeDispensed: settlement.change.dispensed,
+        },
+      );
+
+      if (settlement.change.state === 'failed') {
         await adminService.appendAdminLog(
-          'scan_soft_copy_charged',
-          'Soft copy access charged.',
+          'hopper_dispense_failed',
+          'Coin change dispense failed after scan soft-copy charge.',
           {
             filename: safeFilename,
-            amount: result.amount,
-            requiredAmount: result.requiredAmount,
-            balance: result.balance,
+            requested: settlement.change.requested,
+            dispensed: settlement.change.dispensed,
+            attempts: settlement.change.attempts ?? 0,
+            owedChangeId: settlement.change.owedChangeId ?? null,
+            message: settlement.change.message ?? null,
           },
         );
       }
 
-      return res.json(result);
+      return res.json({
+        ok: true,
+        charged: true,
+        alreadyPaid: false,
+        requiredAmount,
+        amount: settlement.chargedAmount,
+        balance: settlement.remainingBalance,
+        change: settlement.change,
+      });
     },
   );
 
