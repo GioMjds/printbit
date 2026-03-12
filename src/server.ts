@@ -45,6 +45,7 @@ import {
   renderUploadPortal,
   resolvePublicBaseUrl,
   runHopperSelfTest,
+  startPrinterMonitor,
 } from '@/services';
 
 const app = express();
@@ -138,6 +139,7 @@ registerPageRoutes(app, {
 });
 registerStaticAssets(app);
 registerAdminRoutes(app, {
+  io,
   uploadDir: UPLOAD_DIR,
   getSerialStatus,
   getHopperStatus,
@@ -183,6 +185,8 @@ async function start() {
   startScanStorageCleanup();
   await initSerial(io);
   await runHopperSelfTest();
+
+  startPrinterMonitor(io);
 
   // Launch MyPublicWiFi hotspot on startup (idempotent — Print page can re-call safely)
   await startHotspot();

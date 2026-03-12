@@ -1,16 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Express, Request, Response } from 'express';
+import type { Server as SocketIOServer } from 'socket.io';
 import {
   requireAdminLocalAccess,
   requireAdminPin,
 } from '../middleware/admin-auth';
 import { adminService } from '../services/admin';
 import { db } from '../services/db';
-import { getPrinterTelemetry } from '../services/printer-status';
+import {
+  getPrinterTelemetry,
+  refreshPrinterTelemetry,
+} from '../services/printer-status';
+import { detectDefaultPrinter, printFile } from '../services/printer';
+import { generateTestPagePdf } from '../services/test-page';
 import { getScannerStatus } from '../services/scanner';
 
 interface RegisterAdminRoutesDeps {
+  io: SocketIOServer;
   uploadDir: string;
   getSerialStatus: () => {
     connected: boolean;
@@ -76,6 +83,9 @@ export function registerAdminRoutes(
         jobStats: db.data!.jobStats,
         hopperStats: db.data!.hopperStats,
         owedChangeOpenCount: db.data!.owedChanges.filter(
+          (entry) => entry.status === 'open',
+        ).length,
+        pendingRefundOpenCount: db.data!.pendingRefunds.filter(
           (entry) => entry.status === 'open',
         ).length,
         storage,
@@ -163,41 +173,33 @@ export function registerAdminRoutes(
         printPerPage !== undefined &&
         (!isFiniteNumber(printPerPage) || !isWholePeso(printPerPage))
       ) {
-        return res
-          .status(400)
-          .json({
-            error: 'printPerPage must be a whole peso value (no decimals).',
-          });
+        return res.status(400).json({
+          error: 'printPerPage must be a whole peso value (no decimals).',
+        });
       }
       if (
         copyPerPage !== undefined &&
         (!isFiniteNumber(copyPerPage) || !isWholePeso(copyPerPage))
       ) {
-        return res
-          .status(400)
-          .json({
-            error: 'copyPerPage must be a whole peso value (no decimals).',
-          });
+        return res.status(400).json({
+          error: 'copyPerPage must be a whole peso value (no decimals).',
+        });
       }
       if (
         scanDocument !== undefined &&
         (!isFiniteNumber(scanDocument) || !isWholePeso(scanDocument))
       ) {
-        return res
-          .status(400)
-          .json({
-            error: 'scanDocument must be a whole peso value (no decimals).',
-          });
+        return res.status(400).json({
+          error: 'scanDocument must be a whole peso value (no decimals).',
+        });
       }
       if (
         colorSurcharge !== undefined &&
         (!isFiniteNumber(colorSurcharge) || !isWholePeso(colorSurcharge))
       ) {
-        return res
-          .status(400)
-          .json({
-            error: 'colorSurcharge must be a whole peso value (no decimals).',
-          });
+        return res.status(400).json({
+          error: 'colorSurcharge must be a whole peso value (no decimals).',
+        });
       }
 
       if (
@@ -348,6 +350,130 @@ export function registerAdminRoutes(
     },
   );
 
+  // ── Admin printer re-detect ────────────────────────────────────────────────
+  //
+  // Re-runs detectDefaultPrinter() (logs new hardware info to console) then
+  // forces an immediate refresh of the telemetry cache and returns the result.
+  // Use this after a printer swap, driver re-registration, or USB reconnect
+  // so the admin panel reflects the new hardware without waiting for the next
+  // 30-second automatic poll cycle.
+
+  app.post(
+    '/api/admin/printer/re-detect',
+    requireAdminLocalAccess,
+    requireAdminPin,
+    async (_req: Request, res: Response) => {
+      // Re-run the startup printer detection so updated driver/port info is
+      // written to the server console (useful for operator diagnostics).
+      await detectDefaultPrinter();
+
+      // Force-refresh the telemetry cache and return the fresh snapshot.
+      const telemetry = await refreshPrinterTelemetry();
+
+      await adminService.appendAdminLog(
+        'admin_printer_redetected',
+        `Admin triggered printer re-detection. Result: "${telemetry.name ?? 'none'}" — ${telemetry.status}.`,
+        {
+          printerName: telemetry.name ?? null,
+          printerStatus: telemetry.status,
+          connected: telemetry.connected,
+          driverName: telemetry.driverName ?? null,
+          portName: telemetry.portName ?? null,
+          connectionType: telemetry.connectionType,
+        },
+      );
+
+      res.json({
+        ok: true,
+        printer: telemetry,
+      });
+    },
+  );
+
+  // ── Admin test-print ───────────────────────────────────────────────────────
+  //
+  // Generates a built-in test page PDF and sends it to the default Windows
+  // printer via SumatraPDF. No balance is checked or charged. Use this after
+  // a printer swap or driver re-registration to confirm the hardware is ready.
+
+  app.post(
+    '/api/admin/printer/test-print',
+    requireAdminLocalAccess,
+    requireAdminPin,
+    async (_req: Request, res: Response) => {
+      const telemetry = getPrinterTelemetry();
+
+      if (!telemetry.connected || !telemetry.name) {
+        await adminService.appendAdminLog(
+          'admin_test_print_failed',
+          'Admin test print skipped: no printer connected.',
+          { printerStatus: telemetry.status },
+        );
+        return res.status(503).json({
+          ok: false,
+          error: 'No printer is currently connected or detected.',
+          printerStatus: telemetry.status,
+        });
+      }
+
+      // Write a temp PDF into the uploads dir so printFile() can resolve it
+      const tmpFilename = `test-print-${Date.now()}.pdf`;
+      const tmpAbsPath = path.resolve(deps.uploadDir, tmpFilename);
+
+      try {
+        const pdfBuffer = generateTestPagePdf(new Date());
+        fs.writeFileSync(tmpAbsPath, pdfBuffer);
+
+        await printFile(tmpFilename, {
+          copies: 1,
+          colorMode: 'grayscale',
+          orientation: 'portrait',
+          paperSize: 'A4',
+        });
+
+        await adminService.appendAdminLog(
+          'admin_test_print',
+          `Admin triggered test print on "${telemetry.name}".`,
+          {
+            printerName: telemetry.name,
+            printerStatus: telemetry.status,
+            driverName: telemetry.driverName ?? null,
+            portName: telemetry.portName ?? null,
+          },
+        );
+
+        res.json({
+          ok: true,
+          printerName: telemetry.name,
+          printerStatus: telemetry.status,
+          message: `Test page sent to "${telemetry.name}". Check the printer output tray.`,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        await adminService.appendAdminLog(
+          'admin_test_print_failed',
+          `Admin test print failed on "${telemetry.name}".`,
+          {
+            printerName: telemetry.name,
+            error: message,
+          },
+        );
+        res.status(500).json({
+          ok: false,
+          error: message,
+          printerName: telemetry.name,
+        });
+      } finally {
+        // Always remove the temp file regardless of success/failure
+        try {
+          fs.unlinkSync(tmpAbsPath);
+        } catch {
+          /* ignore — file may not exist if writeFileSync itself failed */
+        }
+      }
+    },
+  );
+
   // ── Owed change management ─────────────────────────────────────────────────
 
   app.get(
@@ -417,6 +543,150 @@ export function registerAdminRoutes(
       }
 
       res.json({ ok: true, resolvedCount: count });
+    },
+  );
+
+  // ── Pending refund management ──────────────────────────────────────────────
+  //
+  // Pending refunds are created automatically when the Windows print spooler
+  // reports a job failure AFTER the user's balance has already been settled.
+  // The admin can either:
+  //   - Restore the amount to the current machine balance (user still present)
+  //   - Dismiss the entry (no action — e.g. partial print was acceptable)
+
+  app.get(
+    '/api/admin/pending-refunds',
+    requireAdminLocalAccess,
+    requireAdminPin,
+    (req: Request, res: Response) => {
+      const entries = db.data!.pendingRefunds ?? [];
+      const statusFilter = req.query.status as string | undefined;
+
+      const filtered =
+        statusFilter === 'open' ||
+        statusFilter === 'refunded' ||
+        statusFilter === 'dismissed'
+          ? entries.filter((e) => e.status === statusFilter)
+          : entries;
+
+      const open = entries.filter((e) => e.status === 'open');
+      const refunded = entries.filter((e) => e.status === 'refunded');
+      const dismissed = entries.filter((e) => e.status === 'dismissed');
+
+      res.json({
+        total: entries.length,
+        openCount: open.length,
+        refundedCount: refunded.length,
+        dismissedCount: dismissed.length,
+        entries: filtered,
+      });
+    },
+  );
+
+  /**
+   * POST /api/admin/pending-refunds/:id/refund
+   *
+   * Marks the entry as refunded and optionally restores the charged amount
+   * to the machine balance so the user (if still present) can retry.
+   *
+   * Body: { restoreBalance?: boolean }  — defaults to true
+   */
+  app.post(
+    '/api/admin/pending-refunds/:id/refund',
+    requireAdminLocalAccess,
+    requireAdminPin,
+    async (req: Request, res: Response) => {
+      const entryId = req.params.id as string;
+      const entry = db.data!.pendingRefunds.find((e) => e.id === entryId);
+
+      if (!entry) {
+        return res.status(404).json({ error: 'Pending refund not found.' });
+      }
+      if (entry.status !== 'open') {
+        return res
+          .status(409)
+          .json({ error: `Entry is already ${entry.status}.` });
+      }
+
+      const restoreBalance =
+        typeof req.body?.restoreBalance === 'boolean'
+          ? req.body.restoreBalance
+          : true;
+
+      entry.status = 'refunded';
+      entry.closedAt = new Date().toISOString();
+
+      if (restoreBalance) {
+        db.data!.balance += entry.chargedAmount;
+        // Subtract from earnings so the books stay balanced
+        db.data!.earnings = Math.max(
+          0,
+          db.data!.earnings - entry.chargedAmount,
+        );
+      }
+
+      await db.write();
+      deps.io.emit('balance', db.data!.balance);
+
+      await adminService.appendAdminLog(
+        'pending_refund_processed',
+        `Pending refund ₱${entry.chargedAmount} processed by admin.`,
+        {
+          refundId: entry.id,
+          chargedAmount: entry.chargedAmount,
+          restoreBalance,
+          newBalance: db.data!.balance,
+          reason: entry.reason,
+        },
+      );
+
+      res.json({
+        ok: true,
+        entry,
+        balance: db.data!.balance,
+        restoreBalance,
+      });
+    },
+  );
+
+  /**
+   * POST /api/admin/pending-refunds/:id/dismiss
+   *
+   * Closes the entry without restoring balance (e.g. the partial printout
+   * was acceptable or the user has already left).
+   */
+  app.post(
+    '/api/admin/pending-refunds/:id/dismiss',
+    requireAdminLocalAccess,
+    requireAdminPin,
+    async (req: Request, res: Response) => {
+      const entryId = req.params.id as string;
+      const entry = db.data!.pendingRefunds.find((e) => e.id === entryId);
+
+      if (!entry) {
+        return res.status(404).json({ error: 'Pending refund not found.' });
+      }
+      if (entry.status !== 'open') {
+        return res
+          .status(409)
+          .json({ error: `Entry is already ${entry.status}.` });
+      }
+
+      entry.status = 'dismissed';
+      entry.closedAt = new Date().toISOString();
+      await db.write();
+
+      await adminService.appendAdminLog(
+        'pending_refund_dismissed',
+        `Pending refund ₱${entry.chargedAmount} dismissed by admin (no balance restored).`,
+        {
+          refundId: entry.id,
+          chargedAmount: entry.chargedAmount,
+          reason: entry.reason,
+        },
+      );
+
+      res.json({ ok: true, entry });
     },
   );
 }

@@ -11,7 +11,12 @@ import {
 import { adminService } from '../services/admin';
 import path from 'node:path';
 import fs from 'node:fs';
-import { getPrinterTelemetry, settlementService } from '@/services';
+import {
+  getPrinterTelemetry,
+  settlementService,
+  watchJobForMalfunction,
+} from '@/services';
+import { BLOCKED_STATUSES } from '@/utils';
 
 const VALID_COLOR_MODES = new Set(['colored', 'grayscale']);
 const VALID_ORIENTATIONS = new Set(['portrait', 'landscape']);
@@ -187,14 +192,6 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       try {
         // Preflight: verify printer is ready before dispatching the copy job
         const telemetry = getPrinterTelemetry();
-        const BLOCKED_STATUSES = new Set([
-          'Offline',
-          'Error',
-          'Paper Jam',
-          'Paper Out',
-          'Door Open',
-          'User Intervention Required',
-        ]);
         if (!telemetry.connected || BLOCKED_STATUSES.has(telemetry.status)) {
           void adminService.appendAdminLog(
             'copy_preflight_failed',
@@ -224,6 +221,39 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
         };
         const relPath = path.join('scans', previewFilename);
         await printFile(relPath, printOptions);
+
+        // Start mid-job watchdog. Polls printer status every 3 s for 30 s
+        // post-dispatch and emits printerMalfunction if the printer faults.
+        // Fire-and-forget — does not block settlement.
+        void watchJobForMalfunction(deps.io, {
+          jobId: job.id,
+          onFailure: (failedJobId, fault) => {
+            const activeJob = jobStore.getJob(failedJobId);
+            if (!activeJob || activeJob.state !== 'running') {
+              return;
+            }
+
+            jobStore.updateJobState(failedJobId, 'failed', {
+              failure: {
+                code: 'PRINTER_MALFUNCTION',
+                message: `Printer fault detected during copy job: ${fault.reason}`,
+                retryable: true,
+                stage: 'running',
+              },
+            });
+
+            void adminService.appendAdminLog(
+              'copy_job_failed_printer_malfunction',
+              'Copy job marked failed due to mid-job printer malfunction.',
+              {
+                jobId: failedJobId,
+                reason: fault.reason,
+                severity: fault.severity,
+                timestamp: fault.timestamp,
+              },
+            );
+          },
+        });
 
         const settlement = await settlementService.settle({
           requiredAmount,
