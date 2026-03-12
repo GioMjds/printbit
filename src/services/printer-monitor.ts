@@ -51,6 +51,19 @@ export type WatchResult =
       fault: PrinterFault;
     };
 
+async function appendAdminLogBestEffort(
+  ...args: Parameters<typeof adminService.appendAdminLog>
+): Promise<void> {
+  try {
+    await adminService.appendAdminLog(...args);
+  } catch (err) {
+    console.error(
+      '[PRINTER-MONITOR] Failed to append admin log:',
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 class PrinterMonitorService {
@@ -106,7 +119,11 @@ class PrinterMonitorService {
     if (wasConnected && !currentConnected) {
       void this.onDisconnected(this.previousStatus, now);
     } else if (!wasConnected && currentConnected) {
-      void this.onReconnected(telemetry, now);
+      if (isNowBlocked) {
+        void this.onMalfunctionDetected(telemetry, now);
+      } else {
+        void this.onReconnected(telemetry, now);
+      }
     }
 
     // ── Status transitions (only while connected) ──────────────────────────
@@ -136,7 +153,7 @@ class PrinterMonitorService {
       `[PRINTER-MONITOR] ⚠ Printer already faulted at startup: ${telemetry.status}`,
     );
 
-    await adminService.appendAdminLog(
+    await appendAdminLogBestEffort(
       'printer_malfunction_at_startup',
       `Printer is already in a faulted state on startup: ${telemetry.status}.`,
       {
@@ -154,7 +171,7 @@ class PrinterMonitorService {
   private async onStartupDisconnected(timestamp: string): Promise<void> {
     console.warn('[PRINTER-MONITOR] ⚠ No printer detected at startup.');
 
-    await adminService.appendAdminLog(
+    await appendAdminLogBestEffort(
       'printer_not_detected_at_startup',
       'No default printer was detected when the server started.',
       {},
@@ -186,7 +203,7 @@ class PrinterMonitorService {
       `[PRINTER-MONITOR] 🚨 Printer malfunction detected: ${this.previousStatus} → ${telemetry.status}`,
     );
 
-    await adminService.appendAdminLog(
+    await appendAdminLogBestEffort(
       'printer_malfunction_detected',
       `Printer transitioned into a faulted state: ${telemetry.status}.`,
       {
@@ -210,7 +227,7 @@ class PrinterMonitorService {
       `[PRINTER-MONITOR] ✓ Printer recovered: ${this.previousStatus} → ${telemetry.status}`,
     );
 
-    await adminService.appendAdminLog(
+    await appendAdminLogBestEffort(
       'printer_recovered',
       `Printer recovered from faulted state. Now: ${telemetry.status}.`,
       {
@@ -230,7 +247,7 @@ class PrinterMonitorService {
   ): Promise<void> {
     console.warn('[PRINTER-MONITOR] ✗ Printer disconnected.');
 
-    await adminService.appendAdminLog(
+    await appendAdminLogBestEffort(
       'printer_disconnected',
       'Printer connection was lost.',
       { lastStatus },
@@ -370,9 +387,6 @@ export async function watchJobForMalfunction(
   console.log('[PRINTER-MONITOR] 👁 Mid-job watchdog started.');
 
   while (Date.now() < deadline) {
-    await sleep(pollIntervalMs);
-    if (Date.now() >= deadline) break;
-
     const liveStatus = await queryLivePrinterStatus();
 
     const { connected, status, statusFlags } = liveStatus;
@@ -388,7 +402,7 @@ export async function watchJobForMalfunction(
         `[PRINTER-MONITOR] 🚨 Mid-job fault detected by watchdog: ${status}`,
       );
 
-      await adminService.appendAdminLog(
+      await appendAdminLogBestEffort(
         'printer_midjob_malfunction',
         `Printer fault detected during active job: ${status}.`,
         { status, statusFlags: statusFlags.join(', '), connected },
@@ -415,6 +429,10 @@ export async function watchJobForMalfunction(
         fault,
       };
     }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
+    await sleep(Math.min(pollIntervalMs, remainingMs));
   }
 
   console.log(
