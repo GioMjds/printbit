@@ -11,6 +11,7 @@ import { getPrinterTelemetry } from '@/services';
 import { adminService } from '../services/admin';
 import { settlementService } from '../services/settlement';
 import { printFile, type PrintJobOptions } from '../services/printer';
+import { monitorSpoolerJob } from '../services/print-spooler';
 import type { SessionStore } from '../services/session';
 import { randomUUID } from 'node:crypto';
 
@@ -256,8 +257,6 @@ export function registerFinancialRoutes(
 
   app.post('/api/confirm-payment', async (req: Request, res: Response) => {
     // ── Idempotency guard ──────────────────────────────────────────────
-    // The slot is claimed synchronously BEFORE any side effects so that two
-    // concurrent requests with the same key cannot both proceed.
     const idempotencyKey = req.get('Idempotency-Key') ?? '';
     let idempotencyClaimed = false;
     if (idempotencyKey) {
@@ -283,7 +282,6 @@ export function registerFinancialRoutes(
       idempotencyClaimed = true;
     }
 
-    // Unique ID linking every log entry for this payment cycle together
     const transactionId = randomUUID();
 
     const sendResponse = (status: number, body: unknown): void => {
@@ -468,8 +466,10 @@ export function registerFinancialRoutes(
     }
 
     // ── Printer preflight ────────────────────────────────────────────────────
+    const telemetry = getPrinterTelemetry();
+    let jobDispatchedAt: string | null = null;
+
     if (mode === 'print' && serverFilename && printOptions) {
-      const telemetry = getPrinterTelemetry();
       const BLOCKED_STATUSES = new Set([
         'Offline',
         'Error',
@@ -498,6 +498,7 @@ export function registerFinancialRoutes(
       }
 
       try {
+        jobDispatchedAt = new Date().toISOString();
         await printFile(serverFilename, printOptions);
       } catch (err) {
         void adminService.appendAdminLog(
@@ -592,5 +593,27 @@ export function registerFinancialRoutes(
       earnings: settlement.earnings,
       change: settlement.change,
     });
+
+    // ── Fire-and-forget: monitor the Windows print spooler for post-settlement failures ──
+    // Settlement has already completed and the response is sent. This runs in the
+    // background — if the spooler reports the job as failed (Paper Jam, Offline, etc.)
+    // a PendingRefundEntry is created so the admin can restore the user's balance.
+    if (mode === 'print' && jobDispatchedAt && telemetry.name) {
+      void monitorSpoolerJob({
+        printerName: telemetry.name,
+        chargedAmount: settlement.chargedAmount,
+        jobDispatchedAt,
+        io: deps.io,
+        jobContext: {
+          transactionId,
+          mode,
+          copies,
+          colorMode,
+          sessionId: sessionId ?? null,
+          filename: serverFilename ?? filename ?? null,
+          pageRange: printOptions?.pageRange ?? null,
+        },
+      });
+    }
   });
 }

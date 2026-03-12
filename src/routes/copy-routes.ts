@@ -11,7 +11,11 @@ import {
 import { adminService } from '../services/admin';
 import path from 'node:path';
 import fs from 'node:fs';
-import { getPrinterTelemetry, settlementService } from '@/services';
+import {
+  getPrinterTelemetry,
+  settlementService,
+  watchJobForMalfunction,
+} from '@/services';
 
 const VALID_COLOR_MODES = new Set(['colored', 'grayscale']);
 const VALID_ORIENTATIONS = new Set(['portrait', 'landscape']);
@@ -224,6 +228,11 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
         };
         const relPath = path.join('scans', previewFilename);
         await printFile(relPath, printOptions);
+
+        // Start mid-job watchdog. Polls printer status every 3 s for 30 s
+        // post-dispatch and emits printerMalfunction if the printer faults.
+        // Fire-and-forget — does not block settlement.
+        void watchJobForMalfunction(deps.io);
 
         const settlement = await settlementService.settle({
           requiredAmount,

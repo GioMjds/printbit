@@ -257,6 +257,9 @@
         <header class="topbar">
           <div class="topbar__left">
             <h2 class="topbar__title">System</h2>
+            <span class="live-pill" aria-label="Live updates active">
+              <span class="live-pill__dot"></span>Live
+            </span>
           </div>
           <div class="topbar__right">
             <p
@@ -290,7 +293,42 @@
 
         <div class="content">
           <section class="page">
+            <!-- ── Spooler failure alert (hidden until socket event fires) ── -->
+            <div
+              id="spoolerAlert"
+              class="alert-banner hidden"
+              role="alert"
+              aria-live="assertive"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <div class="alert-banner__body">
+                <span class="alert-banner__title">Print Job Failed</span>
+                <span id="spoolerAlertMsg" class="alert-banner__msg"></span>
+              </div>
+              <button
+                id="spoolerAlertDismiss"
+                class="alert-banner__dismiss"
+                aria-label="Dismiss alert"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path
+                    fill-rule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <!-- ── System status grid ────────────────────────────────────── -->
             <div class="sys-grid">
+              <!-- Server -->
               <div class="sys-card">
                 <div
                   class="sys-card__icon sys-card__icon--server"
@@ -312,6 +350,8 @@
                   <span class="sys-card__dot" aria-hidden="true"></span>
                 </div>
               </div>
+
+              <!-- Host IP -->
               <div class="sys-card">
                 <div
                   class="sys-card__icon sys-card__icon--host"
@@ -334,6 +374,8 @@
                   >
                 </div>
               </div>
+
+              <!-- Wi-Fi -->
               <div class="sys-card">
                 <div
                   class="sys-card__icon sys-card__icon--wifi"
@@ -355,6 +397,8 @@
                   <span class="sys-card__dot" aria-hidden="true"></span>
                 </div>
               </div>
+
+              <!-- Arduino / Serial -->
               <div class="sys-card">
                 <div
                   class="sys-card__icon sys-card__icon--serial"
@@ -382,6 +426,8 @@
                   <span class="sys-card__dot" aria-hidden="true"></span>
                 </div>
               </div>
+
+              <!-- Coin Hopper -->
               <div class="sys-card">
                 <div
                   class="sys-card__icon sys-card__icon--serial"
@@ -409,38 +455,187 @@
                   <span class="sys-card__dot" aria-hidden="true"></span>
                 </div>
               </div>
-              <div class="sys-card">
-                <div
-                  class="sys-card__icon sys-card__icon--printer"
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 20 20" fill="currentColor">
-                    <path
-                      fill-rule="evenodd"
-                      d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div class="sys-card__info">
-                  <span class="sys-card__name">Printer</span>
-                  <span class="sys-card__val" id="printerStatus">—</span>
-                  <span
-                    class="sys-card__sub sys-card__val--mono"
-                    id="printerName"
-                    >—</span
+
+              <!-- ── Printer — enhanced full-width card ───────────────────── -->
+              <div class="sys-card sys-card--printer-full" id="printerCard">
+                <div class="sys-card__printer-left">
+                  <div
+                    class="sys-card__icon sys-card__icon--printer"
+                    id="printerIconWrap"
+                    aria-hidden="true"
                   >
+                    <svg viewBox="0 0 20 20" fill="currentColor">
+                      <path
+                        fill-rule="evenodd"
+                        d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div class="sys-card__info">
+                    <span class="sys-card__name">Printer</span>
+                    <span class="sys-card__val" id="printerStatus">—</span>
+                    <span
+                      class="sys-card__sub sys-card__val--mono"
+                      id="printerName"
+                      >—</span
+                    >
+                    <span class="sys-card__sub" id="printerUpdatedAt"></span>
+                  </div>
                 </div>
+
+                <dl class="printer-detail-grid">
+                  <div class="printer-detail-row">
+                    <dt class="printer-detail-row__key">Driver</dt>
+                    <dd
+                      class="printer-detail-row__val printer-detail-row__val--mono"
+                      id="printerDriver"
+                    >
+                      —
+                    </dd>
+                  </div>
+                  <div class="printer-detail-row">
+                    <dt class="printer-detail-row__key">Port</dt>
+                    <dd
+                      class="printer-detail-row__val printer-detail-row__val--mono"
+                      id="printerPort"
+                    >
+                      —
+                    </dd>
+                  </div>
+                  <div class="printer-detail-row">
+                    <dt class="printer-detail-row__key">Connection</dt>
+                    <dd
+                      class="printer-detail-row__val"
+                      id="printerConnectionType"
+                    >
+                      —
+                    </dd>
+                  </div>
+                </dl>
+
                 <div class="sys-card__indicator" id="printerBadge" data-ok="">
                   <span class="sys-card__dot" aria-hidden="true"></span>
                 </div>
               </div>
             </div>
 
+            <!-- ── Ink / Toner Levels (unchanged) ─────────────────────────── -->
             <div class="ink-section">
               <h3 class="ink-section__title">Ink / Toner Levels</h3>
               <div id="inkGrid" class="ink-grid">
                 <div class="ink-empty">Loading…</div>
+              </div>
+            </div>
+
+            <!-- ── Printer Controls + SOP ─────────────────────────────────── -->
+            <div class="printer-actions-row">
+              <!-- Controls -->
+              <div class="printer-actions-panel">
+                <div class="printer-actions-panel__head">
+                  <h3 class="printer-actions-panel__title">Printer Controls</h3>
+                </div>
+                <div class="printer-actions-panel__body">
+                  <button id="reDetectBtn" class="ctrl-btn ctrl-btn--amber">
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                    <span>
+                      Re-detect Printer
+                      <span class="ctrl-btn__sub"
+                        >Rescans Windows default printer</span
+                      >
+                    </span>
+                  </button>
+                  <button id="testPrintBtn" class="ctrl-btn ctrl-btn--green">
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                    <span>
+                      Send Test Page
+                      <span class="ctrl-btn__sub"
+                        >Prints a diagnostic A4 page</span
+                      >
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Replacement SOP -->
+              <div class="printer-actions-panel">
+                <div class="printer-actions-panel__head">
+                  <h3 class="printer-actions-panel__title">
+                    Printer Replacement SOP
+                  </h3>
+                </div>
+                <div class="printer-actions-panel__body">
+                  <ol class="sop-list">
+                    <li class="sop-list__item">
+                      <span class="sop-list__num">1</span>
+                      <div>
+                        <span class="sop-list__step"
+                          >Swap hardware &amp; install driver</span
+                        >
+                        <span class="sop-list__note"
+                          >Use Windows Device Manager or the manufacturer
+                          installer</span
+                        >
+                      </div>
+                    </li>
+                    <li class="sop-list__item">
+                      <span class="sop-list__num">2</span>
+                      <div>
+                        <span class="sop-list__step"
+                          >Set as Windows default printer</span
+                        >
+                        <span class="sop-list__note"
+                          >Settings → Bluetooth &amp; devices → Printers &amp;
+                          scanners</span
+                        >
+                      </div>
+                    </li>
+                    <li class="sop-list__item">
+                      <span class="sop-list__num">3</span>
+                      <div>
+                        <span class="sop-list__step"
+                          >Click <strong>Re-detect Printer</strong></span
+                        >
+                        <span class="sop-list__note"
+                          >Confirms the server sees the new printer name and
+                          driver</span
+                        >
+                      </div>
+                    </li>
+                    <li class="sop-list__item">
+                      <span class="sop-list__num">4</span>
+                      <div>
+                        <span class="sop-list__step"
+                          >Click <strong>Send Test Page</strong></span
+                        >
+                        <span class="sop-list__note"
+                          >Verifies end-to-end print path before going
+                          live</span
+                        >
+                      </div>
+                    </li>
+                  </ol>
+                </div>
               </div>
             </div>
           </section>
@@ -527,6 +722,8 @@
         <span>Reports</span>
       </a>
     </nav>
+
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/admin/system/app.js"></script>
   </body>
 </html>

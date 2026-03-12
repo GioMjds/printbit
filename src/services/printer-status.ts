@@ -1,4 +1,4 @@
-import { runPowerShell } from "@/utils";
+import { runPowerShell } from '@/utils';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -7,7 +7,7 @@ export interface InkLevel {
   /** 0–100 when readable, null when driver does not expose levels */
   level: number | null;
   /** "ok" | "low" | "empty" | "unknown" */
-  status: "ok" | "low" | "empty" | "unknown";
+  status: 'ok' | 'low' | 'empty' | 'unknown';
   /** Optional color hint for UI rendering, e.g. "cyan", "black" */
   colorHint?: string;
 }
@@ -18,7 +18,7 @@ export interface PrinterTelemetry {
   driverName: string | null;
   portName: string | null;
   /** Connection type derived from port name */
-  connectionType: "usb" | "network" | "wsd" | "virtual" | "unknown";
+  connectionType: 'usb' | 'network' | 'wsd' | 'virtual' | 'unknown';
   /** Human-readable printer status: "Idle", "Printing", "Error", "Offline", etc. */
   status: string;
   /** Active status flags parsed from the PrinterState bitmask */
@@ -26,11 +26,11 @@ export interface PrinterTelemetry {
   ink: InkLevel[];
   /** Which detection method successfully returned ink data */
   inkDetectionMethod:
-    | "snmp"
-    | "vendor-wmi"
-    | "printer-property"
-    | "error-state"
-    | "none";
+    | 'snmp'
+    | 'vendor-wmi'
+    | 'printer-property'
+    | 'error-state'
+    | 'none';
   lastCheckedAt: string;
   lastError: string | null;
 }
@@ -39,31 +39,31 @@ export interface PrinterTelemetry {
 // Ref: https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/win32-printer
 
 const PRINTER_STATE_FLAGS: Record<number, string> = {
-  0x00000001: "Paused",
-  0x00000002: "Error",
-  0x00000004: "Deleting",
-  0x00000008: "Paper Jam",
-  0x00000010: "Paper Out",
-  0x00000020: "Manual Feed Required",
-  0x00000040: "Paper Problem",
-  0x00000080: "Offline",
-  0x00000200: "IO Active",
-  0x00000400: "Busy",
-  0x00000800: "Printing",
-  0x00001000: "Output Bin Full",
-  0x00002000: "Not Available",
-  0x00004000: "Waiting",
-  0x00008000: "Processing",
-  0x00010000: "Initializing",
-  0x00020000: "Warming Up",
-  0x00040000: "Toner Low",
-  0x00080000: "No Toner",
-  0x00100000: "Page Punt",
-  0x00200000: "User Intervention Required",
-  0x00400000: "Out of Memory",
-  0x00800000: "Door Open",
-  0x02000000: "Server Unknown",
-  0x04000000: "Power Save",
+  0x00000001: 'Paused',
+  0x00000002: 'Error',
+  0x00000004: 'Deleting',
+  0x00000008: 'Paper Jam',
+  0x00000010: 'Paper Out',
+  0x00000020: 'Manual Feed Required',
+  0x00000040: 'Paper Problem',
+  0x00000080: 'Offline',
+  0x00000200: 'IO Active',
+  0x00000400: 'Busy',
+  0x00000800: 'Printing',
+  0x00001000: 'Output Bin Full',
+  0x00002000: 'Not Available',
+  0x00004000: 'Waiting',
+  0x00008000: 'Processing',
+  0x00010000: 'Initializing',
+  0x00020000: 'Warming Up',
+  0x00040000: 'Toner Low',
+  0x00080000: 'No Toner',
+  0x00100000: 'Page Punt',
+  0x00200000: 'User Intervention Required',
+  0x00400000: 'Out of Memory',
+  0x00800000: 'Door Open',
+  0x02000000: 'Server Unknown',
+  0x04000000: 'Power Save',
 };
 
 function parsePrinterStateFlags(state: number | undefined | null): string[] {
@@ -77,49 +77,49 @@ function humanStatusFromFlags(
   flags: string[],
   printerStatusCode: number,
 ): string {
-  if (flags.includes("Offline")) return "Offline";
-  if (flags.includes("Error")) return "Error";
-  if (flags.includes("Paper Jam")) return "Paper Jam";
-  if (flags.includes("Paper Out")) return "Paper Out";
-  if (flags.includes("Door Open")) return "Door Open";
-  if (flags.includes("User Intervention Required"))
-    return "User Intervention Required";
-  if (flags.includes("Printing")) return "Printing";
-  if (flags.includes("Warming Up")) return "Warming Up";
-  if (flags.includes("Paused")) return "Paused";
-  if (flags.length === 0 || printerStatusCode === 3) return "Idle";
-  return flags[0] ?? "Unknown";
+  if (flags.includes('Offline')) return 'Offline';
+  if (flags.includes('Error')) return 'Error';
+  if (flags.includes('Paper Jam')) return 'Paper Jam';
+  if (flags.includes('Paper Out')) return 'Paper Out';
+  if (flags.includes('Door Open')) return 'Door Open';
+  if (flags.includes('User Intervention Required'))
+    return 'User Intervention Required';
+  if (flags.includes('Printing')) return 'Printing';
+  if (flags.includes('Warming Up')) return 'Warming Up';
+  if (flags.includes('Paused')) return 'Paused';
+  if (flags.length === 0 || printerStatusCode === 3) return 'Idle';
+  return flags[0] ?? 'Unknown';
 }
 
 // ── Port → connection type ───────────────────────────────────────
 
 function detectConnectionType(
   portName: string | null,
-): PrinterTelemetry["connectionType"] {
-  if (!portName) return "unknown";
+): PrinterTelemetry['connectionType'] {
+  if (!portName) return 'unknown';
   const p = portName.toUpperCase();
-  if (p.startsWith("USB") || p.includes("USBPRINT")) return "usb";
-  if (p.startsWith("WSD-") || p.startsWith("WSD:")) return "wsd";
+  if (p.startsWith('USB') || p.includes('USBPRINT')) return 'usb';
+  if (p.startsWith('WSD-') || p.startsWith('WSD:')) return 'wsd';
   if (
-    p.startsWith("IP_") ||
-    p.startsWith("TCPIP") ||
-    p.startsWith("10.") ||
-    p.startsWith("192.") ||
-    p.startsWith("172.") ||
+    p.startsWith('IP_') ||
+    p.startsWith('TCPIP') ||
+    p.startsWith('10.') ||
+    p.startsWith('192.') ||
+    p.startsWith('172.') ||
     p.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)
   )
-    return "network";
+    return 'network';
   if (
-    p.includes("NUL") ||
-    p.includes("FILE:") ||
-    p.includes("PDF") ||
-    p.includes("XPS") ||
-    p.includes("ONENOTE") ||
-    p.includes("SEND") ||
-    p.includes("FAX")
+    p.includes('NUL') ||
+    p.includes('FILE:') ||
+    p.includes('PDF') ||
+    p.includes('XPS') ||
+    p.includes('ONENOTE') ||
+    p.includes('SEND') ||
+    p.includes('FAX')
   )
-    return "virtual";
-  return "unknown";
+    return 'virtual';
+  return 'unknown';
 }
 
 /**
@@ -142,12 +142,12 @@ function extractIpFromPortName(portName: string | null): string | null {
 // ── Color hints for common supply names ─────────────────────────
 
 const COLOR_HINT_MAP: [RegExp, string][] = [
-  [/black|bk|k\b|pgbk/i, "black"],
-  [/cyan|c\b/i, "cyan"],
-  [/magenta|m\b/i, "magenta"],
-  [/yellow|y\b/i, "yellow"],
-  [/photo|gray|grey/i, "gray"],
-  [/toner/i, "black"],
+  [/black|bk|k\b|pgbk/i, 'black'],
+  [/cyan|c\b/i, 'cyan'],
+  [/magenta|m\b/i, 'magenta'],
+  [/yellow|y\b/i, 'yellow'],
+  [/photo|gray|grey/i, 'gray'],
+  [/toner/i, 'black'],
 ];
 
 function colorHintFromName(name: string): string | undefined {
@@ -157,17 +157,36 @@ function colorHintFromName(name: string): string | undefined {
   return undefined;
 }
 
+// ── Refresh-callback registry ────────────────────────────────────
+//
+// printer-monitor.ts (and any other subscriber) can register a callback here
+// instead of running a second independent timer. Callbacks are invoked
+// synchronously inside the refresh() try/catch so errors are isolated per
+// subscriber via a try/catch wrapper.
+
+type RefreshCallback = (telemetry: PrinterTelemetry) => void;
+const refreshCallbacks: RefreshCallback[] = [];
+
+/**
+ * Register a function to be called after every telemetry refresh cycle.
+ * The callback receives the latest PrinterTelemetry snapshot.
+ * Call this once during application startup (before the first interval fires).
+ */
+export function onPrinterRefresh(cb: RefreshCallback): void {
+  refreshCallbacks.push(cb);
+}
+
 const REFRESH_INTERVAL_MS = 30_000;
 let cached: PrinterTelemetry = {
   connected: false,
   name: null,
   driverName: null,
   portName: null,
-  connectionType: "unknown",
-  status: "Checking…",
+  connectionType: 'unknown',
+  status: 'Checking…',
   statusFlags: [],
   ink: [],
-  inkDetectionMethod: "none",
+  inkDetectionMethod: 'none',
   lastCheckedAt: new Date().toISOString(),
   lastError: null,
 };
@@ -184,16 +203,30 @@ async function refresh(): Promise<void> {
       name: null,
       driverName: null,
       portName: null,
-      connectionType: "unknown",
-      status: "Error",
+      connectionType: 'unknown',
+      status: 'Error',
       statusFlags: [],
       ink: [],
-      inkDetectionMethod: "none",
+      inkDetectionMethod: 'none',
       lastCheckedAt: new Date().toISOString(),
       lastError: err instanceof Error ? err.message : String(err),
     };
   } finally {
     refreshing = false;
+  }
+
+  // Notify all registered subscribers with the latest snapshot.
+  // Each callback is wrapped individually so one failing subscriber cannot
+  // prevent the others from receiving the update.
+  for (const cb of refreshCallbacks) {
+    try {
+      cb(cached);
+    } catch (err) {
+      console.warn(
+        '[PRINTER-STATUS] refresh callback threw:',
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
 }
 
@@ -203,6 +236,48 @@ setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
 /** Returns the latest cached printer telemetry (never blocks). */
 export function getPrinterTelemetry(): PrinterTelemetry {
   return cached;
+}
+
+/**
+ * Performs a fast, ink-free status query directly against Win32_Printer.
+ * Completes in < 1 s on most systems — intentionally skips all ink-detection
+ * strategies so the mid-job watchdog can poll tightly without blocking.
+ *
+ * Unlike getPrinterTelemetry() this always issues a live PowerShell call
+ * instead of returning the 30 s cached value.
+ */
+export async function queryLivePrinterStatus(): Promise<{
+  connected: boolean;
+  status: string;
+  statusFlags: string[];
+}> {
+  try {
+    const json = await runPowerShell(
+      `Get-CimInstance -ClassName Win32_Printer ` +
+        `| Where-Object {$_.Default -eq $true} ` +
+        `| Select-Object PrinterStatus, PrinterState ` +
+        `| ConvertTo-Json -Depth 2`,
+      5_000,
+    );
+
+    if (!json) {
+      return {
+        connected: false,
+        status: 'No default printer',
+        statusFlags: [],
+      };
+    }
+
+    const raw = JSON.parse(json) as {
+      PrinterStatus: number;
+      PrinterState: number;
+    };
+    const statusFlags = parsePrinterStateFlags(raw.PrinterState);
+    const status = humanStatusFromFlags(statusFlags, raw.PrinterStatus);
+    return { connected: true, status, statusFlags };
+  } catch {
+    return { connected: false, status: 'Error', statusFlags: [] };
+  }
 }
 
 // ── Main telemetry query ─────────────────────────────────────────
@@ -240,11 +315,11 @@ async function queryPrinterTelemetry(): Promise<PrinterTelemetry> {
       name: null,
       driverName: null,
       portName: null,
-      connectionType: "unknown",
-      status: "Error",
+      connectionType: 'unknown',
+      status: 'Error',
       statusFlags: [],
       ink: [],
-      inkDetectionMethod: "none",
+      inkDetectionMethod: 'none',
       lastCheckedAt,
       lastError: msg,
     };
@@ -287,11 +362,11 @@ function noDefaultPrinter(lastCheckedAt: string): PrinterTelemetry {
     name: null,
     driverName: null,
     portName: null,
-    connectionType: "unknown",
-    status: "No default printer",
+    connectionType: 'unknown',
+    status: 'No default printer',
     statusFlags: [],
     ink: [],
-    inkDetectionMethod: "none",
+    inkDetectionMethod: 'none',
     lastCheckedAt,
     lastError: null,
   };
@@ -301,7 +376,7 @@ function noDefaultPrinter(lastCheckedAt: string): PrinterTelemetry {
 
 interface InkResult {
   ink: InkLevel[];
-  method: PrinterTelemetry["inkDetectionMethod"];
+  method: PrinterTelemetry['inkDetectionMethod'];
 }
 
 async function detectInkLevels(
@@ -310,36 +385,36 @@ async function detectInkLevels(
   portName: string,
   printerState: number,
   printerStatus: number,
-  connectionType: PrinterTelemetry["connectionType"],
+  connectionType: PrinterTelemetry['connectionType'],
 ): Promise<InkResult> {
   // Strategy 1 – SNMP Printer MIB (most accurate for network/WSD printers)
-  if (connectionType === "network" || connectionType === "wsd") {
+  if (connectionType === 'network' || connectionType === 'wsd') {
     const ip =
       extractIpFromPortName(portName) ??
       (await resolveWsdPrinterIp(printerName));
 
     if (ip) {
       const snmp = await querySnmpPrinterMib(ip);
-      if (snmp.length > 0) return { ink: snmp, method: "snmp" };
+      if (snmp.length > 0) return { ink: snmp, method: 'snmp' };
     }
   }
 
   // Strategy 2 – Vendor-specific WMI namespaces (USB + some network)
   const vendorWmi = await queryVendorWmiInk(printerName, driverName);
-  if (vendorWmi.length > 0) return { ink: vendorWmi, method: "vendor-wmi" };
+  if (vendorWmi.length > 0) return { ink: vendorWmi, method: 'vendor-wmi' };
 
   // Strategy 3 – Get-PrinterProperty (works for some USB + network drivers)
   const prop = await queryPrinterPropertyInk(printerName);
-  if (prop.length > 0) return { ink: prop, method: "printer-property" };
+  if (prop.length > 0) return { ink: prop, method: 'printer-property' };
 
   // Strategy 4 – DetectedErrorState / PrinterState bitmask flags
   const errorState = inferInkFromErrorState(printerState, printerStatus);
-  if (errorState.length > 0) return { ink: errorState, method: "error-state" };
+  if (errorState.length > 0) return { ink: errorState, method: 'error-state' };
 
   // Nothing worked — return unknown
   return {
-    ink: [{ name: "Ink / Toner", level: null, status: "unknown" }],
-    method: "none",
+    ink: [{ name: 'Ink / Toner', level: null, status: 'unknown' }],
+    method: 'none',
   };
 }
 
@@ -443,7 +518,7 @@ $results | ConvertTo-Json -Depth 3
 async function querySnmpPrinterMib(ip: string): Promise<InkLevel[]> {
   try {
     const json = await runPowerShell(SNMP_PS_SCRIPT(ip), 20_000);
-    if (!json || json === "null") return [];
+    if (!json || json === 'null') return [];
 
     const raw = JSON.parse(json);
     const rows: { col: number; idx: number; type: string; value: unknown }[] =
@@ -486,7 +561,7 @@ async function querySnmpPrinterMib(ip: string): Promise<InkLevel[]> {
     return result;
   } catch (err) {
     console.warn(
-      "[PRINTER-STATUS] SNMP query failed:",
+      '[PRINTER-STATUS] SNMP query failed:',
       err instanceof Error ? err.message : err,
     );
     return [];
@@ -528,22 +603,22 @@ async function queryVendorWmiInk(
 ): Promise<InkLevel[]> {
   const driver = driverName.toLowerCase();
 
-  if (driver.includes("hp") || driver.includes("hewlett")) {
+  if (driver.includes('hp') || driver.includes('hewlett')) {
     const hp = await queryHpWmi(printerName);
     if (hp.length > 0) return hp;
   }
 
-  if (driver.includes("epson")) {
+  if (driver.includes('epson')) {
     const epson = await queryEpsonBidi(printerName);
     if (epson.length > 0) return epson;
   }
 
-  if (driver.includes("canon")) {
+  if (driver.includes('canon')) {
     const canon = await queryCanonWmi(printerName);
     if (canon.length > 0) return canon;
   }
 
-  if (driver.includes("brother")) {
+  if (driver.includes('brother')) {
     const brother = await queryBrotherProperty(printerName);
     if (brother.length > 0) return brother;
   }
@@ -607,12 +682,12 @@ async function queryCanonWmi(printerName: string): Promise<InkLevel[]> {
     );
 
     // Remap Canon's property names
-    if (!json || json === "[]") return [];
+    if (!json || json === '[]') return [];
     const raw = JSON.parse(json);
     const items = Array.isArray(raw) ? raw : [raw];
     return items.map((i) => {
       const lvl = parsePercentLevel(i.InkLevel, i.MaxInkLevel);
-      const name = String(i.InkName ?? "Ink");
+      const name = String(i.InkName ?? 'Ink');
       return {
         name,
         level: lvl,
@@ -669,29 +744,29 @@ function inferInkFromErrorState(
 ): InkLevel[] {
   const tonerLow = (printerState & 0x00040000) !== 0;
   const noToner = (printerState & 0x00080000) !== 0;
-  if (noToner) return [{ name: "Toner / Ink", level: 0, status: "empty" }];
-  if (tonerLow) return [{ name: "Toner / Ink", level: null, status: "low" }];
+  if (noToner) return [{ name: 'Toner / Ink', level: 0, status: 'empty' }];
+  if (tonerLow) return [{ name: 'Toner / Ink', level: null, status: 'low' }];
   return [];
 }
 
 // ── Shared parsers ───────────────────────────────────────────────
 
 function parseVendorInkJson(json: string): InkLevel[] {
-  if (!json || json === "[]" || json === "null") return [];
+  if (!json || json === '[]' || json === 'null') return [];
   try {
     const raw = JSON.parse(json);
     const items = Array.isArray(raw) ? raw : [raw];
     const result: InkLevel[] = [];
     for (const item of items) {
       const name = String(
-        item.Name ?? item.Color ?? item.InkName ?? "Supply",
+        item.Name ?? item.Color ?? item.InkName ?? 'Supply',
       ).trim();
       const lvl = parsePercentLevel(
         item.Level ?? item.InkLevel,
         item.MaxLevel ?? item.MaxInkLevel ?? 100,
       );
       result.push({
-        name: name || "Supply",
+        name: name || 'Supply',
         level: lvl,
         status: inkStatusFromLevel(lvl),
         colorHint: colorHintFromName(name),
@@ -704,18 +779,18 @@ function parseVendorInkJson(json: string): InkLevel[] {
 }
 
 function parsePrinterPropertyJson(json: string): InkLevel[] {
-  if (!json || json === "[]" || json === "null") return [];
+  if (!json || json === '[]' || json === 'null') return [];
   try {
     const raw = JSON.parse(json);
     const items = Array.isArray(raw) ? raw : [raw];
     const result: InkLevel[] = [];
 
     for (const item of items) {
-      const rawName = String(item.PropertyName ?? "Supply");
+      const rawName = String(item.PropertyName ?? 'Supply');
       const name = rawName
-        .replace(/Level$/i, "")
-        .replace(/^Config:/i, "")
-        .replace(/InkLevel/i, "Ink")
+        .replace(/Level$/i, '')
+        .replace(/^Config:/i, '')
+        .replace(/InkLevel/i, 'Ink')
         .trim();
 
       const numVal = Number(item.Value);
@@ -723,7 +798,7 @@ function parsePrinterPropertyJson(json: string): InkLevel[] {
         Number.isFinite(numVal) && numVal >= 0 && numVal <= 100 ? numVal : null;
 
       result.push({
-        name: name || "Supply",
+        name: name || 'Supply',
         level,
         status: inkStatusFromLevel(level),
         colorHint: colorHintFromName(name),
@@ -746,9 +821,56 @@ function parsePercentLevel(level: unknown, max: unknown = 100): number | null {
   return null;
 }
 
-function inkStatusFromLevel(level: number | null): InkLevel["status"] {
-  if (level === null) return "unknown";
-  if (level <= 0) return "empty";
-  if (level <= 15) return "low";
-  return "ok";
+function inkStatusFromLevel(level: number | null): InkLevel['status'] {
+  if (level === null) return 'unknown';
+  if (level <= 0) return 'empty';
+  if (level <= 15) return 'low';
+  return 'ok';
+}
+
+/**
+ * Forces an immediate re-query of the default Windows printer, bypassing the
+ * 30-second background poll interval.
+ *
+ * Use this after a printer swap, driver re-registration, or USB reconnect so
+ * the admin panel reflects the new hardware state without waiting for the next
+ * automatic refresh cycle.
+ *
+ * Safe to call concurrently — if a background refresh is already running it is
+ * allowed to finish first (we await it via the shared `refreshing` guard),
+ * then we run a fresh query on top so the caller always gets a post-action
+ * snapshot, not a stale one.
+ *
+ * @returns The freshly-queried PrinterTelemetry object (also updates the cache
+ *          so subsequent `getPrinterTelemetry()` calls see the same value).
+ */
+export async function refreshPrinterTelemetry(): Promise<PrinterTelemetry> {
+  // If a refresh is already in flight, wait for it to settle before we
+  // fire our own so we don't race against it.
+  while (refreshing) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+  }
+
+  refreshing = true;
+  try {
+    cached = await queryPrinterTelemetry();
+  } catch (err: unknown) {
+    cached = {
+      connected: false,
+      name: null,
+      driverName: null,
+      portName: null,
+      connectionType: 'unknown',
+      status: 'Error',
+      statusFlags: [],
+      ink: [],
+      inkDetectionMethod: 'none',
+      lastCheckedAt: new Date().toISOString(),
+      lastError: err instanceof Error ? err.message : String(err),
+    };
+  } finally {
+    refreshing = false;
+  }
+
+  return cached;
 }

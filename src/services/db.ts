@@ -151,6 +151,16 @@ export interface ReportIssueEntry {
   meta?: LogMeta;
 }
 
+export interface PendingRefundEntry {
+  id: string;
+  timestamp: string;
+  chargedAmount: number;
+  reason: string;
+  status: 'open' | 'refunded' | 'dismissed';
+  refundedAt: string | null;
+  jobContext: Record<string, string | number | boolean | null>;
+}
+
 export type Schema = {
   balance: number;
   earnings: number;
@@ -166,6 +176,7 @@ export type Schema = {
   reportIssues: ReportIssueEntry[];
   reportIssueSessions: ReportIssueSessionEntry[];
   reportIssueAttachments: ReportIssueAttachmentEntry[];
+  pendingRefunds: PendingRefundEntry[];
 };
 
 const DEFAULT_DATA: Schema = {
@@ -218,6 +229,7 @@ const DEFAULT_DATA: Schema = {
   reportIssues: [],
   reportIssueSessions: [],
   reportIssueAttachments: [],
+  pendingRefunds: [],
 };
 
 /**
@@ -374,6 +386,9 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
     reportIssueAttachments: Array.isArray(data?.reportIssueAttachments)
       ? data.reportIssueAttachments
       : DEFAULT_DATA.reportIssueAttachments,
+    pendingRefunds: Array.isArray(data?.pendingRefunds)
+      ? data.pendingRefunds
+      : DEFAULT_DATA.pendingRefunds,
   };
 }
 
