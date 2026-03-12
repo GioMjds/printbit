@@ -30,6 +30,27 @@ export interface PrinterRecoveredEvent {
   timestamp: string;
 }
 
+export interface PrinterFault {
+  timestamp: string;
+  reason: string;
+  severity: 'warning' | 'critical';
+}
+
+export interface WatchFailureContext {
+  jobId: string;
+  sessionId: string | null;
+  fault: PrinterFault;
+}
+
+export type WatchResult =
+  | { ok: true }
+  | {
+      ok: false;
+      jobId: string;
+      sessionId: string | null;
+      fault: PrinterFault;
+    };
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 class PrinterMonitorService {
@@ -302,8 +323,8 @@ class PrinterMonitorService {
 // WATCHDOG_DURATION_MS. On the first blocked status it emits printerMalfunction
 // to all Socket.IO clients and logs to the admin log, then stops.
 //
-// This is intentionally fire-and-forget from route handlers:
-//   void watchJobForMalfunction(io);
+// This can be fire-and-forget from route handlers:
+//   void watchJobForMalfunction(io, { jobId, onFailure });
 //
 // Design notes:
 //   • Uses queryLivePrinterStatus() (fresh PowerShell call, ~< 1 s) rather than
@@ -322,16 +343,26 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Watches for printer faults for ~30 s after a job is spooled.
- * Emits `printerMalfunction` via Socket.IO if a fault is detected.
+ * Emits `printerMalfunction` via Socket.IO if a fault is detected and returns
+ * a job-scoped structured result for callers that need per-job handling.
  *
  * @param io       - The Socket.IO server instance.
+ * @param opts.jobId - Job identifier used in the structured result.
+ * @param opts.sessionId - Optional session identifier for correlation.
  * @param opts.pollIntervalMs  - How often to poll (default: 3 000 ms).
  * @param opts.watchDurationMs - Total watch window  (default: 30 000 ms).
+ * @param opts.onFailure - Optional callback invoked with the fault details.
  */
 export async function watchJobForMalfunction(
   io: Server,
-  opts: { pollIntervalMs?: number; watchDurationMs?: number } = {},
-): Promise<void> {
+  opts: {
+    jobId: string;
+    sessionId?: string | null;
+    pollIntervalMs?: number;
+    watchDurationMs?: number;
+    onFailure?: (jobId: string, fault: PrinterFault) => void;
+  },
+): Promise<WatchResult> {
   const pollIntervalMs = opts.pollIntervalMs ?? WATCHDOG_POLL_MS;
   const watchDurationMs = opts.watchDurationMs ?? WATCHDOG_DURATION_MS;
   const deadline = Date.now() + watchDurationMs;
@@ -348,6 +379,11 @@ export async function watchJobForMalfunction(
 
     if (!connected || BLOCKED_STATUSES.has(status)) {
       const timestamp = new Date().toISOString();
+      const fault: PrinterFault = {
+        timestamp,
+        reason: !connected ? 'Printer disconnected during active job.' : status,
+        severity: connected ? 'warning' : 'critical',
+      };
       console.warn(
         `[PRINTER-MONITOR] 🚨 Mid-job fault detected by watchdog: ${status}`,
       );
@@ -355,7 +391,7 @@ export async function watchJobForMalfunction(
       await adminService.appendAdminLog(
         'printer_midjob_malfunction',
         `Printer fault detected during active job: ${status}.`,
-        { status, statusFlags: statusFlags.join(", "), connected },
+        { status, statusFlags: statusFlags.join(', '), connected },
       );
 
       // Emit malfunction so kiosk UI can surface an error immediately.
@@ -370,13 +406,22 @@ export async function watchJobForMalfunction(
       };
       io.emit('printerMalfunction', payload);
 
-      return;
+      opts.onFailure?.(opts.jobId, fault);
+
+      return {
+        ok: false,
+        jobId: opts.jobId,
+        sessionId: opts.sessionId!,
+        fault,
+      };
     }
   }
 
   console.log(
     '[PRINTER-MONITOR] 👁 Mid-job watchdog complete — no fault detected.',
   );
+
+  return { ok: true };
 }
 
 // ── Singleton exports ─────────────────────────────────────────────────────────

@@ -139,6 +139,7 @@ registerPageRoutes(app, {
 });
 registerStaticAssets(app);
 registerAdminRoutes(app, {
+  io,
   uploadDir: UPLOAD_DIR,
   getSerialStatus,
   getHopperStatus,

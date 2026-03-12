@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Express, Request, Response } from 'express';
+import type { Server as SocketIOServer } from 'socket.io';
 import {
   requireAdminLocalAccess,
   requireAdminPin,
@@ -16,6 +17,7 @@ import { generateTestPagePdf } from '../services/test-page';
 import { getScannerStatus } from '../services/scanner';
 
 interface RegisterAdminRoutesDeps {
+  io: SocketIOServer;
   uploadDir: string;
   getSerialStatus: () => {
     connected: boolean;
@@ -624,6 +626,7 @@ export function registerAdminRoutes(
       }
 
       await db.write();
+      deps.io.emit('balance', db.data!.balance);
 
       await adminService.appendAdminLog(
         'pending_refund_processed',

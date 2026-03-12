@@ -225,7 +225,35 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
         // Start mid-job watchdog. Polls printer status every 3 s for 30 s
         // post-dispatch and emits printerMalfunction if the printer faults.
         // Fire-and-forget — does not block settlement.
-        void watchJobForMalfunction(deps.io);
+        void watchJobForMalfunction(deps.io, {
+          jobId: job.id,
+          onFailure: (failedJobId, fault) => {
+            const activeJob = jobStore.getJob(failedJobId);
+            if (!activeJob || activeJob.state !== 'running') {
+              return;
+            }
+
+            jobStore.updateJobState(failedJobId, 'failed', {
+              failure: {
+                code: 'PRINTER_MALFUNCTION',
+                message: `Printer fault detected during copy job: ${fault.reason}`,
+                retryable: true,
+                stage: 'running',
+              },
+            });
+
+            void adminService.appendAdminLog(
+              'copy_job_failed_printer_malfunction',
+              'Copy job marked failed due to mid-job printer malfunction.',
+              {
+                jobId: failedJobId,
+                reason: fault.reason,
+                severity: fault.severity,
+                timestamp: fault.timestamp,
+              },
+            );
+          },
+        });
 
         const settlement = await settlementService.settle({
           requiredAmount,

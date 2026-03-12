@@ -81,13 +81,48 @@ let refreshTimer: number | null = null;
 // ── Printer telemetry type (extended fields from Phase 4) ─────────────────────
 
 interface PrinterTelemetryExt {
-  name?: string;
+  name?: string | null;
   status: string;
   connected: boolean;
-  driverName?: string;
-  portName?: string;
-  connectionType?: string;
+  driverName?: string | null;
+  portName?: string | null;
+  connectionType?: string | null;
   ink?: Array<{ name: string; level: number | null; status: string }>;
+}
+
+type PrinterTelemetryPatch = Partial<PrinterTelemetryExt>;
+
+let lastPrinterSnapshot: PrinterTelemetryExt | null = null;
+
+function mergePrinterSnapshot(
+  patch: PrinterTelemetryPatch,
+): PrinterTelemetryExt | null {
+  if (!lastPrinterSnapshot &&
+      (patch.connected === undefined || patch.status === undefined)) {
+    return null;
+  }
+
+  const merged: PrinterTelemetryExt = {
+    connected: patch.connected ?? lastPrinterSnapshot?.connected ?? false,
+    status: patch.status ?? lastPrinterSnapshot?.status ?? 'Unknown',
+    name: lastPrinterSnapshot?.name,
+    driverName: lastPrinterSnapshot?.driverName,
+    portName: lastPrinterSnapshot?.portName,
+    connectionType: lastPrinterSnapshot?.connectionType,
+    ink: lastPrinterSnapshot?.ink,
+  };
+
+  if (patch.name !== undefined) merged.name = patch.name;
+  if (patch.driverName !== undefined) merged.driverName = patch.driverName;
+  if (patch.portName !== undefined) merged.portName = patch.portName;
+  if (patch.connectionType !== undefined) {
+    merged.connectionType = patch.connectionType;
+  }
+  if (patch.connected !== undefined) merged.connected = patch.connected;
+  if (patch.status !== undefined) merged.status = patch.status;
+  if (patch.ink !== undefined) merged.ink = patch.ink;
+
+  return merged;
 }
 
 // ── Helper: apply extended printer fields ─────────────────────────────────────
@@ -256,6 +291,7 @@ reDetectBtn?.addEventListener('click', () => {
       }
       // Update the card immediately with the fresh telemetry
       const p = body.printer;
+      lastPrinterSnapshot = { ...p };
       printerStatus.textContent = p.connected ? p.status : 'Not Found';
       printerBadge?.setAttribute('data-ok', String(p.connected));
       printerNameEl.textContent = p.name ?? '—';
@@ -326,12 +362,15 @@ function connectSocket(): void {
 
   // Live printer card update (emitted by Phase 2 health monitor)
   socket.on('printerStatusChanged', (payload: unknown) => {
-    const p = payload as PrinterTelemetryExt;
-    printerStatus.textContent = p.connected ? p.status : 'Not Found';
-    printerBadge?.setAttribute('data-ok', String(p.connected));
-    if (p.name) printerNameEl.textContent = p.name;
-    applyPrinterExt(p);
-    setMessage(`Printer: ${p.status}`);
+    const next = mergePrinterSnapshot(payload as PrinterTelemetryPatch);
+    if (!next) return;
+
+    lastPrinterSnapshot = next;
+    printerStatus.textContent = next.connected ? next.status : 'Not Found';
+    printerBadge?.setAttribute('data-ok', String(next.connected));
+    if (next.name !== undefined) printerNameEl.textContent = next.name ?? '—';
+    applyPrinterExt(next);
+    setMessage(`Printer: ${next.status}`);
   });
 
   // Spooler failure banner (emitted by Phase 3 spooler monitor)

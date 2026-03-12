@@ -20,4 +20,5 @@ export const BLOCKED_STATUSES = new Set([
   'Paper Out',
   'Door Open',
   'User Intervention Required',
+  'Paused',
 ]);
