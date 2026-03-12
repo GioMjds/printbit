@@ -275,7 +275,6 @@ export function registerScanRoutes(
       }
 
       markSoftCopyPaid(safeFilename);
-      deps.io.emit('balance', settlement.remainingBalance);
 
       await adminService.appendAdminLog(
         'scan_soft_copy_charged',
