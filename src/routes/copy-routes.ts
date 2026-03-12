@@ -1,42 +1,44 @@
-import type { Express, Request, Response } from "express";
-import type { Server } from "socket.io";
-import { jobStore } from "../services/job-store";
-import { printFile, type PrintJobOptions } from "../services/printer";
+import type { Express, Request, Response } from 'express';
+import type { Server } from 'socket.io';
+import { jobStore } from '../services/job-store';
+import { printFile, type PrintJobOptions } from '../services/printer';
 import {
   db,
   acquireIdempotencyKey,
   storeIdempotencyKey,
   releaseIdempotencyKey,
-} from "../services/db";
-import { adminService } from "../services/admin";
-import { settlementService } from "../services/settlement";
-import path from "node:path";
-import fs from "node:fs";
+} from '../services/db';
+import { adminService } from '../services/admin';
+import path from 'node:path';
+import fs from 'node:fs';
+import { getPrinterTelemetry, settlementService } from '@/services';
 
-const VALID_COLOR_MODES = new Set(["colored", "grayscale"]);
-const VALID_ORIENTATIONS = new Set(["portrait", "landscape"]);
-const VALID_PAPER_SIZES = new Set(["A4", "Letter", "Legal"]);
+const VALID_COLOR_MODES = new Set(['colored', 'grayscale']);
+const VALID_ORIENTATIONS = new Set(['portrait', 'landscape']);
+const VALID_PAPER_SIZES = new Set(['A4', 'Letter', 'Legal']);
 
 export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
   // ── POST /api/copy/jobs — Start a copy job (print checked scan, then charge) ─
-  app.post("/api/copy/jobs", async (req: Request, res: Response) => {
+  app.post('/api/copy/jobs', async (req: Request, res: Response) => {
     // ── Idempotency guard ──────────────────────────────────────────────
     // The key is claimed (or waits) BEFORE any side effects so that two
     // simultaneous requests with the same key cannot both create jobs.
-    const idempotencyKey = req.get("Idempotency-Key") ?? "";
+    const idempotencyKey = req.get('Idempotency-Key') ?? '';
     let idempotencyClaimed = false;
     if (idempotencyKey) {
-      const slot = acquireIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs");
-      if (slot.type === "hit") {
+      const slot = acquireIdempotencyKey(idempotencyKey, 'POST:/api/copy/jobs');
+      if (slot.type === 'hit') {
         res.status(slot.entry.statusCode).json(slot.entry.response);
         return;
       }
-      if (slot.type === "inflight") {
+      if (slot.type === 'inflight') {
         const entry = await slot.promise;
         if (entry) {
           res.status(entry.statusCode).json(entry.response);
         } else {
-          res.status(503).json({ error: "Concurrent request failed. Please retry." });
+          res
+            .status(503)
+            .json({ error: 'Concurrent request failed. Please retry.' });
         }
         return;
       }
@@ -55,50 +57,72 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
       };
 
     const safeCopies =
-      typeof copies === "number" && Number.isFinite(copies)
+      typeof copies === 'number' && Number.isFinite(copies)
         ? Math.max(1, Math.floor(copies))
         : 1;
     const safeColorMode =
       colorMode && VALID_COLOR_MODES.has(colorMode)
-        ? (colorMode as "colored" | "grayscale")
-        : "grayscale";
+        ? (colorMode as 'colored' | 'grayscale')
+        : 'grayscale';
     const safeOrientation =
       orientation && VALID_ORIENTATIONS.has(orientation)
-        ? (orientation as "portrait" | "landscape")
-        : "portrait";
+        ? (orientation as 'portrait' | 'landscape')
+        : 'portrait';
     const safePaperSize =
       paperSize && VALID_PAPER_SIZES.has(paperSize)
-        ? (paperSize as "A4" | "Letter" | "Legal")
-        : "A4";
+        ? (paperSize as 'A4' | 'Letter' | 'Legal')
+        : 'A4';
     const safePreviewPath =
-      typeof previewPath === "string" ? previewPath.trim() : "";
+      typeof previewPath === 'string' ? previewPath.trim() : '';
 
     if (!safePreviewPath) {
       const errorBody = {
-        error: "Missing checked document. Please go back to /copy and tap Check for Document again.",
+        error:
+          'Missing checked document. Please go back to /copy and tap Check for Document again.',
       };
-      if (idempotencyClaimed) storeIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs", 400, errorBody);
+      if (idempotencyClaimed)
+        storeIdempotencyKey(
+          idempotencyKey,
+          'POST:/api/copy/jobs',
+          400,
+          errorBody,
+        );
       return res.status(400).json(errorBody);
     }
 
     const previewFilename = path.basename(safePreviewPath);
     if (previewFilename !== safePreviewPath) {
-      const errorBody = { error: "Invalid preview path. Please check your document again." };
-      if (idempotencyClaimed) storeIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs", 400, errorBody);
+      const errorBody = {
+        error: 'Invalid preview path. Please check your document again.',
+      };
+      if (idempotencyClaimed)
+        storeIdempotencyKey(
+          idempotencyKey,
+          'POST:/api/copy/jobs',
+          400,
+          errorBody,
+        );
       return res.status(400).json(errorBody);
     }
 
-    const previewAbsPath = path.resolve("uploads", "scans", previewFilename);
+    const previewAbsPath = path.resolve('uploads', 'scans', previewFilename);
     if (!fs.existsSync(previewAbsPath)) {
       const errorBody = {
-        error: "Checked document not found. Please go back to /copy and scan again.",
+        error:
+          'Checked document not found. Please go back to /copy and scan again.',
       };
-      if (idempotencyClaimed) storeIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs", 409, errorBody);
+      if (idempotencyClaimed)
+        storeIdempotencyKey(
+          idempotencyKey,
+          'POST:/api/copy/jobs',
+          409,
+          errorBody,
+        );
       return res.status(409).json(errorBody);
     }
 
     const requiredAmount = adminService.calculateJobAmount(
-      "copy",
+      'copy',
       safeColorMode,
       safeCopies,
     );
@@ -106,31 +130,32 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
     // Pre-check balance (will re-verify inside lock after print succeeds)
     if ((db.data?.balance ?? 0) < requiredAmount) {
       const errorBody = {
-        error: "Insufficient balance",
+        error: 'Insufficient balance',
         balance: db.data?.balance ?? 0,
         requiredAmount,
       };
       void adminService.appendAdminLog(
-        "payment_failed",
-        "Copy job failed: insufficient balance.",
+        'payment_failed',
+        'Copy job failed: insufficient balance.',
         {
           balance: db.data?.balance ?? 0,
           requiredAmount,
         },
       );
       // Release so the client can retry once more balance is inserted
-      if (idempotencyClaimed) releaseIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs");
+      if (idempotencyClaimed)
+        releaseIdempotencyKey(idempotencyKey, 'POST:/api/copy/jobs');
       return res.status(400).json(errorBody);
     }
 
     if (
-      typeof amount === "number" &&
+      typeof amount === 'number' &&
       Number.isFinite(amount) &&
       amount !== requiredAmount
     ) {
       void adminService.appendAdminLog(
-        "payment_amount_mismatch",
-        "Client amount differed from server pricing.",
+        'payment_amount_mismatch',
+        'Client amount differed from server pricing.',
         {
           amount,
           requiredAmount,
@@ -148,7 +173,7 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
     // Create job with payment pending (charged after successful dispatch)
     const job = jobStore.createCopyJob(settings, null);
 
-    void adminService.appendAdminLog("copy_job_created", "Copy job created.", {
+    void adminService.appendAdminLog('copy_job_created', 'Copy job created.', {
       jobId: job.id,
       copies: safeCopies,
       colorMode: safeColorMode,
@@ -158,23 +183,53 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
 
     // Start copy asynchronously — charge AFTER successful print dispatch
     void (async () => {
-      jobStore.updateJobState(job.id, "running");
+      jobStore.updateJobState(job.id, 'running');
       try {
+        // Preflight: verify printer is ready before dispatching the copy job
+        const telemetry = getPrinterTelemetry();
+        const BLOCKED_STATUSES = new Set([
+          'Offline',
+          'Error',
+          'Paper Jam',
+          'Paper Out',
+          'Door Open',
+          'User Intervention Required',
+        ]);
+        if (!telemetry.connected || BLOCKED_STATUSES.has(telemetry.status)) {
+          void adminService.appendAdminLog(
+            'copy_preflight_failed',
+            'Copy job rejected: printer not ready.',
+            {
+              jobId: job.id,
+              printerStatus: telemetry.status,
+              printerConnected: telemetry.connected,
+            },
+          );
+          jobStore.updateJobState(job.id, 'failed', {
+            failure: {
+              code: 'PRINTER_NOT_READY',
+              message: `Printer is not ready: ${telemetry.status}. Please notify the operator.`,
+              retryable: true,
+              stage: 'precheck',
+            },
+          });
+          return;
+        }
+
         const printOptions: PrintJobOptions = {
           copies: safeCopies,
           colorMode: safeColorMode,
           orientation: safeOrientation,
           paperSize: safePaperSize,
         };
-        const relPath = path.join("scans", previewFilename);
+        const relPath = path.join('scans', previewFilename);
         await printFile(relPath, printOptions);
 
-        // Print succeeded — settle payment (charge + change dispense)
         const settlement = await settlementService.settle({
           requiredAmount,
           io: deps.io,
           jobContext: {
-            mode: "copy",
+            mode: 'copy',
             jobId: job.id,
             copies: safeCopies,
             colorMode: safeColorMode,
@@ -186,11 +241,11 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
             chargedAmount: settlement.chargedAmount,
             remainingBalance: settlement.remainingBalance,
           };
-          jobStore.updateJobState(job.id, "succeeded");
-          await adminService.incrementJobStats("copy");
+          jobStore.updateJobState(job.id, 'succeeded');
+          await adminService.incrementJobStats('copy');
           void adminService.appendAdminLog(
-            "copy_job_completed",
-            "Copy job completed and charged.",
+            'copy_job_completed',
+            'Copy job completed and charged.',
             {
               jobId: job.id,
               chargedAmount: settlement.chargedAmount,
@@ -201,28 +256,30 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
             },
           );
         } else {
-          jobStore.updateJobState(job.id, "failed", {
+          jobStore.updateJobState(job.id, 'failed', {
             failure: {
-              code: "COPY_ERROR",
-              message: settlement.error ?? "Balance drained before charge could complete.",
+              code: 'COPY_ERROR',
+              message:
+                settlement.error ??
+                'Balance drained before charge could complete.',
               retryable: false,
-              stage: "running",
+              stage: 'running',
             },
           });
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        jobStore.updateJobState(job.id, "failed", {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        jobStore.updateJobState(job.id, 'failed', {
           failure: {
-            code: "COPY_ERROR",
+            code: 'COPY_ERROR',
             message,
             retryable: true,
-            stage: "running",
+            stage: 'running',
           },
         });
         void adminService.appendAdminLog(
-          "copy_job_failed",
-          "Copy job failed — balance NOT charged.",
+          'copy_job_failed',
+          'Copy job failed — balance NOT charged.',
           {
             jobId: job.id,
             error: message,
@@ -235,34 +292,39 @@ export function registerCopyRoutes(app: Express, deps: { io: Server }): void {
     // mutated by later jobStore state updates (e.g. state → "running"/"succeeded").
     const responseBody = JSON.parse(JSON.stringify(job)) as typeof job;
     if (idempotencyClaimed) {
-      storeIdempotencyKey(idempotencyKey, "POST:/api/copy/jobs", 201, responseBody);
+      storeIdempotencyKey(
+        idempotencyKey,
+        'POST:/api/copy/jobs',
+        201,
+        responseBody,
+      );
     }
     res.status(201).json(responseBody);
   });
 
   // ── GET /api/copy/jobs/:id — Get copy job status ───────────────────
-  app.get("/api/copy/jobs/:id", (req: Request, res: Response) => {
+  app.get('/api/copy/jobs/:id', (req: Request, res: Response) => {
     const job = jobStore.getJob(req.params.id as string);
     if (!job) {
-      return res.status(404).json({ error: "Job not found" });
+      return res.status(404).json({ error: 'Job not found' });
     }
     res.json(job);
   });
 
   // ── POST /api/copy/jobs/:id/cancel — Cancel a copy job ────────────
-  app.post("/api/copy/jobs/:id/cancel", (req: Request, res: Response) => {
+  app.post('/api/copy/jobs/:id/cancel', (req: Request, res: Response) => {
     const job = jobStore.getJob(req.params.id as string);
     if (!job) {
-      return res.status(404).json({ error: "Job not found" });
+      return res.status(404).json({ error: 'Job not found' });
     }
 
     const cancelled = jobStore.requestCancel(job.id);
     if (!cancelled) {
       return res
         .status(409)
-        .json({ error: "Job is already in a terminal state" });
+        .json({ error: 'Job is already in a terminal state' });
     }
 
-    res.status(202).json({ ok: true, state: "cancel_requested" });
+    res.status(202).json({ ok: true, state: 'cancel_requested' });
   });
 }
