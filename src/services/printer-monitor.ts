@@ -411,7 +411,7 @@ export async function watchJobForMalfunction(
       return {
         ok: false,
         jobId: opts.jobId,
-        sessionId: opts.sessionId!,
+        sessionId: opts.sessionId ?? null,
         fault,
       };
     }
