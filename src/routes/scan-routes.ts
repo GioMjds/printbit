@@ -267,8 +267,14 @@ export function registerScanRoutes(
             balance: settlement.remainingBalance,
           },
         );
+
+        const shortFall = Math.max(
+          requiredAmount - settlement.remainingBalance,
+          0,
+        );
+
         return res.status(402).json({
-          error: `Insufficient balance. Please add ₱${requiredAmount} to access this scan.`,
+          error: `Insufficient balance. Please add ₱${shortFall} to access this scan.`,
           requiredAmount,
           balance: settlement.remainingBalance,
         });
