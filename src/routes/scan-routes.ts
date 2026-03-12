@@ -282,7 +282,7 @@ export function registerScanRoutes(
 
       markSoftCopyPaid(safeFilename);
 
-      await adminService.appendAdminLog(
+      void adminService.appendAdminLog(
         'scan_soft_copy_charged',
         'Soft copy access charged.',
         {
@@ -294,10 +294,10 @@ export function registerScanRoutes(
           changeRequested: settlement.change.requested,
           changeDispensed: settlement.change.dispensed,
         },
-      );
+      ).catch(() => {});
 
       if (settlement.change.state === 'failed') {
-        await adminService.appendAdminLog(
+        void adminService.appendAdminLog(
           'hopper_dispense_failed',
           'Coin change dispense failed after scan soft-copy charge.',
           {
@@ -308,7 +308,7 @@ export function registerScanRoutes(
             owedChangeId: settlement.change.owedChangeId ?? null,
             message: settlement.change.message ?? null,
           },
-        );
+        ).catch(() => {});
       }
 
       return res.json({
