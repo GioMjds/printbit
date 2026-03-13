@@ -19,6 +19,7 @@ export function registerPrinterRoutes(app: Express) {
       !telemetry.connected || BLOCKED_STATUSES.has(telemetry.status);
     const ready = !blocked;
 
+    res.set('Cache-Control', 'no-store');
     res.json({
       ready,
       blocked,
