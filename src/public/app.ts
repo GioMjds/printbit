@@ -235,3 +235,104 @@ reportOverlay?.addEventListener('click', (e) => {
 });
 
 export { navigateTo };
+
+const brandArea = document.querySelector('.brand') as HTMLElement | null;
+const adminOverlay = document.getElementById('adminOverlay');
+const adminPinInput = document.getElementById(
+  'adminPinInput',
+) as HTMLInputElement | null;
+const adminPinError = document.getElementById('adminPinError');
+const adminCancelBtn = document.getElementById('adminCancelBtn');
+const adminSubmitBtn = document.getElementById('adminSubmitBtn');
+
+const REQUIRED_TAPS = 5;
+const TAP_WINDOW_MS = 3000;
+
+let tapCount = 0;
+let tapTimer: number | null = null;
+
+function openAdminModal(): void {
+  adminOverlay?.classList.add('is-visible');
+  adminOverlay?.setAttribute('aria-hidden', 'false');
+  adminPinInput?.focus();
+  if (adminPinError) adminPinError.textContent = '';
+  if (adminPinInput) adminPinInput.value = '';
+}
+
+function closeAdminModal(): void {
+  adminOverlay?.classList.remove('is-visible');
+  adminOverlay?.setAttribute('aria-hidden', 'true');
+  if (adminPinInput) adminPinInput.value = '';
+  if (adminPinError) adminPinError.textContent = '';
+}
+
+function setAdminError(msg: string): void {
+  if (adminPinError) adminPinError.textContent = msg;
+}
+
+async function submitAdminPin(): Promise<void> {
+  const pin = adminPinInput?.value.trim() ?? '';
+  if (!pin) {
+    setAdminError('Please enter a PIN.');
+    return;
+  }
+
+  if (adminSubmitBtn) adminSubmitBtn.textContent = 'Checking…';
+
+  try {
+    const res = await fetch('/api/admin/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+
+    const data = (await res.json()) as {
+      ok: boolean;
+      sessionToken?: string;
+      error?: string;
+    };
+
+    if (data.ok && data.sessionToken) {
+      // Store session token for the admin panel to pick up
+      sessionStorage.setItem('adminSessionToken', data.sessionToken);
+      closeAdminModal();
+      navigateTo('/admin/dashboard');
+    } else {
+      setAdminError(data.error ?? 'Incorrect PIN.');
+      if (adminPinInput) adminPinInput.value = '';
+      adminPinInput?.focus();
+    }
+  } catch {
+    setAdminError('Connection error. Please try again.');
+  } finally {
+    if (adminSubmitBtn) adminSubmitBtn.textContent = 'Enter';
+  }
+}
+
+brandArea?.addEventListener('click', () => {
+  tapCount += 1;
+
+  if (tapTimer !== null) clearTimeout(tapTimer);
+
+  if (tapCount >= REQUIRED_TAPS) {
+    tapCount = 0;
+    openAdminModal();
+    return;
+  }
+
+  tapTimer = window.setTimeout(() => {
+    tapCount = 0;
+  }, TAP_WINDOW_MS);
+});
+
+adminCancelBtn?.addEventListener('click', closeAdminModal);
+
+adminSubmitBtn?.addEventListener('click', () => void submitAdminPin());
+
+adminPinInput?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') void submitAdminPin();
+});
+
+adminOverlay?.addEventListener('click', (e) => {
+  if (e.target === adminOverlay) closeAdminModal();
+});

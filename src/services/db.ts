@@ -1,9 +1,13 @@
-import { Low } from 'lowdb';
-import { JSONFile } from 'lowdb/node';
+import { LowSync } from 'lowdb';
+import { JSONFileSync } from 'lowdb/node';
 import { finiteOr } from '@/utils';
 
 export type PrintMode = 'print' | 'copy' | 'scan';
 export type ColorMode = 'colored' | 'grayscale';
+export type AdminLockout = {
+  failedAttempts: number;
+  lockedUntil: string | null;
+};
 
 export interface PricingSettings {
   printPerPage: number;
@@ -162,6 +166,7 @@ export interface PendingRefundEntry {
 }
 
 export type Schema = {
+  adminLockout: AdminLockout;
   balance: number;
   earnings: number;
   settings: AdminSettings;
@@ -180,6 +185,10 @@ export type Schema = {
 };
 
 const DEFAULT_DATA: Schema = {
+  adminLockout: {
+    failedAttempts: 0,
+    lockedUntil: null,
+  },
   balance: 0,
   earnings: 0,
   settings: {
@@ -190,7 +199,8 @@ const DEFAULT_DATA: Schema = {
       colorSurcharge: 2,
     },
     idleTimeoutSeconds: 120,
-    adminPin: '1234',
+    adminPin:
+      '$argon2id$v=19$m=65536,t=3,p=4$gqSpsbLttLcalBC6SYKG0A$T34vxa4BxPcJ++fLZ+19qp9FGaQufJCCCqWu1fb35TQ',
     adminLocalOnly: true,
   },
   coinStats: {
@@ -254,6 +264,13 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const hopperStats = data?.hopperStats;
 
   return {
+    adminLockout: {
+      failedAttempts: finiteOr(data?.adminLockout?.failedAttempts, 0),
+      lockedUntil:
+        typeof data?.adminLockout?.lockedUntil === 'string'
+          ? data.adminLockout.lockedUntil
+          : DEFAULT_DATA.adminLockout.lockedUntil,
+    },
     balance: finiteOr(data?.balance, DEFAULT_DATA.balance),
     earnings: finiteOr(data?.earnings, DEFAULT_DATA.earnings),
     settings: {
@@ -392,21 +409,21 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   };
 }
 
-const adapter = new JSONFile<Schema>('db.json');
-export const db = new Low(adapter, DEFAULT_DATA);
+const adapter = new JSONFileSync<Schema>('db.json');
+export const db = new LowSync(adapter, DEFAULT_DATA);
 
-export async function initDB() {
+export function initDB() {
   try {
-    await db.read();
+    db.read();
   } catch (err) {
     // If the file is empty or malformed, initialize with defaults
     db.data = { ...DEFAULT_DATA };
-    await db.write();
+    db.write();
     return;
   }
 
   db.data = normalizeSchema(db.data);
-  await db.write();
+  db.write();
 }
 
 // ── Balance mutex ─────────────────────────────────────────────────────────────

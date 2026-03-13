@@ -5,26 +5,26 @@ import {
   initAuth,
   peso,
   formatBytes,
-} from "../shared";
+} from '../shared';
 
-const metricBalance = document.getElementById("metricBalance") as HTMLElement;
-const earningsToday = document.getElementById("earningsToday") as HTMLElement;
-const jobsTotal = document.getElementById("jobsTotal") as HTMLElement;
-const jobsPrint = document.getElementById("jobsPrint") as HTMLElement;
-const jobsCopy = document.getElementById("jobsCopy") as HTMLElement;
-const jobsScan = document.getElementById("jobsScan") as HTMLElement;
-const storageFiles = document.getElementById("storageFiles") as HTMLElement;
-const storageBytes = document.getElementById("storageBytes") as HTMLElement;
-const barPrint = document.getElementById("barPrint") as HTMLElement | null;
-const barCopy = document.getElementById("barCopy") as HTMLElement | null;
-const barScan = document.getElementById("barScan") as HTMLElement | null;
+const metricBalance = document.getElementById('metricBalance') as HTMLElement;
+const earningsToday = document.getElementById('earningsToday') as HTMLElement;
+const jobsTotal = document.getElementById('jobsTotal') as HTMLElement;
+const jobsPrint = document.getElementById('jobsPrint') as HTMLElement;
+const jobsCopy = document.getElementById('jobsCopy') as HTMLElement;
+const jobsScan = document.getElementById('jobsScan') as HTMLElement;
+const storageFiles = document.getElementById('storageFiles') as HTMLElement;
+const storageBytes = document.getElementById('storageBytes') as HTMLElement;
+const barPrint = document.getElementById('barPrint') as HTMLElement | null;
+const barCopy = document.getElementById('barCopy') as HTMLElement | null;
+const barScan = document.getElementById('barScan') as HTMLElement | null;
 
-const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
+const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 const resetBalanceBtn = document.getElementById(
-  "resetBalanceBtn",
+  'resetBalanceBtn',
 ) as HTMLButtonElement;
 const clearStorageBtn = document.getElementById(
-  "clearStorageBtn",
+  'clearStorageBtn',
 ) as HTMLButtonElement;
 
 let refreshTimer: number | null = null;
@@ -49,49 +49,49 @@ function applySummary(summary: SummaryResponse): void {
 }
 
 async function loadData(): Promise<void> {
-  const res = await apiFetch("/api/admin/summary");
+  const res = await apiFetch('/api/admin/summary');
   if (!res.ok) {
-    if (res.status === 401) throw new Error("Invalid admin PIN.");
-    throw new Error("Failed to load dashboard data.");
+    if (res.status === 401) throw new Error('Invalid admin PIN.');
+    throw new Error('Failed to load dashboard data.');
   }
   const summary = (await res.json()) as SummaryResponse;
   applySummary(summary);
 }
 
-refreshBtn.addEventListener("click", () => {
-  setMessage("Refreshing...");
+refreshBtn.addEventListener('click', () => {
+  setMessage('Refreshing...');
   void loadData()
-    .then(() => setMessage("Dashboard refreshed."))
+    .then(() => setMessage('Dashboard refreshed.'))
     .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : "Refresh failed."),
+      setMessage(e instanceof Error ? e.message : 'Refresh failed.'),
     );
 });
 
-resetBalanceBtn.addEventListener("click", () => {
-  if (!window.confirm("Reset machine balance to 0?")) return;
-  setMessage("Resetting balance...");
-  void apiFetch("/api/admin/balance/reset", { method: "POST" })
+resetBalanceBtn.addEventListener('click', () => {
+  if (!window.confirm('Reset machine balance to 0?')) return;
+  setMessage('Resetting balance...');
+  void apiFetch('/api/admin/balance/reset', { method: 'POST' })
     .then(async (r) => {
-      if (!r.ok) throw new Error("Failed to reset balance.");
+      if (!r.ok) throw new Error('Failed to reset balance.');
       await loadData();
-      setMessage("Balance reset.");
+      setMessage('Balance reset.');
     })
     .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : "Failed to reset balance."),
+      setMessage(e instanceof Error ? e.message : 'Failed to reset balance.'),
     );
 });
 
-clearStorageBtn.addEventListener("click", () => {
-  if (!window.confirm("Clear uploaded files in storage?")) return;
-  setMessage("Clearing storage...");
-  void apiFetch("/api/admin/storage/clear", { method: "POST" })
+clearStorageBtn.addEventListener('click', () => {
+  if (!window.confirm('Clear uploaded files in storage?')) return;
+  setMessage('Clearing storage...');
+  void apiFetch('/api/admin/storage/clear', { method: 'POST' })
     .then(async (r) => {
-      if (!r.ok) throw new Error("Failed to clear storage.");
+      if (!r.ok) throw new Error('Failed to clear storage.');
       await loadData();
-      setMessage("Storage cleared.");
+      setMessage('Storage cleared.');
     })
     .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : "Failed to clear storage."),
+      setMessage(e instanceof Error ? e.message : 'Failed to clear storage.'),
     );
 });
 

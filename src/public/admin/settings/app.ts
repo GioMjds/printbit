@@ -36,7 +36,7 @@ function applySettings(settings: SettingsResponse): void {
   settingScanDocument.value = String(settings.pricing.scanDocument);
   settingColorSurcharge.value = String(settings.pricing.colorSurcharge);
   settingIdleTimeout.value = String(settings.idleTimeoutSeconds);
-  settingAdminPin.value = settings.adminPin;
+  settingAdminPin.value = '';
   settingAdminLocalOnly.checked = settings.adminLocalOnly;
 }
 
@@ -52,6 +52,7 @@ async function loadData(): Promise<void> {
 
 settingsForm.addEventListener("submit", (e) => {
   e.preventDefault();
+  const newPin = settingAdminPin.value.trim();
   const payload = {
     pricing: {
       printPerPage: Number(settingPrintPerPage.value),
@@ -60,7 +61,7 @@ settingsForm.addEventListener("submit", (e) => {
       colorSurcharge: Number(settingColorSurcharge.value),
     },
     idleTimeoutSeconds: Number(settingIdleTimeout.value),
-    adminPin: settingAdminPin.value.trim(),
+    ...(newPin ? { adminPin: newPin } : {}),
     adminLocalOnly: settingAdminLocalOnly.checked,
   };
 
@@ -74,7 +75,7 @@ settingsForm.addEventListener("submit", (e) => {
         const body = (await response.json()) as { error?: string };
         throw new Error(body.error ?? "Failed to save settings.");
       }
-      setAdminPin(payload.adminPin);
+      setAdminPin(payload.adminPin as string);
       await loadData();
       setMessage("Settings saved.");
     })
