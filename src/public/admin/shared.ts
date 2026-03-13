@@ -187,6 +187,7 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
     const response = await fetch('/api/admin/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ pin }),
     });
     if (!response.ok) {
