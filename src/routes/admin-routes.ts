@@ -205,7 +205,7 @@ export function registerAdminRoutes(
       if (
         body.idleTimeoutSeconds !== undefined &&
         (!isFiniteNumber(body.idleTimeoutSeconds) ||
-          body.idleTimeoutSeconds < 15)
+          body.idleTimeoutSeconds < 60)
       ) {
         return res
           .status(400)

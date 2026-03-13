@@ -112,3 +112,91 @@
 body {
   font-family: "Plus Jakarta Sans", sans-serif;
 }
+
+/* ── Idle Warning Modal (Shared) ─────────────────────────────────────────────── */
+
+.idle-warning-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.idle-warning-modal {
+  background: #1a1829;
+  border: 2px solid #ff6b3d;
+  border-radius: 24px;
+  padding: 48px 40px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.idle-warning-content {
+  text-align: center;
+}
+
+.idle-warning-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 16px;
+  color: #ff6b3d;
+}
+
+.idle-warning-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 16px;
+}
+
+.idle-warning-countdown {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 32px;
+  line-height: 1.5;
+}
+
+.idle-warning-countdown span {
+  font-weight: 700;
+  color: #ff9966;
+}
+
+.idle-warning-btn {
+  background: linear-gradient(135deg, #ff6b3d 0%, #ff9144 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(255, 107, 61, 0.3);
+}
+
+.idle-warning-btn:hover {
+  background: linear-gradient(135deg, #ff5810 0%, #ff7a20 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 107, 61, 0.4);
+}
+
+.idle-warning-btn:active {
+  transform: translateY(0);
+}

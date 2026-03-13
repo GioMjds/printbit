@@ -189,7 +189,7 @@ const DEFAULT_DATA: Schema = {
       scanDocument: 5,
       colorSurcharge: 2,
     },
-    idleTimeoutSeconds: 120,
+    idleTimeoutSeconds: 60,
     adminPin: '1234',
     adminLocalOnly: true,
   },

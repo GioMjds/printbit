@@ -1,4 +1,8 @@
-import QRCode from "qrcode";
+import QRCode from 'qrcode';
+import {
+  initializePageIdleTimeout,
+  setupPageIdleWarningButton,
+} from '../../services/idle-timeout';
 
 type UploadedFile = {
   filename: string;
@@ -9,7 +13,7 @@ type UploadedFile = {
 type SessionResponse = {
   sessionId: string;
   token: string;
-  status: "pending" | "uploaded";
+  status: 'pending' | 'uploaded';
   uploadUrl: string;
   /** Single document (legacy) */
   document?: UploadedFile;
@@ -25,37 +29,39 @@ type HotspotConfig = {
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
 const uploadLink = document.getElementById(
-  "uploadLink",
+  'uploadLink',
 ) as HTMLAnchorElement | null;
 const openUploadBtn = document.getElementById(
-  "openUploadBtn",
+  'openUploadBtn',
 ) as HTMLButtonElement | null;
 const refreshSessionBtn = document.getElementById(
-  "refreshSessionBtn",
+  'refreshSessionBtn',
 ) as HTMLButtonElement | null;
 const continueBtn = document.getElementById(
-  "continueBtn",
+  'continueBtn',
 ) as HTMLButtonElement | null;
 const sessionText = document.getElementById(
-  "sessionText",
+  'sessionText',
 ) as HTMLElement | null;
-const sessionDot = document.getElementById("sessionDot") as HTMLElement | null;
+const sessionDot = document.getElementById('sessionDot') as HTMLElement | null;
 const uploadQrCanvas = document.getElementById(
-  "uploadQrCanvas",
+  'uploadQrCanvas',
 ) as HTMLCanvasElement | null;
-const filesEmpty = document.getElementById("filesEmpty") as HTMLElement | null;
-const fileList = document.getElementById("fileList") as HTMLUListElement | null;
-const filesCount = document.getElementById("filesCount") as HTMLElement | null;
-const footerHint = document.getElementById("footerHint") as HTMLElement | null;
-const wifiSsidEl = document.getElementById("wifiSsid") as HTMLElement | null;
-const wifiPasswordEl = document.getElementById("wifiPassword") as HTMLElement | null;
-const wifiStepEl = document.getElementById("wifiStep") as HTMLElement | null;
+const filesEmpty = document.getElementById('filesEmpty') as HTMLElement | null;
+const fileList = document.getElementById('fileList') as HTMLUListElement | null;
+const filesCount = document.getElementById('filesCount') as HTMLElement | null;
+const footerHint = document.getElementById('footerHint') as HTMLElement | null;
+const wifiSsidEl = document.getElementById('wifiSsid') as HTMLElement | null;
+const wifiPasswordEl = document.getElementById(
+  'wifiPassword',
+) as HTMLElement | null;
+const wifiStepEl = document.getElementById('wifiStep') as HTMLElement | null;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let activeSessionId = "";
+let activeSessionId = '';
 let pollHandle: number | null = null;
-let selectedFilename = "";
+let selectedFilename = '';
 let knownFiles = new Set<string>();
 let attachedSessionId: string | null = null;
 let hotspotConfig: HotspotConfig | null = null;
@@ -67,25 +73,25 @@ function setSessionText(text: string): void {
 }
 
 function setSessionActive(active: boolean): void {
-  sessionDot?.classList.toggle("active", active);
+  sessionDot?.classList.toggle('active', active);
 }
 
 function setFilesCount(n: number): void {
   if (!filesCount) return;
-  filesCount.textContent = n === 1 ? "1 file" : `${n} files`;
-  filesCount.classList.toggle("has-files", n > 0);
+  filesCount.textContent = n === 1 ? '1 file' : `${n} files`;
+  filesCount.classList.toggle('has-files', n > 0);
 }
 
 /** Map a filename extension to a SVG sprite id */
 function iconIdForFile(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-  if (ext === "pdf") return "icon-pdf";
-  if (ext === "doc" || ext === "docx") return "icon-doc";
-  if (ext === "xls" || ext === "xlsx") return "icon-xls";
-  if (ext === "ppt" || ext === "pptx") return "icon-ppt";
-  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"].includes(ext))
-    return "icon-img";
-  return "icon-txt";
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'pdf') return 'icon-pdf';
+  if (ext === 'doc' || ext === 'docx') return 'icon-doc';
+  if (ext === 'xls' || ext === 'xlsx') return 'icon-xls';
+  if (ext === 'ppt' || ext === 'pptx') return 'icon-ppt';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'].includes(ext))
+    return 'icon-img';
+  return 'icon-txt';
 }
 
 /** Format bytes → human-readable string */
@@ -106,20 +112,20 @@ function selectFile(filename: string): void {
   selectedFilename = filename;
 
   // Update aria-selected on all items
-  fileList?.querySelectorAll(".file-item").forEach((el) => {
+  fileList?.querySelectorAll('.file-item').forEach((el) => {
     const selected = (el as HTMLElement).dataset.filename === filename;
-    el.setAttribute("aria-selected", String(selected));
+    el.setAttribute('aria-selected', String(selected));
   });
 
   // Enable continue button
   if (continueBtn) {
     continueBtn.disabled = false;
-    continueBtn.setAttribute("aria-disabled", "false");
+    continueBtn.setAttribute('aria-disabled', 'false');
   }
 
   if (footerHint) {
     footerHint.textContent = `"${filename}" selected.`;
-    footerHint.classList.add("ready");
+    footerHint.classList.add('ready');
   }
 }
 
@@ -129,13 +135,13 @@ function addFileToList(file: UploadedFile): void {
   if (knownFiles.has(key)) return;
   knownFiles.add(key);
 
-  const ext = file.filename.split(".").pop()?.toUpperCase() ?? "FILE";
+  const ext = file.filename.split('.').pop()?.toUpperCase() ?? 'FILE';
   const icon = iconIdForFile(file.filename);
 
-  const li = document.createElement("li");
-  li.className = "file-item";
-  li.role = "option";
-  li.setAttribute("aria-selected", "false");
+  const li = document.createElement('li');
+  li.className = 'file-item';
+  li.role = 'option';
+  li.setAttribute('aria-selected', 'false');
   li.dataset.filename = file.filename;
 
   li.innerHTML = `
@@ -146,15 +152,15 @@ function addFileToList(file: UploadedFile): void {
       <p class="file-item__name">${escapeHtml(file.filename)}</p>
       <div class="file-item__meta">
         <span class="file-item__ext">${escapeHtml(ext)}</span>
-        ${file.size !== undefined ? `<span>${formatBytes(file.size)}</span>` : ""}
+        ${file.size !== undefined ? `<span>${formatBytes(file.size)}</span>` : ''}
       </div>
     </div>
     <div class="file-item__radio" aria-hidden="true"></div>
   `;
 
-  li.addEventListener("click", () => selectFile(file.filename));
-  li.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
+  li.addEventListener('click', () => selectFile(file.filename));
+  li.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       selectFile(file.filename);
     }
@@ -164,18 +170,18 @@ function addFileToList(file: UploadedFile): void {
   const total = knownFiles.size;
   setFilesCount(total);
 
-  filesEmpty?.classList.add("hidden");
-  fileList.classList.remove("hidden");
+  filesEmpty?.classList.add('hidden');
+  fileList.classList.remove('hidden');
 
   if (total === 1) selectFile(file.filename);
 }
 
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 // ── Session management ────────────────────────────────────────────────────────
@@ -194,23 +200,23 @@ function updateUploadLink(uploadUrl: string): void {
   }
 
   if (openUploadBtn) {
-    openUploadBtn.onclick = () => window.open(href, "_blank");
+    openUploadBtn.onclick = () => window.open(href, '_blank');
   }
 
   if (hotspotConfig) {
     if (wifiSsidEl) wifiSsidEl.textContent = hotspotConfig.ssid;
     if (wifiPasswordEl) wifiPasswordEl.textContent = hotspotConfig.password;
-    if (wifiStepEl) wifiStepEl.style.display = "";
+    if (wifiStepEl) wifiStepEl.style.display = '';
   } else {
-    if (wifiStepEl) wifiStepEl.style.display = "none";
+    if (wifiStepEl) wifiStepEl.style.display = 'none';
   }
 
   if (uploadQrCanvas) {
     void QRCode.toCanvas(uploadQrCanvas, uploadUrl, {
       width: 220,
       margin: 1,
-      color: { dark: "#1a1a2e", light: "#ffffff" },
-      errorCorrectionLevel: "M",
+      color: { dark: '#1a1a2e', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
     });
   }
 }
@@ -224,7 +230,7 @@ async function createSession(): Promise<void> {
   // Fetch hotspot config (for Wi-Fi QR code)
   if (!hotspotConfig) {
     try {
-      const cfgRes = await fetch("/api/config/hotspot");
+      const cfgRes = await fetch('/api/config/hotspot');
       if (cfgRes.ok) hotspotConfig = (await cfgRes.json()) as HotspotConfig;
     } catch {
       /* non-critical — falls back to URL QR */
@@ -234,42 +240,44 @@ async function createSession(): Promise<void> {
   // Start the hotspot on-demand so the Wi-Fi network is ready for scanning
   if (hotspotConfig) {
     try {
-      await fetch("/api/hotspot/start", { method: "POST" });
-    } catch { /* best-effort */ }
+      await fetch('/api/hotspot/start', { method: 'POST' });
+    } catch {
+      /* best-effort */
+    }
   }
 
   // Reset UI
-  selectedFilename = "";
+  selectedFilename = '';
   knownFiles.clear();
   setSessionActive(false);
-  setSessionText("Creating session…");
+  setSessionText('Creating session…');
   setFilesCount(0);
 
   if (continueBtn) {
     continueBtn.disabled = true;
-    continueBtn.setAttribute("aria-disabled", "true");
+    continueBtn.setAttribute('aria-disabled', 'true');
   }
   if (footerHint) {
-    footerHint.textContent = "Select a file above to continue.";
-    footerHint.classList.remove("ready");
+    footerHint.textContent = 'Select a file above to continue.';
+    footerHint.classList.remove('ready');
   }
 
   if (fileList) {
-    fileList.innerHTML = "";
-    fileList.classList.add("hidden");
+    fileList.innerHTML = '';
+    fileList.classList.add('hidden');
   }
   if (filesEmpty) {
-    filesEmpty.classList.remove("hidden");
+    filesEmpty.classList.remove('hidden');
   }
 
-  const response = await fetch("/api/wireless/sessions");
+  const response = await fetch('/api/wireless/sessions');
   const session = (await response.json()) as SessionResponse;
   activeSessionId = session.sessionId;
 
-  sessionStorage.setItem("printbit.mode", "print");
-  sessionStorage.setItem("printbit.sessionId", session.sessionId);
-  sessionStorage.removeItem("printbit.uploadedFile");
-  sessionStorage.removeItem("printbit.uploadedFiles");
+  sessionStorage.setItem('printbit.mode', 'print');
+  sessionStorage.setItem('printbit.sessionId', session.sessionId);
+  sessionStorage.removeItem('printbit.uploadedFile');
+  sessionStorage.removeItem('printbit.uploadedFiles');
 
   setSessionText(session.sessionId);
   setSessionActive(true);
@@ -309,10 +317,10 @@ async function checkUploadStatus(): Promise<void> {
 
   if (files.length > 0) {
     sessionStorage.setItem(
-      "printbit.uploadedFiles",
+      'printbit.uploadedFiles',
       JSON.stringify(files.map((f) => f.filename)),
     );
-    sessionStorage.setItem("printbit.uploadedFile", files[0].filename);
+    sessionStorage.setItem('printbit.uploadedFile', files[0].filename);
   }
 }
 
@@ -323,30 +331,39 @@ function attachSocket(sid: string): void {
     emit: (e: string, ...a: unknown[]) => void;
   };
   const ioFactory = (window as unknown as { io?: () => SocketLike }).io;
-  if (typeof ioFactory !== "function") return;
+  if (typeof ioFactory !== 'function') return;
   if (attachedSessionId === sid) return;
 
   const socket = ioFactory();
   attachedSessionId = sid;
-  socket.emit("joinSession", sid);
-  socket.on("UploadCompleted", () => void checkUploadStatus());
+  socket.emit('joinSession', sid);
+  socket.on('UploadCompleted', () => void checkUploadStatus());
 }
+
+// ── Idle Timeout Detection (uses shared module) ──────────────────────────────
 
 // ── New-session confirmation dialog ───────────────────────────────────────────
 
-const dialogOverlay = document.getElementById("newSessionOverlay") as HTMLElement | null;
-const dialogConfirmBtn = document.getElementById("newSessionConfirm") as HTMLButtonElement | null;
-const dialogCancelBtn = document.getElementById("newSessionCancel") as HTMLButtonElement | null;
+const dialogOverlay = document.getElementById(
+  'newSessionOverlay',
+) as HTMLElement | null;
+const dialogConfirmBtn = document.getElementById(
+  'newSessionConfirm',
+) as HTMLButtonElement | null;
+const dialogCancelBtn = document.getElementById(
+  'newSessionCancel',
+) as HTMLButtonElement | null;
 
 let lastFocusedElement: HTMLElement | null = null;
 
 function showNewSessionDialog(): void {
   const activeElement = document.activeElement;
-  lastFocusedElement = activeElement instanceof HTMLElement ? activeElement : null;
+  lastFocusedElement =
+    activeElement instanceof HTMLElement ? activeElement : null;
 
   if (dialogOverlay) {
-    dialogOverlay.classList.add("is-visible");
-    dialogOverlay.setAttribute("aria-hidden", "false");
+    dialogOverlay.classList.add('is-visible');
+    dialogOverlay.setAttribute('aria-hidden', 'false');
   }
 
   if (dialogConfirmBtn) {
@@ -358,21 +375,21 @@ function showNewSessionDialog(): void {
 
 function hideNewSessionDialog(): void {
   if (dialogOverlay) {
-    dialogOverlay.classList.remove("is-visible");
-    dialogOverlay.setAttribute("aria-hidden", "true");
+    dialogOverlay.classList.remove('is-visible');
+    dialogOverlay.setAttribute('aria-hidden', 'true');
   }
 
-  if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+  if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
     lastFocusedElement.focus();
   }
   lastFocusedElement = null;
 }
 
-dialogCancelBtn?.addEventListener("click", hideNewSessionDialog);
-dialogOverlay?.addEventListener("click", (e) => {
+dialogCancelBtn?.addEventListener('click', hideNewSessionDialog);
+dialogOverlay?.addEventListener('click', (e) => {
   if (e.target === dialogOverlay) hideNewSessionDialog();
 });
-dialogConfirmBtn?.addEventListener("click", () => {
+dialogConfirmBtn?.addEventListener('click', () => {
   hideNewSessionDialog();
   void createSession();
 });
@@ -384,21 +401,25 @@ async function restoreSession(sid: string): Promise<void> {
 
   if (!hotspotConfig) {
     try {
-      const cfgRes = await fetch("/api/config/hotspot");
+      const cfgRes = await fetch('/api/config/hotspot');
       if (cfgRes.ok) hotspotConfig = (await cfgRes.json()) as HotspotConfig;
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   setSessionText(sid);
   setSessionActive(true);
 
-  sessionStorage.setItem("printbit.mode", "print");
-  sessionStorage.setItem("printbit.sessionId", sid);
+  sessionStorage.setItem('printbit.mode', 'print');
+  sessionStorage.setItem('printbit.sessionId', sid);
 
   attachSocket(sid);
   await checkUploadStatus();
 
-  const response = await fetch(`/api/wireless/sessions/${encodeURIComponent(sid)}`);
+  const response = await fetch(
+    `/api/wireless/sessions/${encodeURIComponent(sid)}`,
+  );
   if (response.ok) {
     const session = (await response.json()) as SessionResponse;
     updateUploadLink(session.uploadUrl);
@@ -410,7 +431,7 @@ async function restoreSession(sid: string): Promise<void> {
 
 // ── Events ────────────────────────────────────────────────────────────────────
 
-refreshSessionBtn?.addEventListener("click", () => {
+refreshSessionBtn?.addEventListener('click', () => {
   if (knownFiles.size > 0) {
     showNewSessionDialog();
   } else {
@@ -418,17 +439,41 @@ refreshSessionBtn?.addEventListener("click", () => {
   }
 });
 
-continueBtn?.addEventListener("click", () => {
+continueBtn?.addEventListener('click', () => {
   if (!activeSessionId || !selectedFilename) return;
   window.location.href = `/config?mode=print&sessionId=${encodeURIComponent(activeSessionId)}&file=${encodeURIComponent(selectedFilename)}`;
 });
 
-const savedSessionId = sessionStorage.getItem("printbit.sessionId");
+const savedSessionId = sessionStorage.getItem('printbit.sessionId');
 if (savedSessionId) {
   void restoreSession(savedSessionId);
 } else {
   void createSession();
 }
+
+// Initialize idle timeout with custom session cleanup handler
+void setupPageIdleWarningButton();
+void initializePageIdleTimeout({
+  showWarningModal: true,
+  onTimeout: async () => {
+    // Attempt to cancel session on server
+    if (activeSessionId) {
+      try {
+        const res = await fetch(
+          `/api/wireless/sessions/${activeSessionId}/cancel`,
+          {
+            method: 'DELETE',
+          },
+        );
+        console.log('[IDLE] Session cancelled:', res.status);
+      } catch (err) {
+        console.error('[IDLE] Failed to cancel session:', err);
+      }
+    }
+    // Redirect to home
+    window.location.replace('/');
+  },
+});
 
 export { navigateTo };
 function navigateTo(path: string) {

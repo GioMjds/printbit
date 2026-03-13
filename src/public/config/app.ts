@@ -1,4 +1,22 @@
+import {
+  initializePageIdleTimeout,
+  setupPageIdleWarningButton,
+} from '../../services/idle-timeout';
+
 export {};
+
+// Initialize page idle timeout on load with warning modal
+void setupPageIdleWarningButton();
+void initializePageIdleTimeout({
+  showWarningModal: true,
+  onTimeout: async () => {
+    console.log('[PAGE IDLE] Config page timeout reached, redirecting to home');
+    // Clear state before redirect
+    sessionStorage.removeItem('printbit.config');
+    sessionStorage.removeItem('printbit.sessionId');
+    window.location.replace('/');
+  },
+});
 
 type ColorMode = 'colored' | 'grayscale';
 type Orientation = 'portrait' | 'landscape';

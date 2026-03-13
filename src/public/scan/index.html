@@ -78,7 +78,6 @@
           </svg>
           <h1>Scan &amp; Print</h1>
         </div>
-
       </header>
 
       <!-- ── Main two-column layout ── -->
@@ -244,15 +243,47 @@
 
         <!-- RIGHT — Scan info panel -->
         <section class="controls-col" aria-label="Scan info">
-
           <!-- Scan info card -->
           <div class="scan-info-card">
             <div class="scan-info-card__icon" aria-hidden="true">
               <svg viewBox="0 0 64 64" fill="none">
-                <rect x="8" y="22" width="48" height="26" rx="4" stroke="currentColor" stroke-width="2" fill="currentColor" opacity=".08"/>
-                <line x1="8" y1="33" x2="56" y2="33" stroke="currentColor" stroke-width="2" opacity=".35"/>
-                <rect x="16" y="10" width="32" height="13" rx="2" stroke="currentColor" stroke-width="2" fill="currentColor" opacity=".18"/>
-                <path d="M24 23v-5M40 23v-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <rect
+                  x="8"
+                  y="22"
+                  width="48"
+                  height="26"
+                  rx="4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="currentColor"
+                  opacity=".08"
+                />
+                <line
+                  x1="8"
+                  y1="33"
+                  x2="56"
+                  y2="33"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  opacity=".35"
+                />
+                <rect
+                  x="16"
+                  y="10"
+                  width="32"
+                  height="13"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="currentColor"
+                  opacity=".18"
+                />
+                <path
+                  d="M24 23v-5M40 23v-5"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
               </svg>
             </div>
             <h2 class="scan-info-card__title">How to Scan</h2>
@@ -262,12 +293,14 @@
               <li>Review the preview and proceed to pay</li>
             </ol>
             <div class="scan-info-fee">
-              <p class="scan-info-fee__text" id="softCopyFeeText">Soft copy fee: loading…</p>
+              <p class="scan-info-fee__text" id="softCopyFeeText">
+                Soft copy fee: loading…
+              </p>
             </div>
           </div>
 
           <!-- /scan-info-card -->
-          <div style="display:none">
+          <div style="display: none">
             <!-- (legacy delivery markup kept for reference, not rendered) -->
             <div class="delivery-pre" id="deliveryPre" aria-hidden="true">
               <div class="qr-ghost">
@@ -707,6 +740,29 @@
           </button>
         </div>
       </footer>
+    </div>
+
+    <!-- Idle Warning Modal -->
+    <div
+      id="idleWarningModal"
+      class="idle-warning-overlay"
+      aria-hidden="true"
+      role="alertdialog"
+      aria-labelledby="idleWarningTitle"
+    >
+      <div class="idle-warning-modal">
+        <div class="idle-warning-content">
+          <h2 id="idleWarningTitle" class="idle-warning-title">Session Idle</h2>
+          <p class="idle-warning-subtitle">No activity detected</p>
+          <p class="idle-warning-countdown">
+            Your session will expire in
+            <span id="idleCountdown">30</span> seconds
+          </p>
+          <button id="keepActiveBtn" class="idle-warning-btn">
+            Keep Me Active
+          </button>
+        </div>
+      </div>
     </div>
 
     <script src="/scan/app.js"></script>

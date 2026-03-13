@@ -708,6 +708,31 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+
+    <!-- Idle Warning Modal -->
+    <div
+      id="idleWarningModal"
+      class="idle-warning-overlay"
+      style="display: none"
+    >
+      <div class="idle-warning-modal">
+        <div class="idle-warning-content">
+          <div class="idle-warning-icon" aria-hidden="true">⏱️</div>
+          <h2 class="idle-warning-title">Session Idle</h2>
+          <p class="idle-warning-message">
+            No activity detected. Your session will close in
+            <span id="idleCountdown">0</span>s
+          </p>
+          <p class="idle-warning-subtitle">
+            Click below to keep your session active.
+          </p>
+          <button id="keepActiveBtn" type="button" class="idle-warning-btn">
+            Keep Me Active
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="/confirm/app.js"></script>
   </body>
 </html>
