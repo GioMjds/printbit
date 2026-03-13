@@ -457,6 +457,29 @@
       </footer>
     </div>
 
+    <!-- Idle Warning Modal -->
+    <div
+      id="idleWarningModal"
+      class="idle-warning-overlay"
+      style="display: none"
+      role="alertdialog"
+      aria-labelledby="idleWarningTitle"
+    >
+      <div class="idle-warning-modal">
+        <div class="idle-warning-content">
+          <h2 id="idleWarningTitle" class="idle-warning-title">Session Idle</h2>
+          <p class="idle-warning-subtitle">No activity detected</p>
+          <p class="idle-warning-countdown">
+            Your session will expire in
+            <span id="idleCountdown">30</span> seconds
+          </p>
+          <button id="keepActiveBtn" class="idle-warning-btn">
+            Keep Me Active
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="/copy/app.js"></script>
   </body>
 </html>

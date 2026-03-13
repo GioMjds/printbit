@@ -1,6 +1,25 @@
 import QRCode from 'qrcode';
+import {
+  initializePageIdleTimeout,
+  setupPageIdleWarningButton,
+} from '../../services/idle-timeout';
 
 export {};
+
+// Initialize page idle timeout on load with warning modal
+void setupPageIdleWarningButton();
+void initializePageIdleTimeout({
+  showWarningModal: true,
+  onTimeout: async () => {
+    console.log(
+      '[PAGE IDLE] Confirm page timeout reached, redirecting to home',
+    );
+    // Clear state before redirect
+    sessionStorage.removeItem('printbit.config');
+    sessionStorage.removeItem('printbit.sessionId');
+    window.location.replace('/');
+  },
+});
 
 type SocketLike = {
   on: (event: string, cb: (...args: unknown[]) => void) => void;
@@ -98,10 +117,10 @@ function pageRangeLabel(sel?: PageRangeSelection): string {
 function countPrintPages(): number {
   const total = config.totalPages ?? 1;
   const range = config.pageRange;
-  if (!range || range.type === "all") return total;
-  if (range.type === "single") return 1;
+  if (!range || range.type === 'all') return total;
+  if (range.type === 'single') return 1;
   let count = 0;
-  for (const part of range.range.split(",")) {
+  for (const part of range.range.split(',')) {
     const trimmed = part.trim();
     const m = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
     if (m) {
@@ -123,7 +142,7 @@ function calculateTotalPrice(pricing: PricingResponse): number {
   const base =
     config.mode === 'copy' ? pricing.copyPerPage : pricing.printPerPage;
   const color = config.colorMode === 'colored' ? pricing.colorSurcharge : 0;
-  const pages = config.mode === "print" ? countPrintPages() : 1;
+  const pages = config.mode === 'print' ? countPrintPages() : 1;
   return (base + color) * pages * Math.max(1, config.copies);
 }
 
@@ -225,8 +244,7 @@ function setPrintingPhase(
 
   if (phase === 'printing') {
     if (printingSubtitle) {
-      printingSubtitle.textContent =
-        `Please wait while your document is being ${modeLabel.toLowerCase()}...`;
+      printingSubtitle.textContent = `Please wait while your document is being ${modeLabel.toLowerCase()}...`;
     }
     if (printingHint) {
       printingHint.textContent = 'Do not turn off the machine.';
@@ -236,8 +254,7 @@ function setPrintingPhase(
 
   if (phase === 'dispensing') {
     if (printingSubtitle) {
-      printingSubtitle.textContent =
-        `${modeLabel} done. Dispensing your coin change...`;
+      printingSubtitle.textContent = `${modeLabel} done. Dispensing your coin change...`;
     }
     if (printingHint) {
       printingHint.textContent = 'Please wait until the dispenser completes.';
@@ -247,8 +264,7 @@ function setPrintingPhase(
 
   if (phase === 'failed') {
     if (printingSubtitle) {
-      printingSubtitle.textContent =
-        `${modePast} completed, but coin change dispensing failed.`;
+      printingSubtitle.textContent = `${modePast} completed, but coin change dispensing failed.`;
     }
     if (printingHint) {
       printingHint.textContent =
@@ -265,26 +281,31 @@ function setPrintingPhase(
   }
 }
 
-async function showScanQrOverlay(downloadUrl: string, expiresAt?: string): Promise<void> {
-  const scanQrOverlay = document.getElementById("scanQrOverlay");
-  const scanQrCanvas = document.getElementById("scanQrCanvas") as HTMLCanvasElement | null;
-  const scanQrLinkText = document.getElementById("scanQrLinkText");
-  const scanQrExpiry = document.getElementById("scanQrExpiry");
+async function showScanQrOverlay(
+  downloadUrl: string,
+  expiresAt?: string,
+): Promise<void> {
+  const scanQrOverlay = document.getElementById('scanQrOverlay');
+  const scanQrCanvas = document.getElementById(
+    'scanQrCanvas',
+  ) as HTMLCanvasElement | null;
+  const scanQrLinkText = document.getElementById('scanQrLinkText');
+  const scanQrExpiry = document.getElementById('scanQrExpiry');
 
   if (!scanQrOverlay || !scanQrCanvas) return;
 
   await QRCode.toCanvas(scanQrCanvas, downloadUrl, {
     width: 220,
     margin: 1,
-    color: { dark: "#1a1a2e", light: "#ffffff" },
-    errorCorrectionLevel: "M",
+    color: { dark: '#1a1a2e', light: '#ffffff' },
+    errorCorrectionLevel: 'M',
   });
 
   if (scanQrLinkText) scanQrLinkText.textContent = downloadUrl;
   if (scanQrExpiry && expiresAt) {
     const expiry = new Date(expiresAt).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
+      hour: '2-digit',
+      minute: '2-digit',
     });
     scanQrExpiry.textContent = `Link expires at ${expiry}`;
   }
@@ -298,14 +319,18 @@ async function showScanQrOverlay(downloadUrl: string, expiresAt?: string): Promi
       'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
     return Array.from(
       scanQrOverlay.querySelectorAll<HTMLElement>(focusableSelector),
-    ).filter((el) => !el.hasAttribute("disabled") && !el.getAttribute("aria-hidden"));
+    ).filter(
+      (el) => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'),
+    );
   };
 
   const focusInitialElement = (): void => {
     // Prefer a specific Done button if the markup provides one.
     const doneButton =
-      scanQrOverlay.querySelector<HTMLButtonElement>("#scanQrDoneButton") ??
-      scanQrOverlay.querySelector<HTMLButtonElement>('button[data-scan-qr-done]');
+      scanQrOverlay.querySelector<HTMLButtonElement>('#scanQrDoneButton') ??
+      scanQrOverlay.querySelector<HTMLButtonElement>(
+        'button[data-scan-qr-done]',
+      );
 
     if (doneButton) {
       doneButton.focus();
@@ -319,7 +344,7 @@ async function showScanQrOverlay(downloadUrl: string, expiresAt?: string): Promi
   };
 
   // Use requestAnimationFrame to ensure the overlay is visible before moving focus.
-  if (typeof window !== "undefined" && "requestAnimationFrame" in window) {
+  if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
     window.requestAnimationFrame(focusInitialElement);
   } else {
     focusInitialElement();
@@ -327,10 +352,10 @@ async function showScanQrOverlay(downloadUrl: string, expiresAt?: string): Promi
 
   // Initialize a simple focus trap once per overlay element.
   if (!(scanQrOverlay as HTMLElement).dataset.focusTrapInitialized) {
-    (scanQrOverlay as HTMLElement).dataset.focusTrapInitialized = "true";
+    (scanQrOverlay as HTMLElement).dataset.focusTrapInitialized = 'true';
 
-    scanQrOverlay.addEventListener("keydown", (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return;
+    scanQrOverlay.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
 
       const focusable = getFocusableElements();
       if (focusable.length === 0) return;
@@ -524,23 +549,28 @@ modalConfirmBtn?.addEventListener('click', async () => {
   showOverlay(printingOverlay);
 
   const printingTitle = document.querySelector('.printingTitle');
-  if (printingTitle && config.mode === "scan") {
-    printingTitle.textContent = "Your file is preparing...";
+  if (printingTitle && config.mode === 'scan') {
+    printingTitle.textContent = 'Your file is preparing...';
   }
 
-  if (config.mode === "scan") {
-    if (printingSubtitle) printingSubtitle.textContent = "Processing your payment...";
-    if (printingHint) printingHint.textContent = "Please wait while we secure your download link.";
+  if (config.mode === 'scan') {
+    if (printingSubtitle)
+      printingSubtitle.textContent = 'Processing your payment...';
+    if (printingHint)
+      printingHint.textContent =
+        'Please wait while we secure your download link.';
   } else {
-    setPrintingPhase("printing");
+    setPrintingPhase('printing');
   }
   const MIN_OVERLAY_MS = 3_000;
   const overlayStart = Date.now();
 
-  if (config.mode === "scan") {
+  if (config.mode === 'scan') {
     if (!config.scanFilename) {
       hideOverlay(printingOverlay);
-      if (statusMessage) statusMessage.textContent = "No scan file found. Please go back and scan again.";
+      if (statusMessage)
+        statusMessage.textContent =
+          'No scan file found. Please go back and scan again.';
       isProcessingPayment = false;
       confirmBtn.disabled = false;
       modalConfirmBtn.disabled = false;
@@ -548,24 +578,29 @@ modalConfirmBtn?.addEventListener('click', async () => {
     }
 
     try {
-      const chargeRes = await fetch("/api/scanner/soft-copy/charge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const chargeRes = await fetch('/api/scanner/soft-copy/charge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: config.scanFilename }),
       });
-      const chargeData = (await chargeRes.json()) as { ok?: boolean; error?: string };
+      const chargeData = (await chargeRes.json()) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!chargeRes.ok || chargeData.ok === false) {
         hideOverlay(printingOverlay);
-        if (statusMessage) statusMessage.textContent = chargeData.error ?? "Payment failed. Please add more coins.";
+        if (statusMessage)
+          statusMessage.textContent =
+            chargeData.error ?? 'Payment failed. Please add more coins.';
         isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
         return;
       }
 
-      const linkRes = await fetch("/api/scanner/wireless-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const linkRes = await fetch('/api/scanner/wireless-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: config.scanFilename }),
       });
       const linkData = (await linkRes.json()) as {
@@ -575,7 +610,9 @@ modalConfirmBtn?.addEventListener('click', async () => {
       };
       if (!linkRes.ok || !linkData.downloadUrl) {
         hideOverlay(printingOverlay);
-        if (statusMessage) statusMessage.textContent = linkData.error ?? "Failed to generate download link.";
+        if (statusMessage)
+          statusMessage.textContent =
+            linkData.error ?? 'Failed to generate download link.';
         isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
@@ -583,24 +620,26 @@ modalConfirmBtn?.addEventListener('click', async () => {
       }
 
       const remaining = MIN_OVERLAY_MS - (Date.now() - overlayStart);
-      if (remaining > 0) await new Promise<void>((r) => setTimeout(r, remaining));
+      if (remaining > 0)
+        await new Promise<void>((r) => setTimeout(r, remaining));
       hideOverlay(printingOverlay);
 
       await showScanQrOverlay(linkData.downloadUrl, linkData.expiresAt);
 
-      sessionStorage.removeItem("printbit.config");
-      sessionStorage.removeItem("printbit.uploadedFile");
-      sessionStorage.removeItem("printbit.sessionId");
+      sessionStorage.removeItem('printbit.config');
+      sessionStorage.removeItem('printbit.uploadedFile');
+      sessionStorage.removeItem('printbit.sessionId');
     } catch {
       hideOverlay(printingOverlay);
-      if (statusMessage) statusMessage.textContent = "Network error. Please try again.";
+      if (statusMessage)
+        statusMessage.textContent = 'Network error. Please try again.';
       isProcessingPayment = false;
       confirmBtn.disabled = false;
       modalConfirmBtn.disabled = false;
     }
     isProcessingPayment = false;
     return;
-  } else if (config.mode === "copy") {
+  } else if (config.mode === 'copy') {
     // Copy flow: print the already checked scan file
     if (!config.copyPreviewPath) {
       hideOverlay(printingOverlay);
@@ -806,9 +845,11 @@ thankYouDoneBtn?.addEventListener('click', () => {
   hideOverlay(thankYouOverlay);
   window.location.href = '/';
 });
-const scanQrDoneBtn = document.getElementById("scanQrDoneBtn") as HTMLButtonElement | null;
-scanQrDoneBtn?.addEventListener("click", () => {
-  window.location.href = "/";
+const scanQrDoneBtn = document.getElementById(
+  'scanQrDoneBtn',
+) as HTMLButtonElement | null;
+scanQrDoneBtn?.addEventListener('click', () => {
+  window.location.href = '/';
 });
 resetBalanceBtn?.addEventListener('click', () => {
   void resetBalanceForTesting();

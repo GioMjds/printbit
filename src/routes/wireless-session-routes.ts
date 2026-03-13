@@ -1,4 +1,5 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import type { Express, Request, RequestHandler, Response } from 'express';
 import type { Server } from 'socket.io';
 import { adminService } from '../services/admin';
@@ -300,6 +301,46 @@ export function registerWirelessSessionRoutes(
         contentType: doc.contentType,
         sizeBytes: doc.sizeBytes,
         uploadedAt: doc.uploadedAt,
+      });
+    },
+  );
+
+  app.delete(
+    '/api/wireless/sessions/:sessionId/cancel',
+    async (req: Request, res: Response) => {
+      const { sessionId } = req.params as { sessionId: string };
+
+      // Attempt to cancel the session
+      const result = await deps.sessionStore.cancelSession(sessionId);
+
+      if (!result.success) {
+        await adminService.appendAdminLog(
+          'session_cancel_failed',
+          'Failed to cancel session: session not found or already expired.',
+          {
+            sessionId,
+          },
+        );
+        return res.status(404).json({
+          error: 'Session not found or already expired.',
+          sessionId,
+        });
+      }
+
+      await adminService.appendAdminLog(
+        'session_abandoned',
+        'User session abandoned and cleaned up.',
+        {
+          sessionId,
+          deletedFileCount: result.deletedFileCount,
+          reason: 'idle_timeout',
+        },
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Session cancelled and cleaned up.',
+        deletedFileCount: result.deletedFileCount,
       });
     },
   );

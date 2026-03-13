@@ -243,6 +243,34 @@ export class SessionStore {
     return latest?.token ?? null;
   }
 
+  /** Cancel a session immediately and delete all uploaded files. */
+  async cancelSession(
+    sessionId: string,
+  ): Promise<{ success: boolean; deletedFileCount: number }> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return { success: false, deletedFileCount: 0 };
+    }
+
+    // Delete uploaded files asynchronously to avoid blocking the event loop
+    const docs =
+      session.documents ?? (session.document ? [session.document] : []);
+    const deletionResults = await Promise.allSettled(
+      docs.map((doc) => fs.promises.unlink(doc.filePath)),
+    );
+
+    // Count successful deletions
+    const deletedCount = deletionResults.filter(
+      (result) => result.status === 'fulfilled',
+    ).length;
+
+    // Remove session from maps
+    this.byToken.delete(session.token);
+    this.sessions.delete(sessionId);
+
+    return { success: true, deletedFileCount: deletedCount };
+  }
+
   /** Remove expired sessions and their uploaded files from disk. */
   private cleanupExpired(): void {
     const now = Date.now();
