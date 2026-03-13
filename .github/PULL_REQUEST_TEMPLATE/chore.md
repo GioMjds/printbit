@@ -7,7 +7,7 @@
 - [ ] TypeScript config change (`tsconfig.json`)
 - [ ] Code refactor (no behavior change)
 - [ ] Dead code / unused import removal
-- [ ] Documentation update (`README.md`, `PRINTBIT_NOTES.txt`, etc.)
+- [ ] Documentation update (`README.md`, `PRINTBIT_NOTES.txt`, etc.)   
 - [ ] `.gitignore` or repo config change
 - [ ] GitHub Actions / workflow update
 - [ ] Other: ______
