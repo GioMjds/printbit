@@ -39,7 +39,6 @@ export const requireAdminLocalAccess: RequestHandler = (req, res, next) => {
 };
 
 export const requireAdminPin: RequestHandler = async (req, res, next) => {
-  // Use || so that an empty-string header value falls through to the cookie.
   const headerToken = req.get('x-admin-token') || undefined;
   const cookieToken = (req.cookies?.['adminToken'] as string | undefined) || undefined;
   const token = headerToken ?? cookieToken;

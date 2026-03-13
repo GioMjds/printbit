@@ -144,16 +144,14 @@ export async function apiFetch(
 // ── Auth helpers ─────────────────────────────────────────────────
 
 export async function ensureAuth(): Promise<boolean> {
-  try {
-    // The httpOnly adminToken cookie is sent automatically by the browser;
-    // no need to read it from sessionStorage.
-    const response = await fetch('/api/admin/verify', {
-      method: 'POST',
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
+  const token = getAdminToken();
+  if (!token) return false;
+
+  const response = await fetch('/api/admin/verify', {
+    method: 'POST',
+  });
+
+  return response.ok;
 }
 
 let messageEl: HTMLElement | null = null;
@@ -236,7 +234,12 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
   });
 
   logoutBtn.addEventListener('click', () => {
-    void apiFetch('/api/admin/logout', { method: 'POST' }).finally(() => {
+    const token = getAdminToken();
+    void fetch('/api/admin/logout', {
+      method: 'POST',
+      headers: { 'x-admin-token': token },
+      credentials: 'include',
+    }).finally(() => {
       clearAdminToken();
       showDashboard(false);
       setMessage('Admin panel locked.');
