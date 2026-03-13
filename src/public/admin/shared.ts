@@ -58,7 +58,7 @@ export type SummaryResponse = {
       ink: Array<{
         name: string;
         level: number | null;
-        status: "ok" | "low" | "empty" | "unknown";
+        status: 'ok' | 'low' | 'empty' | 'unknown';
       }>;
       lastCheckedAt: string;
       lastError: string | null;
@@ -89,10 +89,11 @@ export type LogsResponse = {
 
 // ── PIN state via sessionStorage ─────────────────────────────────
 
-const PIN_KEY = "printbit.adminPin";
+const PIN_KEY = 'printbit.adminPin';
+const TOKEN_KEY = 'adminSessionToken';
 
 export function getAdminPin(): string {
-  return sessionStorage.getItem(PIN_KEY) ?? "";
+  return sessionStorage.getItem(PIN_KEY) ?? '';
 }
 
 export function setAdminPin(pin: string): void {
@@ -101,6 +102,18 @@ export function setAdminPin(pin: string): void {
 
 export function clearAdminPin(): void {
   sessionStorage.removeItem(PIN_KEY);
+}
+
+export function getAdminToken(): string {
+  return sessionStorage.getItem(TOKEN_KEY) ?? '';
+}
+
+export function setAdminToken(token: string): void {
+  sessionStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearAdminToken(): void {
+  sessionStorage.removeItem(TOKEN_KEY);
 }
 
 // ── Utilities ────────────────────────────────────────────────────
@@ -120,9 +133,10 @@ export async function apiFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const headers = new Headers(init.headers ?? {});
-  headers.set("x-admin-pin", getAdminPin());
-  if (!headers.has("Content-Type") && init.body) {
-    headers.set("Content-Type", "application/json");
+  const token = getAdminToken();
+  if (token) headers.set('x-admin-token', token);
+  if (!headers.has('Content-Type') && init.body) {
+    headers.set('Content-Type', 'application/json');
   }
   return fetch(path, { ...init, headers });
 }
@@ -130,13 +144,11 @@ export async function apiFetch(
 // ── Auth helpers ─────────────────────────────────────────────────
 
 export async function ensureAuth(): Promise<boolean> {
-  const pin = getAdminPin();
-  if (!pin) return false;
+  const token = getAdminToken();
+  if (!token) return false;
 
-  const response = await fetch("/api/admin/auth", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pin }),
+  const response = await fetch('/api/admin/verify', {
+    method: 'POST',
   });
 
   return response.ok;
@@ -145,7 +157,7 @@ export async function ensureAuth(): Promise<boolean> {
 let messageEl: HTMLElement | null = null;
 
 export function setMessage(text: string): void {
-  if (!messageEl) messageEl = document.getElementById("adminMessage");
+  if (!messageEl) messageEl = document.getElementById('adminMessage');
   if (messageEl) messageEl.textContent = text;
 }
 
@@ -157,62 +169,96 @@ export function setMessage(text: string): void {
  * @returns a cleanup function that stops the auto-refresh timer.
  */
 export function initAuth(onSuccess: () => void | Promise<void>): () => void {
-  const authView = document.getElementById("adminAuthView") as HTMLElement;
-  const dashboard = document.getElementById("adminDashboard") as HTMLElement;
-  const authForm = document.getElementById("adminAuthForm") as HTMLFormElement;
-  const pinInput = document.getElementById("adminPinInput") as HTMLInputElement;
-  const logoutBtn = document.getElementById("logoutBtn") as HTMLButtonElement;
+  const authView = document.getElementById('adminAuthView') as HTMLElement;
+  const dashboard = document.getElementById('adminDashboard') as HTMLElement;
+  const authForm = document.getElementById('adminAuthForm') as HTMLFormElement;
+  const pinInput = document.getElementById('adminPinInput') as HTMLInputElement;
+  const logoutBtn = document.getElementById('logoutBtn') as HTMLButtonElement;
 
   function showDashboard(visible: boolean): void {
-    authView.classList.toggle("hidden", visible);
-    dashboard.classList.toggle("hidden", !visible);
+    authView.classList.toggle('hidden', visible);
+    dashboard.classList.toggle('hidden', !visible);
   }
 
   async function unlock(pin: string): Promise<void> {
-    setAdminPin(pin);
-    const ok = await ensureAuth();
-    if (!ok) throw new Error("Invalid admin PIN.");
+    const response = await fetch('/api/admin/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    if (!response.ok) {
+      let errorMessage = 'Invalid admin PIN.';
+      try {
+        const errorBody = (await response.json()) as unknown;
+        if (
+          errorBody &&
+          typeof errorBody === 'object' &&
+          'error' in errorBody &&
+          typeof (errorBody as { error: unknown }).error === 'string' &&
+          (errorBody as { error: string }).error.trim()
+        ) {
+          errorMessage = (errorBody as { error: string }).error;
+        }
+      } catch {
+        // Ignore JSON parse errors and fall back to default message
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = (await response.json()) as {
+      ok: boolean;
+      sessionToken?: string;
+    };
+    if (data.sessionToken) setAdminToken(data.sessionToken);
 
     showDashboard(true);
     await onSuccess();
   }
 
-  authForm.addEventListener("submit", (e) => {
+  authForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const pin = pinInput.value.trim();
     if (!pin) {
-      setMessage("Please enter admin PIN.");
+      setMessage('Please enter admin PIN.');
       return;
     }
-    setMessage("Unlocking admin panel...");
+    setMessage('Unlocking admin panel...');
     void unlock(pin)
-      .then(() => setMessage("Admin panel unlocked."))
+      .then(() => setMessage('Admin panel unlocked.'))
       .catch((err: unknown) => {
         const msg =
-          err instanceof Error ? err.message : "Failed to unlock admin panel.";
+          err instanceof Error ? err.message : 'Failed to unlock admin panel.';
         setMessage(msg);
         showDashboard(false);
       });
   });
 
-  logoutBtn.addEventListener("click", () => {
-    clearAdminPin();
-    showDashboard(false);
-    setMessage("Admin panel locked.");
+  logoutBtn.addEventListener('click', () => {
+    const token = getAdminToken();
+    void fetch('/api/admin/logout', {
+      method: 'POST',
+      headers: { 'x-admin-token': token },
+      credentials: 'include',
+    }).finally(() => {
+      clearAdminToken();
+      showDashboard(false);
+      setMessage('Admin panel locked.');
+    });
   });
 
-  // Auto-unlock from stored PIN
-  const storedPin = getAdminPin();
-  if (storedPin) {
-    void unlock(storedPin)
-      .then(() => setMessage("Admin panel unlocked."))
-      .catch(() => {
-        clearAdminPin();
-        showDashboard(false);
-      });
-  } else {
-    showDashboard(false);
-  }
+  // On startup, check for an existing valid session (httpOnly cookie sent
+  // automatically) and show the dashboard immediately if authenticated.
+  void ensureAuth()
+    .then((authenticated) => {
+      if (authenticated) {
+        showDashboard(true);
+        return onSuccess();
+      }
+      showDashboard(false);
+    })
+    .catch(() => {
+      showDashboard(false);
+    });
 
   // Return no-op cleanup (pages manage their own timers)
   return () => {};

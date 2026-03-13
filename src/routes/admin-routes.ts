@@ -15,6 +15,15 @@ import {
 import { detectDefaultPrinter, printFile } from '../services/printer';
 import { generateTestPagePdf } from '../services/test-page';
 import { getScannerStatus } from '../services/scanner';
+import {
+  checkLockout,
+  clearLockout,
+  formatRemainingTime,
+  recordFailedAttempt,
+  MAX_ATTEMPTS,
+} from '@/utils/lockout';
+import { hashPassword, verifyPassword } from '@/utils/hash';
+import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
 
 interface RegisterAdminRoutesDeps {
   io: SocketIOServer;
@@ -55,13 +64,82 @@ export function registerAdminRoutes(
   app.post(
     '/api/admin/auth',
     requireAdminLocalAccess,
-    (req: Request, res: Response) => {
-      const pin = typeof req.body?.pin === 'string' ? req.body.pin : '';
-      if (!pin || pin !== db.data!.settings.adminPin) {
-        return res.status(401).json({ ok: false, error: 'Invalid admin PIN.' });
+    async (req: Request, res: Response) => {
+      const pin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
+
+      const lockStatus = checkLockout();
+      if (lockStatus.locked) {
+        await adminService.appendAdminLog(
+          'admin_auth_blocked',
+          `Admin login blocked - account is locked.`,
+        );
+        return res.status(423).json({
+          ok: false,
+          error: `Too many failed attempts. Try again in ${formatRemainingTime(lockStatus.remainingMs!)}.`,
+        });
       }
 
+      if (!pin) {
+        return res.status(400).json({ ok: false, error: 'PIN is required.' });
+      }
+
+      const storedPin = db.data!.settings.adminPin;
+      let valid = false;
+
+      try {
+        valid = await verifyPassword(storedPin, pin);
+      } catch {
+        valid = storedPin === pin;
+      }
+
+      if (!valid) {
+        const attempts = await recordFailedAttempt();
+        const attemptsLeft = Math.max(0, MAX_ATTEMPTS - attempts);
+
+        await adminService.appendAdminLog(
+          'admin_auth_failed',
+          `Admin login failed (attempt ${attempts}/${MAX_ATTEMPTS}).`,
+        );
+
+        const message =
+          attemptsLeft > 0
+            ? `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`
+            : 'Too many failed attempts. Kiosk locked for 10 minutes.';
+
+        return res.status(401).json({ ok: false, error: message });
+      }
+
+      await clearLockout();
+      const sessionToken = createAdminSession();
+
+      res.cookie('adminToken', sessionToken, {
+        httpOnly: true,
+        sameSite: 'strict',
+        maxAge: 5 * 60 * 1000,
+      });
+
       return res.json({ ok: true });
+    },
+  );
+
+  app.post(
+    '/api/admin/logout',
+    requireAdminLocalAccess,
+    requireAdminPin,
+    async (_req: Request, res: Response) => {
+      destroyAdminSession();
+      await adminService.appendAdminLog('admin_logout', 'Admin logged out.');
+      res.clearCookie('adminToken');
+      return res.json({ ok: true });
+    },
+  );
+
+  app.post(
+    '/api/admin/verify',
+    requireAdminLocalAccess,
+    requireAdminPin,
+    (_req: Request, res: Response) => {
+      res.json({ ok: true });
     },
   );
 
@@ -238,8 +316,8 @@ export function registerAdminRoutes(
         );
       }
 
-      if (body.adminPin !== undefined) {
-        db.data!.settings.adminPin = body.adminPin.trim();
+      if (body.adminPin && body.adminPin.trim()) {
+        db.data!.settings.adminPin = await hashPassword(body.adminPin.trim());
       }
 
       if (body.adminLocalOnly !== undefined) {
