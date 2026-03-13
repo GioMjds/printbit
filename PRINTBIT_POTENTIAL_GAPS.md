@@ -1,4 +1,4 @@
-# Potential Gaps for **PrintBit** (*unofficial*)
+# Potential Gaps for **PrintBit**
 
 ## 1\. Ink Monitoring: **HIGH**
 
@@ -131,3 +131,7 @@
 ## 33\. Pilot Metrics & Acceptance Criteria: **MEDIUM**
 
 * Define success metrics before rollout: print success rate, refund rate, mean recovery time, admin response time, and customer complaint rate.
+
+## Documentation baseline recommendation
+
+Before closing deployment-critical gaps, maintain an updated dependency and environment baseline in [INSTALLATION_AND_DEPENDENCIES.md](./INSTALLATION_AND_DEPENDENCIES.md).

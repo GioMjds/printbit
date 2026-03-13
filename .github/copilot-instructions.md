@@ -2,8 +2,8 @@
 
 ## Build, test, and lint commands
 - Install dependencies: `pnpm install`
-- Run kiosk server in dev mode (TypeScript via ts-node-dev): `pnpm dev`
-- Build browser bundle from `src/public/app.ts`: `pnpm build:client`
+- Run kiosk server in dev mode (TypeScript via ts-node-dev): `pnpm run dev`
+- Build browser bundle from `src/public/app.ts`: `pnpm run build`
 - Type-check server/client TypeScript (no emit): `pnpm exec tsc --noEmit`
 - Tests: no test runner or test scripts are currently configured.
 - Single-test command: not available yet (no test framework is configured in this repository).
@@ -20,8 +20,12 @@
 ## Key repository conventions
 - Global styling is on `src/globals.css` and component-specific styles are co-located as `*.css` files next to their respective `*.ts` modules in `src/public/`.
 - Keep backend runtime code in `src/` and browser logic in `src/public/`; do not import browser-only code into server modules.
-- If `src/public/app.ts` changes, regenerate `src/public/bundle.js` with `pnpm build:client` (bundle is checked into the repo and loaded directly by HTML).
+- If `src/public/app.ts` changes, regenerate `src/public/bundle.js` with `pnpm run build` (bundle is checked into the repo and loaded directly by HTML).
 - UI event wiring depends on specific element IDs (`openPrintBtn`, `openCopyBtn`, `openScanBtn`, `openSettingsBtn`, `powerOffBtn`, `balance`) referenced in `app.ts`.
 - The current print pricing logic is fixed in route code (`/print` uses a balance threshold of `5`), and money reset/earnings transfer happens immediately after print dispatch.
 - `uploads/` and `db.json` are runtime state artifacts used by kiosk workflows; avoid destructive changes to these paths during feature work.
 - TypeScript settings are strict with CommonJS modules (`tsconfig.json`), so new modules should follow existing import/export style and strict typing.
+
+## Documentation references
+- Installation/software baseline: `INSTALLATION_AND_DEPENDENCIES.md`.
+- Documentation improvement backlog: `DOCUMENTATION_SUGGESTIONS.md`.

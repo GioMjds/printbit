@@ -59,3 +59,8 @@ For every change, at minimum:
 1. Run `pnpm exec tsc --noEmit`.
 2. Manually verify the affected UI/API flow.
 3. Confirm no regressions in print, upload, or admin behavior related to your change.
+
+## Installation and dependency references
+
+- For required software and external tools, see [INSTALLATION_AND_DEPENDENCIES.md](./INSTALLATION_AND_DEPENDENCIES.md).
+- For proposed future doc improvements, see [DOCUMENTATION_SUGGESTIONS.md](./DOCUMENTATION_SUGGESTIONS.md).

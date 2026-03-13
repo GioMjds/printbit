@@ -69,3 +69,7 @@
 - Scanned files in `uploads/scans` are auto-cleaned based on `PRINTBIT_SCAN_FILE_RETENTION_MS` (default 24 hours).
 - Back up `db.json` before maintenance.
 - Use admin endpoints to clear storage instead of manual destructive deletes when possible.
+
+## Install/software dependency reference
+
+Use [INSTALLATION_AND_DEPENDENCIES.md](./INSTALLATION_AND_DEPENDENCIES.md) as the primary source for software installation and dependency verification.

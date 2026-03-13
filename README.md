@@ -133,3 +133,12 @@ bin/                        # External executables (ex: SumatraPDF.exe)
 - [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [OPERATIONS.md](./OPERATIONS.md)
+- [INSTALLATION_AND_DEPENDENCIES.md](./INSTALLATION_AND_DEPENDENCIES.md)
+- [DOCUMENTATION_SUGGESTIONS.md](./DOCUMENTATION_SUGGESTIONS.md)
+
+## Documentation notes
+
+- For full install/software/dependency setup, start with
+  [`INSTALLATION_AND_DEPENDENCIES.md`](./INSTALLATION_AND_DEPENDENCIES.md).
+- For suggested next documentation improvements, see
+  [`DOCUMENTATION_SUGGESTIONS.md`](./DOCUMENTATION_SUGGESTIONS.md).
