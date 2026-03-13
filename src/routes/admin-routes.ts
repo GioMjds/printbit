@@ -115,7 +115,7 @@ export function registerAdminRoutes(
       res.cookie('adminToken', sessionToken, {
         httpOnly: true,
         sameSite: 'strict',
-        maxAge: 5 * 60 * 1000,
+        maxAge: 24 * 60 * 60 * 1000,
       });
 
       return res.json({ ok: true });
