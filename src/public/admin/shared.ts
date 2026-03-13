@@ -144,14 +144,16 @@ export async function apiFetch(
 // ── Auth helpers ─────────────────────────────────────────────────
 
 export async function ensureAuth(): Promise<boolean> {
-  const token = getAdminToken();
-  if (!token) return false;
-
-  const response = await fetch('/api/admin/verify', {
-    method: "POST",
-  });
-
-  return response.ok;
+  try {
+    // The httpOnly adminToken cookie is sent automatically by the browser;
+    // no need to read it from sessionStorage.
+    const response = await fetch('/api/admin/verify', {
+      method: 'POST',
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 let messageEl: HTMLElement | null = null;
@@ -234,19 +236,26 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
   });
 
   logoutBtn.addEventListener('click', () => {
-    const token = getAdminToken();
-    void fetch('/api/admin/logout', {
-      method: 'POST',
-      headers: { 'x-admin-token': token },
-    }).finally(() => {
+    void apiFetch('/api/admin/logout', { method: 'POST' }).finally(() => {
       clearAdminToken();
       showDashboard(false);
       setMessage('Admin panel locked.');
     });
   });
 
-  // Initialize in locked state; rely on server-side session/token for auth
-  showDashboard(false);
+  // On startup, check for an existing valid session (httpOnly cookie sent
+  // automatically) and show the dashboard immediately if authenticated.
+  void ensureAuth()
+    .then((authenticated) => {
+      if (authenticated) {
+        showDashboard(true);
+        return onSuccess();
+      }
+      showDashboard(false);
+    })
+    .catch(() => {
+      showDashboard(false);
+    });
 
   // Return no-op cleanup (pages manage their own timers)
   return () => {};
