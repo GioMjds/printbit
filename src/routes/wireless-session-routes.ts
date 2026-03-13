@@ -1,16 +1,20 @@
 import path from 'node:path';
-import fs from 'node:fs';
-import type { Express, Request, RequestHandler, Response } from 'express';
+import type { Express, Request, Response } from 'express';
 import type { Server } from 'socket.io';
 import { adminService } from '../services/admin';
 import type { SessionStore } from '../services/session';
 import { generateHtmlPreview, supportsHtmlPreview } from '../services/preview';
 import { detectPdfColorContent } from '@/services/config';
+import {
+  uploadMiddleware,
+  handleMulterError,
+  validateMagicBytes,
+  scanForMalware,
+} from '@/middleware/file-validation';
 
 interface RegisterWirelessSessionRoutesDeps {
   io: Server;
   sessionStore: SessionStore;
-  wirelessUploadSingle: RequestHandler;
   resolvePublicBaseUrl: (req: Request) => URL;
   convertToPdfPreview: (sourcePath: string) => Promise<string>;
 }
@@ -226,7 +230,9 @@ export function registerWirelessSessionRoutes(
 
   app.post(
     '/api/wireless/sessions/:sessionId/upload',
-    deps.wirelessUploadSingle,
+    uploadMiddleware.single('file'),
+    validateMagicBytes,
+    scanForMalware,
     async (req: Request, res: Response) => {
       const { sessionId } = req.params as { sessionId: string };
       const token = (req.query.token as string) ?? '';
@@ -344,4 +350,6 @@ export function registerWirelessSessionRoutes(
       });
     },
   );
+
+  app.use('/api/wireless/sessions/:sessionId/upload', handleMulterError);
 }

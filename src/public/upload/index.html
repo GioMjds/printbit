@@ -63,7 +63,7 @@
           <div>
             <h1 id="uploadTitle" class="card-title">Send to PrintBit</h1>
             <p class="card-sub">
-              PDF, DOC, and DOCX files only · up to 25 MB each
+              PDF, DOCX, JPG, and PNG files only · up to 25 MB each
             </p>
           </div>
         </header>
@@ -143,12 +143,11 @@
               >
             </p>
             <p class="drop-zone__hint">Multiple files supported</p>
-            <!-- Disable first `.xls`, `.xlsx`, `.ppt`, and `.pptx` -->
             <input
               id="fileInput"
               name="file"
               type="file"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+              accept=".pdf,.docx,.jpg,.jpeg,.png"
               multiple
               class="drop-zone__input"
               aria-hidden="true"
