@@ -246,8 +246,19 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
     });
   });
 
-  // Initialize in locked state; rely on server-side session/token for auth
-  showDashboard(false);
+  // On startup, check for an existing valid session (httpOnly cookie sent
+  // automatically) and show the dashboard immediately if authenticated.
+  void ensureAuth()
+    .then((authenticated) => {
+      if (authenticated) {
+        showDashboard(true);
+        return onSuccess();
+      }
+      showDashboard(false);
+    })
+    .catch(() => {
+      showDashboard(false);
+    });
 
   // Return no-op cleanup (pages manage their own timers)
   return () => {};
