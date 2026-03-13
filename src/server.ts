@@ -4,7 +4,7 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import multer from 'multer';
-import cookieParser from "cookie-parser";
+import cookieParser from 'cookie-parser';
 import {
   PORT,
   PORTAL_ASSETS,
@@ -83,7 +83,11 @@ const wirelessUpload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-const ALLOWED_REPORT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_REPORT_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
 
 const reportIssueUpload = multer({
   dest: path.join(UPLOAD_DIR, 'report-issues'),

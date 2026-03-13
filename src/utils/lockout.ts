@@ -1,7 +1,7 @@
 import { db } from '@/services/db';
 
-const MAX_ATTEMPTS = 3;
-const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+export const MAX_ATTEMPTS = 3;
+export const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
 export function checkLockout(): { locked: boolean; remainingMs?: number } {
   const { lockedUntil } = db.data!.adminLockout;
@@ -17,6 +17,7 @@ export function checkLockout(): { locked: boolean; remainingMs?: number } {
   // Lock expired — auto-clear
   db.data!.adminLockout.failedAttempts = 0;
   db.data!.adminLockout.lockedUntil = null;
+  db.write();
   return { locked: false };
 }
 

@@ -1,5 +1,5 @@
-import { LowSync } from 'lowdb';
-import { JSONFileSync } from 'lowdb/node';
+import { Low } from 'lowdb';
+import { JSONFile } from 'lowdb/node';
 import { finiteOr } from '@/utils';
 
 export type PrintMode = 'print' | 'copy' | 'scan';
@@ -409,21 +409,21 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   };
 }
 
-const adapter = new JSONFileSync<Schema>('db.json');
-export const db = new LowSync(adapter, DEFAULT_DATA);
+const adapter = new JSONFile<Schema>('db.json');
+export const db = new Low(adapter, DEFAULT_DATA);
 
-export function initDB() {
+export async function initDB() {
   try {
-    db.read();
+    await db.read();
   } catch (err) {
     // If the file is empty or malformed, initialize with defaults
     db.data = { ...DEFAULT_DATA };
-    db.write();
+    await db.write();
     return;
   }
 
   db.data = normalizeSchema(db.data);
-  db.write();
+  await db.write();
 }
 
 // ── Balance mutex ─────────────────────────────────────────────────────────────

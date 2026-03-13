@@ -75,7 +75,7 @@ settingsForm.addEventListener("submit", (e) => {
         const body = (await response.json()) as { error?: string };
         throw new Error(body.error ?? "Failed to save settings.");
       }
-      setAdminPin(payload.adminPin as string);
+      if (newPin) setAdminPin(newPin);
       await loadData();
       setMessage("Settings saved.");
     })

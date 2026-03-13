@@ -148,7 +148,7 @@ export async function ensureAuth(): Promise<boolean> {
   if (!token) return false;
 
   const response = await fetch('/api/admin/verify', {
-    headers: { 'x-admin-token': token },
+    method: "POST",
   });
 
   return response.ok;
@@ -186,7 +186,24 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin }),
     });
-    if (!response.ok) throw new Error('Invalid admin PIN.');
+    if (!response.ok) {
+      let errorMessage = 'Invalid admin PIN.';
+      try {
+        const errorBody = (await response.json()) as unknown;
+        if (
+          errorBody &&
+          typeof errorBody === 'object' &&
+          'error' in errorBody &&
+          typeof (errorBody as { error: unknown }).error === 'string' &&
+          (errorBody as { error: string }).error.trim()
+        ) {
+          errorMessage = (errorBody as { error: string }).error;
+        }
+      } catch {
+        // Ignore JSON parse errors and fall back to default message
+      }
+      throw new Error(errorMessage);
+    }
 
     const data = (await response.json()) as {
       ok: boolean;

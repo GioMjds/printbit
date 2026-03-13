@@ -20,6 +20,7 @@ import {
   clearLockout,
   formatRemainingTime,
   recordFailedAttempt,
+  MAX_ATTEMPTS,
 } from '@/utils/lockout';
 import { hashPassword, verifyPassword } from '@/utils/hash';
 import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
@@ -93,11 +94,11 @@ export function registerAdminRoutes(
 
       if (!valid) {
         const attempts = await recordFailedAttempt();
-        const attemptsLeft = Math.max(0, 3 - attempts);
+        const attemptsLeft = Math.max(0, MAX_ATTEMPTS - attempts);
 
         await adminService.appendAdminLog(
           'admin_auth_failed',
-          `Admin login failed (attempt ${attempts}/3).`,
+          `Admin login failed (attempt ${attempts}/${MAX_ATTEMPTS}).`,
         );
 
         const message =
@@ -117,7 +118,7 @@ export function registerAdminRoutes(
         maxAge: 5 * 60 * 1000,
       });
 
-      return res.json({ ok: true, sessionToken });
+      return res.json({ ok: true });
     },
   );
 
@@ -133,7 +134,7 @@ export function registerAdminRoutes(
     },
   );
 
-  app.post('/api/auth/verify', requireAdminPin, (_req: Request, res: Response) => {
+  app.post('/api/admin/verify', requireAdminLocalAccess, requireAdminPin, (_req: Request, res: Response) => {
     res.json({ ok: true });
   })
 
@@ -318,7 +319,7 @@ export function registerAdminRoutes(
         db.data!.settings.adminLocalOnly = Boolean(body.adminLocalOnly);
       }
 
-      db.write();
+      await db.write();
       await adminService.appendAdminLog(
         'admin_settings_updated',
         'Admin settings updated.',

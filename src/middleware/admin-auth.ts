@@ -39,13 +39,13 @@ export const requireAdminLocalAccess: RequestHandler = (req, res, next) => {
 };
 
 export const requireAdminPin: RequestHandler = async (req, res, next) => {
-  const token = req.headers['x-admin-token'] ?? req.cookies?.['adminToken'];
+  const headerToken = req.get('x-admin-token') ?? undefined;
+  const cookieToken = req.cookies?.['adminToken'];
+  const token = headerToken ?? cookieToken;
   if (!token || !validateAdminSession(token)) {
-    return res
-      .status(401)
-      .json({
-        error: 'Admin session invalid or expired. Please log in again.',
-      });
+    return res.status(401).json({
+      error: 'Admin session invalid or expired. Please log in again.',
+    });
   }
   return next();
 };
