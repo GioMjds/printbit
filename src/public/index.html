@@ -409,11 +409,7 @@
     </div>
 
     <!-- Report floating button -->
-    <button
-      class="report-fab"
-      id="openReportBtn"
-      aria-label="Report an issue"
-    >
+    <button class="report-fab" id="openReportBtn" aria-label="Report an issue">
       <svg
         viewBox="0 0 20 20"
         fill="currentColor"
@@ -442,7 +438,8 @@
           Report an Issue
         </h3>
         <p class="report-modal__sub">
-          Scan with your phone to describe the problem and attach photos as evidence.
+          Scan with your phone to describe the problem and attach photos as
+          evidence.
         </p>
         <div class="report-modal__qr-wrap" id="reportQrWrap">
           <canvas id="reportQrCanvas"></canvas>
@@ -525,6 +522,46 @@
         >
           Close
         </button>
+      </div>
+    </div>
+
+    <!-- Admin PIN modal — no visible entry point, triggered by hidden tap sequence -->
+    <div class="admin-overlay" id="adminOverlay" aria-hidden="true">
+      <div
+        class="admin-modal"
+        role="dialog"
+        aria-labelledby="adminModalTitle"
+        aria-modal="true"
+      >
+        <h3 class="admin-modal__title" id="adminModalTitle">Admin Access</h3>
+        <p class="admin-modal__sub">Enter PIN to continue</p>
+        <input
+          class="admin-modal__input"
+          id="adminPinInput"
+          type="password"
+          inputmode="numeric"
+          maxlength="12"
+          placeholder="••••"
+          autocomplete="off"
+          aria-label="Admin PIN"
+        />
+        <p class="admin-modal__error" id="adminPinError" aria-live="polite"></p>
+        <div class="admin-modal__actions">
+          <button
+            class="admin-modal__btn admin-modal__btn--cancel"
+            id="adminCancelBtn"
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            class="admin-modal__btn admin-modal__btn--submit"
+            id="adminSubmitBtn"
+            type="button"
+          >
+            Enter
+          </button>
+        </div>
       </div>
     </div>
 
