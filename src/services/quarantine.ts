@@ -4,8 +4,8 @@ import { adminService } from './admin';
 
 const QUARANTINE_DIR = path.resolve('uploads', 'quarantine');
 
-function ensureQuarantineDir(): void {
-  fs.mkdirSync(QUARANTINE_DIR, { recursive: true });
+async function ensureQuarantineDir(): Promise<void> {
+  await fs.promises.mkdir(QUARANTINE_DIR, { recursive: true });
 }
 
 export interface QuarantineRecord {
@@ -29,7 +29,7 @@ export async function quarantineBuffer(
   virusName?: string,
 ): Promise<void> {
   try {
-    ensureQuarantineDir();
+    await ensureQuarantineDir();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const safeName = path
@@ -39,7 +39,7 @@ export async function quarantineBuffer(
     const filePath = path.join(QUARANTINE_DIR, savedAs);
 
     // Write the raw buffer to quarantine — never process it further
-    fs.writeFileSync(filePath, buffer);
+    await fs.promises.writeFile(filePath, buffer);
 
     const record: QuarantineRecord = {
       timestamp: new Date().toISOString(),

@@ -38,6 +38,8 @@ function fileFilter(
     );
     return;
   }
+
+  cb(null, true);
 }
 
 export const uploadMiddleware = multer({
@@ -89,6 +91,86 @@ function matchesMagicBytes(buffer: Buffer, mime: string): boolean {
   });
 }
 
+function findEndOfCentralDirectoryOffset(buffer: Buffer): number {
+  const eocdSignature = 0x06054b50;
+  const minEocdLength = 22;
+  const maxCommentLength = 0xffff;
+
+  if (buffer.length < minEocdLength) return -1;
+
+  const searchStart = Math.max(
+    0,
+    buffer.length - minEocdLength - maxCommentLength,
+  );
+
+  for (
+    let offset = buffer.length - minEocdLength;
+    offset >= searchStart;
+    offset -= 1
+  ) {
+    if (buffer.readUInt32LE(offset) === eocdSignature) {
+      return offset;
+    }
+  }
+
+  return -1;
+}
+
+function validateDocxMagic(buffer: Buffer): boolean {
+  const centralDirectoryHeaderSignature = 0x02014b50;
+  const eocdOffset = findEndOfCentralDirectoryOffset(buffer);
+
+  if (eocdOffset === -1) return false;
+
+  const centralDirectorySize = buffer.readUInt32LE(eocdOffset + 12);
+  const centralDirectoryOffset = buffer.readUInt32LE(eocdOffset + 16);
+  const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
+
+  if (
+    centralDirectoryOffset < 0 ||
+    centralDirectorySize <= 0 ||
+    centralDirectoryEnd > buffer.length
+  ) {
+    return false;
+  }
+
+  let cursor = centralDirectoryOffset;
+  let hasContentTypes = false;
+  let hasWordEntry = false;
+
+  while (cursor + 46 <= centralDirectoryEnd) {
+    if (buffer.readUInt32LE(cursor) !== centralDirectoryHeaderSignature) {
+      return false;
+    }
+
+    const fileNameLength = buffer.readUInt16LE(cursor + 28);
+    const extraFieldLength = buffer.readUInt16LE(cursor + 30);
+    const fileCommentLength = buffer.readUInt16LE(cursor + 32);
+    const fileNameStart = cursor + 46;
+    const fileNameEnd = fileNameStart + fileNameLength;
+
+    if (fileNameEnd > centralDirectoryEnd) return false;
+
+    const entryName = buffer.toString('utf8', fileNameStart, fileNameEnd);
+
+    if (entryName === '[Content_Types].xml') {
+      hasContentTypes = true;
+    }
+
+    if (entryName.startsWith('word/') && entryName.length > 'word/'.length) {
+      hasWordEntry = true;
+    }
+
+    if (hasContentTypes && hasWordEntry) {
+      return true;
+    }
+
+    cursor = fileNameEnd + extraFieldLength + fileCommentLength;
+  }
+
+  return false;
+}
+
 export async function validateMagicBytes(
   req: Request,
   res: Response,
@@ -103,7 +185,12 @@ export async function validateMagicBytes(
 
   const mime = file.mimetype.toLowerCase();
 
-  if (!matchesMagicBytes(file.buffer, mime)) {
+  const hasValidMagicBytes = matchesMagicBytes(file.buffer, mime);
+  const isDocxMime =
+    mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const isValidDocx = !isDocxMime || (hasValidMagicBytes && validateDocxMagic(file.buffer));
+
+  if (!hasValidMagicBytes || isValidDocx) {
     void quarantineBuffer(
       file.buffer,
       file.originalname,

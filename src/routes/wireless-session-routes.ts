@@ -32,6 +32,51 @@ export function registerWirelessSessionRoutes(
   app: Express,
   deps: RegisterWirelessSessionRoutesDeps,
 ) {
+  const extractUploadToken = (req: Request): string => {
+    const queryToken = req.query.token;
+    if (typeof queryToken === 'string' && queryToken.trim().length > 0) {
+      return queryToken;
+    }
+
+    const headerToken =
+      req.header('x-session-token') ?? req.header('x-upload-token');
+    if (headerToken && headerToken.trim().length > 0) {
+      return headerToken;
+    }
+
+    const authorizationHeader = req.header('authorization');
+    if (!authorizationHeader) return '';
+
+    const bearerMatch = authorizationHeader.match(/^Bearer\s+(.+)$/i);
+    return bearerMatch?.[1]?.trim() ?? '';
+  };
+
+  const verifyUploadTarget = (
+    req: Request,
+    res: Response,
+    next: () => void,
+  ) => {
+    const { sessionId } = req.params as { sessionId?: string };
+    const token = extractUploadToken(req);
+
+    if (!sessionId || !token) {
+      return res.status(401).json({ error: 'Missing session or token.' });
+    }
+
+    const publicBaseUrl = deps.resolvePublicBaseUrl(req);
+    const session = deps.sessionStore.tryGetSession(sessionId, publicBaseUrl);
+
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found.' });
+    }
+
+    if (session.token !== token) {
+      return res.status(403).json({ error: 'Invalid token for session.' });
+    }
+
+    next();
+  };
+
   app.get('/api/wireless/sessions', (req: Request, res: Response) => {
     const publicBaseUrl = deps.resolvePublicBaseUrl(req);
     const session = deps.sessionStore.createSession(publicBaseUrl);
@@ -230,12 +275,13 @@ export function registerWirelessSessionRoutes(
 
   app.post(
     '/api/wireless/sessions/:sessionId/upload',
+    verifyUploadTarget,
     uploadMiddleware.single('file'),
     validateMagicBytes,
     scanForMalware,
     async (req: Request, res: Response) => {
       const { sessionId } = req.params as { sessionId: string };
-      const token = (req.query.token as string) ?? '';
+      const token = extractUploadToken(req);
       const file = req.file;
 
       if (!file) {
