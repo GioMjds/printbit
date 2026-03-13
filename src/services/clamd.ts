@@ -77,13 +77,12 @@ export async function scanBuffer(buffer: Buffer): Promise<ScanResult> {
 export async function isClamdReachable(): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
-    const timeout = setTimeout(() => {
+    socket.setTimeout(3_000, () => {
       socket.destroy();
       resolve(false);
-    }, 3_000);
+    });
 
     socket.connect(CLAMD_PORT, CLAMD_HOST, () => {
-      clearTimeout(timeout);
       socket.write('zPING\0');
     });
 
@@ -93,7 +92,6 @@ export async function isClamdReachable(): Promise<boolean> {
     });
 
     socket.on('error', () => {
-      clearTimeout(timeout);
       resolve(false);
     });
   });

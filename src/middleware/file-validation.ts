@@ -19,16 +19,25 @@ function fileFilter(
 ): void {
   const ext = path.extname(file.originalname).toLowerCase();
   const mime = file.mimetype.toLowerCase();
-
-  if (!ALLOWED_EXTENSIONS.has(ext) || !ALLOWED_MIME_TYPES.has(mime)) {
-    return cb(
+  const pairAllowed =
+    (ext === '.pdf' && mime === 'application/pdf') ||
+    (ext === '.docx' &&
+      mime ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+    ((ext === '.jpg' || ext === '.jpeg') && mime === 'image/jpeg') ||
+    (ext === '.png' && mime === 'image/png');
+  if (
+    !ALLOWED_EXTENSIONS.has(ext) ||
+    !ALLOWED_MIME_TYPES.has(mime) ||
+    !pairAllowed
+  ) {
+    cb(
       Object.assign(new Error('Invalid file type'), {
         code: 'UNSUPPORTED_TYPE',
       }),
     );
+    return;
   }
-
-  cb(null, true);
 }
 
 export const uploadMiddleware = multer({
@@ -49,26 +58,25 @@ export function handleMulterError(
         code: 'FILE_TOO_LARGE',
         error: `File size exceeds the limit of ${MAX_FILE_SIZE_LABEL}.`,
       });
-      res.status(400).json({
-        code: 'UPLOAD_ERROR',
-        error: error.message,
-      });
       return;
     }
-
-    if (
-      error instanceof Error &&
-      (error as Error & { code?: string }).code === 'UNSUPPORTED_TYPE'
-    ) {
-      res.status(415).json({
-        code: 'UNSUPPORTED_FILE_TYPE',
-        error: error.message,
-      });
-      return;
-    }
-
-    next(error);
+    res.status(400).json({
+      code: 'UPLOAD_ERROR',
+      error: error.message,
+    });
+    return;
   }
+  if (
+    error instanceof Error &&
+    (error as Error & { code?: string }).code === 'UNSUPPORTED_TYPE'
+  ) {
+    res.status(415).json({
+      code: 'UNSUPPORTED_FILE_TYPE',
+      error: error.message,
+    });
+    return;
+  }
+  next(error);
 }
 
 function matchesMagicBytes(buffer: Buffer, mime: string): boolean {
