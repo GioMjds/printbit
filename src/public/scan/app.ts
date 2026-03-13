@@ -7,12 +7,19 @@ export {};
 
 // ── Idle Timeout with Warning Modal (Scan Page) ───────────────────────────────────────────────
 
-// Initialize page idle timeout on load with warning modal
-void setupPageIdleWarningButton();
 void initializePageIdleTimeout({
   showWarningModal: true,
   onTimeout: async () => {
     console.log('[PAGE IDLE] Scan page timeout reached, redirecting to home');
+    // Cancel server-side session if exists
+    const sessionId = sessionStorage.getItem('printbit.sessionId');
+    if (sessionId) {
+      try {
+        await fetch(`/api/wireless/sessions/${sessionId}/cancel`, { method: 'DELETE' });
+      } catch {
+        // Best-effort cleanup
+      }
+    }
     // Clear state before redirect
     sessionStorage.removeItem('printbit.config');
     sessionStorage.removeItem('printbit.sessionId');
