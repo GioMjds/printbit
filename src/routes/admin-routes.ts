@@ -134,9 +134,14 @@ export function registerAdminRoutes(
     },
   );
 
-  app.post('/api/admin/verify', requireAdminLocalAccess, requireAdminPin, (_req: Request, res: Response) => {
-    res.json({ ok: true });
-  })
+  app.post(
+    '/api/admin/verify',
+    requireAdminLocalAccess,
+    requireAdminPin,
+    (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    },
+  );
 
   app.get(
     '/api/admin/summary',

@@ -148,7 +148,7 @@ export async function ensureAuth(): Promise<boolean> {
   if (!token) return false;
 
   const response = await fetch('/api/admin/verify', {
-    method: "POST",
+    method: 'POST',
   });
 
   return response.ok;
@@ -238,6 +238,7 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
     void fetch('/api/admin/logout', {
       method: 'POST',
       headers: { 'x-admin-token': token },
+      credentials: 'include',
     }).finally(() => {
       clearAdminToken();
       showDashboard(false);
