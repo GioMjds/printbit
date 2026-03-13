@@ -138,17 +138,20 @@ export async function apiFetch(
   if (!headers.has('Content-Type') && init.body) {
     headers.set('Content-Type', 'application/json');
   }
-  return fetch(path, { ...init, headers });
+  return fetch(path, { ...init, headers, credentials: 'include' });
 }
 
 // ── Auth helpers ─────────────────────────────────────────────────
 
 export async function ensureAuth(): Promise<boolean> {
+  const headers = new Headers();
   const token = getAdminToken();
-  if (!token) return false;
+  if (token) headers.set('x-admin-token', token);
 
   const response = await fetch('/api/admin/verify', {
     method: 'POST',
+    headers,
+    credentials: 'include',
   });
 
   return response.ok;
