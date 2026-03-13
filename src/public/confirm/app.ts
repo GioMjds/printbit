@@ -214,7 +214,15 @@ function updateChangeDisplay(balance: number): void {
 //   printerReady, pricingLoaded, or currentBalance.
 function applyConfirmGate(): void {
   if (!confirmBtn || !statusMessage) return;
-  if (isProcessingPayment) return;
+  if (isProcessingPayment) {
+    confirmBtn.disabled = true;
+    confirmBtn.setAttribute('aria-disabled', 'true');
+    if (modalConfirmBtn) {
+      modalConfirmBtn.disabled = true;
+      modalConfirmBtn.setAttribute('aria-disabled', 'true');
+    }
+    return;
+  }
 
   // Gate 1: pricing not yet loaded
   if (!pricingLoaded) {
@@ -612,6 +620,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
       isProcessingPayment = false;
       confirmBtn.disabled = false;
       modalConfirmBtn.disabled = false;
+      applyConfirmGate();
       return;
     }
 
@@ -633,6 +642,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
+        applyConfirmGate();
         return;
       }
 
@@ -654,6 +664,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
+        applyConfirmGate();
         return;
       }
 
@@ -676,6 +687,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
       modalConfirmBtn.disabled = false;
     }
     isProcessingPayment = false;
+    applyConfirmGate();
     return;
   } else if (config.mode === 'copy') {
     // Copy flow: print the already checked scan file
@@ -686,8 +698,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
           'No checked document found. Please go back to /copy and tap Check for Document again.';
       }
       isProcessingPayment = false;
-      confirmBtn.disabled = false;
-      modalConfirmBtn.disabled = false;
+      applyConfirmGate();
       return;
     }
 
@@ -715,8 +726,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
           statusMessage.textContent =
             payload.error ?? 'Failed to start copy job.';
         isProcessingPayment = false;
-        confirmBtn.disabled = false;
-        modalConfirmBtn.disabled = false;
+        applyConfirmGate();
         return;
       }
 
@@ -744,21 +754,18 @@ modalConfirmBtn?.addEventListener('click', async () => {
         if (statusMessage)
           statusMessage.textContent = 'Copy job failed. Please try again.';
         isProcessingPayment = false;
-        confirmBtn.disabled = false;
-        modalConfirmBtn.disabled = false;
+        applyConfirmGate();
       } else {
         if (statusMessage) statusMessage.textContent = 'Copy was cancelled.';
         isProcessingPayment = false;
-        confirmBtn.disabled = false;
-        modalConfirmBtn.disabled = false;
+        applyConfirmGate();
       }
     } catch {
       hideOverlay(printingOverlay);
       if (statusMessage)
         statusMessage.textContent = 'Network error during copy job.';
       isProcessingPayment = false;
-      confirmBtn.disabled = false;
-      modalConfirmBtn.disabled = false;
+      applyConfirmGate();
     }
   } else {
     // Print flow: existing behavior
@@ -786,8 +793,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         statusMessage.textContent =
           payload.error ?? 'Payment confirmation failed.';
       isProcessingPayment = false;
-      confirmBtn.disabled = false;
-      modalConfirmBtn.disabled = false;
+      applyConfirmGate();
       return;
     }
 
@@ -835,6 +841,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
     sessionStorage.removeItem('printbit.sessionId');
   }
   isProcessingPayment = false;
+  applyConfirmGate();
 });
 
 async function pollCopyJob(jobId: string): Promise<string> {
