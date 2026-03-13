@@ -10,6 +10,10 @@ import {
   type HopperErrorCodeValue,
   HopperErrorCode,
 } from './hopper-protocol';
+// [PHASE 5 - PRINTER GATE] Import printer telemetry and blocked status set
+// so we can refuse coin credits when the printer is offline or faulted.
+import { getPrinterTelemetry } from './printer-status';
+import { BLOCKED_STATUSES } from '@/utils';
 
 const ACCEPTED_COINS = new Set([1, 5, 10, 20]);
 const FRAGMENT_WINDOW_MS = 140;
@@ -351,6 +355,53 @@ async function attemptSerialConnection(io: Server, attempt: number) {
       };
 
       const processToken = async (token: string) => {
+        // ── [PHASE 5 - PRINTER GATE] ────────────────────────────────────────
+        // The coin acceptor hardware cannot be disabled over serial — it's a
+        // one-way pulse interface. Instead we gate credit at the server level:
+        // if the printer is offline or in a blocked state, we absorb the coin
+        // signal, emit a warning, and log it. The coin physically enters the
+        // machine but no balance credit is given, preventing users from paying
+        // for a job the printer cannot fulfill.
+        //
+        // getPrinterTelemetry() reads from the 30 s cached value — no extra
+        // PowerShell call on every coin pulse.
+        const telemetry = getPrinterTelemetry();
+        const printerBlocked =
+          !telemetry.connected || BLOCKED_STATUSES.has(telemetry.status);
+
+        if (printerBlocked) {
+          const coinValue = Number(token.replace(/[^0-9]/g, ''));
+          const reason = !telemetry.connected
+            ? 'Printer not connected'
+            : `Printer status: ${telemetry.status}`;
+
+          console.warn(
+            `[SERIAL] ⚠ Coin rejected — printer unavailable (${reason}). Token: "${token}"`,
+          );
+
+          io.emit('coinRejected', {
+            value: coinValue > 0 ? coinValue : null,
+            reason,
+            printerStatus: telemetry.status,
+          });
+
+          void adminService.appendAdminLog(
+            'coin_rejected_printer_unavailable',
+            `Coin rejected: printer unavailable (${reason}).`,
+            {
+              token,
+              printerStatus: telemetry.status,
+              printerConnected: telemetry.connected,
+            },
+          );
+
+          // Clear any pending fragment state so it doesn't carry over to the
+          // next coin insertion once the printer recovers.
+          clearPending();
+          return;
+        }
+        // ── [END PHASE 5 GATE] ───────────────────────────────────────────────
+
         console.log(`[SERIAL] Token: "${token}"`);
         if (pendingPrefix) {
           if (token === '0') {
