@@ -82,6 +82,9 @@ const DEFAULT_PRICING: PricingResponse = {
 let totalPrice = 0;
 let pricingLoaded = false;
 let currentBalance = 0;
+// [PRINTER GUARD] Starts false — fail-safe: UI stays locked until the first
+// /api/printer/status check confirms the printer is online.
+let printerReady = false;
 
 if (!rawConfig) {
   const storedSessionId = sessionStorage.getItem('printbit.sessionId');
@@ -206,30 +209,73 @@ function updateChangeDisplay(balance: number): void {
   }
 }
 
+// [PRINTER GUARD] Single source of truth for whether the user can proceed.
+// Called whenever any of the three gating conditions change:
+//   printerReady, pricingLoaded, or currentBalance.
+function applyConfirmGate(): void {
+  if (!confirmBtn || !statusMessage) return;
+  if (isProcessingPayment) {
+    confirmBtn.disabled = true;
+    confirmBtn.setAttribute('aria-disabled', 'true');
+    if (modalConfirmBtn) {
+      modalConfirmBtn.disabled = true;
+      modalConfirmBtn.setAttribute('aria-disabled', 'true');
+    }
+    return;
+  }
+
+  // Gate 1: pricing not yet loaded
+  if (!pricingLoaded) {
+    confirmBtn.disabled = true;
+    confirmBtn.setAttribute('aria-disabled', 'true');
+    if (modalConfirmBtn) {
+      modalConfirmBtn.disabled = true;
+      modalConfirmBtn.setAttribute('aria-disabled', 'true');
+    }
+    statusMessage.textContent = 'Loading pricing...';
+    return;
+  }
+
+  // Gate 2: printer not ready — blocks button AND coin insertion guidance
+  if (!printerReady) {
+    confirmBtn.disabled = true;
+    confirmBtn.setAttribute('aria-disabled', 'true');
+    if (modalConfirmBtn) {
+      modalConfirmBtn.disabled = true;
+      modalConfirmBtn.setAttribute('aria-disabled', 'true');
+    }
+    statusMessage.textContent =
+      'Printer unavailable. Please wait for printer connection before inserting coins.';
+    return;
+  }
+
+  // Gate 3: insufficient balance
+  if (currentBalance >= totalPrice) {
+    confirmBtn.disabled = false;
+    confirmBtn.setAttribute('aria-disabled', 'false');
+    if (modalConfirmBtn) {
+      modalConfirmBtn.disabled = false;
+      modalConfirmBtn.setAttribute('aria-disabled', 'false');
+    }
+    statusMessage.textContent =
+      'Sufficient balance detected. You can confirm now.';
+  } else {
+    const needed = totalPrice - currentBalance;
+    confirmBtn.disabled = true;
+    confirmBtn.setAttribute('aria-disabled', 'true');
+    if (modalConfirmBtn) {
+      modalConfirmBtn.disabled = true;
+      modalConfirmBtn.setAttribute('aria-disabled', 'true');
+    }
+    statusMessage.textContent = `Insert more coins: ₱ ${needed} remaining.`;
+  }
+}
+
 function updateBalanceUI(balance: number): void {
   currentBalance = balance;
   if (balanceValue) balanceValue.textContent = `₱ ${balance}`;
   updateChangeDisplay(balance);
-  if (!statusMessage || !confirmBtn) return;
-  if (isProcessingPayment) return;
-  if (!pricingLoaded) {
-    statusMessage.textContent = 'Loading pricing...';
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    return;
-  }
-
-  if (balance >= totalPrice) {
-    statusMessage.textContent =
-      'Sufficient balance detected. You can confirm now.';
-    confirmBtn.disabled = false;
-    confirmBtn.setAttribute('aria-disabled', 'false');
-  } else {
-    const needed = totalPrice - balance;
-    statusMessage.textContent = `Insert more coins: ₱ ${needed} remaining.`;
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-  }
+  applyConfirmGate(); // [PRINTER GUARD] replaced inline enable/disable logic
 }
 
 function setCoinEventMessage(message: string): void {
@@ -574,6 +620,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
       isProcessingPayment = false;
       confirmBtn.disabled = false;
       modalConfirmBtn.disabled = false;
+      applyConfirmGate();
       return;
     }
 
@@ -595,6 +642,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
+        applyConfirmGate();
         return;
       }
 
@@ -616,6 +664,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         isProcessingPayment = false;
         confirmBtn.disabled = false;
         modalConfirmBtn.disabled = false;
+        applyConfirmGate();
         return;
       }
 
@@ -638,6 +687,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
       modalConfirmBtn.disabled = false;
     }
     isProcessingPayment = false;
+    applyConfirmGate();
     return;
   } else if (config.mode === 'copy') {
     // Copy flow: print the already checked scan file
@@ -648,8 +698,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
           'No checked document found. Please go back to /copy and tap Check for Document again.';
       }
       isProcessingPayment = false;
-      confirmBtn.disabled = false;
-      modalConfirmBtn.disabled = false;
+      applyConfirmGate();
       return;
     }
 
@@ -677,8 +726,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
           statusMessage.textContent =
             payload.error ?? 'Failed to start copy job.';
         isProcessingPayment = false;
-        confirmBtn.disabled = false;
-        modalConfirmBtn.disabled = false;
+        applyConfirmGate();
         return;
       }
 
@@ -706,21 +754,18 @@ modalConfirmBtn?.addEventListener('click', async () => {
         if (statusMessage)
           statusMessage.textContent = 'Copy job failed. Please try again.';
         isProcessingPayment = false;
-        confirmBtn.disabled = false;
-        modalConfirmBtn.disabled = false;
+        applyConfirmGate();
       } else {
         if (statusMessage) statusMessage.textContent = 'Copy was cancelled.';
         isProcessingPayment = false;
-        confirmBtn.disabled = false;
-        modalConfirmBtn.disabled = false;
+        applyConfirmGate();
       }
     } catch {
       hideOverlay(printingOverlay);
       if (statusMessage)
         statusMessage.textContent = 'Network error during copy job.';
       isProcessingPayment = false;
-      confirmBtn.disabled = false;
-      modalConfirmBtn.disabled = false;
+      applyConfirmGate();
     }
   } else {
     // Print flow: existing behavior
@@ -748,8 +793,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         statusMessage.textContent =
           payload.error ?? 'Payment confirmation failed.';
       isProcessingPayment = false;
-      confirmBtn.disabled = false;
-      modalConfirmBtn.disabled = false;
+      applyConfirmGate();
       return;
     }
 
@@ -797,6 +841,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
     sessionStorage.removeItem('printbit.sessionId');
   }
   isProcessingPayment = false;
+  applyConfirmGate();
 });
 
 async function pollCopyJob(jobId: string): Promise<string> {
@@ -962,9 +1007,52 @@ if (typeof ioFactory === 'function') {
       }
     }
   });
+
+  // [PRINTER GUARD] React to real-time printer state from printer-monitor.ts.
+  // printerMalfunction fires when the printer enters a blocked/offline state.
+  // printerRecovered fires when it comes back online.
+  socket.on('printerMalfunction', () => {
+    printerReady = false;
+    applyConfirmGate();
+    setCoinEventMessage(
+      '⚠ Printer offline — do not insert coins until connection is restored.',
+    );
+  });
+
+  socket.on('printerRecovered', () => {
+    printerReady = true;
+    applyConfirmGate();
+    setCoinEventMessage('✓ Printer connected. You may now insert coins.');
+  });
+}
+
+// [PRINTER GUARD] Fetches current printer readiness on page load.
+// Must resolve before loadPricing/fetchInitialBalance so the gate is set
+// before the balance UI attempts to enable the confirm button.
+async function loadPrinterStatus(): Promise<void> {
+  try {
+    const res = await fetch('/api/printer/status');
+    if (!res.ok) {
+      printerReady = false;
+      applyConfirmGate();
+      return;
+    }
+    const data = (await res.json()) as { ready: boolean; status: string };
+    printerReady = data.ready;
+    if (!printerReady) {
+      setCoinEventMessage(
+        `⚠ Printer status: ${data.status}. Do not insert coins yet.`,
+      );
+    }
+  } catch {
+    // Network error — fail safe: keep printer locked
+    printerReady = false;
+  }
+  applyConfirmGate();
 }
 
 async function boot(): Promise<void> {
+  await loadPrinterStatus(); // [PRINTER GUARD] must run first
   await loadPricing();
   await fetchInitialBalance();
 }

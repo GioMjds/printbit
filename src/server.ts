@@ -29,6 +29,7 @@ import {
   registerWirelessSessionRoutes,
   registerScanRoutes,
   registerCopyRoutes,
+  registerPrinterRoutes,
 } from '@/routes';
 import {
   initDB,
@@ -178,6 +179,7 @@ registerWirelessSessionRoutes(app, {
 });
 registerScanRoutes(app, { io, resolvePublicBaseUrl });
 registerCopyRoutes(app, { io });
+registerPrinterRoutes(app);
 
 io.on('connection', (socket) => {
   socket.on('joinSession', (sessionId: string) => {

@@ -11,10 +11,16 @@ import {
   HopperErrorCode,
 } from './hopper-protocol';
 
+// [PHASE 5 - PRINTER GATE] Import printer telemetry and blocked status set
+// so we can refuse coin credits when the printer is offline or faulted.
+import { getPrinterTelemetry } from './printer-status';
+import { BLOCKED_STATUSES } from '@/utils';
+
 const ACCEPTED_COINS = new Set([1, 5, 10, 20]);
 const FRAGMENT_WINDOW_MS = 140;
+const TELEMETRY_MAX_AGE_MS = 45_000;
 const RETRY_INTERVAL_MS = 5_000;
-const MAX_RETRIES = 12; // ~60 seconds of retrying
+const MAX_RETRIES = 12; // 60 seconds of retrying
 
 let serialConnected = false;
 let serialPortPath: string | null = null;
@@ -315,6 +321,72 @@ async function attemptSerialConnection(io: Server, attempt: number) {
         });
       };
 
+      const getPrinterAvailability = () => {
+        const telemetry = getPrinterTelemetry();
+        const checkedAtMs = Date.parse(telemetry.lastCheckedAt);
+        const telemetryStale =
+          !Number.isFinite(checkedAtMs) ||
+          Date.now() - checkedAtMs > TELEMETRY_MAX_AGE_MS;
+        const printerBlocked =
+          telemetryStale ||
+          !telemetry.connected ||
+          BLOCKED_STATUSES.has(telemetry.status);
+
+        const reason = telemetryStale
+          ? 'Printer telemetry is stale'
+          : !telemetry.connected
+            ? 'Printer not connected'
+            : `Printer status: ${telemetry.status}`;
+
+        return {
+          telemetry,
+          printerBlocked,
+          reason,
+        };
+      };
+
+      const rejectCoinCredit = (
+        token: string,
+        value: number,
+        reason: string,
+        telemetry: ReturnType<typeof getPrinterTelemetry>,
+      ) => {
+        console.warn(
+          `[SERIAL] ⚠ Coin rejected — printer unavailable (${reason}). Token: "${token}"`,
+        );
+
+        io.emit('coinRejected', {
+          value: value > 0 ? value : null,
+          reason,
+          printerStatus: telemetry.status,
+          telemetryLastCheckedAt: telemetry.lastCheckedAt,
+        });
+
+        void adminService.appendAdminLog(
+          'coin_rejected_printer_unavailable',
+          `Coin rejected: printer unavailable (${reason}).`,
+          {
+            token,
+            coinValue: value > 0 ? value : null,
+            printerStatus: telemetry.status,
+            printerConnected: telemetry.connected,
+            telemetryLastCheckedAt: telemetry.lastCheckedAt,
+          },
+        );
+
+        clearPending();
+      };
+
+      const creditResolvedCoin = async (coinValue: number, token: string) => {
+        const { telemetry, printerBlocked, reason } = getPrinterAvailability();
+        if (printerBlocked) {
+          rejectCoinCredit(token, coinValue, reason, telemetry);
+          return;
+        }
+
+        await persistBalance(coinValue);
+      };
+
       const flushPending = async (reason: 'timeout' | 'interrupted') => {
         if (!pendingPrefix) return;
         const prefix = pendingPrefix;
@@ -324,7 +396,7 @@ async function attemptSerialConnection(io: Server, attempt: number) {
         clearPending();
 
         if (prefix === '1') {
-          await persistBalance(1);
+          await creditResolvedCoin(1, prefix);
           return;
         }
 
@@ -357,7 +429,7 @@ async function attemptSerialConnection(io: Server, attempt: number) {
             const combined = Number(`${pendingPrefix}${token}`);
             clearPending();
             if (ACCEPTED_COINS.has(combined)) {
-              await persistBalance(combined);
+              await creditResolvedCoin(combined, `${pendingPrefix}${token}`);
             } else {
               io.emit('coinParserWarning', {
                 code: 'INVALID_COMBINATION',
@@ -407,7 +479,7 @@ async function attemptSerialConnection(io: Server, attempt: number) {
           return;
         }
 
-        await persistBalance(value);
+        await creditResolvedCoin(value, token);
       };
 
       parser.on('data', (rawLine: string) => {
