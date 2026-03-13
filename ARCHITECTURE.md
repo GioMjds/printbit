@@ -121,3 +121,8 @@ Ephemeral (process memory):
 - Prioritizes kiosk availability even when optional hardware is unavailable.
 - Uses strict request validation in most job endpoints.
 - Uses mixed legacy and newer routes; migration toward unified APIs is ongoing.
+
+## Dependency context
+
+- Runtime and external software dependency details are documented in [INSTALLATION_AND_DEPENDENCIES.md](./INSTALLATION_AND_DEPENDENCIES.md).
+- Operational installation notes and checks are in [OPERATIONS.md](./OPERATIONS.md).

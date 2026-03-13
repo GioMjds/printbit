@@ -295,3 +295,7 @@ Marks a single owed change entry as resolved. Returns `{ ok, entry }`. Returns `
 ### `POST /api/admin/owed-changes/resolve-all`
 
 Bulk-resolves all open owed change entries. Returns `{ ok, resolvedCount }`.
+
+## Installation notes
+
+Before testing API routes that interact with hardware, complete the setup checklist in [INSTALLATION_AND_DEPENDENCIES.md](./INSTALLATION_AND_DEPENDENCIES.md).
