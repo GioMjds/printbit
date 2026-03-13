@@ -190,7 +190,7 @@ export async function validateMagicBytes(
     mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   const isValidDocx = !isDocxMime || (hasValidMagicBytes && validateDocxMagic(file.buffer));
 
-  if (!hasValidMagicBytes || isValidDocx) {
+  if (!hasValidMagicBytes || !isValidDocx) {
     void quarantineBuffer(
       file.buffer,
       file.originalname,

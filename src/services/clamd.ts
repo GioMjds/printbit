@@ -47,7 +47,7 @@ export async function scanBuffer(buffer: Buffer): Promise<ScanResult> {
 
     socket.on('end', () => {
       clearTimeout(timeout);
-      const trimmed = response.trim();
+      const trimmed = response.replace(/\0/g, '').trim();
 
       // ClamAV responds with either:
       //   "stream: OK"
@@ -88,7 +88,7 @@ export async function isClamdReachable(): Promise<boolean> {
 
     socket.on('data', (data) => {
       socket.destroy();
-      resolve(data.toString().trim() === 'PONG');
+      resolve(data.toString().replace(/\0/g, '').trim() === 'PONG');
     });
 
     socket.on('error', () => {
