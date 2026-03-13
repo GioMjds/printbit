@@ -193,7 +193,6 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
       sessionToken?: string;
     };
     if (data.sessionToken) setAdminToken(data.sessionToken);
-    setAdminPin(pin);
 
     showDashboard(true);
     await onSuccess();
@@ -223,25 +222,14 @@ export function initAuth(onSuccess: () => void | Promise<void>): () => void {
       method: 'POST',
       headers: { 'x-admin-token': token },
     }).finally(() => {
-      clearAdminPin();
       clearAdminToken();
       showDashboard(false);
       setMessage('Admin panel locked.');
     });
   });
 
-  // Auto-unlock from stored PIN
-  const storedPin = getAdminPin();
-  if (storedPin) {
-    void unlock(storedPin)
-      .then(() => setMessage('Admin panel unlocked.'))
-      .catch(() => {
-        clearAdminPin();
-        showDashboard(false);
-      });
-  } else {
-    showDashboard(false);
-  }
+  // Initialize in locked state; rely on server-side session/token for auth
+  showDashboard(false);
 
   // Return no-op cleanup (pages manage their own timers)
   return () => {};
