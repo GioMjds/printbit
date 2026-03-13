@@ -79,10 +79,6 @@ function getLocalIPv4(): string | null {
 }
 
 const upload = multer({ dest: UPLOAD_DIR });
-const wirelessUpload = multer({
-  dest: UPLOAD_DIR,
-  limits: { fileSize: 25 * 1024 * 1024 },
-});
 
 const ALLOWED_REPORT_IMAGE_TYPES = new Set([
   'image/jpeg',
@@ -173,7 +169,6 @@ registerUploadPortalRoutes(app, {
 registerWirelessSessionRoutes(app, {
   io,
   sessionStore,
-  wirelessUploadSingle: wirelessUpload.single('file'),
   resolvePublicBaseUrl,
   convertToPdfPreview,
 });

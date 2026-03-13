@@ -197,7 +197,12 @@ export class SessionStore {
     const documentId = randomUUID();
     const safeName = `${documentId}${allowedExt}`;
     const destPath = path.join(this.uploadDir, safeName);
-    await fs.promises.rename(file.path, destPath);
+
+    if (!file.buffer) {
+      throw new Error('Uploaded file is missing in-memory content buffer.');
+    }
+
+    await fs.promises.writeFile(destPath, file.buffer);
 
     const document: UploadedDocument = {
       documentId,
