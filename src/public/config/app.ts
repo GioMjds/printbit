@@ -228,6 +228,7 @@ class PrintPreview {
 
   async load(sessionId: string, filename?: string): Promise<void> {
     this.iframe.onload = null; // clear any stale iframe load handler
+    this.controls.style.display = 'none';
     this.showLoading(true);
     this.showCanvas(false);
     this.showImg(false);
@@ -361,6 +362,9 @@ class PrintPreview {
   private async loadImage(url: string): Promise<void> {
     return new Promise((resolve) => {
       this.img.onload = () => {
+        this.totalPages = 1;
+        this.currentPage = 1;
+        this.updatePager();
         this.showImg(true);
         this.showCanvas(false);
         this.showLoading(false);
@@ -391,7 +395,10 @@ class PrintPreview {
 
   private updatePager(): void {
     const multi = this.totalPages > 1;
-    this.controls.style.display = multi ? 'flex' : 'none';
+    this.controls.style.display = 'flex';
+    this.pagePrev.hidden = !multi;
+    this.pageNext.hidden = !multi;
+    this.pagerLabel.hidden = !multi;
     this.pagerLabel.textContent = `${this.currentPage} / ${this.totalPages}`;
     this.pagePrev.disabled = this.currentPage <= 1;
     this.pageNext.disabled = this.currentPage >= this.totalPages;
@@ -448,6 +455,7 @@ class PrintPreview {
     this.showLoading(false);
     this.showCanvas(false);
     this.showImg(false);
+    this.controls.style.display = 'none';
     this.iframe.style.display = 'none';
     const text = document.getElementById('placeholderText');
     if (text) text.textContent = msg;
