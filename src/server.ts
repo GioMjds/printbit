@@ -5,6 +5,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import multer from 'multer';
 import cookieParser from 'cookie-parser';
+import { startClamd, stopClamd } from './services/clamd-process';
 import {
   PORT,
   PORTAL_ASSETS,
@@ -192,6 +193,7 @@ async function start() {
 
   startPrinterMonitor(io);
 
+  await startClamd();
   // Launch MyPublicWiFi hotspot on startup (idempotent — Print page can re-call safely)
   await startHotspot();
 
