@@ -83,7 +83,6 @@ export class PrinterService {
 
     parts.push(options.colorMode === 'colored' ? 'color' : 'monochrome');
     parts.push(options.orientation === 'landscape' ? 'landscape' : 'portrait');
-    parts.push(options.duplex ? 'duplex' : 'simplex');
     if (typeof options.duplex === 'boolean') {
       parts.push(options.duplex ? 'duplex' : 'simplex');
     }

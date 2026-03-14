@@ -82,7 +82,7 @@ export function registerWirelessSessionRoutes(
   const analyzeAndStoreDocument = async (
     req: Request,
     sessionId: string,
-    filename?: string,
+    documentId?: string,
   ) => {
     const publicBaseUrl = deps.resolvePublicBaseUrl(req);
     const session = deps.sessionStore.tryGetSession(sessionId, publicBaseUrl);
@@ -97,9 +97,11 @@ export function registerWirelessSessionRoutes(
           ? [session.document]
           : [];
 
-    const target = filename
-      ? docs.find((doc) => doc.filename === filename)
-      : (session.document ?? docs[docs.length - 1]);
+    const fallbackDocumentId = session.document?.documentId;
+    const targetDocumentId = documentId ?? fallbackDocumentId;
+    const target = targetDocumentId
+      ? docs.find((doc) => doc.documentId === targetDocumentId) ?? null
+      : (docs[docs.length - 1] ?? null);
 
     if (!target) {
       return { error: 'Document not found.', status: 404 as const };
@@ -419,7 +421,11 @@ export function registerWirelessSessionRoutes(
 
       const docExtension = path.extname(doc.filename).toLowerCase();
       if (POWERPOINT_EXTENSIONS.has(docExtension)) {
-        const analyzed = await analyzeAndStoreDocument(req, sessionId, doc.filename);
+        const analyzed = await analyzeAndStoreDocument(
+          req,
+          sessionId,
+          doc.documentId,
+        );
         if (!('analysis' in analyzed)) {
           deps.io.to(`session:${sessionId}`).emit('UploadFailed');
           await adminService.appendAdminLog(
@@ -438,7 +444,7 @@ export function registerWirelessSessionRoutes(
           });
         }
       } else {
-        void analyzeAndStoreDocument(req, sessionId, doc.filename).catch(
+        void analyzeAndStoreDocument(req, sessionId, doc.documentId).catch(
           (error) => {
             console.warn(
               '[analyze-document] Failed to analyze uploaded file:',
@@ -515,7 +521,9 @@ export function registerWirelessSessionRoutes(
     '/api/wireless/sessions/:sessionId/analyze',
     async (req: Request, res: Response) => {
       const { sessionId } = req.params as { sessionId: string };
-      const { filename } = (req.body ?? {}) as { filename: string };
+      const { documentId } = (req.body ?? {}) as {
+        documentId?: string;
+      };
 
       const token = extractUploadToken(req);
 
@@ -538,7 +546,7 @@ export function registerWirelessSessionRoutes(
         const analyzed = await analyzeAndStoreDocument(
           req,
           sessionId,
-          filename,
+          documentId,
         );
         if (!('analysis' in analyzed)) {
           return res.status(analyzed.status).json({ error: analyzed.error });
