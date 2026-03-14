@@ -21,6 +21,7 @@ const FRAGMENT_WINDOW_MS = 140;
 const TELEMETRY_MAX_AGE_MS = 45_000;
 const RETRY_INTERVAL_MS = 5_000;
 const MAX_RETRIES = 12; // 60 seconds of retrying
+const LEGACY_START_TIMEOUT_EXTENSION_MS = 20_000;
 
 let serialConnected = false;
 let serialPortPath: string | null = null;
@@ -42,10 +43,32 @@ export interface HopperCommandResult {
 interface PendingHopperCommand {
   requestId: string;
   resolve: (result: HopperCommandResult) => void;
-  timer: NodeJS.Timeout;
+  timer: NodeJS.Timeout | null;
+  sawLegacyStart: boolean;
 }
 
 let pendingHopperCommand: PendingHopperCommand | null = null;
+
+function armPendingHopperTimeout(
+  pending: PendingHopperCommand,
+  timeoutMs: number,
+): void {
+  if (pending.timer) clearTimeout(pending.timer);
+  pending.timer = setTimeout(() => {
+    if (pendingHopperCommand !== pending) return;
+
+    const startedWithoutDone = pending.sawLegacyStart;
+    completePendingHopperCommand({
+      ok: false,
+      message: startedWithoutDone
+        ? `Hopper started dispensing but no DONE signal was received within ${timeoutMs}ms.`
+        : `Hopper timeout after ${timeoutMs}ms.`,
+      errorCode: startedWithoutDone
+        ? HopperErrorCode.SENSOR
+        : HopperErrorCode.MOTOR_TIMEOUT,
+    });
+  }, timeoutMs);
+}
 
 export function getSerialStatus() {
   return {
@@ -69,7 +92,7 @@ function completePendingHopperCommand(result: HopperCommandResult): boolean {
   if (!pendingHopperCommand) return false;
   const pending = pendingHopperCommand;
   pendingHopperCommand = null;
-  clearTimeout(pending.timer);
+  if (pending.timer) clearTimeout(pending.timer);
   hopperCommandPending = false;
 
   if (result.ok) {
@@ -169,6 +192,11 @@ function tryHandleHopperResponse(rawLine: string): boolean {
           total,
         });
       }
+      pendingHopperCommand.sawLegacyStart = true;
+      armPendingHopperTimeout(
+        pendingHopperCommand,
+        LEGACY_START_TIMEOUT_EXTENSION_MS,
+      );
       console.log(`[SERIAL] Hopper legacy START received: ${line}`);
       return true;
     }
@@ -236,15 +264,14 @@ export async function sendHopperCommand(
     : 8000;
 
   return await new Promise<HopperCommandResult>((resolve) => {
-    const timer = setTimeout(() => {
-      completePendingHopperCommand({
-        ok: false,
-        message: `Hopper timeout after ${normalizedTimeout}ms.`,
-        errorCode: HopperErrorCode.MOTOR_TIMEOUT,
-      });
-    }, normalizedTimeout);
-
-    pendingHopperCommand = { requestId: requestId ?? '', resolve, timer };
+    const pending: PendingHopperCommand = {
+      requestId: requestId ?? '',
+      resolve,
+      timer: null,
+      sawLegacyStart: false,
+    };
+    pendingHopperCommand = pending;
+    armPendingHopperTimeout(pending, normalizedTimeout);
     hopperCommandPending = true;
 
     activeSerialPort!.write(`${command.trim()}\n`, (error) => {

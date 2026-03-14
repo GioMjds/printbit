@@ -1087,6 +1087,28 @@ if (typeof ioFactory === 'function') {
     }
   });
 
+  socket.on('changeDispenseProgress', (payload: unknown) => {
+    if (!payload || typeof payload !== 'object') return;
+
+    const dispensed =
+      'dispensed' in payload &&
+      typeof (payload as { dispensed: unknown }).dispensed === 'number'
+        ? (payload as { dispensed: number }).dispensed
+        : 0;
+    const total =
+      'total' in payload &&
+      typeof (payload as { total: unknown }).total === 'number'
+        ? (payload as { total: number }).total
+        : 0;
+
+    if (total <= 0) return;
+
+    setPrintingPhase('dispensing');
+    if (statusMessage) {
+      statusMessage.textContent = `Dispensing change: ${dispensed} / ${total} coin${total === 1 ? '' : 's'}...`;
+    }
+  });
+
   // [PRINTER GUARD] React to real-time printer state from printer-monitor.ts.
   // printerMalfunction fires when the printer enters a blocked/offline state.
   // printerRecovered fires when it comes back online.

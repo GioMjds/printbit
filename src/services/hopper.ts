@@ -194,8 +194,10 @@ class HopperService {
     const maxAttempts = Math.max(1, Math.floor(settings.retryCount) + 1);
     let lastMessage = 'Unknown hopper failure.';
     let lastResult: HopperCommandResult | null = null;
+    let performedAttempts = 0;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      performedAttempts = attempt;
       stats.dispenseAttempts += 1;
       const requestId = generateRequestId();
       const command = buildDispenseCommand(requestId, coins);
@@ -220,7 +222,7 @@ class HopperService {
           requestedCoins: coins,
           dispensedCoins: dispensed,
           message: result.message,
-          attempts: attempt,
+          attempts: performedAttempts,
         };
       }
 
@@ -252,7 +254,7 @@ class HopperService {
       requestedCoins: coins,
       dispensedCoins: 0,
       message: lastMessage,
-      attempts: maxAttempts,
+      attempts: performedAttempts,
       owedChangeId: owed.id,
       errorCode: lastResult?.errorCode,
     };
