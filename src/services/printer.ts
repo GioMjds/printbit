@@ -98,7 +98,15 @@ export class PrinterService {
     console.log('[PRINTER] Options:', JSON.stringify(options, null, 2));
 
     return new Promise((resolve, reject) => {
-      const filePath = path.resolve('uploads', filename);
+      const uploadsDir = path.resolve('uploads');
+      const filePath = path.resolve(uploadsDir, filename);
+      const relativePath = path.relative(uploadsDir, filePath);
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        console.error(
+          '[PRINTER] ✗ Invalid filename — outside uploads directory',
+        );
+        return reject(new Error('Invalid filename'));
+      }
       const fileExists = fs.existsSync(filePath);
       console.log(
         `[PRINTER] Resolved path: ${filePath} (exists: ${fileExists})`,

@@ -28,6 +28,7 @@ const IMAGE_TYPES: Record<string, string> = {
 
 // Only PPT/PPTX still go through LibreOffice; doc/docx use Word COM → PDF
 const PDF_CONVERT_EXTENSIONS = new Set(['.doc', '.docx', '.ppt', '.pptx']);
+const POWERPOINT_EXTENSIONS = new Set(['.ppt', '.pptx']);
 
 export function registerWirelessSessionRoutes(
   app: Express,
@@ -104,10 +105,36 @@ export function registerWirelessSessionRoutes(
       return { error: 'Document not found.', status: 404 as const };
     }
 
+    const targetExtension = path.extname(target.filename).toLowerCase();
+    let analysisFilePath = target.filePath;
+    let analysisContentType = target.contentType;
+    let analysisFilename = target.filename;
+
+    if (
+      PDF_CONVERT_EXTENSIONS.has(targetExtension) &&
+      POWERPOINT_EXTENSIONS.has(targetExtension)
+    ) {
+      try {
+        analysisFilePath = await deps.convertToPdfPreview(
+          path.resolve(target.filePath),
+        );
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : 'Unknown conversion error';
+        return {
+          error: `PowerPoint conversion failed before analysis: ${reason}`,
+          status: 422 as const,
+        };
+      }
+
+      analysisContentType = 'application/pdf';
+      analysisFilename = `${path.basename(target.filename, targetExtension)}.pdf`;
+    }
+
     const analysis = await analyzeDocument({
-      filePath: target.filePath,
-      contentType: target.contentType,
-      filename: target.filename,
+      filePath: analysisFilePath,
+      contentType: analysisContentType,
+      filename: analysisFilename,
       convertToPdfPreview: deps.convertToPdfPreview,
     });
 
@@ -390,14 +417,36 @@ export function registerWirelessSessionRoutes(
 
       const doc = result.document;
 
-      void analyzeAndStoreDocument(req, sessionId, doc.filename).catch(
-        (error) => {
-          console.warn(
-            '[analyze-document] Failed to analyze uploaded file:',
-            error,
+      const docExtension = path.extname(doc.filename).toLowerCase();
+      if (POWERPOINT_EXTENSIONS.has(docExtension)) {
+        const analyzed = await analyzeAndStoreDocument(req, sessionId, doc.filename);
+        if (!('analysis' in analyzed)) {
+          deps.io.to(`session:${sessionId}`).emit('UploadFailed');
+          await adminService.appendAdminLog(
+            'upload_failed',
+            'Wireless upload failed during required PowerPoint analysis.',
+            {
+              sessionId,
+              filename: doc.filename,
+              documentId: doc.documentId,
+              reason: analyzed.error,
+            },
           );
-        },
-      );
+          return res.status(analyzed.status).json({
+            code: 'ANALYSIS_FAILED',
+            error: analyzed.error,
+          });
+        }
+      } else {
+        void analyzeAndStoreDocument(req, sessionId, doc.filename).catch(
+          (error) => {
+            console.warn(
+              '[analyze-document] Failed to analyze uploaded file:',
+              error,
+            );
+          },
+        );
+      }
 
       deps.io.to(`session:${sessionId}`).emit('UploadCompleted', doc);
       await adminService.appendAdminLog(

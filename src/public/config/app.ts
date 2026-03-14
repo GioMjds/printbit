@@ -603,6 +603,8 @@ let quoteError: string | null = null;
 let quoteLoading = false;
 let quoteRequestVersion = 0;
 let quoteDebounceHandle: number | null = null;
+const QUOTE_409_RETRY_ATTEMPTS = 5;
+const QUOTE_409_RETRY_DELAY_MS = 300;
 
 [pageModeAll, pageModeCustom, pageModeSingle].forEach((el) => {
   el?.addEventListener('change', () => {
@@ -733,6 +735,12 @@ function setPrintContinueState(): void {
   continueBtn.setAttribute('aria-disabled', canContinue ? 'false' : 'true');
 }
 
+function waitForQuoteRetry(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 async function refreshPrintQuote(): Promise<void> {
   if (mode !== 'print' || !sessionId) return;
   if (pageModeCustom?.checked && pageRangeInput && !pageRangeInput.checkValidity()) {
@@ -748,41 +756,75 @@ async function refreshPrintQuote(): Promise<void> {
   const requestVersion = ++quoteRequestVersion;
   quoteLoading = true;
   quoteError = null;
-  currentPrintQuote = null;
   updateSummary();
   setPrintContinueState();
 
   try {
     const cfg = currentPreviewConfig();
-    const response = await fetch('/api/print/quote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        documentId: selectedDocumentId ?? undefined,
-        copies: getCopies(),
-        colorMode: cfg.colorMode,
-        orientation: cfg.orientation,
-        paperSize: cfg.paperSize,
-        pageRange: getPageRange(),
-        duplex: false,
-      }),
+    const requestBody = JSON.stringify({
+      sessionId,
+      documentId: selectedDocumentId ?? undefined,
+      copies: getCopies(),
+      colorMode: cfg.colorMode,
+      orientation: cfg.orientation,
+      paperSize: cfg.paperSize,
+      pageRange: getPageRange(),
+      duplex: false,
     });
+
+    let resolvedQuote: PrintQuote | null = null;
+    let resolvedError: string | null = null;
+
+    for (let attempt = 0; attempt < QUOTE_409_RETRY_ATTEMPTS; attempt += 1) {
+      if (requestVersion !== quoteRequestVersion) return;
+
+      let response: Response;
+      try {
+        response = await fetch('/api/print/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: requestBody,
+        });
+      } catch {
+        resolvedError = 'Network error while calculating price.';
+        break;
+      }
+
+      if (requestVersion !== quoteRequestVersion) return;
+
+      let payload: { error?: string; quote?: PrintQuote } = {};
+      try {
+        payload = (await response.json()) as {
+          error?: string;
+          quote?: PrintQuote;
+        };
+      } catch {
+        payload = {};
+      }
+
+      if (response.status === 409 && attempt < QUOTE_409_RETRY_ATTEMPTS - 1) {
+        await waitForQuoteRetry(QUOTE_409_RETRY_DELAY_MS);
+        continue;
+      }
+
+      if (!response.ok || !payload.quote) {
+        resolvedError = payload.error ?? 'Failed to calculate price.';
+        break;
+      }
+
+      resolvedQuote = payload.quote;
+      break;
+    }
 
     if (requestVersion !== quoteRequestVersion) return;
 
-    const payload = (await response.json()) as {
-      error?: string;
-      quote?: PrintQuote;
-    };
-    if (!response.ok || !payload.quote) {
-      quoteError = payload.error ?? 'Failed to calculate price.';
+    if (resolvedQuote) {
+      currentPrintQuote = resolvedQuote;
+      quoteError = null;
+    } else {
       currentPrintQuote = null;
-      return;
+      quoteError = resolvedError ?? 'Failed to calculate price.';
     }
-
-    currentPrintQuote = payload.quote;
-    quoteError = null;
   } catch {
     if (requestVersion !== quoteRequestVersion) return;
     currentPrintQuote = null;
