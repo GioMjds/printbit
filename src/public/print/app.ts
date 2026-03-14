@@ -5,7 +5,7 @@ import {
 } from '../../services/idle-timeout';
 
 type UploadedFile = {
-  documentId: string;
+  documentId?: string;
   filename: string;
   size?: number;
   sizeBytes?: number;
@@ -105,21 +105,24 @@ function formatBytes(bytes: number): string {
 
 function fileKey(file: UploadedFile): string {
   const bytes = file.size ?? file.sizeBytes ?? -1;
-  return `${file.documentId}::${file.filename}::${bytes}`;
+  return `${file.documentId || file.filename}::${file.filename}::${bytes}`;
 }
 
 // ── File list rendering ───────────────────────────────────────────────────────
 
 function selectFile(file: UploadedFile): void {
+  const resolvedDocumentId = file.documentId || file.filename;
   selectedFilename = file.filename;
-  selectedDocumentId = file.documentId;
+  selectedDocumentId = resolvedDocumentId;
+  sessionStorage.setItem('printbit.uploadedFile', file.filename);
+  sessionStorage.setItem('printbit.uploadedDocumentId', resolvedDocumentId);
 
   // Update aria-selected on all items
   fileList?.querySelectorAll('.file-item').forEach((el) => {
     const fileEl = el as HTMLElement;
     const selected =
       fileEl.dataset.filename === file.filename &&
-      fileEl.dataset.documentId === file.documentId;
+      fileEl.dataset.documentId === resolvedDocumentId;
     el.setAttribute('aria-selected', String(selected));
   });
 
@@ -149,7 +152,7 @@ function addFileToList(file: UploadedFile): void {
   li.role = 'option';
   li.setAttribute('aria-selected', 'false');
   li.dataset.filename = file.filename;
-  li.dataset.documentId = file.documentId;
+  li.dataset.documentId = file.documentId || file.filename;
 
   li.innerHTML = `
     <div class="file-item__icon" aria-hidden="true">
@@ -317,7 +320,7 @@ async function checkUploadStatus(): Promise<void> {
         : [];
 
   const files: UploadedFile[] = rawFiles.map((file) => ({
-    documentId: file.documentId,
+    documentId: file.documentId || file.filename,
     filename: file.filename,
     size: file.size ?? file.sizeBytes,
     sizeBytes: file.sizeBytes,
@@ -331,7 +334,10 @@ async function checkUploadStatus(): Promise<void> {
       JSON.stringify(files.map((f) => f.filename)),
     );
     sessionStorage.setItem('printbit.uploadedFile', files[0].filename);
-    sessionStorage.setItem('printbit.uploadedDocumentId', files[0].documentId);
+    sessionStorage.setItem(
+      'printbit.uploadedDocumentId',
+      files[0].documentId ?? files[0].filename,
+    );
   }
 }
 

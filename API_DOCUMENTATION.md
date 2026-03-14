@@ -54,7 +54,7 @@ Request:
 ```json
 {
   "sessionId": "uuid",
-  "filename": "optional-selected-file",
+  "documentId": "optional-selected-document-id",
   "copies": 2,
   "colorMode": "colored",
   "pageRange": { "type": "custom", "range": "1-3,5" },
@@ -68,6 +68,7 @@ Success response:
 {
   "ok": true,
   "sessionId": "uuid",
+  "documentId": "doc_01H...",
   "filename": "my-file.pdf",
   "quote": {
     "requiredAmount": 48,
@@ -120,7 +121,7 @@ Request (print example):
 {
   "mode": "print",
   "sessionId": "uuid",
-  "filename": "optional-selected-file",
+  "documentId": "optional-selected-document-id",
   "copies": 1,
   "colorMode": "grayscale",
   "orientation": "portrait",

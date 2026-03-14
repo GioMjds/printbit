@@ -759,7 +759,7 @@ async function refreshPrintQuote(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId,
-        documentId: selectedDocumentId,
+        documentId: selectedDocumentId ?? undefined,
         copies: getCopies(),
         colorMode: cfg.colorMode,
         orientation: cfg.orientation,
@@ -1049,7 +1049,7 @@ continueBtn?.addEventListener('click', () => {
   const config: PrintConfig = {
     mode,
     sessionId,
-    documentId: selectedDocumentId,
+    documentId: mode === 'print' ? selectedDocumentId : null,
     filename: selectedFile,
     copyPreviewPath: mode === 'copy' ? copyPreviewPath : null,
     colorMode: cfg.colorMode,
