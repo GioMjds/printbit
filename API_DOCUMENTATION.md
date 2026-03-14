@@ -70,7 +70,7 @@ Success response:
   "sessionId": "uuid",
   "filename": "my-file.pdf",
   "quote": {
-    "requiredAmount": 34,
+    "requiredAmount": 48,
     "copies": 2,
     "duplex": true,
     "pageRange": "1-3,5",

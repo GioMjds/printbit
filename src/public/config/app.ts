@@ -37,6 +37,7 @@ type PageRangeSelection =
 interface PrintConfig {
   mode: 'print' | 'copy';
   sessionId: string | null;
+  documentId: string | null;
   filename: string | null;
   copyPreviewPath?: string | null;
   colorMode: ColorMode;
@@ -518,6 +519,9 @@ const sessionId =
   params.get('sessionId') ?? sessionStorage.getItem('printbit.sessionId');
 const selectedFile =
   params.get('file') ?? sessionStorage.getItem('printbit.uploadedFile');
+const selectedDocumentId =
+  params.get('documentId') ??
+  sessionStorage.getItem('printbit.uploadedDocumentId');
 const copyPreviewPath = sessionStorage.getItem('printbit.copyPreviewPath');
 
 const backLink = document.getElementById(
@@ -732,6 +736,7 @@ function setPrintContinueState(): void {
 async function refreshPrintQuote(): Promise<void> {
   if (mode !== 'print' || !sessionId) return;
   if (pageModeCustom?.checked && pageRangeInput && !pageRangeInput.checkValidity()) {
+    quoteRequestVersion += 1;
     currentPrintQuote = null;
     quoteError = pageRangeInput.validationMessage || 'Invalid page range.';
     quoteLoading = false;
@@ -754,7 +759,7 @@ async function refreshPrintQuote(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId,
-        filename: selectedFile,
+        documentId: selectedDocumentId,
         copies: getCopies(),
         colorMode: cfg.colorMode,
         orientation: cfg.orientation,
@@ -1044,6 +1049,7 @@ continueBtn?.addEventListener('click', () => {
   const config: PrintConfig = {
     mode,
     sessionId,
+    documentId: selectedDocumentId,
     filename: selectedFile,
     copyPreviewPath: mode === 'copy' ? copyPreviewPath : null,
     colorMode: cfg.colorMode,
@@ -1060,6 +1066,8 @@ continueBtn?.addEventListener('click', () => {
   if (sessionId) sessionStorage.setItem('printbit.sessionId', sessionId);
   if (selectedFile)
     sessionStorage.setItem('printbit.uploadedFile', selectedFile);
+  if (selectedDocumentId)
+    sessionStorage.setItem('printbit.uploadedDocumentId', selectedDocumentId);
   sessionStorage.setItem('printbit.config', JSON.stringify(config));
 
   window.location.href = '/confirm';

@@ -33,6 +33,7 @@ type PageRangeSelection =
 type ConfirmConfig = {
   mode: 'print' | 'copy' | 'scan';
   sessionId: string | null;
+  documentId?: string | null;
   scanFilename?: string;
   copyPreviewPath?: string | null;
   colorMode: 'colored' | 'grayscale';
@@ -94,6 +95,7 @@ const resetBalanceBtn = document.getElementById(
 
 const rawConfig = sessionStorage.getItem('printbit.config');
 const uploadedFile = sessionStorage.getItem('printbit.uploadedFile');
+const uploadedDocumentId = sessionStorage.getItem('printbit.uploadedDocumentId');
 const DEFAULT_PRICING: PricingResponse = {
   printPerPage: 5,
   copyPerPage: 3,
@@ -102,6 +104,7 @@ const DEFAULT_PRICING: PricingResponse = {
 };
 let totalPrice = 0;
 let pricingLoaded = false;
+let pricingError: string | null = null;
 let currentBalance = 0;
 let currentPrintQuote: PrintQuote | null = null;
 // [PRINTER GUARD] Starts false — fail-safe: UI stays locked until the first
@@ -118,7 +121,10 @@ if (!rawConfig) {
 }
 
 const config = JSON.parse(rawConfig ?? '{}') as ConfirmConfig;
-config.duplex = false;
+config.duplex = config.duplex === true;
+if (typeof config.documentId !== 'string') {
+  config.documentId = uploadedDocumentId;
+}
 currentPrintQuote = config.mode === 'print' ? (config.quote ?? null) : null;
 
 // Update back link to return to the correct config page with the session
@@ -242,7 +248,7 @@ function applyConfirmGate(): void {
       modalConfirmBtn.disabled = true;
       modalConfirmBtn.setAttribute('aria-disabled', 'true');
     }
-    statusMessage.textContent = 'Loading pricing...';
+    statusMessage.textContent = pricingError ?? 'Loading pricing...';
     return;
   }
 
@@ -445,37 +451,53 @@ async function fetchInitialBalance(): Promise<void> {
 
 async function loadPricing(): Promise<void> {
   if (config.mode === 'print') {
-    if (!config.sessionId) throw new Error('Print session is required.');
-    const response = await fetch('/api/print/quote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: config.sessionId,
-        filename: uploadedFile,
-        copies: config.copies,
-        colorMode: config.colorMode,
-        orientation: config.orientation,
-        paperSize: config.paperSize,
-        pageRange: config.pageRange,
-        duplex: false,
-      }),
-    });
+    try {
+      if (!config.sessionId) {
+        throw new Error('Print session is required.');
+      }
 
-    const payload = (await response.json()) as {
-      error?: string;
-      quote?: PrintQuote;
-    };
-    if (!response.ok || !payload.quote) {
-      throw new Error(payload.error ?? 'Failed to load print quote.');
-    }
+      const response = await fetch('/api/print/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: config.sessionId,
+          documentId: config.documentId ?? uploadedDocumentId ?? undefined,
+          copies: config.copies,
+          colorMode: config.colorMode,
+          orientation: config.orientation,
+          paperSize: config.paperSize,
+          pageRange: config.pageRange,
+          duplex: config.duplex === true,
+        }),
+      });
 
-    currentPrintQuote = payload.quote;
-    totalPrice = payload.quote.requiredAmount;
-    pricingLoaded = true;
-    if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
-    if (colorValue) colorValue.textContent = getDisplayColorMode();
-    if (pagesValue) {
-      pagesValue.textContent = `${pageRangeLabel(config.pageRange)} (${payload.quote.selectedPages} of ${payload.quote.totalPages})`;
+      const payload = (await response.json()) as {
+        error?: string;
+        quote?: PrintQuote;
+      };
+      if (!response.ok || !payload.quote) {
+        throw new Error(payload.error ?? 'Failed to load print quote.');
+      }
+
+      currentPrintQuote = payload.quote;
+      totalPrice = payload.quote.requiredAmount;
+      pricingLoaded = true;
+      pricingError = null;
+      if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
+      if (colorValue) colorValue.textContent = getDisplayColorMode();
+      if (pagesValue) {
+        pagesValue.textContent = `${pageRangeLabel(config.pageRange)} (${payload.quote.selectedPages} of ${payload.quote.totalPages})`;
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load print quote.';
+      currentPrintQuote = null;
+      totalPrice = 0;
+      pricingLoaded = false;
+      pricingError = message;
+      if (priceValue) priceValue.textContent = 'Unavailable';
+      if (colorValue) colorValue.textContent = config.colorMode;
+      if (pagesValue) pagesValue.textContent = pageRangeLabel(config.pageRange);
     }
     return;
   }
@@ -515,6 +537,7 @@ async function loadPricing(): Promise<void> {
 
   totalPrice = calculateLegacyTotalPrice(pricing);
   pricingLoaded = true;
+  pricingError = null;
   if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
 }
 
@@ -728,6 +751,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
 
       sessionStorage.removeItem('printbit.config');
       sessionStorage.removeItem('printbit.uploadedFile');
+      sessionStorage.removeItem('printbit.uploadedDocumentId');
       sessionStorage.removeItem('printbit.sessionId');
     } catch {
       hideOverlay(printingOverlay);
@@ -800,6 +824,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         sessionStorage.removeItem('printbit.config');
         sessionStorage.removeItem('printbit.copyPreviewPath');
         sessionStorage.removeItem('printbit.uploadedFile');
+        sessionStorage.removeItem('printbit.uploadedDocumentId');
         sessionStorage.removeItem('printbit.sessionId');
       } else if (pollResult === 'failed') {
         if (statusMessage)
@@ -829,13 +854,13 @@ modalConfirmBtn?.addEventListener('click', async () => {
         amount: totalPrice,
         mode: config.mode,
         sessionId: config.sessionId,
-        filename: uploadedFile,
+        documentId: config.documentId ?? uploadedDocumentId ?? undefined,
         copies: config.copies,
         colorMode: getDisplayColorMode(),
         orientation: config.orientation,
         paperSize: config.paperSize,
         pageRange: config.pageRange,
-        duplex: false,
+        duplex: config.duplex === true,
       }),
     });
 
@@ -891,6 +916,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
     sessionStorage.removeItem('printbit.config');
     sessionStorage.removeItem('printbit.copyPreviewPath');
     sessionStorage.removeItem('printbit.uploadedFile');
+    sessionStorage.removeItem('printbit.uploadedDocumentId');
     sessionStorage.removeItem('printbit.sessionId');
   }
   isProcessingPayment = false;

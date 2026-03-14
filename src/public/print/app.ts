@@ -5,6 +5,7 @@ import {
 } from '../../services/idle-timeout';
 
 type UploadedFile = {
+  documentId: string;
   filename: string;
   size?: number;
   sizeBytes?: number;
@@ -62,6 +63,7 @@ const wifiStepEl = document.getElementById('wifiStep') as HTMLElement | null;
 let activeSessionId = '';
 let pollHandle: number | null = null;
 let selectedFilename = '';
+let selectedDocumentId = '';
 let knownFiles = new Set<string>();
 let attachedSessionId: string | null = null;
 let hotspotConfig: HotspotConfig | null = null;
@@ -103,17 +105,21 @@ function formatBytes(bytes: number): string {
 
 function fileKey(file: UploadedFile): string {
   const bytes = file.size ?? file.sizeBytes ?? -1;
-  return `${file.filename}::${bytes}`;
+  return `${file.documentId}::${file.filename}::${bytes}`;
 }
 
 // ── File list rendering ───────────────────────────────────────────────────────
 
-function selectFile(filename: string): void {
-  selectedFilename = filename;
+function selectFile(file: UploadedFile): void {
+  selectedFilename = file.filename;
+  selectedDocumentId = file.documentId;
 
   // Update aria-selected on all items
   fileList?.querySelectorAll('.file-item').forEach((el) => {
-    const selected = (el as HTMLElement).dataset.filename === filename;
+    const fileEl = el as HTMLElement;
+    const selected =
+      fileEl.dataset.filename === file.filename &&
+      fileEl.dataset.documentId === file.documentId;
     el.setAttribute('aria-selected', String(selected));
   });
 
@@ -124,7 +130,7 @@ function selectFile(filename: string): void {
   }
 
   if (footerHint) {
-    footerHint.textContent = `"${filename}" selected.`;
+    footerHint.textContent = `"${file.filename}" selected.`;
     footerHint.classList.add('ready');
   }
 }
@@ -143,6 +149,7 @@ function addFileToList(file: UploadedFile): void {
   li.role = 'option';
   li.setAttribute('aria-selected', 'false');
   li.dataset.filename = file.filename;
+  li.dataset.documentId = file.documentId;
 
   li.innerHTML = `
     <div class="file-item__icon" aria-hidden="true">
@@ -158,11 +165,11 @@ function addFileToList(file: UploadedFile): void {
     <div class="file-item__radio" aria-hidden="true"></div>
   `;
 
-  li.addEventListener('click', () => selectFile(file.filename));
+  li.addEventListener('click', () => selectFile(file));
   li.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      selectFile(file.filename);
+      selectFile(file);
     }
   });
 
@@ -173,7 +180,7 @@ function addFileToList(file: UploadedFile): void {
   filesEmpty?.classList.add('hidden');
   fileList.classList.remove('hidden');
 
-  if (total === 1) selectFile(file.filename);
+  if (total === 1) selectFile(file);
 }
 
 function escapeHtml(str: string): string {
@@ -248,6 +255,7 @@ async function createSession(): Promise<void> {
 
   // Reset UI
   selectedFilename = '';
+  selectedDocumentId = '';
   knownFiles.clear();
   setSessionActive(false);
   setSessionText('Creating session…');
@@ -277,6 +285,7 @@ async function createSession(): Promise<void> {
   sessionStorage.setItem('printbit.mode', 'print');
   sessionStorage.setItem('printbit.sessionId', session.sessionId);
   sessionStorage.removeItem('printbit.uploadedFile');
+  sessionStorage.removeItem('printbit.uploadedDocumentId');
   sessionStorage.removeItem('printbit.uploadedFiles');
 
   setSessionText(session.sessionId);
@@ -308,6 +317,7 @@ async function checkUploadStatus(): Promise<void> {
         : [];
 
   const files: UploadedFile[] = rawFiles.map((file) => ({
+    documentId: file.documentId,
     filename: file.filename,
     size: file.size ?? file.sizeBytes,
     sizeBytes: file.sizeBytes,
@@ -321,6 +331,7 @@ async function checkUploadStatus(): Promise<void> {
       JSON.stringify(files.map((f) => f.filename)),
     );
     sessionStorage.setItem('printbit.uploadedFile', files[0].filename);
+    sessionStorage.setItem('printbit.uploadedDocumentId', files[0].documentId);
   }
 }
 
@@ -440,8 +451,11 @@ refreshSessionBtn?.addEventListener('click', () => {
 });
 
 continueBtn?.addEventListener('click', () => {
-  if (!activeSessionId || !selectedFilename) return;
-  window.location.href = `/config?mode=print&sessionId=${encodeURIComponent(activeSessionId)}&file=${encodeURIComponent(selectedFilename)}`;
+  if (!activeSessionId || !selectedFilename || !selectedDocumentId) return;
+  window.location.href =
+    `/config?mode=print&sessionId=${encodeURIComponent(activeSessionId)}` +
+    `&file=${encodeURIComponent(selectedFilename)}` +
+    `&documentId=${encodeURIComponent(selectedDocumentId)}`;
 });
 
 const savedSessionId = sessionStorage.getItem('printbit.sessionId');

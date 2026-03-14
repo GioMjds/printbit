@@ -390,22 +390,14 @@ export function registerWirelessSessionRoutes(
 
       const doc = result.document;
 
-      let analysisPayload = null;
-      try {
-        const analyzed = await analyzeAndStoreDocument(
-          req,
-          sessionId,
-          doc.filename,
-        );
-        if ('analysis' in analyzed) {
-          analysisPayload = analyzed.analysis;
-        }
-      } catch (error) {
-        console.warn(
-          '[analyze-document] Failed to analyze uploaded file:',
-          error,
-        );
-      }
+      void analyzeAndStoreDocument(req, sessionId, doc.filename).catch(
+        (error) => {
+          console.warn(
+            '[analyze-document] Failed to analyze uploaded file:',
+            error,
+          );
+        },
+      );
 
       deps.io.to(`session:${sessionId}`).emit('UploadCompleted', doc);
       await adminService.appendAdminLog(
@@ -473,16 +465,15 @@ export function registerWirelessSessionRoutes(
   app.post(
     '/api/wireless/sessions/:sessionId/analyze',
     async (req: Request, res: Response) => {
-      const { sessionId, filename } = req.body as {
-        sessionId?: string;
-        filename?: string;
-      };
+      const { sessionId } = req.params as { sessionId: string };
+      const { filename } = (req.body ?? {}) as { filename: string };
+
       const token = extractUploadToken(req);
 
-      if (!sessionId || !token) {
+      if (!token) {
         return res
           .status(401)
-          .json({ error: 'sessionId and token are required.' });
+          .json({ error: 'Token are required.' });
       }
 
       const publicBaseUrl = deps.resolvePublicBaseUrl(req);

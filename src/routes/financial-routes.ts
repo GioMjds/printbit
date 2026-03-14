@@ -37,13 +37,13 @@ function getSessionDocuments(session: {
 
 function resolveTargetDocument(
   session: { documents?: UploadedDocument[]; document?: UploadedDocument },
-  filename?: string,
+  documentId?: string,
 ): UploadedDocument | null {
   const allDocs = getSessionDocuments(session);
   if (allDocs.length === 0) return null;
 
-  if (!filename) return allDocs[allDocs.length - 1];
-  return allDocs.find((doc) => doc.filename === filename) ?? null;
+  if (!documentId) return allDocs[allDocs.length - 1];
+  return allDocs.find((doc) => doc.documentId === documentId) ?? null;
 }
 
 export function registerFinancialRoutes(
@@ -62,9 +62,9 @@ export function registerFinancialRoutes(
   });
 
   app.post('/api/print/quote', (req: Request, res: Response) => {
-    const { sessionId, filename } = req.body as {
+    const { sessionId, documentId } = req.body as {
       sessionId?: string;
-      filename?: string;
+      documentId?: string;
       copies?: number;
       colorMode?: 'colored' | 'grayscale';
       pageRange?: unknown;
@@ -83,11 +83,11 @@ export function registerFinancialRoutes(
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    const target = resolveTargetDocument(session, filename);
+    const target = resolveTargetDocument(session, documentId);
     if (!target) {
       return res.status(400).json({
-        error: filename
-          ? `Document "${filename}" not found in session`
+        error: documentId
+          ? `Document "${documentId}" not found in session`
           : 'No uploaded document found for this session',
       });
     }
@@ -123,6 +123,7 @@ export function registerFinancialRoutes(
     return res.json({
       ok: true,
       sessionId,
+      documentId: target.documentId,
       filename: target.filename,
       quote: quoteComputation.quote,
     });
@@ -322,11 +323,11 @@ export function registerFinancialRoutes(
       res.status(status).json(body);
     };
 
-    const { amount, mode, sessionId, filename } = req.body as {
+    const { amount, mode, sessionId, documentId } = req.body as {
       amount?: number;
       mode?: 'print' | 'copy';
       sessionId?: string;
-      filename?: string;
+      documentId?: string;
       copies?: number;
       colorMode?: 'colored' | 'grayscale';
       orientation?: 'portrait' | 'landscape';
@@ -373,6 +374,7 @@ export function registerFinancialRoutes(
         : 0;
 
     let serverFilename: string | null = null;
+    let targetDocumentId: string | null = null;
     let printOptions: PrintJobOptions | null = null;
     let printQuotePages:
       | {
@@ -408,18 +410,18 @@ export function registerFinancialRoutes(
         return sendResponse(404, { error: 'Session not found' });
       }
 
-      const target = resolveTargetDocument(session, filename);
+      const target = resolveTargetDocument(session, documentId);
       if (!target) {
         void adminService.appendAdminLog(
           'payment_failed',
-          filename
+          documentId
             ? 'Confirm payment failed: target document not found.'
             : 'Confirm payment failed: no uploaded document in session.',
-          { transactionId, sessionId, filename: filename ?? null },
+          { transactionId, sessionId, documentId: documentId ?? null },
         );
         return sendResponse(400, {
-          error: filename
-            ? `Document "${filename}" not found in session`
+          error: documentId
+            ? `Document "${documentId}" not found in session`
             : 'No uploaded document found for this session',
         });
       }
@@ -472,6 +474,7 @@ export function registerFinancialRoutes(
       };
 
       serverFilename = path.basename(target.filePath);
+      targetDocumentId = target.documentId;
       printOptions = {
         copies: quoteComputation.quote.copies,
         colorMode: quoteComputation.quote.effectiveColorMode,
@@ -566,7 +569,8 @@ export function registerFinancialRoutes(
         colorMode: printOptions?.colorMode ?? colorMode,
         duplex: printOptions?.duplex ?? false,
         sessionId: sessionId ?? null,
-        filename: filename ?? null,
+        documentId: targetDocumentId ?? null,
+        filename: serverFilename ?? null,
       },
     });
 
@@ -597,8 +601,9 @@ export function registerFinancialRoutes(
         selectedBwPages: printQuotePages?.selectedBwPages ?? null,
         billableColorPages: printQuotePages?.billableColorPages ?? null,
         billableBwPages: printQuotePages?.billableBwPages ?? null,
+        documentId: targetDocumentId ?? null,
         sessionId: sessionId ?? null,
-        filename: filename ?? null,
+        filename: serverFilename ?? null,
         remainingBalance: settlement.remainingBalance,
         changeState: settlement.change.state,
         changeRequested: settlement.change.requested,
@@ -659,7 +664,8 @@ export function registerFinancialRoutes(
           colorMode: printOptions?.colorMode ?? colorMode,
           duplex: printOptions?.duplex ?? false,
           sessionId: sessionId ?? null,
-          filename: serverFilename ?? filename ?? null,
+          documentId: targetDocumentId ?? null,
+          filename: serverFilename ?? null,
           pageRange: printOptions?.pageRange ?? null,
         },
       }).catch((err) => {
