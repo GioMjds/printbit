@@ -98,7 +98,12 @@ export class PrinterService {
 
     return new Promise((resolve, reject) => {
       const uploadsDir = path.resolve('uploads');
-      const filePath = path.resolve(uploadsDir, filename);
+      const normalizeFilename = filename.trim();
+      if (!normalizeFilename) {
+        console.error('[PRINTER] ✗ Invalid filename — empty string');
+        return reject(new Error('Invalid filename'));
+      }
+      const filePath = path.resolve(uploadsDir, normalizeFilename);
       const relativePath = path.relative(uploadsDir, filePath);
       if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
         console.error(
@@ -107,6 +112,10 @@ export class PrinterService {
         return reject(new Error('Invalid filename'));
       }
       const fileExists = fs.existsSync(filePath);
+      if (fileExists && !fs.statSync(filePath).isFile()) {
+        console.error('[PRINTER] ✗ Invalid filename — not a file');
+        return reject(new Error('Invalid filename'));
+      }
       console.log(
         `[PRINTER] Resolved path: ${filePath} (exists: ${fileExists})`,
       );
