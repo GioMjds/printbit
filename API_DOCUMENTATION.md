@@ -45,6 +45,58 @@ Returns current `balance` and `earnings`.
 
 Returns pricing settings (`printPerPage`, `copyPerPage`, `colorSurcharge`).
 
+### `POST /api/print/quote`
+
+Returns a **server-verified print quote** (page counts + final amount) before payment.
+
+Request:
+
+```json
+{
+  "sessionId": "uuid",
+  "documentId": "optional-selected-document-id",
+  "copies": 2,
+  "colorMode": "colored",
+  "pageRange": { "type": "custom", "range": "1-3,5" },
+  "duplex": true
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "sessionId": "uuid",
+  "documentId": "doc_01H...",
+  "filename": "my-file.pdf",
+  "quote": {
+    "requiredAmount": 48,
+    "copies": 2,
+    "duplex": true,
+    "pageRange": "1-3,5",
+    "totalPages": 9,
+    "selectedPages": 4,
+    "selectedColorPages": 2,
+    "selectedBwPages": 2,
+    "billableColorPages": 2,
+    "billableBwPages": 2,
+    "requestedColorMode": "colored",
+    "effectiveColorMode": "colored",
+    "pricing": {
+      "printPerPage": 5,
+      "colorSurcharge": 2
+    }
+  }
+}
+```
+
+Notes:
+
+- Page range is validated against analyzed document page count.
+- If analysis is missing, endpoint returns `409`.
+- Duplex affects print behavior only (per-page pricing remains unchanged).
+
 ### `POST /api/balance/reset`
 
 Resets current balance to `0` (non-admin route currently available).
@@ -69,11 +121,13 @@ Request (print example):
 {
   "mode": "print",
   "sessionId": "uuid",
-  "filename": "optional-selected-file",
+  "documentId": "optional-selected-document-id",
   "copies": 1,
   "colorMode": "grayscale",
   "orientation": "portrait",
   "paperSize": "A4",
+  "pageRange": { "type": "all" },
+  "duplex": false,
   "amount": 5
 }
 ```
@@ -96,6 +150,8 @@ Response:
 ```
 
 The `change` object is always present. `state` is one of `"none"`, `"dispensed"`, or `"failed"`. When `state` is `"failed"`, an `owedChangeId` and `message` are included — the owed change is recorded for admin resolution.
+
+For `mode: "print"`, the server now recomputes pricing from the same quote pipeline used by `/api/print/quote`, so displayed quote amount and charged amount stay aligned.
 
 ### Legacy endpoints
 

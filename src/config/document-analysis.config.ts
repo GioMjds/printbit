@@ -1,0 +1,3 @@
+export const COLOR_SATURATION_THRESHOLD = 0.05;
+export const PDF_RENDER_SCALE = 0.35;
+export const MAX_PIXELS_TO_SAMPLE = 200_000;

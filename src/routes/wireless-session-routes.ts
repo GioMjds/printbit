@@ -5,6 +5,7 @@ import { adminService } from '../services/admin';
 import type { SessionStore } from '../services/session';
 import { generateHtmlPreview, supportsHtmlPreview } from '../services/preview';
 import { detectPdfColorContent } from '@/services/config';
+import { analyzeDocument } from '@/services/document-analysis';
 import {
   uploadMiddleware,
   handleMulterError,
@@ -27,6 +28,7 @@ const IMAGE_TYPES: Record<string, string> = {
 
 // Only PPT/PPTX still go through LibreOffice; doc/docx use Word COM → PDF
 const PDF_CONVERT_EXTENSIONS = new Set(['.doc', '.docx', '.ppt', '.pptx']);
+const POWERPOINT_EXTENSIONS = new Set(['.ppt', '.pptx']);
 
 export function registerWirelessSessionRoutes(
   app: Express,
@@ -75,6 +77,88 @@ export function registerWirelessSessionRoutes(
     }
 
     next();
+  };
+
+  const analyzeAndStoreDocument = async (
+    req: Request,
+    sessionId: string,
+    documentId?: string,
+  ) => {
+    const publicBaseUrl = deps.resolvePublicBaseUrl(req);
+    const session = deps.sessionStore.tryGetSession(sessionId, publicBaseUrl);
+    if (!session) {
+      return { error: 'Session not found.', status: 404 as const };
+    }
+
+    const docs =
+      session.documents && session.documents.length > 0
+        ? session.documents
+        : session.document
+          ? [session.document]
+          : [];
+
+    const fallbackDocumentId = session.document?.documentId;
+    const targetDocumentId = documentId ?? fallbackDocumentId;
+    const target = targetDocumentId
+      ? docs.find((doc) => doc.documentId === targetDocumentId) ?? null
+      : (docs[docs.length - 1] ?? null);
+
+    if (!target) {
+      return { error: 'Document not found.', status: 404 as const };
+    }
+
+    const targetExtension = path.extname(target.filename).toLowerCase();
+    let analysisFilePath = target.filePath;
+    let analysisContentType = target.contentType;
+    let analysisFilename = target.filename;
+
+    if (
+      PDF_CONVERT_EXTENSIONS.has(targetExtension) &&
+      POWERPOINT_EXTENSIONS.has(targetExtension)
+    ) {
+      try {
+        analysisFilePath = await deps.convertToPdfPreview(
+          path.resolve(target.filePath),
+        );
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : 'Unknown conversion error';
+        return {
+          error: `PowerPoint conversion failed before analysis: ${reason}`,
+          status: 422 as const,
+        };
+      }
+
+      analysisContentType = 'application/pdf';
+      analysisFilename = `${path.basename(target.filename, targetExtension)}.pdf`;
+    }
+
+    const analysis = await analyzeDocument({
+      filePath: analysisFilePath,
+      contentType: analysisContentType,
+      filename: analysisFilename,
+      convertToPdfPreview: deps.convertToPdfPreview,
+    });
+
+    const persisted = deps.sessionStore.setDocumentAnalysis(
+      sessionId,
+      target.documentId,
+      analysis,
+    );
+
+    if (!persisted) {
+      return {
+        error: 'Failed to persist document analysis.',
+        status: 500 as const,
+      };
+    }
+
+    return {
+      status: 200 as const,
+      analysis: persisted,
+      documentId: target.documentId,
+      fileName: target.filename,
+    };
   };
 
   app.get('/api/wireless/sessions', (req: Request, res: Response) => {
@@ -334,6 +418,42 @@ export function registerWirelessSessionRoutes(
       }
 
       const doc = result.document;
+
+      const docExtension = path.extname(doc.filename).toLowerCase();
+      if (POWERPOINT_EXTENSIONS.has(docExtension)) {
+        const analyzed = await analyzeAndStoreDocument(
+          req,
+          sessionId,
+          doc.documentId,
+        );
+        if (!('analysis' in analyzed)) {
+          deps.io.to(`session:${sessionId}`).emit('UploadFailed');
+          await adminService.appendAdminLog(
+            'upload_failed',
+            'Wireless upload failed during required PowerPoint analysis.',
+            {
+              sessionId,
+              filename: doc.filename,
+              documentId: doc.documentId,
+              reason: analyzed.error,
+            },
+          );
+          return res.status(analyzed.status).json({
+            code: 'ANALYSIS_FAILED',
+            error: analyzed.error,
+          });
+        }
+      } else {
+        void analyzeAndStoreDocument(req, sessionId, doc.documentId).catch(
+          (error) => {
+            console.warn(
+              '[analyze-document] Failed to analyze uploaded file:',
+              error,
+            );
+          },
+        );
+      }
+
       deps.io.to(`session:${sessionId}`).emit('UploadCompleted', doc);
       await adminService.appendAdminLog(
         'upload_completed',
@@ -394,6 +514,55 @@ export function registerWirelessSessionRoutes(
         message: 'Session cancelled and cleaned up.',
         deletedFileCount: result.deletedFileCount,
       });
+    },
+  );
+
+  app.post(
+    '/api/wireless/sessions/:sessionId/analyze',
+    async (req: Request, res: Response) => {
+      const { sessionId } = req.params as { sessionId: string };
+      const { documentId } = (req.body ?? {}) as {
+        documentId?: string;
+      };
+
+      const token = extractUploadToken(req);
+
+      if (!token) {
+        return res
+          .status(401)
+          .json({ error: 'Token are required.' });
+      }
+
+      const publicBaseUrl = deps.resolvePublicBaseUrl(req);
+      const session = deps.sessionStore.tryGetSession(sessionId, publicBaseUrl);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found.' });
+      }
+      if (session.token !== token) {
+        return res.status(403).json({ error: 'Invalid token for session.' });
+      }
+
+      try {
+        const analyzed = await analyzeAndStoreDocument(
+          req,
+          sessionId,
+          documentId,
+        );
+        if (!('analysis' in analyzed)) {
+          return res.status(analyzed.status).json({ error: analyzed.error });
+        }
+
+        return res.status(200).json({
+          documentId: analyzed.documentId,
+          fileName: analyzed.fileName,
+          ...analyzed.analysis,
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error';
+        return res
+          .status(500)
+          .json({ error: 'Document analysis failed.', reason });
+      }
     },
   );
 
