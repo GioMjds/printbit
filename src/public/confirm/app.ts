@@ -36,11 +36,13 @@ type ConfirmConfig = {
   scanFilename?: string;
   copyPreviewPath?: string | null;
   colorMode: 'colored' | 'grayscale';
+  duplex?: boolean;
   copies: number;
   orientation: 'portrait' | 'landscape';
   paperSize: 'A4' | 'Letter' | 'Legal';
   pageRange?: PageRangeSelection;
   totalPages?: number;
+  quote?: PrintQuote;
 };
 
 type PricingResponse = {
@@ -50,10 +52,31 @@ type PricingResponse = {
   scanDocument: number;
 };
 
+type PrintQuote = {
+  requiredAmount: number;
+  copies: number;
+  duplex: boolean;
+  pageRange: string | null;
+  totalPages: number;
+  selectedPages: number;
+  selectedColorPages: number;
+  selectedBwPages: number;
+  billableColorPages: number;
+  billableBwPages: number;
+  requestedColorMode: 'colored' | 'grayscale';
+  effectiveColorMode: 'colored' | 'grayscale';
+  pricing: {
+    printPerPage: number;
+    colorSurcharge: number;
+  };
+};
+
 const modeValue = document.getElementById('modeValue');
 const fileValue = document.getElementById('fileValue');
 const colorValue = document.getElementById('colorValue');
 const copiesValue = document.getElementById('copiesValue');
+const duplexRow = document.getElementById('duplexRow');
+const duplexValue = document.getElementById('duplexValue');
 const pagesValue = document.getElementById('pagesValue');
 const pagesRow = document.getElementById('pagesRow');
 const orientationValue = document.getElementById('orientationValue');
@@ -82,6 +105,7 @@ const DEFAULT_PRICING: PricingResponse = {
 let totalPrice = 0;
 let pricingLoaded = false;
 let currentBalance = 0;
+let currentPrintQuote: PrintQuote | null = null;
 // [PRINTER GUARD] Starts false — fail-safe: UI stays locked until the first
 // /api/printer/status check confirms the printer is online.
 let printerReady = false;
@@ -96,6 +120,8 @@ if (!rawConfig) {
 }
 
 const config = JSON.parse(rawConfig ?? '{}') as ConfirmConfig;
+config.duplex = config.duplex === true;
+currentPrintQuote = config.mode === 'print' ? (config.quote ?? null) : null;
 
 // Update back link to return to the correct config page with the session
 const backLink = document.getElementById(
@@ -117,35 +143,25 @@ function pageRangeLabel(sel?: PageRangeSelection): string {
   return sel.range ? `Pages ${sel.range}` : 'Pages (custom)';
 }
 
-function countPrintPages(): number {
-  const total = config.totalPages ?? 1;
-  const range = config.pageRange;
-  if (!range || range.type === 'all') return total;
-  if (range.type === 'single') return 1;
-  let count = 0;
-  for (const part of range.range.split(',')) {
-    const trimmed = part.trim();
-    const m = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
-    if (m) {
-      const from = Math.max(1, parseInt(m[1], 10));
-      const to = Math.min(total, parseInt(m[2], 10));
-      if (from <= to) count += to - from + 1;
-    } else {
-      const p = parseInt(trimmed, 10);
-      if (!isNaN(p) && p >= 1 && p <= total) count += 1;
-    }
+function getDisplayColorMode(): 'colored' | 'grayscale' {
+  if (config.mode === 'print' && currentPrintQuote) {
+    return currentPrintQuote.effectiveColorMode;
   }
-  return Math.max(1, count);
+  return config.colorMode;
 }
 
-function calculateTotalPrice(pricing: PricingResponse): number {
+function getDuplexLabel(): string {
+  return config.duplex ? 'Double-sided' : 'Single-sided';
+}
+
+function calculateLegacyTotalPrice(pricing: PricingResponse): number {
   if (config.mode === 'scan') {
     return pricing.scanDocument ?? DEFAULT_PRICING.scanDocument;
   }
   const base =
     config.mode === 'copy' ? pricing.copyPerPage : pricing.printPerPage;
   const color = config.colorMode === 'colored' ? pricing.colorSurcharge : 0;
-  const pages = config.mode === 'print' ? countPrintPages() : 1;
+  const pages = config.mode === 'print' ? Math.max(1, config.totalPages ?? 1) : 1;
   return (base + color) * pages * Math.max(1, config.copies);
 }
 
@@ -170,6 +186,7 @@ if (modalConfirmBtnSpan) {
 
 if (config.mode === 'copy' || config.mode === 'scan') {
   pagesRow?.setAttribute('hidden', '');
+  duplexRow?.setAttribute('hidden', '');
 }
 
 if (config.mode === 'scan') {
@@ -187,8 +204,9 @@ if (fileValue)
       : config.mode === 'copy'
         ? 'Physical document copy'
         : (config.scanFilename ?? 'Scanned document');
-if (colorValue) colorValue.textContent = config.colorMode;
+if (colorValue) colorValue.textContent = getDisplayColorMode();
 if (copiesValue) copiesValue.textContent = String(config.copies);
+if (duplexValue) duplexValue.textContent = getDuplexLabel();
 if (pagesValue) pagesValue.textContent = pageRangeLabel(config.pageRange);
 if (orientationValue) orientationValue.textContent = config.orientation;
 if (paperSizeValue) paperSizeValue.textContent = config.paperSize;
@@ -434,8 +452,44 @@ async function fetchInitialBalance(): Promise<void> {
 }
 
 async function loadPricing(): Promise<void> {
-  let pricing = DEFAULT_PRICING;
+  if (config.mode === 'print') {
+    if (!config.sessionId) throw new Error('Print session is required.');
+    const response = await fetch('/api/print/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: config.sessionId,
+        filename: uploadedFile,
+        copies: config.copies,
+        colorMode: config.colorMode,
+        orientation: config.orientation,
+        paperSize: config.paperSize,
+        pageRange: config.pageRange,
+        duplex: config.duplex,
+      }),
+    });
 
+    const payload = (await response.json()) as {
+      error?: string;
+      quote?: PrintQuote;
+    };
+    if (!response.ok || !payload.quote) {
+      throw new Error(payload.error ?? 'Failed to load print quote.');
+    }
+
+    currentPrintQuote = payload.quote;
+    totalPrice = payload.quote.requiredAmount;
+    pricingLoaded = true;
+    if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
+    if (colorValue) colorValue.textContent = getDisplayColorMode();
+    if (pagesValue) {
+      pagesValue.textContent = `${pageRangeLabel(config.pageRange)} (${payload.quote.selectedPages} of ${payload.quote.totalPages})`;
+    }
+    if (duplexValue) duplexValue.textContent = getDuplexLabel();
+    return;
+  }
+
+  let pricing = DEFAULT_PRICING;
   const response = await fetch('/api/pricing');
   if (!response.ok) throw new Error('Pricing request failed.');
 
@@ -455,7 +509,6 @@ async function loadPricing(): Promise<void> {
     Number.isFinite(payload.colorSurcharge)
       ? payload.colorSurcharge
       : DEFAULT_PRICING.colorSurcharge;
-
   const safeScan =
     typeof payload.scanDocument === 'number' &&
     Number.isFinite(payload.scanDocument)
@@ -469,7 +522,7 @@ async function loadPricing(): Promise<void> {
     scanDocument: safeScan,
   };
 
-  totalPrice = calculateTotalPrice(pricing);
+  totalPrice = calculateLegacyTotalPrice(pricing);
   pricingLoaded = true;
   if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
 }
@@ -510,6 +563,8 @@ const modalFile = document.getElementById('modalFile');
 const modalMode = document.getElementById('modalMode');
 const modalColor = document.getElementById('modalColor');
 const modalCopies = document.getElementById('modalCopies');
+const modalDuplex = document.getElementById('modalDuplex');
+const modalDuplexRow = document.getElementById('modalDuplexRow');
 const modalPages = document.getElementById('modalPages');
 const modalPagesRow = document.getElementById('modalPagesRow');
 const modalOrientation = document.getElementById('modalOrientation');
@@ -526,6 +581,7 @@ let isProcessingPayment = false;
 
 if (config.mode === 'copy' || config.mode === 'scan') {
   modalPagesRow?.setAttribute('hidden', '');
+  modalDuplexRow?.setAttribute('hidden', '');
 }
 
 function showModal(): void {
@@ -536,9 +592,17 @@ function showModal(): void {
         ? (uploadedFile ?? 'No file')
         : 'Physical document copy';
   if (modalMode) modalMode.textContent = config.mode.toUpperCase();
-  if (modalColor) modalColor.textContent = config.colorMode;
+  if (modalColor) modalColor.textContent = getDisplayColorMode();
   if (modalCopies) modalCopies.textContent = String(config.copies);
-  if (modalPages) modalPages.textContent = pageRangeLabel(config.pageRange);
+  if (modalDuplex) modalDuplex.textContent = getDuplexLabel();
+  if (modalPages) {
+    const baseLabel = pageRangeLabel(config.pageRange);
+    if (config.mode === 'print' && currentPrintQuote) {
+      modalPages.textContent = `${baseLabel} (${currentPrintQuote.selectedPages} of ${currentPrintQuote.totalPages})`;
+    } else {
+      modalPages.textContent = baseLabel;
+    }
+  }
   if (modalOrientation) modalOrientation.textContent = config.orientation;
   if (modalPaper) modalPaper.textContent = config.paperSize;
   if (modalPrice) modalPrice.textContent = `₱ ${totalPrice}`;
@@ -778,11 +842,13 @@ modalConfirmBtn?.addEventListener('click', async () => {
         amount: totalPrice,
         mode: config.mode,
         sessionId: config.sessionId,
+        filename: uploadedFile,
         copies: config.copies,
-        colorMode: config.colorMode,
+        colorMode: getDisplayColorMode(),
         orientation: config.orientation,
         paperSize: config.paperSize,
         pageRange: config.pageRange,
+        duplex: config.duplex,
       }),
     });
 

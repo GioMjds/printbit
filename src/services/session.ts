@@ -4,6 +4,21 @@ import fs from 'node:fs';
 import type { Request } from 'express';
 import { PUBLIC_URL } from '../config/http';
 
+export interface DocumentPageAnalysis {
+  index: number;
+  isColor: boolean;
+}
+
+export interface DocumentAnalysis {
+  fileType: 'pdf' | 'docx' | 'doc' | 'image' | 'unknown';
+  pageCount: number;
+  pages: DocumentPageAnalysis[];
+  colorPages: number;
+  bwPages: number;
+  totalPages: number;
+  analyzedAt: Date;
+}
+
 export interface UploadedDocument {
   documentId: string;
   sessionId: string;
@@ -13,6 +28,7 @@ export interface UploadedDocument {
   uploadedAt: Date;
   // The full path to the uploaded file on the server, e.g. "uploads/abc123"
   filePath: string;
+  analysis?: DocumentAnalysis;
 }
 
 export interface Session {
@@ -226,6 +242,32 @@ export class SessionStore {
     session.document = document;
 
     return { isSuccess: true, document, errorCode: '', errorMsg: '' };
+  }
+
+  setDocumentAnalysis(
+    sessionId: string,
+    documentId: string,
+    analysis: Omit<DocumentAnalysis, 'analyzedAt'>,
+  ): DocumentAnalysis | null {
+    const session = this.sessions.get(sessionId);
+    if (!session || this.isSessionExpired(session)) return null;
+
+    const docs =
+      session.documents ?? (session.document ? [session.document] : []);
+    const target = docs.find((doc) => doc.documentId === documentId);
+    if (!target) return null;
+
+    const stamped: DocumentAnalysis = {
+      ...analysis,
+      analyzedAt: new Date(),
+    };
+
+    target.analysis = stamped;
+    if (session.document?.documentId === documentId) {
+      session.document.analysis = stamped;
+    }
+
+    return stamped;
   }
 
   private withFreshUrl(session: Session, publicBaseUrl: URL): Session {

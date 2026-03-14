@@ -528,6 +528,94 @@
               </div>
             </fieldset>
 
+            <fieldset class="option-group" id="duplexGroup">
+              <legend class="option-label">Duplex</legend>
+              <div class="option-grid">
+                <label class="option-card">
+                  <input
+                    id="duplexSimplex"
+                    type="radio"
+                    name="duplexMode"
+                    value="simplex"
+                    checked
+                    class="sr-only"
+                  />
+                  <div class="option-card__icon" aria-hidden="true">
+                    <svg viewBox="0 0 36 36" fill="none">
+                      <rect
+                        x="8"
+                        y="6"
+                        width="20"
+                        height="24"
+                        rx="2"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        fill="currentColor"
+                        opacity=".1"
+                      />
+                      <rect
+                        x="12"
+                        y="12"
+                        width="12"
+                        height="2"
+                        rx="1"
+                        fill="currentColor"
+                        opacity=".4"
+                      />
+                      <rect
+                        x="12"
+                        y="17"
+                        width="9"
+                        height="2"
+                        rx="1"
+                        fill="currentColor"
+                        opacity=".3"
+                      />
+                    </svg>
+                  </div>
+                  <span class="option-card__label">Single-sided</span>
+                  <span class="option-card__radio" aria-hidden="true"></span>
+                </label>
+                <label class="option-card">
+                  <input
+                    id="duplexDuplex"
+                    type="radio"
+                    name="duplexMode"
+                    value="duplex"
+                    class="sr-only"
+                  />
+                  <div class="option-card__icon" aria-hidden="true">
+                    <svg viewBox="0 0 36 36" fill="none">
+                      <rect
+                        x="6"
+                        y="8"
+                        width="14"
+                        height="20"
+                        rx="2"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        fill="currentColor"
+                        opacity=".1"
+                      />
+                      <rect
+                        x="16"
+                        y="6"
+                        width="14"
+                        height="20"
+                        rx="2"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        fill="currentColor"
+                        opacity=".16"
+                      />
+                    </svg>
+                  </div>
+                  <span class="option-card__label">Double-sided</span>
+                  <span class="option-card__radio" aria-hidden="true"></span>
+                </label>
+              </div>
+            </fieldset>
+
             <fieldset class="option-group" id="pageRangeGroup">
               <legend class="option-label">Page Range</legend>
               <div class="option-grid">

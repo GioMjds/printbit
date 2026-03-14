@@ -19,7 +19,7 @@ class AdminService {
 
   calculateJobAmount(
     mode: PrintMode,
-    colorMode: ColorMode,
+    colorOrPageCounts: ColorMode | { colorPages: number; bwPages: number },
     copies: number,
   ): number {
     const safeCopies = Math.max(1, Math.floor(copies));
@@ -29,9 +29,44 @@ class AdminService {
       return pricing.scanDocument;
     }
 
-    const base = mode === 'print' ? pricing.printPerPage : pricing.copyPerPage;
-    const color = colorMode === 'colored' ? pricing.colorSurcharge : 0;
-    return (base + color) * safeCopies;
+    const basePerPage =
+      mode === 'print' ? pricing.printPerPage : pricing.copyPerPage;
+
+    if (typeof colorOrPageCounts === 'object' && colorOrPageCounts !== null) {
+      const safeColorPages = Math.max(
+        0,
+        Math.floor(colorOrPageCounts.colorPages),
+      );
+      const safeBwPages = Math.max(0, Math.floor(colorOrPageCounts.bwPages));
+
+      return (
+        (safeColorPages * (basePerPage + pricing.colorSurcharge) +
+          safeBwPages * basePerPage) *
+        safeCopies
+      );
+    }
+
+    const color = colorOrPageCounts === 'colored' ? pricing.colorSurcharge : 0;
+    return (basePerPage + color) * safeCopies;
+  }
+
+  calculateDocumentAmount(
+    mode: Exclude<PrintMode, 'scan'>,
+    pageCounts: { colorPages: number; bwPages: number },
+    copies: number,
+  ): number {
+    const safeCopies = Math.max(1, Math.floor(copies));
+    const safeColorPages = Math.max(0, Math.floor(pageCounts.colorPages));
+    const safeBwPages = Math.max(0, Math.floor(pageCounts.bwPages));
+    const pricing = this.getPricingSettings();
+    const basePerPage =
+      mode === 'print' ? pricing.printPerPage : pricing.copyPerPage;
+
+    return (
+      (safeColorPages * (basePerPage + pricing.colorSurcharge) +
+        safeBwPages * basePerPage) *
+      safeCopies
+    );
   }
 
   async appendAdminLog(

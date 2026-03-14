@@ -12,6 +12,7 @@ export interface PrintJobOptions {
   orientation: Orientation;
   paperSize: PaperSize;
   pageRange?: string;
+  duplex?: boolean;
 }
 
 export class PrinterService {
@@ -80,6 +81,7 @@ export class PrinterService {
 
     parts.push(options.colorMode === "colored" ? "color" : "monochrome");
     parts.push(options.orientation === "landscape" ? "landscape" : "portrait");
+    parts.push(options.duplex ? "duplex" : "simplex");
     parts.push(`paper=${options.paperSize}`);
 
     return parts.join(",");

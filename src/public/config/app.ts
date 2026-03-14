@@ -40,11 +40,32 @@ interface PrintConfig {
   filename: string | null;
   copyPreviewPath?: string | null;
   colorMode: ColorMode;
+  duplex: boolean;
   copies: number;
   orientation: Orientation;
   paperSize: PaperSize;
   pageRange: PageRangeSelection;
   totalPages: number;
+  quote?: PrintQuote;
+}
+
+interface PrintQuote {
+  requiredAmount: number;
+  copies: number;
+  duplex: boolean;
+  pageRange: string | null;
+  totalPages: number;
+  selectedPages: number;
+  selectedColorPages: number;
+  selectedBwPages: number;
+  billableColorPages: number;
+  billableBwPages: number;
+  requestedColorMode: ColorMode;
+  effectiveColorMode: ColorMode;
+  pricing: {
+    printPerPage: number;
+    colorSurcharge: number;
+  };
 }
 
 interface PreviewConfig {
@@ -520,6 +541,13 @@ const copiesDec = document.getElementById(
 const copiesInc = document.getElementById(
   'copiesInc',
 ) as HTMLButtonElement | null;
+const duplexGroup = document.getElementById('duplexGroup') as HTMLElement | null;
+const duplexSimplex = document.getElementById(
+  'duplexSimplex',
+) as HTMLInputElement | null;
+const duplexDuplex = document.getElementById(
+  'duplexDuplex',
+) as HTMLInputElement | null;
 
 const pageModeAll = document.getElementById(
   'pageModeAll',
@@ -564,6 +592,7 @@ if (mode === 'print' && continueBtn) {
 
 if (mode === 'copy' && continueBtn) {
   pageRangeGroup?.classList.add('hidden');
+  duplexGroup?.classList.add('hidden');
   const hasCopyPreview = Boolean(copyPreviewPath);
   continueBtn.disabled = !hasCopyPreview;
   continueBtn.setAttribute('aria-disabled', hasCopyPreview ? 'false' : 'true');
@@ -573,22 +602,33 @@ if (mode === 'copy' && continueBtn) {
       : 'No checked document found — go back to /copy first.';
 }
 
+let currentPrintQuote: PrintQuote | null = null;
+let quoteError: string | null = null;
+let quoteLoading = false;
+let quoteRequestVersion = 0;
+let quoteDebounceHandle: number | null = null;
+
 [pageModeAll, pageModeCustom, pageModeSingle].forEach((el) => {
   el?.addEventListener('change', () => {
     syncPageRangeUI();
     syncCustomRangeValidity();
     updateSummary();
+    schedulePrintQuoteRefresh();
   });
 });
 
-pageRangeInput?.addEventListener('input', () => updateSummary());
-pageRangeInput?.addEventListener('input', () => syncCustomRangeValidity());
+pageRangeInput?.addEventListener('input', () => {
+  syncCustomRangeValidity();
+  updateSummary();
+  schedulePrintQuoteRefresh();
+});
 
 singlePageDec?.addEventListener('click', () => {
   if (!singlePageInput) return;
   singlePageInput.value = String(Math.max(1, clampSinglePage() - 1));
   clampSinglePage();
   updateSummary();
+  schedulePrintQuoteRefresh();
 });
 
 singlePageInc?.addEventListener('click', () => {
@@ -596,11 +636,13 @@ singlePageInc?.addEventListener('click', () => {
   singlePageInput.value = String(clampSinglePage() + 1);
   clampSinglePage();
   updateSummary();
+  schedulePrintQuoteRefresh();
 });
 
 singlePageInput?.addEventListener('change', () => {
   clampSinglePage();
   updateSummary();
+  schedulePrintQuoteRefresh();
 });
 
 function clampSinglePage(): number {
@@ -677,6 +719,10 @@ function getCopies(): number {
   );
 }
 
+function isDuplexEnabled(): boolean {
+  return Boolean(duplexDuplex?.checked);
+}
+
 function currentPreviewConfig(): PreviewConfig {
   return {
     colorMode: (getRadio('colorMode') as ColorMode) || 'colored',
@@ -685,16 +731,120 @@ function currentPreviewConfig(): PreviewConfig {
   };
 }
 
+function setPrintContinueState(): void {
+  if (mode !== 'print' || !continueBtn) return;
+  const canContinue =
+    Boolean(currentPrintQuote) &&
+    !quoteLoading &&
+    !(pageModeCustom?.checked && Boolean(pageRangeInput?.validationMessage));
+  continueBtn.disabled = !canContinue;
+  continueBtn.setAttribute('aria-disabled', canContinue ? 'false' : 'true');
+}
+
+async function refreshPrintQuote(): Promise<void> {
+  if (mode !== 'print' || !sessionId) return;
+  if (pageModeCustom?.checked && pageRangeInput && !pageRangeInput.checkValidity()) {
+    currentPrintQuote = null;
+    quoteError = pageRangeInput.validationMessage || 'Invalid page range.';
+    quoteLoading = false;
+    updateSummary();
+    setPrintContinueState();
+    return;
+  }
+
+  const requestVersion = ++quoteRequestVersion;
+  quoteLoading = true;
+  quoteError = null;
+  currentPrintQuote = null;
+  updateSummary();
+  setPrintContinueState();
+
+  try {
+    const cfg = currentPreviewConfig();
+    const response = await fetch('/api/print/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        filename: selectedFile,
+        copies: getCopies(),
+        colorMode: cfg.colorMode,
+        orientation: cfg.orientation,
+        paperSize: cfg.paperSize,
+        pageRange: getPageRange(),
+        duplex: isDuplexEnabled(),
+      }),
+    });
+
+    if (requestVersion !== quoteRequestVersion) return;
+
+    const payload = (await response.json()) as {
+      error?: string;
+      quote?: PrintQuote;
+    };
+    if (!response.ok || !payload.quote) {
+      quoteError = payload.error ?? 'Failed to calculate price.';
+      currentPrintQuote = null;
+      return;
+    }
+
+    currentPrintQuote = payload.quote;
+    quoteError = null;
+  } catch {
+    if (requestVersion !== quoteRequestVersion) return;
+    currentPrintQuote = null;
+    quoteError = 'Network error while calculating price.';
+  } finally {
+    if (requestVersion === quoteRequestVersion) {
+      quoteLoading = false;
+      updateSummary();
+      setPrintContinueState();
+    }
+  }
+}
+
+function schedulePrintQuoteRefresh(): void {
+  if (mode !== 'print') return;
+  if (quoteDebounceHandle !== null) {
+    window.clearTimeout(quoteDebounceHandle);
+  }
+  quoteDebounceHandle = window.setTimeout(() => {
+    quoteDebounceHandle = null;
+    void refreshPrintQuote();
+  }, 120);
+}
+
 function updateSummary(): void {
-  if (!footerSummary || mode === 'copy') return;
+  if (!footerSummary) return;
+  if (mode === 'copy') return;
+
   const cfg = currentPreviewConfig();
   const n = getCopies();
   const pages = pageRangeLabel(getPageRange());
+  const duplexLabel = isDuplexEnabled() ? 'Duplex' : 'Single-sided';
+
+  let suffix = '';
+  if (mode === 'print') {
+    if (quoteLoading) {
+      suffix = ' · Calculating price...';
+      footerSummary.classList.remove('ready');
+    } else if (currentPrintQuote) {
+      suffix = ` · ₱${currentPrintQuote.requiredAmount}`;
+      footerSummary.classList.add('ready');
+    } else if (quoteError) {
+      suffix = ` · ${quoteError}`;
+      footerSummary.classList.remove('ready');
+    } else {
+      footerSummary.classList.remove('ready');
+    }
+  } else {
+    footerSummary.classList.add('ready');
+  }
+
   footerSummary.textContent =
     `${n} cop${n === 1 ? 'y' : 'ies'} · ${pages} · ${cfg.paperSize} · ` +
     `${cfg.orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ` +
-    `${cfg.colorMode === 'colored' ? 'Colour' : 'Grayscale'}`;
-  footerSummary.classList.add('ready');
+    `${cfg.colorMode === 'colored' ? 'Colour' : 'Grayscale'} · ${duplexLabel}${suffix}`;
 }
 
 const preview = new PrintPreview();
@@ -708,6 +858,7 @@ document
       const cfg = currentPreviewConfig();
       preview.applyConfig(cfg);
       updateSummary();
+      schedulePrintQuoteRefresh();
     });
   });
 
@@ -716,6 +867,7 @@ copiesDec?.addEventListener('click', () => {
   if (v > 1 && copiesInput) {
     copiesInput.value = String(v - 1);
     updateSummary();
+    schedulePrintQuoteRefresh();
   }
 });
 copiesInc?.addEventListener('click', () => {
@@ -723,12 +875,14 @@ copiesInc?.addEventListener('click', () => {
   if (v < 99 && copiesInput) {
     copiesInput.value = String(v + 1);
     updateSummary();
+    schedulePrintQuoteRefresh();
   }
 });
 copiesInput?.addEventListener('change', () => {
   if (copiesInput) {
     copiesInput.value = String(getCopies());
     updateSummary();
+    schedulePrintQuoteRefresh();
   }
 });
 
@@ -736,6 +890,7 @@ updateSummary();
 syncPageRangeUI();
 clampSinglePage();
 syncCustomRangeValidity();
+setPrintContinueState();
 
 async function loadPreview(): Promise<void> {
   if (mode === 'copy') {
@@ -790,12 +945,7 @@ async function loadPreview(): Promise<void> {
   if (sessionId) await applyColorAnalysis(sessionId, selectedFile);
   clampSinglePage();
   updateSummary();
-
-  // Enable continue now that preview has loaded successfully
-  if (continueBtn) {
-    continueBtn.disabled = false;
-    continueBtn.setAttribute('aria-disabled', 'false');
-  }
+  await refreshPrintQuote();
 }
 
 function lockColorMode(): void {
@@ -893,6 +1043,7 @@ async function applyColorAnalysis(
 
 continueBtn?.addEventListener('click', () => {
   if (mode === 'print' && !sessionId) return;
+  if (mode === 'print' && !currentPrintQuote) return;
   if (mode === 'copy' && !copyPreviewPath) return;
   if (mode === 'print' && pageModeCustom?.checked) {
     syncCustomRangeValidity();
@@ -910,11 +1061,13 @@ continueBtn?.addEventListener('click', () => {
     filename: selectedFile,
     copyPreviewPath: mode === 'copy' ? copyPreviewPath : null,
     colorMode: cfg.colorMode,
+    duplex: isDuplexEnabled(),
     copies: getCopies(),
     orientation: cfg.orientation,
     paperSize: cfg.paperSize,
     pageRange: getPageRange(),
     totalPages: preview.pageCount,
+    quote: mode === 'print' ? currentPrintQuote ?? undefined : undefined,
   };
 
   sessionStorage.setItem('printbit.mode', mode);

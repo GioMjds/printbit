@@ -12,7 +12,8 @@ import { adminService } from '../services/admin';
 import { settlementService } from '../services/settlement';
 import { printFile, type PrintJobOptions } from '../services/printer';
 import { monitorSpoolerJob } from '../services/print-spooler';
-import type { SessionStore } from '../services/session';
+import type { SessionStore, UploadedDocument } from '../services/session';
+import { buildPrintQuote } from '../services/print-quote';
 import { randomUUID } from 'node:crypto';
 import { BLOCKED_STATUSES } from '@/utils';
 
@@ -23,73 +24,26 @@ interface RegisterFinancialRoutesDeps {
   resolvePublicBaseUrl: (req: Request) => URL;
 }
 
-type PageRangeSelectionPayload =
-  | { type: 'all' }
-  | { type: 'custom'; range?: unknown }
-  | { type: 'single'; page?: unknown };
-
-function normalizeRangeString(raw: string): string | null {
-  const compact = raw.replace(/\s+/g, '');
-  if (!compact) return null;
-  if (!/^\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$/.test(compact)) return null;
-
-  const chunks = compact.split(',');
-  for (const chunk of chunks) {
-    if (chunk.includes('-')) {
-      const [startRaw, endRaw] = chunk.split('-');
-      const start = Number(startRaw);
-      const end = Number(endRaw);
-      if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
-      if (start < 1 || end < 1 || start > end) return null;
-      continue;
-    }
-
-    const page = Number(chunk);
-    if (!Number.isInteger(page) || page < 1) return null;
-  }
-
-  return compact;
+function getSessionDocuments(session: {
+  documents?: UploadedDocument[];
+  document?: UploadedDocument;
+}): UploadedDocument[] {
+  return session.documents && session.documents.length > 0
+    ? session.documents
+    : session.document
+      ? [session.document]
+      : [];
 }
 
-function parsePageRange(raw: unknown): { value?: string; error?: string } {
-  if (raw == null) return {};
+function resolveTargetDocument(
+  session: { documents?: UploadedDocument[]; document?: UploadedDocument },
+  filename?: string,
+): UploadedDocument | null {
+  const allDocs = getSessionDocuments(session);
+  if (allDocs.length === 0) return null;
 
-  if (typeof raw === 'string') {
-    const normalized = normalizeRangeString(raw);
-    if (!normalized) {
-      return { error: 'Invalid page range format' };
-    }
-    return { value: normalized };
-  }
-
-  if (typeof raw !== 'object') {
-    return { error: 'Invalid page range payload' };
-  }
-
-  const payload = raw as PageRangeSelectionPayload;
-  if (payload.type === 'all') return {};
-
-  if (payload.type === 'single') {
-    const pageRaw = payload.page;
-    const page =
-      typeof pageRaw === 'number' && Number.isFinite(pageRaw)
-        ? Math.floor(pageRaw)
-        : Number(pageRaw);
-    if (!Number.isInteger(page) || page < 1) {
-      return { error: 'Invalid single page selection' };
-    }
-    return { value: String(page) };
-  }
-
-  if (payload.type === 'custom') {
-    const normalized = normalizeRangeString(String(payload.range ?? ''));
-    if (!normalized) {
-      return { error: 'Invalid custom page range' };
-    }
-    return { value: normalized };
-  }
-
-  return { error: 'Invalid page range payload' };
+  if (!filename) return allDocs[allDocs.length - 1];
+  return allDocs.find((doc) => doc.filename === filename) ?? null;
 }
 
 export function registerFinancialRoutes(
@@ -105,6 +59,73 @@ export function registerFinancialRoutes(
 
   app.get('/api/pricing', (_req: Request, res: Response) => {
     res.json(adminService.getPricingSettings());
+  });
+
+  app.post('/api/print/quote', (req: Request, res: Response) => {
+    const { sessionId, filename } = req.body as {
+      sessionId?: string;
+      filename?: string;
+      copies?: number;
+      colorMode?: 'colored' | 'grayscale';
+      pageRange?: unknown;
+      duplex?: boolean;
+    };
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Print session is required' });
+    }
+
+    const session = deps.sessionStore.tryGetSession(
+      sessionId,
+      deps.resolvePublicBaseUrl(req),
+    );
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const target = resolveTargetDocument(session, filename);
+    if (!target) {
+      return res.status(400).json({
+        error: filename
+          ? `Document "${filename}" not found in session`
+          : 'No uploaded document found for this session',
+      });
+    }
+
+    if (!target.analysis) {
+      return res.status(409).json({
+        error:
+          'Document analysis is unavailable. Re-upload the file and try again.',
+      });
+    }
+
+    const safeCopies =
+      typeof req.body?.copies === 'number' && Number.isFinite(req.body.copies)
+        ? Math.max(1, Math.floor(req.body.copies))
+        : 1;
+    const requestedColorMode =
+      req.body?.colorMode === 'colored' || req.body?.colorMode === 'grayscale'
+        ? req.body.colorMode
+        : 'grayscale';
+    const duplex = req.body?.duplex === true;
+
+    const quoteComputation = buildPrintQuote({
+      analysis: target.analysis,
+      copies: safeCopies,
+      colorMode: requestedColorMode,
+      pageRange: req.body?.pageRange,
+      duplex,
+    });
+    if (!quoteComputation.ok) {
+      return res.status(400).json({ error: quoteComputation.error });
+    }
+
+    return res.json({
+      ok: true,
+      sessionId,
+      filename: target.filename,
+      quote: quoteComputation.quote,
+    });
   });
 
   app.post('/api/balance/reset', async (_req: Request, res: Response) => {
@@ -311,6 +332,7 @@ export function registerFinancialRoutes(
       orientation?: 'portrait' | 'landscape';
       paperSize?: 'A4' | 'Letter' | 'Legal';
       pageRange?: unknown;
+      duplex?: boolean;
     };
 
     if (mode !== 'print' && mode !== 'copy') {
@@ -344,30 +366,24 @@ export function registerFinancialRoutes(
       req.body?.paperSize === 'Legal'
         ? req.body.paperSize
         : 'A4';
-    const requiredAmount = adminService.calculateJobAmount(
-      mode,
-      colorMode,
-      copies,
-    );
-
-    if (
-      typeof amount === 'number' &&
-      Number.isFinite(amount) &&
-      amount !== requiredAmount
-    ) {
-      void adminService.appendAdminLog(
-        'payment_amount_mismatch',
-        'Client amount differed from server pricing.',
-        {
-          transactionId,
-          amount,
-          requiredAmount,
-        },
-      );
-    }
+    const duplex = req.body?.duplex === true;
+    let requiredAmount =
+      mode === 'copy'
+        ? adminService.calculateJobAmount('copy', colorMode, copies)
+        : 0;
 
     let serverFilename: string | null = null;
     let printOptions: PrintJobOptions | null = null;
+    let printQuotePages:
+      | {
+          selectedPages: number;
+          selectedColorPages: number;
+          selectedBwPages: number;
+          billableColorPages: number;
+          billableBwPages: number;
+          effectiveColorMode: 'colored' | 'grayscale';
+        }
+      | null = null;
 
     if (mode === 'print') {
       if (!sessionId) {
@@ -392,62 +408,94 @@ export function registerFinancialRoutes(
         return sendResponse(404, { error: 'Session not found' });
       }
 
-      const allDocs =
-        session.documents && session.documents.length > 0
-          ? session.documents
-          : session.document
-            ? [session.document]
-            : [];
-
-      if (allDocs.length === 0) {
-        void adminService.appendAdminLog(
-          'payment_failed',
-          'Confirm payment failed: no uploaded document in session.',
-          { transactionId, sessionId },
-        );
-        return sendResponse(400, {
-          error: 'No uploaded document found for this session',
-        });
-      }
-
-      const target = filename
-        ? allDocs.find((d) => d.filename === filename)
-        : allDocs[allDocs.length - 1];
-
+      const target = resolveTargetDocument(session, filename);
       if (!target) {
         void adminService.appendAdminLog(
           'payment_failed',
-          'Confirm payment failed: target document not found.',
+          filename
+            ? 'Confirm payment failed: target document not found.'
+            : 'Confirm payment failed: no uploaded document in session.',
           { transactionId, sessionId, filename: filename ?? null },
         );
         return sendResponse(400, {
-          error: `Document "${filename}" not found in session`,
+          error: filename
+            ? `Document "${filename}" not found in session`
+            : 'No uploaded document found for this session',
         });
       }
 
-      const parsedPageRange = parsePageRange(req.body?.pageRange);
-      if (parsedPageRange.error) {
+      if (!target.analysis) {
         void adminService.appendAdminLog(
           'payment_failed',
-          'Confirm payment failed: invalid page range.',
+          'Confirm payment failed: document analysis unavailable.',
+          {
+            transactionId,
+            sessionId,
+            filename: target.filename,
+          },
+        );
+        return sendResponse(409, {
+          error:
+            'Document analysis is unavailable. Re-upload the file and try again.',
+        });
+      }
+
+      const quoteComputation = buildPrintQuote({
+        analysis: target.analysis,
+        copies,
+        colorMode,
+        pageRange: req.body?.pageRange,
+        duplex,
+      });
+      if (!quoteComputation.ok) {
+        void adminService.appendAdminLog(
+          'payment_failed',
+          'Confirm payment failed: invalid quote input.',
           {
             transactionId,
             sessionId,
             pageRange: req.body?.pageRange ?? null,
-            error: parsedPageRange.error,
+            error: quoteComputation.error,
           },
         );
-        return sendResponse(400, { error: parsedPageRange.error });
+        return sendResponse(400, { error: quoteComputation.error });
       }
+
+      requiredAmount = quoteComputation.quote.requiredAmount;
+      printQuotePages = {
+        selectedPages: quoteComputation.quote.selectedPages,
+        selectedColorPages: quoteComputation.quote.selectedColorPages,
+        selectedBwPages: quoteComputation.quote.selectedBwPages,
+        billableColorPages: quoteComputation.quote.billableColorPages,
+        billableBwPages: quoteComputation.quote.billableBwPages,
+        effectiveColorMode: quoteComputation.quote.effectiveColorMode,
+      };
 
       serverFilename = path.basename(target.filePath);
       printOptions = {
-        copies,
-        colorMode,
+        copies: quoteComputation.quote.copies,
+        colorMode: quoteComputation.quote.effectiveColorMode,
         orientation,
         paperSize,
-        pageRange: parsedPageRange.value,
+        pageRange: quoteComputation.quote.pageRange ?? undefined,
+        duplex: quoteComputation.quote.duplex,
       };
+    }
+
+    if (
+      typeof amount === 'number' &&
+      Number.isFinite(amount) &&
+      amount !== requiredAmount
+    ) {
+      void adminService.appendAdminLog(
+        'payment_amount_mismatch',
+        'Client amount differed from server pricing.',
+        {
+          transactionId,
+          amount,
+          requiredAmount,
+        },
+      );
     }
 
     // ── Pre-check balance ────────────────────────────────────────────────────
@@ -515,7 +563,8 @@ export function registerFinancialRoutes(
       jobContext: {
         mode,
         copies,
-        colorMode,
+        colorMode: printOptions?.colorMode ?? colorMode,
+        duplex: printOptions?.duplex ?? false,
         sessionId: sessionId ?? null,
         filename: filename ?? null,
       },
@@ -540,8 +589,14 @@ export function registerFinancialRoutes(
         mode,
         amount: requiredAmount,
         copies,
-        colorMode,
+        colorMode: printOptions?.colorMode ?? colorMode,
+        duplex: printOptions?.duplex ?? false,
         pageRange: printOptions?.pageRange ?? null,
+        selectedPages: printQuotePages?.selectedPages ?? null,
+        selectedColorPages: printQuotePages?.selectedColorPages ?? null,
+        selectedBwPages: printQuotePages?.selectedBwPages ?? null,
+        billableColorPages: printQuotePages?.billableColorPages ?? null,
+        billableBwPages: printQuotePages?.billableBwPages ?? null,
         sessionId: sessionId ?? null,
         filename: filename ?? null,
         remainingBalance: settlement.remainingBalance,
@@ -601,7 +656,8 @@ export function registerFinancialRoutes(
           transactionId,
           mode,
           copies,
-          colorMode,
+          colorMode: printOptions?.colorMode ?? colorMode,
+          duplex: printOptions?.duplex ?? false,
           sessionId: sessionId ?? null,
           filename: serverFilename ?? filename ?? null,
           pageRange: printOptions?.pageRange ?? null,

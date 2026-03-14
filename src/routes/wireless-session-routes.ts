@@ -5,6 +5,7 @@ import { adminService } from '../services/admin';
 import type { SessionStore } from '../services/session';
 import { generateHtmlPreview, supportsHtmlPreview } from '../services/preview';
 import { detectPdfColorContent } from '@/services/config';
+import { analyzeDocument } from '@/services/document-analysis';
 import {
   uploadMiddleware,
   handleMulterError,
@@ -75,6 +76,60 @@ export function registerWirelessSessionRoutes(
     }
 
     next();
+  };
+
+  const analyzeAndStoreDocument = async (
+    req: Request,
+    sessionId: string,
+    filename?: string,
+  ) => {
+    const publicBaseUrl = deps.resolvePublicBaseUrl(req);
+    const session = deps.sessionStore.tryGetSession(sessionId, publicBaseUrl);
+    if (!session) {
+      return { error: 'Session not found.', status: 404 as const };
+    }
+
+    const docs =
+      session.documents && session.documents.length > 0
+        ? session.documents
+        : session.document
+          ? [session.document]
+          : [];
+
+    const target = filename
+      ? docs.find((doc) => doc.filename === filename)
+      : (session.document ?? docs[docs.length - 1]);
+
+    if (!target) {
+      return { error: 'Document not found.', status: 404 as const };
+    }
+
+    const analysis = await analyzeDocument({
+      filePath: target.filePath,
+      contentType: target.contentType,
+      filename: target.filename,
+      convertToPdfPreview: deps.convertToPdfPreview,
+    });
+
+    const persisted = deps.sessionStore.setDocumentAnalysis(
+      sessionId,
+      target.documentId,
+      analysis,
+    );
+
+    if (!persisted) {
+      return {
+        error: 'Failed to persist document analysis.',
+        status: 500 as const,
+      };
+    }
+
+    return {
+      status: 200 as const,
+      analysis: persisted,
+      documentId: target.documentId,
+      fileName: target.filename,
+    };
   };
 
   app.get('/api/wireless/sessions', (req: Request, res: Response) => {
@@ -334,6 +389,24 @@ export function registerWirelessSessionRoutes(
       }
 
       const doc = result.document;
+
+      let analysisPayload = null;
+      try {
+        const analyzed = await analyzeAndStoreDocument(
+          req,
+          sessionId,
+          doc.filename,
+        );
+        if ('analysis' in analyzed) {
+          analysisPayload = analyzed.analysis;
+        }
+      } catch (error) {
+        console.warn(
+          '[analyze-document] Failed to analyze uploaded file:',
+          error,
+        );
+      }
+
       deps.io.to(`session:${sessionId}`).emit('UploadCompleted', doc);
       await adminService.appendAdminLog(
         'upload_completed',
@@ -394,6 +467,54 @@ export function registerWirelessSessionRoutes(
         message: 'Session cancelled and cleaned up.',
         deletedFileCount: result.deletedFileCount,
       });
+    },
+  );
+
+  app.post(
+    '/api/wireless/sessions/:sessionId/analyze',
+    async (req: Request, res: Response) => {
+      const { sessionId, filename } = req.body as {
+        sessionId?: string;
+        filename?: string;
+      };
+      const token = extractUploadToken(req);
+
+      if (!sessionId || !token) {
+        return res
+          .status(401)
+          .json({ error: 'sessionId and token are required.' });
+      }
+
+      const publicBaseUrl = deps.resolvePublicBaseUrl(req);
+      const session = deps.sessionStore.tryGetSession(sessionId, publicBaseUrl);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found.' });
+      }
+      if (session.token !== token) {
+        return res.status(403).json({ error: 'Invalid token for session.' });
+      }
+
+      try {
+        const analyzed = await analyzeAndStoreDocument(
+          req,
+          sessionId,
+          filename,
+        );
+        if (!('analysis' in analyzed)) {
+          return res.status(analyzed.status).json({ error: analyzed.error });
+        }
+
+        return res.status(200).json({
+          documentId: analyzed.documentId,
+          fileName: analyzed.fileName,
+          ...analyzed.analysis,
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error';
+        return res
+          .status(500)
+          .json({ error: 'Document analysis failed.', reason });
+      }
     },
   );
 

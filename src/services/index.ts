@@ -1,11 +1,13 @@
 export { adminService } from './admin';
 export * from './db';
+export * from './document-analysis';
 export * from './feedback';
 export * from './hopper';
 export * from './hopper-protocol';
 export * from './hotspot';
 export * from './job-store';
 export * from './preview';
+export * from './print-quote';
 export * from './print-spooler';
 export * from './printer-monitor';
 export type { Orientation, PaperSize, PrintJobOptions } from './printer';
