@@ -105,7 +105,11 @@ export class PrinterService {
       }
       const filePath = path.resolve(uploadsDir, normalizeFilename);
       const relativePath = path.relative(uploadsDir, filePath);
-      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      const outsideUploads =
+        relativePath === '..' ||
+        relativePath.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relativePath);
+      if (outsideUploads) {
         console.error(
           '[PRINTER] ✗ Invalid filename — outside uploads directory',
         );
@@ -115,6 +119,21 @@ export class PrinterService {
       if (fileExists && !fs.statSync(filePath).isFile()) {
         console.error('[PRINTER] ✗ Invalid filename — not a file');
         return reject(new Error('Invalid filename'));
+      }
+      if (fileExists) {
+        const realUploadsDir = fs.realpathSync(uploadsDir);
+        const realFilePath = fs.realpathSync(filePath);
+        const realRelative = path.relative(realUploadsDir, realFilePath);
+        const realOutsideUploads =
+          realRelative === '..' ||
+          realRelative.startsWith(`..${path.sep}`) ||
+          path.isAbsolute(realRelative);
+        if (realOutsideUploads) {
+          console.error(
+            '[PRINTER] ✗ Invalid filename — resolved outside uploads directory',
+          );
+          return reject(new Error('Invalid filename'));
+        }
       }
       console.log(
         `[PRINTER] Resolved path: ${filePath} (exists: ${fileExists})`,
