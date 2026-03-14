@@ -541,13 +541,6 @@ const copiesDec = document.getElementById(
 const copiesInc = document.getElementById(
   'copiesInc',
 ) as HTMLButtonElement | null;
-const duplexGroup = document.getElementById('duplexGroup') as HTMLElement | null;
-const duplexSimplex = document.getElementById(
-  'duplexSimplex',
-) as HTMLInputElement | null;
-const duplexDuplex = document.getElementById(
-  'duplexDuplex',
-) as HTMLInputElement | null;
 
 const pageModeAll = document.getElementById(
   'pageModeAll',
@@ -592,7 +585,6 @@ if (mode === 'print' && continueBtn) {
 
 if (mode === 'copy' && continueBtn) {
   pageRangeGroup?.classList.add('hidden');
-  duplexGroup?.classList.add('hidden');
   const hasCopyPreview = Boolean(copyPreviewPath);
   continueBtn.disabled = !hasCopyPreview;
   continueBtn.setAttribute('aria-disabled', hasCopyPreview ? 'false' : 'true');
@@ -719,10 +711,6 @@ function getCopies(): number {
   );
 }
 
-function isDuplexEnabled(): boolean {
-  return Boolean(duplexDuplex?.checked);
-}
-
 function currentPreviewConfig(): PreviewConfig {
   return {
     colorMode: (getRadio('colorMode') as ColorMode) || 'colored',
@@ -772,7 +760,7 @@ async function refreshPrintQuote(): Promise<void> {
         orientation: cfg.orientation,
         paperSize: cfg.paperSize,
         pageRange: getPageRange(),
-        duplex: isDuplexEnabled(),
+        duplex: false,
       }),
     });
 
@@ -821,8 +809,6 @@ function updateSummary(): void {
   const cfg = currentPreviewConfig();
   const n = getCopies();
   const pages = pageRangeLabel(getPageRange());
-  const duplexLabel = isDuplexEnabled() ? 'Duplex' : 'Single-sided';
-
   let suffix = '';
   if (mode === 'print') {
     if (quoteLoading) {
@@ -844,7 +830,7 @@ function updateSummary(): void {
   footerSummary.textContent =
     `${n} cop${n === 1 ? 'y' : 'ies'} · ${pages} · ${cfg.paperSize} · ` +
     `${cfg.orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ` +
-    `${cfg.colorMode === 'colored' ? 'Colour' : 'Grayscale'} · ${duplexLabel}${suffix}`;
+    `${cfg.colorMode === 'colored' ? 'Colour' : 'Grayscale'}${suffix}`;
 }
 
 const preview = new PrintPreview();
@@ -1061,7 +1047,7 @@ continueBtn?.addEventListener('click', () => {
     filename: selectedFile,
     copyPreviewPath: mode === 'copy' ? copyPreviewPath : null,
     colorMode: cfg.colorMode,
-    duplex: isDuplexEnabled(),
+    duplex: false,
     copies: getCopies(),
     orientation: cfg.orientation,
     paperSize: cfg.paperSize,

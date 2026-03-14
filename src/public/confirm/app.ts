@@ -75,8 +75,6 @@ const modeValue = document.getElementById('modeValue');
 const fileValue = document.getElementById('fileValue');
 const colorValue = document.getElementById('colorValue');
 const copiesValue = document.getElementById('copiesValue');
-const duplexRow = document.getElementById('duplexRow');
-const duplexValue = document.getElementById('duplexValue');
 const pagesValue = document.getElementById('pagesValue');
 const pagesRow = document.getElementById('pagesRow');
 const orientationValue = document.getElementById('orientationValue');
@@ -120,7 +118,7 @@ if (!rawConfig) {
 }
 
 const config = JSON.parse(rawConfig ?? '{}') as ConfirmConfig;
-config.duplex = config.duplex === true;
+config.duplex = false;
 currentPrintQuote = config.mode === 'print' ? (config.quote ?? null) : null;
 
 // Update back link to return to the correct config page with the session
@@ -148,10 +146,6 @@ function getDisplayColorMode(): 'colored' | 'grayscale' {
     return currentPrintQuote.effectiveColorMode;
   }
   return config.colorMode;
-}
-
-function getDuplexLabel(): string {
-  return config.duplex ? 'Double-sided' : 'Single-sided';
 }
 
 function calculateLegacyTotalPrice(pricing: PricingResponse): number {
@@ -186,7 +180,6 @@ if (modalConfirmBtnSpan) {
 
 if (config.mode === 'copy' || config.mode === 'scan') {
   pagesRow?.setAttribute('hidden', '');
-  duplexRow?.setAttribute('hidden', '');
 }
 
 if (config.mode === 'scan') {
@@ -206,7 +199,6 @@ if (fileValue)
         : (config.scanFilename ?? 'Scanned document');
 if (colorValue) colorValue.textContent = getDisplayColorMode();
 if (copiesValue) copiesValue.textContent = String(config.copies);
-if (duplexValue) duplexValue.textContent = getDuplexLabel();
 if (pagesValue) pagesValue.textContent = pageRangeLabel(config.pageRange);
 if (orientationValue) orientationValue.textContent = config.orientation;
 if (paperSizeValue) paperSizeValue.textContent = config.paperSize;
@@ -465,7 +457,7 @@ async function loadPricing(): Promise<void> {
         orientation: config.orientation,
         paperSize: config.paperSize,
         pageRange: config.pageRange,
-        duplex: config.duplex,
+        duplex: false,
       }),
     });
 
@@ -485,7 +477,6 @@ async function loadPricing(): Promise<void> {
     if (pagesValue) {
       pagesValue.textContent = `${pageRangeLabel(config.pageRange)} (${payload.quote.selectedPages} of ${payload.quote.totalPages})`;
     }
-    if (duplexValue) duplexValue.textContent = getDuplexLabel();
     return;
   }
 
@@ -563,8 +554,6 @@ const modalFile = document.getElementById('modalFile');
 const modalMode = document.getElementById('modalMode');
 const modalColor = document.getElementById('modalColor');
 const modalCopies = document.getElementById('modalCopies');
-const modalDuplex = document.getElementById('modalDuplex');
-const modalDuplexRow = document.getElementById('modalDuplexRow');
 const modalPages = document.getElementById('modalPages');
 const modalPagesRow = document.getElementById('modalPagesRow');
 const modalOrientation = document.getElementById('modalOrientation');
@@ -581,7 +570,6 @@ let isProcessingPayment = false;
 
 if (config.mode === 'copy' || config.mode === 'scan') {
   modalPagesRow?.setAttribute('hidden', '');
-  modalDuplexRow?.setAttribute('hidden', '');
 }
 
 function showModal(): void {
@@ -594,7 +582,6 @@ function showModal(): void {
   if (modalMode) modalMode.textContent = config.mode.toUpperCase();
   if (modalColor) modalColor.textContent = getDisplayColorMode();
   if (modalCopies) modalCopies.textContent = String(config.copies);
-  if (modalDuplex) modalDuplex.textContent = getDuplexLabel();
   if (modalPages) {
     const baseLabel = pageRangeLabel(config.pageRange);
     if (config.mode === 'print' && currentPrintQuote) {
@@ -848,7 +835,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         orientation: config.orientation,
         paperSize: config.paperSize,
         pageRange: config.pageRange,
-        duplex: config.duplex,
+        duplex: false,
       }),
     });
 
