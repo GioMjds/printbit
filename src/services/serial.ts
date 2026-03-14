@@ -126,6 +126,54 @@ function tryHandleHopperResponse(rawLine: string): boolean {
     return true;
   }
 
+  // ── Plain legacy firmware fallback ("START <n>" / "DONE" / "ERROR ...") ──
+  // Some Arduino sketches don't include the "HOPPER" prefix. Treat these lines
+  // as hopper traffic so they don't leak into the coin-token parser.
+  const upper = line.toUpperCase();
+  const looksLikePlainLegacy =
+    upper === 'DONE' ||
+    upper.startsWith('DONE ') ||
+    upper === 'START' ||
+    upper.startsWith('START ') ||
+    upper.includes('ERROR') ||
+    upper.includes('FAIL');
+  if (looksLikePlainLegacy) {
+    if (!pendingHopperCommand) {
+      hopperLastError = `Unsolicited hopper response: ${line}`;
+      console.warn(`[SERIAL] ⚠ ${hopperLastError}`);
+      return true;
+    }
+
+    if (upper === 'DONE' || upper.startsWith('DONE ')) {
+      completePendingHopperCommand({
+        ok: true,
+        message: line,
+      });
+      return true;
+    }
+
+    if (upper.includes('ERROR') || upper.includes('FAIL')) {
+      completePendingHopperCommand({
+        ok: false,
+        message: line,
+      });
+      return true;
+    }
+
+    if (upper === 'START' || upper.startsWith('START ')) {
+      const match = line.match(/(\d+)/);
+      const total = match ? parseInt(match[1], 10) : 0;
+      if (Number.isFinite(total) && total > 0) {
+        socketIo?.emit('changeDispenseProgress', {
+          dispensed: 0,
+          total,
+        });
+      }
+      console.log(`[SERIAL] Hopper legacy START received: ${line}`);
+      return true;
+    }
+  }
+
   // Not a hopper message
   return false;
 }
@@ -485,8 +533,8 @@ async function attemptSerialConnection(io: Server, attempt: number) {
       parser.on('data', (rawLine: string) => {
         console.log(`[SERIAL] Raw data: "${rawLine}"`);
         if (tryHandleHopperResponse(rawLine)) return;
-        const token = rawLine.trim().replace(/[^0-9]/g, '');
-        if (!token) return;
+        const token = rawLine.trim();
+        if (!/^\d+$/.test(token)) return;
         void processToken(token);
       });
     });

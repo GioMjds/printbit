@@ -115,11 +115,22 @@ export function isRetryableError(code: HopperErrorCodeValue): boolean {
 
 // ── Request-ID generation ────────────────────────────────────────────────────
 // 4-char lowercase hex — 65 536 unique IDs, cheap on Arduino memory.
+//
+// Compatibility note:
+// Some legacy firmware still uses Serial.parseInt() and will consume the first
+// numeric sequence from the line. Keeping request IDs alpha-only ensures that
+// if a structured command is sent to such firmware, parseInt reads the final
+// coin-count token rather than digits from the request ID.
+
+const REQUEST_ID_ALPHABET = 'abcdef';
 
 export function generateRequestId(): string {
-  return Math.floor(Math.random() * 0xffff)
-    .toString(16)
-    .padStart(4, '0');
+  let id = '';
+  for (let i = 0; i < 4; i += 1) {
+    const idx = Math.floor(Math.random() * REQUEST_ID_ALPHABET.length);
+    id += REQUEST_ID_ALPHABET[idx];
+  }
+  return id;
 }
 
 // ── Command builders ─────────────────────────────────────────────────────────
