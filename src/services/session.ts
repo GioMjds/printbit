@@ -112,6 +112,7 @@ export class SessionStore {
 
   private readonly byToken = new Map<string, string>();
   private readonly uploadDir: string;
+  private retryTimers = new Set<ReturnType<typeof setTimeout>>();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private readonly cleanupInFlight = new Set<string>();
   private readonly cleanupAttempts = new Map<string, number>();
@@ -617,7 +618,8 @@ export class SessionStore {
     }
 
     const retryDelayMs = CLEANUP_RETRY_DELAY_MS * attempt;
-    setTimeout(() => {
+    const timerId = setTimeout(() => {
+      this.retryTimers.delete(timerId);
       const latest = this.sessions.get(sessionId);
       if (!latest) return;
       if (!this.isSessionExpired(latest)) {
@@ -626,6 +628,7 @@ export class SessionStore {
       }
       void this.pruneExpiredSession(sessionId, latest);
     }, retryDelayMs);
+    this.retryTimers.add(timerId);
   }
 
   /** Stop the cleanup timer (for graceful shutdown). */
