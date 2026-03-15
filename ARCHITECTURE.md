@@ -80,6 +80,9 @@ Ephemeral (process memory):
 1. Kiosk creates session and QR.
 2. Phone opens upload portal and uploads file.
 3. Kiosk polls/receives upload completion.
+   - Session ownership is single-device (`x-upload-client-id`) to prevent multi-phone collisions.
+   - Session TTL is idle-based; clients receive countdown metadata and show warning before expiry.
+   - On timeout, uploaded files are cleaned and session state is released.
 4. User selects print settings.
 5. Confirm endpoint validates funds and dispatches print.
 6. Settlement: balance zeroed, earnings updated, change dispensed via coin hopper.
@@ -121,6 +124,7 @@ Ephemeral (process memory):
 - Prioritizes kiosk availability even when optional hardware is unavailable.
 - Uses strict request validation in most job endpoints.
 - Uses mixed legacy and newer routes; migration toward unified APIs is ongoing.
+- Session-based upload is preferred over direct anonymous upload to preserve per-user isolation, bounded lifetime, and deterministic cleanup between kiosk users.
 
 ## Dependency context
 

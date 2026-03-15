@@ -3,22 +3,22 @@ import { Server } from 'socket.io';
 import path from 'node:path';
 import fs from 'node:fs';
 import { settlementService } from '@/services';
-import { jobStore } from '../services/job-store';
-import { db } from '../services/db';
-import { adminService } from '../services/admin';
+import { jobStore } from '@/services/job-store';
+import { db } from '@/services/db';
+import { adminService } from '@/services/admin';
 import {
   getAdapter,
   getScannerStatus,
   type ScannerCapabilities,
-} from '../services/scanner';
+} from '@/services/scanner';
 import {
   createScanDownloadLink,
   resolveScanDownload,
-} from '../services/scan-delivery';
+} from '@/services/scan-delivery';
 import {
   exportScanToUsbDrive,
   listRemovableDrives,
-} from '../services/usb-drives';
+} from '@/services/usb-drives';
 import { detectPdfColorContent } from '@/services/config';
 
 const VALID_SOURCES = new Set(['adf', 'flatbed']);
@@ -282,10 +282,8 @@ export function registerScanRoutes(
 
       markSoftCopyPaid(safeFilename);
 
-      void adminService.appendAdminLog(
-        'scan_soft_copy_charged',
-        'Soft copy access charged.',
-        {
+      void adminService
+        .appendAdminLog('scan_soft_copy_charged', 'Soft copy access charged.', {
           filename: safeFilename,
           amount: settlement.chargedAmount,
           requiredAmount,
@@ -293,22 +291,24 @@ export function registerScanRoutes(
           changeState: settlement.change.state,
           changeRequested: settlement.change.requested,
           changeDispensed: settlement.change.dispensed,
-        },
-      ).catch(() => {});
+        })
+        .catch(() => {});
 
       if (settlement.change.state === 'failed') {
-        void adminService.appendAdminLog(
-          'hopper_dispense_failed',
-          'Coin change dispense failed after scan soft-copy charge.',
-          {
-            filename: safeFilename,
-            requested: settlement.change.requested,
-            dispensed: settlement.change.dispensed,
-            attempts: settlement.change.attempts ?? 0,
-            owedChangeId: settlement.change.owedChangeId ?? null,
-            message: settlement.change.message ?? null,
-          },
-        ).catch(() => {});
+        void adminService
+          .appendAdminLog(
+            'hopper_dispense_failed',
+            'Coin change dispense failed after scan soft-copy charge.',
+            {
+              filename: safeFilename,
+              requested: settlement.change.requested,
+              dispensed: settlement.change.dispensed,
+              attempts: settlement.change.attempts ?? 0,
+              owedChangeId: settlement.change.owedChangeId ?? null,
+              message: settlement.change.message ?? null,
+            },
+          )
+          .catch(() => {});
       }
 
       return res.json({

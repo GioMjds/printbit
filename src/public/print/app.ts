@@ -16,6 +16,8 @@ type SessionResponse = {
   token: string;
   status: 'pending' | 'uploaded';
   uploadUrl: string;
+  remainingSeconds?: number;
+  warningThresholdSeconds?: number;
   /** Single document (legacy) */
   document?: UploadedFile;
   /** Multiple documents (preferred) */
@@ -68,6 +70,7 @@ const wifiStepEl = document.getElementById('wifiStep') as HTMLElement | null;
 // ── State ─────────────────────────────────────────────────────────────────────
 
 let activeSessionId = '';
+let activeSessionToken = '';
 let pollHandle: number | null = null;
 let selectedFilename = '';
 let selectedDocumentId = '';
@@ -76,6 +79,7 @@ let deletingDocumentIds = new Set<string>();
 let lastRenderedFileSignature = '';
 let attachedSessionId: string | null = null;
 let hotspotConfig: HotspotConfig | null = null;
+let sessionWarningThresholdSeconds = 60;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -85,6 +89,31 @@ function setSessionText(text: string): void {
 
 function setSessionActive(active: boolean): void {
   sessionDot?.classList.toggle('active', active);
+}
+
+function formatCountdown(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function updateSessionCountdown(remainingSeconds?: number): void {
+  if (!activeSessionId || typeof remainingSeconds !== 'number') return;
+  const countdown = formatCountdown(remainingSeconds);
+  setSessionText(`${activeSessionId} • Expires in ${countdown}`);
+  if (!footerHint) return;
+
+  if (remainingSeconds <= sessionWarningThresholdSeconds) {
+    footerHint.textContent = `Session expires in ${countdown}. Continue soon.`;
+    footerHint.classList.remove('ready');
+    return;
+  }
+
+  footerHint.textContent = selectedFilename
+    ? `"${selectedFilename}" selected.`
+    : 'Select a file above to continue.';
+  footerHint.classList.add('ready');
 }
 
 function setFilesCount(n: number): void {
@@ -183,8 +212,16 @@ async function deleteSessionFile(file: UploadedFile): Promise<void> {
   deletingDocumentIds.add(documentId);
 
   try {
+    if (!activeSessionToken) {
+      if (footerHint) {
+        footerHint.textContent =
+          'Missing session token. Start a new session to remove files.';
+        footerHint.classList.remove('ready');
+      }
+      return;
+    }
     const response = await fetch(
-      `/api/wireless/sessions/${encodeURIComponent(activeSessionId)}/documents/${encodeURIComponent(documentId)}`,
+      `/api/wireless/sessions/${encodeURIComponent(activeSessionId)}/documents/${encodeURIComponent(documentId)}?token=${encodeURIComponent(activeSessionToken)}`,
       { method: 'DELETE' },
     );
 
@@ -276,9 +313,9 @@ function addFileToList(file: UploadedFile): void {
     }
   });
 
-  const deleteBtn = li.querySelector('.file-item__delete') as
-    | HTMLButtonElement
-    | null;
+  const deleteBtn = li.querySelector(
+    '.file-item__delete',
+  ) as HTMLButtonElement | null;
   deleteBtn?.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -320,7 +357,8 @@ function renderFiles(files: UploadedFile[]): void {
   );
 
   const selected =
-    files.find((f) => (f.documentId || f.filename) === prevSelected) ?? files[0];
+    files.find((f) => (f.documentId || f.filename) === prevSelected) ??
+    files[0];
   selectFile(selected);
 }
 
@@ -399,17 +437,29 @@ async function createSession(): Promise<void> {
   }
 
   const response = await fetch('/api/wireless/sessions');
+  if (!response.ok) {
+    setSessionText('Failed to create session');
+    if (footerHint) {
+      footerHint.textContent = 'Could not create session. Please try again.';
+      footerHint.classList.remove('ready');
+    }
+    return;
+  }
   const session = (await response.json()) as SessionResponse;
   activeSessionId = session.sessionId;
+  activeSessionToken = session.token;
+  sessionWarningThresholdSeconds = session.warningThresholdSeconds ?? 60;
 
   sessionStorage.setItem('printbit.mode', 'print');
   sessionStorage.setItem('printbit.sessionId', session.sessionId);
+  sessionStorage.setItem('printbit.sessionToken', session.token);
   sessionStorage.removeItem('printbit.uploadedFile');
   sessionStorage.removeItem('printbit.uploadedDocumentId');
   sessionStorage.removeItem('printbit.uploadedFiles');
 
   setSessionText(session.sessionId);
   setSessionActive(true);
+  updateSessionCountdown(session.remainingSeconds);
   updateUploadLink(session.uploadUrl);
 
   attachSocket(session.sessionId);
@@ -423,9 +473,29 @@ async function checkUploadStatus(): Promise<void> {
   const response = await fetch(
     `/api/wireless/sessions/${encodeURIComponent(activeSessionId)}`,
   );
-  if (!response.ok) return;
+  if (!response.ok) {
+    if (response.status === 404 || response.status === 410) {
+      activeSessionId = '';
+      activeSessionToken = '';
+      sessionStorage.removeItem('printbit.sessionId');
+      sessionStorage.removeItem('printbit.sessionToken');
+      setSessionActive(false);
+      setSessionText('Session expired');
+      setWaitingForFilesState();
+      if (footerHint) {
+        footerHint.textContent =
+          'Session expired. Tap "New session" to generate a fresh QR code.';
+        footerHint.classList.remove('ready');
+      }
+    }
+    return;
+  }
 
   const session = (await response.json()) as SessionResponse;
+  activeSessionToken = session.token;
+  sessionWarningThresholdSeconds = session.warningThresholdSeconds ?? 60;
+  sessionStorage.setItem('printbit.sessionToken', session.token);
+  updateSessionCountdown(session.remainingSeconds);
 
   // Never gate on status — session stays "uploaded" while accumulating
   // multiple files, so always read the full documents list.
@@ -525,6 +595,7 @@ dialogConfirmBtn?.addEventListener('click', () => {
 
 async function restoreSession(sid: string): Promise<void> {
   activeSessionId = sid;
+  activeSessionToken = sessionStorage.getItem('printbit.sessionToken') ?? '';
 
   if (!hotspotConfig) {
     try {
@@ -549,6 +620,10 @@ async function restoreSession(sid: string): Promise<void> {
   );
   if (response.ok) {
     const session = (await response.json()) as SessionResponse;
+    activeSessionToken = session.token;
+    sessionWarningThresholdSeconds = session.warningThresholdSeconds ?? 60;
+    sessionStorage.setItem('printbit.sessionToken', session.token);
+    updateSessionCountdown(session.remainingSeconds);
     updateUploadLink(session.uploadUrl);
   }
 
@@ -571,7 +646,8 @@ continueBtn?.addEventListener('click', () => {
   window.location.href =
     `/config?mode=print&sessionId=${encodeURIComponent(activeSessionId)}` +
     `&file=${encodeURIComponent(selectedFilename)}` +
-    `&documentId=${encodeURIComponent(selectedDocumentId)}`;
+    `&documentId=${encodeURIComponent(selectedDocumentId)}` +
+    `&token=${encodeURIComponent(activeSessionToken)}`;
 });
 
 const savedSessionId = sessionStorage.getItem('printbit.sessionId');
@@ -587,10 +663,10 @@ void initializePageIdleTimeout({
   showWarningModal: true,
   onTimeout: async () => {
     // Attempt to cancel session on server
-    if (activeSessionId) {
+    if (activeSessionId && activeSessionToken) {
       try {
         const res = await fetch(
-          `/api/wireless/sessions/${activeSessionId}/cancel`,
+          `/api/wireless/sessions/${encodeURIComponent(activeSessionId)}/cancel?token=${encodeURIComponent(activeSessionToken)}`,
           {
             method: 'DELETE',
           },
@@ -601,6 +677,7 @@ void initializePageIdleTimeout({
       }
     }
     // Redirect to home
+    sessionStorage.removeItem('printbit.sessionToken');
     window.location.replace('/');
   },
 });

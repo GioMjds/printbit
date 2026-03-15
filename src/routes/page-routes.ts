@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from 'express';
-import { requireAdminLocalAccess } from '../middleware/admin-auth';
-import type { SessionStore } from '../services/session';
-import { db } from '../services/db';
+import { requireAdminLocalAccess } from '@/middleware/admin-auth';
+import type { SessionStore } from '@/services/session';
+import { db } from '@/services/db';
 
 type PageRoute = { route: string; filePath: string };
 

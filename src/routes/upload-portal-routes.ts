@@ -1,7 +1,7 @@
-import path from "node:path";
-import type { Express, Request, Response } from "express";
-import type { SessionStore } from "../services/session";
-import { adminService } from "../services/admin";
+import path from 'node:path';
+import type { Express, Request, Response } from 'express';
+import type { SessionStore } from '@/services/session';
+import { adminService } from '@/services/admin';
 
 interface RegisterUploadPortalRoutesDeps {
   portalDir: string;
@@ -28,40 +28,44 @@ export function registerUploadPortalRoutes(
   app: Express,
   deps: RegisterUploadPortalRoutesDeps,
 ) {
-  app.get("/upload/:token", (req: Request, res: Response) => {
+  app.get('/upload/:token', (req: Request, res: Response) => {
     try {
       const { token } = req.params as { token: string };
 
       // Validate token before rendering the upload page
       if (!deps.sessionStore.isTokenValid(token)) {
-        void adminService.appendAdminLog("upload_page_rejected", "Upload page hit with invalid/expired token.", {
-          tokenPrefix: token.slice(0, 8),
-        });
-        res.status(410).type("html").send(EXPIRED_HTML);
+        void adminService.appendAdminLog(
+          'upload_page_rejected',
+          'Upload page hit with invalid/expired token.',
+          {
+            tokenPrefix: token.slice(0, 8),
+          },
+        );
+        res.status(410).type('html').send(EXPIRED_HTML);
         return;
       }
 
       const html = deps.renderUploadPortal(
         token,
-        path.join(deps.portalDir, "index.html"),
+        path.join(deps.portalDir, 'index.html'),
       );
       res.send(html);
     } catch (error) {
-      console.error("Error rendering upload portal:", error);
-      res.status(404).send("Error loading upload portal");
+      console.error('Error rendering upload portal:', error);
+      res.status(500).send('Error loading upload portal');
     }
   });
 
-  app.get("/upload/:token/:asset", (req: Request, res: Response) => {
+  app.get('/upload/:token/:asset', (req: Request, res: Response) => {
     const { asset } = req.params as { asset: string };
 
     if (!deps.portalAssets.has(asset)) {
-      return res.status(404).send("Not found.");
+      return res.status(404).send('Not found.');
     }
 
     const filePath = path.join(deps.portalDir, asset);
     res.sendFile(filePath, (err) => {
-      if (err) res.status(404).send("Asset not found.");
+      if (err) res.status(404).send('Asset not found.');
     });
   });
 }

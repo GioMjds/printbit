@@ -15,7 +15,7 @@ export function registerPrinterRoutes(app: Express) {
   app.get('/api/printer/status', async (req: Request, res: Response) => {
     const telemetry = getPrinterTelemetry();
 
-    const blocked = 
+    const blocked =
       !telemetry.connected || BLOCKED_STATUSES.has(telemetry.status);
     const ready = !blocked;
 

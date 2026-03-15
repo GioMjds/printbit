@@ -26,7 +26,7 @@ export interface UploadedDocument {
   contentType: string;
   sizeBytes: number;
   uploadedAt: Date;
-  // The full path to the uploaded file on the server, e.g. "uploads/abc123"
+  /** The full path to the uploaded file on the server, e.g. "uploads/abc123" */
   filePath: string;
   analysis?: DocumentAnalysis;
 }
@@ -34,12 +34,19 @@ export interface UploadedDocument {
 export interface Session {
   sessionId: string;
   token: string;
-  // Full URL the phone should open to upload a file
+  /** Full URL the phone should open to upload a file */
   uploadUrl: string;
   status: 'pending' | 'uploaded';
   documents?: UploadedDocument[];
   document?: UploadedDocument;
   createdAt: Date;
+  lastActivityAt: Date;
+  ownerClientId?: string;
+  ownerClaimedAt?: Date;
+  expiresAt?: Date;
+  remainingSeconds?: number;
+  ttlSeconds?: number;
+  warningThresholdSeconds?: number;
 }
 
 export interface StoreUploadResult {
@@ -55,6 +62,19 @@ export interface RemoveDocumentResult {
   removedDocumentId?: string;
   remainingCount: number;
   deletedFile: boolean;
+}
+
+export type SessionState = 'active' | 'expired' | 'missing';
+
+export interface OwnerClaimResult {
+  ok: boolean;
+  errorCode?:
+    | 'SESSION_NOT_FOUND'
+    | 'SESSION_EXPIRED'
+    | 'INVALID_TOKEN'
+    | 'INVALID_CLIENT_ID'
+    | 'SESSION_OWNED';
+  errorMsg?: string;
 }
 
 const ALLOWED_TYPES = new Map<string, string>([
@@ -79,17 +99,23 @@ const ALLOWED_TYPES = new Map<string, string>([
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB
 
 // Session limits
-const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const SESSION_WARNING_SECONDS = 60;
 const MAX_FILES_PER_SESSION = 10;
 const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024; // 50MB total per session
 const CLEANUP_INTERVAL_MS = 2 * 60 * 1000; // run cleanup every 2 minutes
+const CLEANUP_RETRY_DELAY_MS = 30 * 1000;
+const MAX_CLEANUP_ATTEMPTS = 3;
 
 export class SessionStore {
   private readonly sessions = new Map<string, Session>();
 
   private readonly byToken = new Map<string, string>();
   private readonly uploadDir: string;
+  private retryTimers = new Set<ReturnType<typeof setTimeout>>();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly cleanupInFlight = new Set<string>();
+  private readonly cleanupAttempts = new Map<string, number>();
 
   constructor(uploadDir = 'uploads') {
     this.uploadDir = uploadDir;
@@ -102,7 +128,7 @@ export class SessionStore {
 
   /** Check whether a session is still within its TTL window. */
   isSessionExpired(session: Session): boolean {
-    return Date.now() - session.createdAt.getTime() > SESSION_TTL_MS;
+    return Date.now() - session.lastActivityAt.getTime() > SESSION_TTL_MS;
   }
 
   /** Check if a token maps to a valid, non-expired session. */
@@ -111,20 +137,42 @@ export class SessionStore {
     if (!sessionId) return false;
     const session = this.sessions.get(sessionId);
     if (!session) return false;
-    return !this.isSessionExpired(session);
+    if (this.isSessionExpired(session)) {
+      void this.pruneExpiredSession(sessionId, session);
+      return false;
+    }
+    return true;
+  }
+
+  getSessionState(sessionId: string): SessionState {
+    const session = this.sessions.get(sessionId);
+    if (!session) return 'missing';
+    if (this.isSessionExpired(session)) {
+      void this.pruneExpiredSession(sessionId, session);
+      return 'expired';
+    }
+    return 'active';
+  }
+
+  getTokenState(token: string): SessionState {
+    const sessionId = this.byToken.get(token);
+    if (!sessionId) return 'missing';
+    return this.getSessionState(sessionId);
   }
 
   createSession(baseUrl: URL): Session {
     const sessionId = randomUUID();
     const token = randomUUID();
     const uploadUrl = new URL(`/upload/${token}`, baseUrl).toString();
+    const now = new Date();
 
     const session: Session = {
       sessionId,
       token,
       uploadUrl,
       status: 'pending',
-      createdAt: new Date(),
+      createdAt: now,
+      lastActivityAt: now,
     };
 
     this.sessions.set(sessionId, session);
@@ -135,7 +183,10 @@ export class SessionStore {
   tryGetSession(sessionId: string, publicBaseUrl: URL): Session | null {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
-    if (this.isSessionExpired(session)) return null;
+    if (this.isSessionExpired(session)) {
+      void this.pruneExpiredSession(sessionId, session);
+      return null;
+    }
     return this.withFreshUrl(session, publicBaseUrl);
   }
 
@@ -161,6 +212,7 @@ export class SessionStore {
     }
 
     if (this.isSessionExpired(session)) {
+      void this.pruneExpiredSession(sessionId, session);
       return {
         isSuccess: false,
         errorMsg:
@@ -176,6 +228,8 @@ export class SessionStore {
         errorCode: 'INVALID_TOKEN',
       };
     }
+
+    this.touchSession(sessionId);
 
     if (file.size > MAX_BYTES) {
       return {
@@ -258,7 +312,11 @@ export class SessionStore {
     analysis: Omit<DocumentAnalysis, 'analyzedAt'>,
   ): DocumentAnalysis | null {
     const session = this.sessions.get(sessionId);
-    if (!session || this.isSessionExpired(session)) return null;
+    if (!session) return null;
+    if (this.isSessionExpired(session)) {
+      void this.pruneExpiredSession(sessionId, session);
+      return null;
+    }
 
     const docs =
       session.documents ?? (session.document ? [session.document] : []);
@@ -275,6 +333,7 @@ export class SessionStore {
       session.document.analysis = stamped;
     }
 
+    this.touchSession(sessionId);
     return stamped;
   }
 
@@ -292,6 +351,7 @@ export class SessionStore {
       };
     }
     if (this.isSessionExpired(session)) {
+      void this.pruneExpiredSession(sessionId, session);
       return {
         success: false,
         errorCode: 'SESSION_EXPIRED',
@@ -332,6 +392,7 @@ export class SessionStore {
       delete session.document;
       session.status = 'pending';
     }
+    this.touchSession(sessionId);
 
     return {
       success: true,
@@ -346,7 +407,14 @@ export class SessionStore {
       `/upload/${encodeURIComponent(session.token)}`,
       publicBaseUrl,
     ).toString();
-    return { ...session, uploadUrl: freshUrl };
+    return {
+      ...session,
+      uploadUrl: freshUrl,
+      expiresAt: new Date(this.getExpiryTimestamp(session)),
+      remainingSeconds: this.getRemainingSeconds(session),
+      ttlSeconds: Math.floor(SESSION_TTL_MS / 1000),
+      warningThresholdSeconds: SESSION_WARNING_SECONDS,
+    };
   }
 
   /** Return the token of the most recently created non-expired session (for captive portal redirect). */
@@ -359,6 +427,91 @@ export class SessionStore {
       }
     }
     return latest?.token ?? null;
+  }
+
+  touchSession(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+    if (this.isSessionExpired(session)) {
+      void this.pruneExpiredSession(sessionId, session);
+      return false;
+    }
+    session.lastActivityAt = new Date();
+    return true;
+  }
+
+  touchSessionByToken(token: string): boolean {
+    const sessionId = this.byToken.get(token);
+    if (!sessionId) return false;
+    return this.touchSession(sessionId);
+  }
+
+  claimOwner(
+    sessionId: string,
+    token: string,
+    clientId: string,
+  ): OwnerClaimResult {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return {
+        ok: false,
+        errorCode: 'SESSION_NOT_FOUND',
+        errorMsg: 'Session not found.',
+      };
+    }
+    if (this.isSessionExpired(session)) {
+      void this.pruneExpiredSession(sessionId, session);
+      return {
+        ok: false,
+        errorCode: 'SESSION_EXPIRED',
+        errorMsg: 'Session has expired. Please start a new session.',
+      };
+    }
+    if (session.token !== token) {
+      return {
+        ok: false,
+        errorCode: 'INVALID_TOKEN',
+        errorMsg: 'Invalid session token.',
+      };
+    }
+
+    const safeClientId = clientId.trim();
+    if (!safeClientId) {
+      return {
+        ok: false,
+        errorCode: 'INVALID_CLIENT_ID',
+        errorMsg: 'Missing upload client identifier.',
+      };
+    }
+
+    if (session.ownerClientId && session.ownerClientId !== safeClientId) {
+      return {
+        ok: false,
+        errorCode: 'SESSION_OWNED',
+        errorMsg:
+          'This session is already active on another device. Start a new session from the kiosk.',
+      };
+    }
+
+    if (!session.ownerClientId) {
+      session.ownerClientId = safeClientId;
+      session.ownerClaimedAt = new Date();
+    }
+
+    session.lastActivityAt = new Date();
+    return { ok: true };
+  }
+
+  claimOwnerByToken(token: string, clientId: string): OwnerClaimResult {
+    const sessionId = this.byToken.get(token);
+    if (!sessionId) {
+      return {
+        ok: false,
+        errorCode: 'SESSION_NOT_FOUND',
+        errorMsg: 'Session not found.',
+      };
+    }
+    return this.claimOwner(sessionId, token, clientId);
   }
 
   /** Cancel a session immediately and delete all uploaded files. */
@@ -391,20 +544,91 @@ export class SessionStore {
 
   /** Remove expired sessions and their uploaded files from disk. */
   private cleanupExpired(): void {
-    const now = Date.now();
-    for (const [id, session] of this.sessions) {
-      if (now - session.createdAt.getTime() <= SESSION_TTL_MS) continue;
-
-      // Delete uploaded files asynchronously to avoid blocking the event loop
-      const docs =
-        session.documents ?? (session.document ? [session.document] : []);
-      void Promise.allSettled(
-        docs.map((doc) => fs.promises.unlink(doc.filePath)),
-      );
-
-      this.byToken.delete(session.token);
-      this.sessions.delete(id);
+    for (const [id, session] of this.sessions.entries()) {
+      if (this.isSessionExpired(session)) {
+        void this.pruneExpiredSession(id, session);
+      }
     }
+  }
+
+  private getExpiryTimestamp(session: Session): number {
+    return session.lastActivityAt.getTime() + SESSION_TTL_MS;
+  }
+
+  private getRemainingSeconds(session: Session): number {
+    const remainingMs = this.getExpiryTimestamp(session) - Date.now();
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  }
+
+  private async pruneExpiredSession(
+    sessionId: string,
+    session: Session,
+  ): Promise<void> {
+    if (this.cleanupInFlight.has(sessionId)) return;
+    this.cleanupInFlight.add(sessionId);
+
+    const docs =
+      session.documents ?? (session.document ? [session.document] : []);
+    const deletionResults = await Promise.allSettled(
+      docs.map((doc) => fs.promises.unlink(doc.filePath)),
+    );
+    const failedDeletes: Array<{
+      filePath: string | undefined;
+      reason: unknown;
+    }> = [];
+    deletionResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        failedDeletes.push({
+          filePath: docs[index]?.filePath,
+          reason: result.reason,
+        });
+      }
+    });
+
+    if (failedDeletes.length === 0) {
+      this.byToken.delete(session.token);
+      this.sessions.delete(sessionId);
+      this.cleanupAttempts.delete(sessionId);
+      this.cleanupInFlight.delete(sessionId);
+      return;
+    }
+
+    for (const failed of failedDeletes) {
+      const message =
+        failed.reason instanceof Error
+          ? failed.reason.message
+          : String(failed.reason);
+      console.error('[session-cleanup] Failed to delete expired upload file.', {
+        sessionId,
+        filePath: failed.filePath ?? 'unknown',
+        error: message,
+      });
+    }
+
+    const attempt = (this.cleanupAttempts.get(sessionId) ?? 0) + 1;
+    this.cleanupAttempts.set(sessionId, attempt);
+    this.cleanupInFlight.delete(sessionId);
+
+    if (attempt >= MAX_CLEANUP_ATTEMPTS) {
+      console.error(
+        '[session-cleanup] Reached max retry attempts for expired session cleanup.',
+        { sessionId, attempts: attempt },
+      );
+      return;
+    }
+
+    const retryDelayMs = CLEANUP_RETRY_DELAY_MS * attempt;
+    const timerId = setTimeout(() => {
+      this.retryTimers.delete(timerId);
+      const latest = this.sessions.get(sessionId);
+      if (!latest) return;
+      if (!this.isSessionExpired(latest)) {
+        this.cleanupAttempts.delete(sessionId);
+        return;
+      }
+      void this.pruneExpiredSession(sessionId, latest);
+    }, retryDelayMs);
+    this.retryTimers.add(timerId);
   }
 
   /** Stop the cleanup timer (for graceful shutdown). */

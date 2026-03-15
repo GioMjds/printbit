@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import {
   initializePageIdleTimeout,
   setupPageIdleWarningButton,
-} from '../../services/idle-timeout';
+} from '@/services/idle-timeout';
 
 export {};
 
@@ -14,9 +14,22 @@ void initializePageIdleTimeout({
     console.log(
       '[PAGE IDLE] Confirm page timeout reached, redirecting to home',
     );
+    const sessionId = sessionStorage.getItem('printbit.sessionId');
+    const sessionToken = sessionStorage.getItem('printbit.sessionToken');
+    if (sessionId && sessionToken) {
+      try {
+        await fetch(
+          `/api/wireless/sessions/${encodeURIComponent(sessionId)}/cancel?token=${encodeURIComponent(sessionToken)}`,
+          { method: 'DELETE' },
+        );
+      } catch {
+        // Best-effort cleanup
+      }
+    }
     // Clear state before redirect
     sessionStorage.removeItem('printbit.config');
     sessionStorage.removeItem('printbit.sessionId');
+    sessionStorage.removeItem('printbit.sessionToken');
     window.location.replace('/');
   },
 });
@@ -95,7 +108,9 @@ const resetBalanceBtn = document.getElementById(
 
 const rawConfig = sessionStorage.getItem('printbit.config');
 const uploadedFile = sessionStorage.getItem('printbit.uploadedFile');
-const uploadedDocumentId = sessionStorage.getItem('printbit.uploadedDocumentId');
+const uploadedDocumentId = sessionStorage.getItem(
+  'printbit.uploadedDocumentId',
+);
 const DEFAULT_PRICING: PricingResponse = {
   printPerPage: 5,
   copyPerPage: 3,
@@ -161,7 +176,8 @@ function calculateLegacyTotalPrice(pricing: PricingResponse): number {
   const base =
     config.mode === 'copy' ? pricing.copyPerPage : pricing.printPerPage;
   const color = config.colorMode === 'colored' ? pricing.colorSurcharge : 0;
-  const pages = config.mode === 'print' ? Math.max(1, config.totalPages ?? 1) : 1;
+  const pages =
+    config.mode === 'print' ? Math.max(1, config.totalPages ?? 1) : 1;
   return (base + color) * pages * Math.max(1, config.copies);
 }
 
@@ -753,6 +769,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
       sessionStorage.removeItem('printbit.uploadedFile');
       sessionStorage.removeItem('printbit.uploadedDocumentId');
       sessionStorage.removeItem('printbit.sessionId');
+      sessionStorage.removeItem('printbit.sessionToken');
     } catch {
       hideOverlay(printingOverlay);
       if (statusMessage)
@@ -826,6 +843,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         sessionStorage.removeItem('printbit.uploadedFile');
         sessionStorage.removeItem('printbit.uploadedDocumentId');
         sessionStorage.removeItem('printbit.sessionId');
+        sessionStorage.removeItem('printbit.sessionToken');
       } else if (pollResult === 'failed') {
         if (statusMessage)
           statusMessage.textContent = 'Copy job failed. Please try again.';
@@ -918,6 +936,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
     sessionStorage.removeItem('printbit.uploadedFile');
     sessionStorage.removeItem('printbit.uploadedDocumentId');
     sessionStorage.removeItem('printbit.sessionId');
+    sessionStorage.removeItem('printbit.sessionToken');
   }
   isProcessingPayment = false;
   applyConfirmGate();

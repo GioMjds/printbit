@@ -162,6 +162,15 @@ For `mode: "print"`, the server now recomputes pricing from the same quote pipel
 
 ## Wireless upload sessions
 
+Session-based upload is used to isolate each kiosk print flow, bind uploaded files to one in-progress print transaction, and enforce short-lived cleanup windows for privacy/resource safety.
+
+Current lifecycle rules:
+
+- Idle TTL is server-side and activity-based (session expires after 5 minutes of inactivity; uploads and session queries reset the timer).
+- Session GET payloads return expiry metadata (`remainingSeconds`, `warningThresholdSeconds`).
+- Expired sessions return HTTP `410` with `code: "SESSION_EXPIRED"` on wireless session APIs.
+- Upload client ownership is single-device per session (via `x-upload-client-id` header—clients should generate a UUID v4 per device): concurrent phones receive `409` with `code: "SESSION_OWNED"`.
+
 ### `GET /api/wireless/sessions`
 
 Creates a new wireless session.
@@ -169,6 +178,8 @@ Creates a new wireless session.
 ### `GET /api/wireless/sessions/by-token/:token`
 
 Resolves a session by token.
+
+Requires header `x-upload-client-id` to claim/refresh upload ownership for that device.
 
 ### `GET /api/wireless/sessions/:sessionId`
 
@@ -181,6 +192,8 @@ Returns preview content for uploaded file (PDF/image/HTML-converted).
 ### `POST /api/wireless/sessions/:sessionId/upload?token=<token>`
 
 Uploads one file into the target session.
+
+Requires header `x-upload-client-id` (must match the device that owns the session).
 
 ---
 

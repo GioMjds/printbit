@@ -1,9 +1,9 @@
 import path from 'node:path';
 import type { Express, Request, Response } from 'express';
 import type { Server } from 'socket.io';
-import { adminService } from '../services/admin';
-import type { SessionStore } from '../services/session';
-import { generateHtmlPreview, supportsHtmlPreview } from '../services/preview';
+import { adminService } from '@/services/admin';
+import type { SessionStore } from '@/services/session';
+import { generateHtmlPreview, supportsHtmlPreview } from '@/services/preview';
 import { detectPdfColorContent } from '@/services/config';
 import { analyzeDocument } from '@/services/document-analysis';
 import {
@@ -53,6 +53,36 @@ export function registerWirelessSessionRoutes(
     return bearerMatch?.[1]?.trim() ?? '';
   };
 
+  const extractUploadClientId = (req: Request): string => {
+    const queryClient = req.query.clientId;
+    if (typeof queryClient === 'string' && queryClient.trim().length > 0) {
+      return queryClient.trim();
+    }
+
+    const headerClientId =
+      req.header('x-upload-client-id') ?? req.header('x-session-client-id');
+    if (headerClientId && headerClientId.trim().length > 0) {
+      return headerClientId.trim();
+    }
+
+    return '';
+  };
+
+  const statusForClaimError = (
+    code:
+      | 'SESSION_NOT_FOUND'
+      | 'SESSION_EXPIRED'
+      | 'INVALID_TOKEN'
+      | 'INVALID_CLIENT_ID'
+      | 'SESSION_OWNED',
+  ): number => {
+    if (code === 'SESSION_EXPIRED') return 410;
+    if (code === 'SESSION_OWNED') return 409;
+    if (code === 'INVALID_TOKEN') return 403;
+    if (code === 'INVALID_CLIENT_ID') return 400;
+    return 404;
+  };
+
   const verifyUploadTarget = (
     req: Request,
     res: Response,
@@ -65,11 +95,24 @@ export function registerWirelessSessionRoutes(
       return res.status(401).json({ error: 'Missing session or token.' });
     }
 
+    const sessionState = deps.sessionStore.getSessionState(sessionId);
+    if (sessionState === 'expired') {
+      return res.status(410).json({
+        code: 'SESSION_EXPIRED',
+        error: 'Session has expired. Please start a new session.',
+      });
+    }
+    if (sessionState === 'missing') {
+      return res.status(404).json({ error: 'Session not found.' });
+    }
+
     const publicBaseUrl = deps.resolvePublicBaseUrl(req);
     const session = deps.sessionStore.tryGetSession(sessionId, publicBaseUrl);
-
     if (!session) {
-      return res.status(404).json({ error: 'Session not found.' });
+      return res.status(410).json({
+        code: 'SESSION_EXPIRED',
+        error: 'Session has expired. Please start a new session.',
+      });
     }
 
     if (session.token !== token) {
@@ -77,6 +120,34 @@ export function registerWirelessSessionRoutes(
     }
 
     next();
+  };
+
+  const verifyOwnedUploadTarget = (
+    req: Request,
+    res: Response,
+    next: () => void,
+  ) => {
+    verifyUploadTarget(req, res, () => {
+      const { sessionId } = req.params as { sessionId: string };
+      const token = extractUploadToken(req);
+      const clientId = extractUploadClientId(req);
+      if (!clientId) {
+        return res.status(400).json({
+          code: 'INVALID_CLIENT_ID',
+          error: 'Invalid upload client identifier.',
+        });
+      }
+
+      const claim = deps.sessionStore.claimOwner(sessionId, token, clientId);
+      if (!claim.ok && claim.errorCode) {
+        return res.status(statusForClaimError(claim.errorCode)).json({
+          code: claim.errorCode,
+          error: claim.errorMsg ?? 'Unable to validate session ownership.',
+        });
+      }
+
+      next();
+    });
   };
 
   const analyzeAndStoreDocument = async (
@@ -100,7 +171,7 @@ export function registerWirelessSessionRoutes(
     const fallbackDocumentId = session.document?.documentId;
     const targetDocumentId = documentId ?? fallbackDocumentId;
     const target = targetDocumentId
-      ? docs.find((doc) => doc.documentId === targetDocumentId) ?? null
+      ? (docs.find((doc) => doc.documentId === targetDocumentId) ?? null)
       : (docs[docs.length - 1] ?? null);
 
     if (!target) {
@@ -178,14 +249,45 @@ export function registerWirelessSessionRoutes(
   app.get(
     '/api/wireless/sessions/by-token/:token',
     (req: Request, res: Response) => {
+      const token = req.params.token as string;
+      const clientId = extractUploadClientId(req);
+      if (!clientId) {
+        return res.status(400).json({
+          code: 'MISSING_CLIENT_ID',
+          error: 'Missing upload client identifier.',
+        });
+      }
+
+      const tokenState = deps.sessionStore.getTokenState(token);
+      if (tokenState === 'expired') {
+        return res.status(410).json({
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new session.',
+        });
+      }
+      if (tokenState === 'missing') {
+        return res.status(404).json({ error: 'Session not found.' });
+      }
+
+      const claim = deps.sessionStore.claimOwnerByToken(token, clientId);
+      if (!claim.ok && claim.errorCode) {
+        return res.status(statusForClaimError(claim.errorCode)).json({
+          code: claim.errorCode,
+          error: claim.errorMsg ?? 'Unable to validate session ownership.',
+        });
+      }
+
       const publicBaseUrl = deps.resolvePublicBaseUrl(req);
       const session = deps.sessionStore.tryGetSessionByToken(
-        req.params.token as string,
+        token,
         publicBaseUrl,
       );
 
       if (!session) {
-        return res.status(404).json({ error: 'Session not found.' });
+        return res.status(410).json({
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new session.',
+        });
       }
 
       res.json(session);
@@ -220,6 +322,14 @@ export function registerWirelessSessionRoutes(
           : res
               .status(404)
               .json({ error: 'No documents available for preview.' });
+      }
+
+      deps.sessionStore.touchSession(req.params.sessionId as string);
+      if (!deps.sessionStore.touchSession(req.params.sessionId as string)) {
+        return res.status(410).json({
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new session.',
+        });
       }
 
       const absolutePath = path.resolve(target.filePath);
@@ -299,6 +409,15 @@ export function registerWirelessSessionRoutes(
         });
       }
 
+      deps.sessionStore.touchSession(req.params.sessionId as string);
+
+      if (!deps.sessionStore.touchSession(req.params.sessionId as string)) {
+        return res.status(410).json({
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new session.',
+        });
+      }
+
       const absolutePath = path.resolve(target.filePath);
       const extension = path.extname(absolutePath).toLowerCase();
 
@@ -343,6 +462,19 @@ export function registerWirelessSessionRoutes(
   app.get(
     '/api/wireless/sessions/:sessionId',
     (req: Request, res: Response) => {
+      const sessionState = deps.sessionStore.getSessionState(
+        req.params.sessionId as string,
+      );
+      if (sessionState === 'expired') {
+        return res.status(410).json({
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new session.',
+        });
+      }
+      if (sessionState === 'missing') {
+        return res.status(404).json({ error: 'Session not found.' });
+      }
+
       const publicBaseUrl = deps.resolvePublicBaseUrl(req);
       const session = deps.sessionStore.tryGetSession(
         req.params.sessionId as string,
@@ -350,7 +482,10 @@ export function registerWirelessSessionRoutes(
       );
 
       if (!session) {
-        return res.status(404).json({ error: 'Session not found.' });
+        return res.status(410).json({
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new session.',
+        });
       }
 
       res.json(session);
@@ -359,7 +494,7 @@ export function registerWirelessSessionRoutes(
 
   app.post(
     '/api/wireless/sessions/:sessionId/upload',
-    verifyUploadTarget,
+    verifyOwnedUploadTarget,
     uploadMiddleware.single('file'),
     validateMagicBytes,
     scanForMalware,
@@ -486,7 +621,10 @@ export function registerWirelessSessionRoutes(
         documentId: string;
       };
 
-      const result = await deps.sessionStore.removeDocument(sessionId, documentId);
+      const result = await deps.sessionStore.removeDocument(
+        sessionId,
+        documentId,
+      );
       if (!result.success) {
         const status =
           result.errorCode === 'DOCUMENT_NOT_FOUND'

@@ -5,16 +5,16 @@ import type { Server as SocketIOServer } from 'socket.io';
 import {
   requireAdminLocalAccess,
   requireAdminPin,
-} from '../middleware/admin-auth';
-import { adminService } from '../services/admin';
-import { db } from '../services/db';
+} from '@/middleware/admin-auth';
+import { adminService } from '@/services/admin';
+import { db } from '@/services/db';
 import {
   getPrinterTelemetry,
   refreshPrinterTelemetry,
-} from '../services/printer-status';
-import { detectDefaultPrinter, printFile } from '../services/printer';
-import { generateTestPagePdf } from '../services/test-page';
-import { getScannerStatus } from '../services/scanner';
+} from '@/services/printer-status';
+import { detectDefaultPrinter, printFile } from '@/services/printer';
+import { generateTestPagePdf } from '@/services/test-page';
+import { getScannerStatus } from '@/services/scanner';
 import {
   checkLockout,
   clearLockout,

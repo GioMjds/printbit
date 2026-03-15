@@ -4,9 +4,9 @@ import type { Express, Request, Response } from 'express';
 import {
   requireAdminLocalAccess,
   requireAdminPin,
-} from '../middleware/admin-auth';
-import { feedbackService } from '../services/feedback';
-import type { FeedbackStatus } from '../services/db';
+} from '@/middleware/admin-auth';
+import { feedbackService } from '@/services/feedback';
+import type { FeedbackStatus } from '@/services/db';
 
 const FEEDBACK_PORTAL_DIR = path.resolve('src/public/feedback');
 const FEEDBACK_PORTAL_ASSETS = new Set(['styles.css', 'app.js']);

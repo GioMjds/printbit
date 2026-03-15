@@ -1,7 +1,4 @@
-import {
-  initializePageIdleTimeout,
-  setupPageIdleWarningButton,
-} from '../../services/idle-timeout';
+import { initializePageIdleTimeout } from '@/services/idle-timeout';
 
 export {};
 
@@ -9,24 +6,32 @@ void initializePageIdleTimeout({
   showWarningModal: true,
   onTimeout: async () => {
     console.log('[PAGE IDLE] Config page timeout reached, redirecting to home');
-    // Cancel server-side session if exists
     const sessionId = sessionStorage.getItem('printbit.sessionId');
-    if (sessionId) {
+    const sessionToken = sessionStorage.getItem('printbit.sessionToken');
+    if (sessionId && sessionToken) {
       try {
-        await fetch(`/api/wireless/sessions/${sessionId}/cancel`, {
-          method: 'DELETE',
-        });
+        await fetch(
+          `/api/wireless/sessions/${encodeURIComponent(sessionId)}/cancel?token=${encodeURIComponent(sessionToken)}`,
+          {
+            method: 'DELETE',
+          },
+        );
       } catch {
         // Best-effort cleanup
       }
     }
     // Clear state before redirect
     sessionStorage.removeItem('printbit.config');
+    sessionStorage.removeItem('printbit.mode');
     sessionStorage.removeItem('printbit.sessionId');
+    sessionStorage.removeItem('printbit.sessionToken');
+    sessionStorage.removeItem('printbit.uploadedFile');
+    sessionStorage.removeItem('printbit.uploadedDocumentId');
+    sessionStorage.removeItem('printbit.uploadedFiles');
+    sessionStorage.removeItem('printbit.copyPreviewPath');
     window.location.replace('/');
   },
 });
-
 type ColorMode = 'colored' | 'grayscale';
 type Orientation = 'portrait' | 'landscape';
 type PaperSize = 'A4' | 'Letter' | 'Legal';
@@ -527,6 +532,8 @@ const mode =
   'print';
 const sessionId =
   params.get('sessionId') ?? sessionStorage.getItem('printbit.sessionId');
+const sessionToken =
+  params.get('token') ?? sessionStorage.getItem('printbit.sessionToken');
 const selectedFile =
   params.get('file') ?? sessionStorage.getItem('printbit.uploadedFile');
 const selectedDocumentId =
@@ -1260,6 +1267,8 @@ continueBtn?.addEventListener('click', () => {
 
   sessionStorage.setItem('printbit.mode', mode);
   if (sessionId) sessionStorage.setItem('printbit.sessionId', sessionId);
+  if (sessionToken)
+    sessionStorage.setItem('printbit.sessionToken', sessionToken);
   if (selectedFile)
     sessionStorage.setItem('printbit.uploadedFile', selectedFile);
   if (selectedDocumentId)
