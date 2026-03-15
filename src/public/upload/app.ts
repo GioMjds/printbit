@@ -78,6 +78,7 @@ let sessionId: string | null = null;
 let appState: UploadState = 'session-loading';
 let sessionWarningThresholdSeconds = DEFAULT_WARNING_SECONDS;
 let monitorHandle: number | null = null;
+let isSessionUnavailable = false;
 
 function getOrCreateUploadClientId(): string {
   const existing = window.localStorage.getItem(CLIENT_ID_STORAGE_KEY);
@@ -192,6 +193,7 @@ function applySessionCountdown(remainingSeconds: number): void {
 }
 
 function setSessionUnavailable(message: string): void {
+  isSessionUnavailable = true;
   setAppState('session-error');
   setSessionUI('Session unavailable', 'error');
   setStatus(message, 'error');
@@ -199,7 +201,7 @@ function setSessionUnavailable(message: string): void {
 }
 
 async function refreshSessionLease(): Promise<void> {
-  if (!token || appState === 'session-error') return;
+  if (!token || isSessionUnavailable) return;
 
   try {
     const res = await fetch(
@@ -232,7 +234,9 @@ async function refreshSessionLease(): Promise<void> {
       return;
     }
 
+    if (isSessionUnavailable) return;
     const session = (await res.json()) as SessionResponse;
+    if (isSessionUnavailable) return;
     sessionId = session.sessionId;
     sessionWarningThresholdSeconds =
       session.warningThresholdSeconds ?? DEFAULT_WARNING_SECONDS;
@@ -374,14 +378,15 @@ function clearQueueForRetry(): void {
 // ── Session init ──────────────────────────────────────────────────────────────
 
 async function initSession(): Promise<void> {
+  isSessionUnavailable = false;
   setAppState('session-loading');
   setSessionUI('Connecting to session…', 'idle');
   setStatus('Connecting to kiosk session…', 'info');
 
   if (!token) {
-    setAppState('session-error');
-    setSessionUI('No token — scan a fresh QR', 'error');
-    setStatus('No upload token found. Please scan a fresh kiosk QR.', 'error');
+    setSessionUnavailable(
+      'No upload token found. Please scan a fresh kiosk QR.',
+    );
     return;
   }
 
@@ -420,10 +425,7 @@ async function initSession(): Promise<void> {
       error instanceof Error
         ? error.message
         : 'Could not connect to this session.';
-    setAppState('session-error');
-    setSessionUI('Session unavailable', 'error');
-    setStatus(message, 'error');
-    stopSessionMonitor();
+    setSessionUnavailable(message);
   }
 }
 
@@ -453,7 +455,7 @@ function attachSocket(sid: string): void {
 // ── Upload all pending files sequentially ─────────────────────────────────────
 
 async function uploadPendingFiles(): Promise<void> {
-  if (!sessionId) return;
+  if (!sessionId || isSessionUnavailable) return;
   const pending = queue.filter((q) => q.status === 'pending');
   if (pending.length === 0) return;
 
@@ -465,6 +467,7 @@ async function uploadPendingFiles(): Promise<void> {
   let errorCount = 0;
 
   for (const qf of pending) {
+    if (isSessionUnavailable) break;
     updateItemStatus(qf, 'uploading');
     setItemProgress(qf, 20);
 
@@ -499,6 +502,12 @@ async function uploadPendingFiles(): Promise<void> {
                 xhr.responseText,
               ) as UploadErrorResponse;
               updateItemStatus(qf, 'error', mapError(errBody));
+              if (
+                errBody.code === 'SESSION_EXPIRED' ||
+                errBody.code === 'SESSION_OWNED'
+              ) {
+                setSessionUnavailable(mapError(errBody));
+              }
             } catch {
               updateItemStatus(qf, 'error', 'Upload failed');
             }
@@ -522,6 +531,8 @@ async function uploadPendingFiles(): Promise<void> {
       errorCount++;
     }
   }
+
+  if (isSessionUnavailable) return;
 
   // Final summary
   if (errorCount === 0 && doneCount > 0) {

@@ -73,11 +73,13 @@ export function registerWirelessSessionRoutes(
       | 'SESSION_NOT_FOUND'
       | 'SESSION_EXPIRED'
       | 'INVALID_TOKEN'
+      | 'INVALID_CLIENT_ID'
       | 'SESSION_OWNED',
   ): number => {
     if (code === 'SESSION_EXPIRED') return 410;
     if (code === 'SESSION_OWNED') return 409;
     if (code === 'INVALID_TOKEN') return 403;
+    if (code === 'INVALID_CLIENT_ID') return 400;
     return 404;
   };
 
@@ -131,8 +133,8 @@ export function registerWirelessSessionRoutes(
       const clientId = extractUploadClientId(req);
       if (!clientId) {
         return res.status(400).json({
-          code: 'MISSING_CLIENT_ID',
-          error: 'Missing upload client identifier.',
+          code: 'INVALID_CLIENT_ID',
+          error: 'Invalid upload client identifier.',
         });
       }
 

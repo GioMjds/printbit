@@ -102,10 +102,18 @@ function updateSessionCountdown(remainingSeconds?: number): void {
   if (!activeSessionId || typeof remainingSeconds !== 'number') return;
   const countdown = formatCountdown(remainingSeconds);
   setSessionText(`${activeSessionId} • Expires in ${countdown}`);
-  if (footerHint && remainingSeconds <= sessionWarningThresholdSeconds) {
+  if (!footerHint) return;
+
+  if (remainingSeconds <= sessionWarningThresholdSeconds) {
     footerHint.textContent = `Session expires in ${countdown}. Continue soon.`;
     footerHint.classList.remove('ready');
+    return;
   }
+
+  footerHint.textContent = selectedFilename
+    ? `"${selectedFilename}" selected.`
+    : 'Select a file above to continue.';
+  footerHint.classList.add('ready');
 }
 
 function setFilesCount(n: number): void {

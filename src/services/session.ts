@@ -104,6 +104,8 @@ const SESSION_WARNING_SECONDS = 60;
 const MAX_FILES_PER_SESSION = 10;
 const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024; // 50MB total per session
 const CLEANUP_INTERVAL_MS = 2 * 60 * 1000; // run cleanup every 2 minutes
+const CLEANUP_RETRY_DELAY_MS = 30 * 1000;
+const MAX_CLEANUP_ATTEMPTS = 3;
 
 export class SessionStore {
   private readonly sessions = new Map<string, Session>();
@@ -111,6 +113,8 @@ export class SessionStore {
   private readonly byToken = new Map<string, string>();
   private readonly uploadDir: string;
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly cleanupInFlight = new Set<string>();
+  private readonly cleanupAttempts = new Map<string, number>();
 
   constructor(uploadDir = 'uploads') {
     this.uploadDir = uploadDir;
@@ -133,7 +137,7 @@ export class SessionStore {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     if (this.isSessionExpired(session)) {
-      this.pruneExpiredSession(sessionId, session);
+      void this.pruneExpiredSession(sessionId, session);
       return false;
     }
     return true;
@@ -143,7 +147,7 @@ export class SessionStore {
     const session = this.sessions.get(sessionId);
     if (!session) return 'missing';
     if (this.isSessionExpired(session)) {
-      this.pruneExpiredSession(sessionId, session);
+      void this.pruneExpiredSession(sessionId, session);
       return 'expired';
     }
     return 'active';
@@ -179,7 +183,7 @@ export class SessionStore {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     if (this.isSessionExpired(session)) {
-      this.pruneExpiredSession(sessionId, session);
+      void this.pruneExpiredSession(sessionId, session);
       return null;
     }
     return this.withFreshUrl(session, publicBaseUrl);
@@ -207,7 +211,7 @@ export class SessionStore {
     }
 
     if (this.isSessionExpired(session)) {
-      this.pruneExpiredSession(sessionId, session);
+      void this.pruneExpiredSession(sessionId, session);
       return {
         isSuccess: false,
         errorMsg:
@@ -309,7 +313,7 @@ export class SessionStore {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     if (this.isSessionExpired(session)) {
-      this.pruneExpiredSession(sessionId, session);
+      void this.pruneExpiredSession(sessionId, session);
       return null;
     }
 
@@ -346,7 +350,7 @@ export class SessionStore {
       };
     }
     if (this.isSessionExpired(session)) {
-      this.pruneExpiredSession(sessionId, session);
+      void this.pruneExpiredSession(sessionId, session);
       return {
         success: false,
         errorCode: 'SESSION_EXPIRED',
@@ -428,7 +432,7 @@ export class SessionStore {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     if (this.isSessionExpired(session)) {
-      this.pruneExpiredSession(sessionId, session);
+      void this.pruneExpiredSession(sessionId, session);
       return false;
     }
     session.lastActivityAt = new Date();
@@ -455,7 +459,7 @@ export class SessionStore {
       };
     }
     if (this.isSessionExpired(session)) {
-      this.pruneExpiredSession(sessionId, session);
+      void this.pruneExpiredSession(sessionId, session);
       return {
         ok: false,
         errorCode: 'SESSION_EXPIRED',
@@ -474,7 +478,7 @@ export class SessionStore {
     if (!safeClientId) {
       return {
         ok: false,
-        errorCode: 'INVALID_TOKEN',
+        errorCode: 'INVALID_CLIENT_ID',
         errorMsg: 'Missing upload client identifier.',
       };
     }
@@ -541,7 +545,7 @@ export class SessionStore {
   private cleanupExpired(): void {
     for (const [id, session] of this.sessions.entries()) {
       if (this.isSessionExpired(session)) {
-        this.pruneExpiredSession(id, session);
+        void this.pruneExpiredSession(id, session);
       }
     }
   }
@@ -555,14 +559,73 @@ export class SessionStore {
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }
 
-  private pruneExpiredSession(sessionId: string, session: Session): void {
+  private async pruneExpiredSession(
+    sessionId: string,
+    session: Session,
+  ): Promise<void> {
+    if (this.cleanupInFlight.has(sessionId)) return;
+    this.cleanupInFlight.add(sessionId);
+
     const docs =
       session.documents ?? (session.document ? [session.document] : []);
-    void Promise.allSettled(
+    const deletionResults = await Promise.allSettled(
       docs.map((doc) => fs.promises.unlink(doc.filePath)),
     );
-    this.byToken.delete(session.token);
-    this.sessions.delete(sessionId);
+    const failedDeletes: Array<{
+      filePath: string | undefined;
+      reason: unknown;
+    }> = [];
+    deletionResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        failedDeletes.push({
+          filePath: docs[index]?.filePath,
+          reason: result.reason,
+        });
+      }
+    });
+
+    if (failedDeletes.length === 0) {
+      this.byToken.delete(session.token);
+      this.sessions.delete(sessionId);
+      this.cleanupAttempts.delete(sessionId);
+      this.cleanupInFlight.delete(sessionId);
+      return;
+    }
+
+    for (const failed of failedDeletes) {
+      const message =
+        failed.reason instanceof Error
+          ? failed.reason.message
+          : String(failed.reason);
+      console.error('[session-cleanup] Failed to delete expired upload file.', {
+        sessionId,
+        filePath: failed.filePath ?? 'unknown',
+        error: message,
+      });
+    }
+
+    const attempt = (this.cleanupAttempts.get(sessionId) ?? 0) + 1;
+    this.cleanupAttempts.set(sessionId, attempt);
+    this.cleanupInFlight.delete(sessionId);
+
+    if (attempt >= MAX_CLEANUP_ATTEMPTS) {
+      console.error(
+        '[session-cleanup] Reached max retry attempts for expired session cleanup.',
+        { sessionId, attempts: attempt },
+      );
+      return;
+    }
+
+    const retryDelayMs = CLEANUP_RETRY_DELAY_MS * attempt;
+    setTimeout(() => {
+      const latest = this.sessions.get(sessionId);
+      if (!latest) return;
+      if (!this.isSessionExpired(latest)) {
+        this.cleanupAttempts.delete(sessionId);
+        return;
+      }
+      void this.pruneExpiredSession(sessionId, latest);
+    }, retryDelayMs);
   }
 
   /** Stop the cleanup timer (for graceful shutdown). */

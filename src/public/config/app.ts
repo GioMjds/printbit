@@ -22,8 +22,13 @@ void initializePageIdleTimeout({
     }
     // Clear state before redirect
     sessionStorage.removeItem('printbit.config');
+    sessionStorage.removeItem('printbit.mode');
     sessionStorage.removeItem('printbit.sessionId');
     sessionStorage.removeItem('printbit.sessionToken');
+    sessionStorage.removeItem('printbit.uploadedFile');
+    sessionStorage.removeItem('printbit.uploadedDocumentId');
+    sessionStorage.removeItem('printbit.uploadedFiles');
+    sessionStorage.removeItem('printbit.copyPreviewPath');
     window.location.replace('/');
   },
 });
