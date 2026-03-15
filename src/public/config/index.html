@@ -568,14 +568,84 @@
               </div>
 
               <div id="pageRangeCustomWrap" class="page-range-wrap hidden">
+                <div class="page-range-custom-grid">
+                  <div class="page-range-field">
+                    <span class="page-range-field__label">From</span>
+                    <div class="copies-control">
+                      <button
+                        type="button"
+                        id="customRangeStartDec"
+                        class="copies-btn"
+                        aria-label="Decrease custom range start page"
+                      >
+                        -
+                      </button>
+                      <input
+                        id="customRangeStartInput"
+                        type="number"
+                        min="1"
+                        value="1"
+                        class="copies-input"
+                        readonly
+                        aria-label="Custom range start page"
+                      />
+                      <button
+                        type="button"
+                        id="customRangeStartInc"
+                        class="copies-btn"
+                        aria-label="Increase custom range start page"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="page-range-field">
+                    <span class="page-range-field__label">To</span>
+                    <div class="copies-control">
+                      <button
+                        type="button"
+                        id="customRangeEndDec"
+                        class="copies-btn"
+                        aria-label="Decrease custom range end page"
+                      >
+                        -
+                      </button>
+                      <input
+                        id="customRangeEndInput"
+                        type="number"
+                        min="1"
+                        value="1"
+                        class="copies-input"
+                        readonly
+                        aria-label="Custom range end page"
+                      />
+                      <button
+                        type="button"
+                        id="customRangeEndInc"
+                        class="copies-btn"
+                        aria-label="Increase custom range end page"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <p
+                  id="customRangeDisplay"
+                  class="page-range-selected"
+                  aria-live="polite"
+                >
+                  Selected: 1
+                </p>
                 <input
                   id="pageRangeInput"
                   type="text"
-                  class="page-range-input"
-                  placeholder="e.g. 1-3, 5, 7-9"
+                  class="page-range-hidden-input"
                   pattern="\\d+(\\s*-\\s*\\d+)?(\\s*,\\s*\\d+(\\s*-\\s*\\d+)?)*"
-                  title="Use formats like 1-3, 5, 7-9 or a single page number"
-                  aria-label="Custom page range"
+                  aria-hidden="true"
+                  tabindex="-1"
                 />
               </div>
 

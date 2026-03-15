@@ -237,9 +237,19 @@ function addFilesToQueue(files: FileList | File[]): void {
 function refreshUploadBtn(): void {
   const pendingCount = queue.filter((q) => q.status === "pending").length;
   if (appState !== "session-ready" && appState !== "all-done") return;
-  uploadButton.disabled = pendingCount === 0 || appState === "session-loading";
+  uploadButton.disabled = pendingCount === 0;
   uploadBtnLabel.textContent =
     pendingCount > 1 ? `Send ${pendingCount} files to Kiosk` : "Send to Kiosk";
+}
+
+function clearQueueForRetry(): void {
+  queue.splice(0, queue.length);
+  nextId = 0;
+  fileQueue.innerHTML = "";
+  fileInput.value = "";
+  uploadButton.disabled = true;
+  uploadBtnLabel.textContent = "Send to Kiosk";
+  clearStatus();
 }
 
 // ── Session init ──────────────────────────────────────────────────────────────
@@ -434,7 +444,10 @@ dropZone.addEventListener("drop", (e: DragEvent) => {
   if (e.dataTransfer?.files.length) addFilesToQueue(e.dataTransfer.files);
 });
 
-retrySessionButton.addEventListener("click", () => void initSession());
+retrySessionButton.addEventListener("click", () => {
+  clearQueueForRetry();
+  void initSession();
+});
 
 uploadForm.addEventListener("submit", (e) => {
   e.preventDefault();

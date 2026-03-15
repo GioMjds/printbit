@@ -478,7 +478,70 @@ export function registerWirelessSessionRoutes(
   );
 
   app.delete(
+    '/api/wireless/sessions/:sessionId/documents/:documentId',
+    verifyUploadTarget,
+    async (req: Request, res: Response) => {
+      const { sessionId, documentId } = req.params as {
+        sessionId: string;
+        documentId: string;
+      };
+
+      const result = await deps.sessionStore.removeDocument(sessionId, documentId);
+      if (!result.success) {
+        const status =
+          result.errorCode === 'DOCUMENT_NOT_FOUND'
+            ? 404
+            : result.errorCode === 'SESSION_EXPIRED'
+              ? 410
+              : 404;
+
+        await adminService.appendAdminLog(
+          'upload_delete_failed',
+          'Failed to delete uploaded document from session.',
+          {
+            sessionId,
+            documentId,
+            errorCode: result.errorCode ?? null,
+          },
+        );
+        return res.status(status).json({
+          error:
+            result.errorCode === 'DOCUMENT_NOT_FOUND'
+              ? 'Document not found in session.'
+              : result.errorCode === 'SESSION_EXPIRED'
+                ? 'Session has expired.'
+                : 'Session not found.',
+        });
+      }
+
+      deps.io.to(`session:${sessionId}`).emit('UploadRemoved', {
+        documentId: result.removedDocumentId,
+        remainingCount: result.remainingCount,
+      });
+
+      await adminService.appendAdminLog(
+        'upload_deleted',
+        'Uploaded document removed from active wireless session.',
+        {
+          sessionId,
+          documentId: result.removedDocumentId ?? documentId,
+          remainingCount: result.remainingCount,
+          deletedFile: result.deletedFile,
+        },
+      );
+
+      return res.status(200).json({
+        success: true,
+        removedDocumentId: result.removedDocumentId,
+        remainingCount: result.remainingCount,
+        deletedFile: result.deletedFile,
+      });
+    },
+  );
+
+  app.delete(
     '/api/wireless/sessions/:sessionId/cancel',
+    verifyUploadTarget,
     async (req: Request, res: Response) => {
       const { sessionId } = req.params as { sessionId: string };
 
@@ -519,28 +582,12 @@ export function registerWirelessSessionRoutes(
 
   app.post(
     '/api/wireless/sessions/:sessionId/analyze',
+    verifyUploadTarget,
     async (req: Request, res: Response) => {
       const { sessionId } = req.params as { sessionId: string };
       const { documentId } = (req.body ?? {}) as {
         documentId?: string;
       };
-
-      const token = extractUploadToken(req);
-
-      if (!token) {
-        return res
-          .status(401)
-          .json({ error: 'Token are required.' });
-      }
-
-      const publicBaseUrl = deps.resolvePublicBaseUrl(req);
-      const session = deps.sessionStore.tryGetSession(sessionId, publicBaseUrl);
-      if (!session) {
-        return res.status(404).json({ error: 'Session not found.' });
-      }
-      if (session.token !== token) {
-        return res.status(403).json({ error: 'Invalid token for session.' });
-      }
 
       try {
         const analyzed = await analyzeAndStoreDocument(

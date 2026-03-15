@@ -22,6 +22,13 @@ type SessionResponse = {
   documents?: UploadedFile[];
 };
 
+type DeleteDocumentResponse = {
+  success: boolean;
+  removedDocumentId: string;
+  remainingCount: number;
+  deletedFile: boolean;
+};
+
 type HotspotConfig = {
   ssid: string;
   password: string;
@@ -65,6 +72,8 @@ let pollHandle: number | null = null;
 let selectedFilename = '';
 let selectedDocumentId = '';
 let knownFiles = new Set<string>();
+let deletingDocumentIds = new Set<string>();
+let lastRenderedFileSignature = '';
 let attachedSessionId: string | null = null;
 let hotspotConfig: HotspotConfig | null = null;
 
@@ -108,7 +117,36 @@ function fileKey(file: UploadedFile): string {
   return `${file.documentId || file.filename}::${file.filename}::${bytes}`;
 }
 
+function filesSignature(files: UploadedFile[]): string {
+  return files.map((file) => fileKey(file)).join('|');
+}
+
 // ── File list rendering ───────────────────────────────────────────────────────
+
+function clearSelectedFileState(): void {
+  selectedFilename = '';
+  selectedDocumentId = '';
+  sessionStorage.removeItem('printbit.uploadedFile');
+  sessionStorage.removeItem('printbit.uploadedDocumentId');
+}
+
+function setWaitingForFilesState(): void {
+  clearSelectedFileState();
+  knownFiles = new Set<string>();
+  lastRenderedFileSignature = '';
+  sessionStorage.removeItem('printbit.uploadedFiles');
+  setFilesCount(0);
+  filesEmpty?.classList.remove('hidden');
+  fileList?.classList.add('hidden');
+  if (continueBtn) {
+    continueBtn.disabled = true;
+    continueBtn.setAttribute('aria-disabled', 'true');
+  }
+  if (footerHint) {
+    footerHint.textContent = 'Select a file above to continue.';
+    footerHint.classList.remove('ready');
+  }
+}
 
 function selectFile(file: UploadedFile): void {
   const resolvedDocumentId = file.documentId || file.filename;
@@ -135,6 +173,59 @@ function selectFile(file: UploadedFile): void {
   if (footerHint) {
     footerHint.textContent = `"${file.filename}" selected.`;
     footerHint.classList.add('ready');
+  }
+}
+
+async function deleteSessionFile(file: UploadedFile): Promise<void> {
+  if (!activeSessionId) return;
+  const documentId = file.documentId || file.filename;
+  if (!documentId || deletingDocumentIds.has(documentId)) return;
+  deletingDocumentIds.add(documentId);
+
+  try {
+    const response = await fetch(
+      `/api/wireless/sessions/${encodeURIComponent(activeSessionId)}/documents/${encodeURIComponent(documentId)}`,
+      { method: 'DELETE' },
+    );
+
+    if (!response.ok) {
+      let message = 'Failed to delete file.';
+      try {
+        const payload = (await response.json()) as { error?: string };
+        if (payload.error) message = payload.error;
+      } catch {
+        /* leave default */
+      }
+      if (footerHint) {
+        footerHint.textContent = message;
+        footerHint.classList.remove('ready');
+      }
+      return;
+    }
+
+    let payload: DeleteDocumentResponse | null = null;
+    try {
+      payload = (await response.json()) as DeleteDocumentResponse;
+    } catch {
+      payload = null;
+    }
+
+    await checkUploadStatus();
+
+    if (footerHint) {
+      footerHint.textContent =
+        payload?.remainingCount === 0
+          ? 'No files in this session. Upload a new file to continue.'
+          : `"${file.filename}" removed.`;
+      footerHint.classList.toggle('ready', Boolean(payload?.remainingCount));
+    }
+  } catch {
+    if (footerHint) {
+      footerHint.textContent = 'Network error while deleting file.';
+      footerHint.classList.remove('ready');
+    }
+  } finally {
+    deletingDocumentIds.delete(documentId);
   }
 }
 
@@ -165,7 +256,16 @@ function addFileToList(file: UploadedFile): void {
         ${file.size !== undefined ? `<span>${formatBytes(file.size)}</span>` : ''}
       </div>
     </div>
-    <div class="file-item__radio" aria-hidden="true"></div>
+    <div class="file-item__actions">
+      <button
+        type="button"
+        class="file-item__delete"
+        aria-label="Delete ${escapeHtml(file.filename)}"
+      >
+        Remove
+      </button>
+      <div class="file-item__radio" aria-hidden="true"></div>
+    </div>
   `;
 
   li.addEventListener('click', () => selectFile(file));
@@ -176,14 +276,16 @@ function addFileToList(file: UploadedFile): void {
     }
   });
 
+  const deleteBtn = li.querySelector('.file-item__delete') as
+    | HTMLButtonElement
+    | null;
+  deleteBtn?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void deleteSessionFile(file);
+  });
+
   fileList.appendChild(li);
-  const total = knownFiles.size;
-  setFilesCount(total);
-
-  filesEmpty?.classList.add('hidden');
-  fileList.classList.remove('hidden');
-
-  if (total === 1) selectFile(file);
 }
 
 function escapeHtml(str: string): string {
@@ -192,6 +294,34 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function renderFiles(files: UploadedFile[]): void {
+  const prevSelected = selectedDocumentId;
+  lastRenderedFileSignature = filesSignature(files);
+  knownFiles = new Set<string>();
+
+  if (fileList) {
+    fileList.innerHTML = '';
+  }
+
+  if (files.length === 0) {
+    setWaitingForFilesState();
+    return;
+  }
+
+  files.forEach(addFileToList);
+  setFilesCount(files.length);
+  filesEmpty?.classList.add('hidden');
+  fileList?.classList.remove('hidden');
+  sessionStorage.setItem(
+    'printbit.uploadedFiles',
+    JSON.stringify(files.map((f) => f.filename)),
+  );
+
+  const selected =
+    files.find((f) => (f.documentId || f.filename) === prevSelected) ?? files[0];
+  selectFile(selected);
 }
 
 // ── Session management ────────────────────────────────────────────────────────
@@ -257,28 +387,15 @@ async function createSession(): Promise<void> {
   }
 
   // Reset UI
-  selectedFilename = '';
-  selectedDocumentId = '';
-  knownFiles.clear();
+  clearSelectedFileState();
+  knownFiles = new Set<string>();
+  deletingDocumentIds = new Set<string>();
   setSessionActive(false);
   setSessionText('Creating session…');
-  setFilesCount(0);
-
-  if (continueBtn) {
-    continueBtn.disabled = true;
-    continueBtn.setAttribute('aria-disabled', 'true');
-  }
-  if (footerHint) {
-    footerHint.textContent = 'Select a file above to continue.';
-    footerHint.classList.remove('ready');
-  }
+  setWaitingForFilesState();
 
   if (fileList) {
     fileList.innerHTML = '';
-    fileList.classList.add('hidden');
-  }
-  if (filesEmpty) {
-    filesEmpty.classList.remove('hidden');
   }
 
   const response = await fetch('/api/wireless/sessions');
@@ -326,19 +443,11 @@ async function checkUploadStatus(): Promise<void> {
     sizeBytes: file.sizeBytes,
   }));
 
-  files.forEach(addFileToList);
-
-  if (files.length > 0) {
-    sessionStorage.setItem(
-      'printbit.uploadedFiles',
-      JSON.stringify(files.map((f) => f.filename)),
-    );
-    sessionStorage.setItem('printbit.uploadedFile', files[0].filename);
-    sessionStorage.setItem(
-      'printbit.uploadedDocumentId',
-      files[0].documentId ?? files[0].filename,
-    );
+  const nextSignature = filesSignature(files);
+  if (nextSignature === lastRenderedFileSignature) {
+    return;
   }
+  renderFiles(files);
 }
 
 /** Socket: get instant notification when upload lands, no need to wait for poll. */
@@ -355,6 +464,7 @@ function attachSocket(sid: string): void {
   attachedSessionId = sid;
   socket.emit('joinSession', sid);
   socket.on('UploadCompleted', () => void checkUploadStatus());
+  socket.on('UploadRemoved', () => void checkUploadStatus());
 }
 
 // ── Idle Timeout Detection (uses shared module) ──────────────────────────────

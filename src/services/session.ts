@@ -49,6 +49,14 @@ export interface StoreUploadResult {
   errorCode: string;
 }
 
+export interface RemoveDocumentResult {
+  success: boolean;
+  errorCode?: 'SESSION_NOT_FOUND' | 'SESSION_EXPIRED' | 'DOCUMENT_NOT_FOUND';
+  removedDocumentId?: string;
+  remainingCount: number;
+  deletedFile: boolean;
+}
+
 const ALLOWED_TYPES = new Map<string, string>([
   ['application/pdf', '.pdf'],
   ['application/msword', '.doc'],
@@ -268,6 +276,69 @@ export class SessionStore {
     }
 
     return stamped;
+  }
+
+  async removeDocument(
+    sessionId: string,
+    documentId: string,
+  ): Promise<RemoveDocumentResult> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return {
+        success: false,
+        errorCode: 'SESSION_NOT_FOUND',
+        remainingCount: 0,
+        deletedFile: false,
+      };
+    }
+    if (this.isSessionExpired(session)) {
+      return {
+        success: false,
+        errorCode: 'SESSION_EXPIRED',
+        remainingCount: 0,
+        deletedFile: false,
+      };
+    }
+
+    const docs = session.documents
+      ? [...session.documents]
+      : session.document
+        ? [session.document]
+        : [];
+    const index = docs.findIndex((doc) => doc.documentId === documentId);
+    if (index < 0) {
+      return {
+        success: false,
+        errorCode: 'DOCUMENT_NOT_FOUND',
+        remainingCount: docs.length,
+        deletedFile: false,
+      };
+    }
+
+    const [removed] = docs.splice(index, 1);
+    let deletedFile = true;
+    try {
+      await fs.promises.unlink(removed.filePath);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'ENOENT') deletedFile = false;
+    }
+
+    session.documents = docs;
+    if (docs.length > 0) {
+      session.document = docs[docs.length - 1];
+      session.status = 'uploaded';
+    } else {
+      delete session.document;
+      session.status = 'pending';
+    }
+
+    return {
+      success: true,
+      removedDocumentId: removed.documentId,
+      remainingCount: docs.length,
+      deletedFile,
+    };
   }
 
   private withFreshUrl(session: Session, publicBaseUrl: URL): Session {

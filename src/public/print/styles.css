@@ -643,6 +643,40 @@ body {
   letter-spacing: 0.5px;
 }
 
+.file-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.file-item__delete {
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  background: rgba(255, 107, 107, 0.1);
+  color: #ffd6d6;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 120ms ease;
+}
+
+.file-item__delete:hover {
+  background: rgba(255, 107, 107, 0.2);
+  border-color: rgba(255, 107, 107, 0.7);
+}
+
+.file-item__delete:active {
+  transform: scale(0.97);
+}
+
 /* Selection radio indicator */
 .file-item__radio {
   width: 24px;

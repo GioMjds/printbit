@@ -13,7 +13,9 @@ void initializePageIdleTimeout({
     const sessionId = sessionStorage.getItem('printbit.sessionId');
     if (sessionId) {
       try {
-        await fetch(`/api/wireless/sessions/${sessionId}/cancel`, { method: 'DELETE' });
+        await fetch(`/api/wireless/sessions/${sessionId}/cancel`, {
+          method: 'DELETE',
+        });
       } catch {
         // Best-effort cleanup
       }
@@ -575,6 +577,27 @@ const pageRangeSingleWrap = document.getElementById(
 const pageRangeInput = document.getElementById(
   'pageRangeInput',
 ) as HTMLInputElement | null;
+const customRangeDisplay = document.getElementById(
+  'customRangeDisplay',
+) as HTMLElement | null;
+const customRangeStartInput = document.getElementById(
+  'customRangeStartInput',
+) as HTMLInputElement | null;
+const customRangeStartDec = document.getElementById(
+  'customRangeStartDec',
+) as HTMLButtonElement | null;
+const customRangeStartInc = document.getElementById(
+  'customRangeStartInc',
+) as HTMLButtonElement | null;
+const customRangeEndInput = document.getElementById(
+  'customRangeEndInput',
+) as HTMLInputElement | null;
+const customRangeEndDec = document.getElementById(
+  'customRangeEndDec',
+) as HTMLButtonElement | null;
+const customRangeEndInc = document.getElementById(
+  'customRangeEndInc',
+) as HTMLButtonElement | null;
 const singlePageInput = document.getElementById(
   'singlePageInput',
 ) as HTMLInputElement | null;
@@ -617,18 +640,109 @@ const QUOTE_409_RETRY_DELAY_MS = 300;
 [pageModeAll, pageModeCustom, pageModeSingle].forEach((el) => {
   el?.addEventListener('change', () => {
     syncPageRangeUI();
+    syncCustomRangeInputs();
     syncCustomRangeValidity();
     updateSummary();
     schedulePrintQuoteRefresh();
   });
 });
 
-pageRangeInput?.addEventListener('input', () => {
+function getPageRangeMaxPages(): number {
+  return Math.max(1, preview.pageCount || 1);
+}
+
+function syncCustomRangeInputs(
+  changed: 'start' | 'end' | 'both' = 'both',
+): void {
+  if (!pageRangeInput) return;
+  const max = getPageRangeMaxPages();
+  let start = parseInt(customRangeStartInput?.value ?? '1', 10) || 1;
+  let end = parseInt(customRangeEndInput?.value ?? '1', 10) || 1;
+
+  start = Math.max(1, Math.min(max, start));
+  end = Math.max(1, Math.min(max, end));
+
+  if (start > end) {
+    if (changed === 'start') end = start;
+    else start = end;
+  }
+
+  if (customRangeStartInput) {
+    customRangeStartInput.min = '1';
+    customRangeStartInput.max = String(max);
+    customRangeStartInput.value = String(start);
+  }
+  if (customRangeEndInput) {
+    customRangeEndInput.min = '1';
+    customRangeEndInput.max = String(max);
+    customRangeEndInput.value = String(end);
+  }
+
+  const normalizedRange = start === end ? String(start) : `${start}-${end}`;
+  pageRangeInput.value = normalizedRange;
+  if (customRangeDisplay) {
+    customRangeDisplay.textContent = `Selected: ${normalizedRange}`;
+  }
+}
+
+function updateCustomRangeWithDelta(
+  target: 'start' | 'end',
+  delta: number,
+): void {
+  const input =
+    target === 'start' ? customRangeStartInput : customRangeEndInput;
+  if (!input) return;
+  const next = (parseInt(input.value || '1', 10) || 1) + delta;
+  input.value = String(next);
+  syncCustomRangeInputs(target);
+  syncCustomRangeValidity();
+  updateSummary();
+  schedulePrintQuoteRefresh();
+}
+
+const customRangeStepperControls: Array<{
+  el: HTMLButtonElement | null;
+  target: 'start' | 'end';
+  delta: number;
+}> = [
+  { el: customRangeStartDec, target: 'start', delta: -1 },
+  { el: customRangeStartInc, target: 'start', delta: 1 },
+  { el: customRangeEndDec, target: 'end', delta: -1 },
+  { el: customRangeEndInc, target: 'end', delta: 1 },
+];
+
+customRangeStepperControls.forEach(({ el, target, delta }) => {
+  el?.addEventListener('click', () => {
+    updateCustomRangeWithDelta(target, delta);
+  });
+});
+
+customRangeStartInput?.addEventListener('change', () => {
+  syncCustomRangeInputs('start');
   syncCustomRangeValidity();
   updateSummary();
   schedulePrintQuoteRefresh();
 });
 
+customRangeEndInput?.addEventListener('change', () => {
+  syncCustomRangeInputs('end');
+  syncCustomRangeValidity();
+  updateSummary();
+  schedulePrintQuoteRefresh();
+});
+customRangeStartInput?.addEventListener('change', () => {
+  syncCustomRangeInputs('start');
+  syncCustomRangeValidity();
+  updateSummary();
+  schedulePrintQuoteRefresh();
+});
+
+customRangeEndInput?.addEventListener('change', () => {
+  syncCustomRangeInputs('end');
+  syncCustomRangeValidity();
+  updateSummary();
+  schedulePrintQuoteRefresh();
+});
 singlePageDec?.addEventListener('click', () => {
   if (!singlePageInput) return;
   singlePageInput.value = String(Math.max(1, clampSinglePage() - 1));
@@ -652,7 +766,7 @@ singlePageInput?.addEventListener('change', () => {
 });
 
 function clampSinglePage(): number {
-  const max = Math.max(1, preview.pageCount || 1);
+  const max = getPageRangeMaxPages();
   const raw = parseInt(singlePageInput?.value ?? '1', 10) || 1;
   const next = Math.max(1, Math.min(max, raw));
   if (singlePageInput) {
@@ -670,6 +784,7 @@ function isValidCustomRange(raw: string): boolean {
 
 function syncCustomRangeValidity(): void {
   if (!pageRangeInput) return;
+  syncCustomRangeInputs();
   if (!pageModeCustom?.checked) {
     pageRangeInput.setCustomValidity('');
     return;
@@ -687,6 +802,9 @@ function syncCustomRangeValidity(): void {
 }
 
 function getPageRange(): PageRangeSelection {
+  if (!hasMultiplePages()) {
+    return { type: 'all' };
+  }
   if (pageModeCustom?.checked) {
     const range = (pageRangeInput?.value ?? '').trim();
     return { type: 'custom', range };
@@ -705,10 +823,28 @@ function pageRangeLabel(sel: PageRangeSelection): string {
 }
 
 function syncPageRangeUI(): void {
+  const rangeVisible = pageRangeGroup
+    ? !pageRangeGroup.classList.contains('hidden')
+    : true;
   const isCustom = Boolean(pageModeCustom?.checked);
   const isSingle = Boolean(pageModeSingle?.checked);
-  pageRangeCustomWrap?.classList.toggle('hidden', !isCustom);
-  pageRangeSingleWrap?.classList.toggle('hidden', !isSingle);
+  pageRangeCustomWrap?.classList.toggle('hidden', !(rangeVisible && isCustom));
+  pageRangeSingleWrap?.classList.toggle('hidden', !(rangeVisible && isSingle));
+}
+
+function hasMultiplePages(): boolean {
+  return mode === 'print' && getPageRangeMaxPages() > 1;
+}
+
+function syncPageRangeAvailability(): void {
+  const visible = hasMultiplePages();
+  pageRangeGroup?.classList.toggle('hidden', !visible);
+  if (!visible && pageModeAll) {
+    pageModeAll.checked = true;
+  }
+  syncPageRangeUI();
+  syncCustomRangeInputs();
+  syncCustomRangeValidity();
 }
 
 function getRadio(name: string): string {
@@ -735,10 +871,12 @@ function currentPreviewConfig(): PreviewConfig {
 
 function setPrintContinueState(): void {
   if (mode !== 'print' || !continueBtn) return;
+  const hasCustomRangeError =
+    hasMultiplePages() &&
+    Boolean(pageModeCustom?.checked) &&
+    Boolean(pageRangeInput?.validationMessage);
   const canContinue =
-    Boolean(currentPrintQuote) &&
-    !quoteLoading &&
-    !(pageModeCustom?.checked && Boolean(pageRangeInput?.validationMessage));
+    Boolean(currentPrintQuote) && !quoteLoading && !hasCustomRangeError;
   continueBtn.disabled = !canContinue;
   continueBtn.setAttribute('aria-disabled', canContinue ? 'false' : 'true');
 }
@@ -751,7 +889,12 @@ function waitForQuoteRetry(ms: number): Promise<void> {
 
 async function refreshPrintQuote(): Promise<void> {
   if (mode !== 'print' || !sessionId) return;
-  if (pageModeCustom?.checked && pageRangeInput && !pageRangeInput.checkValidity()) {
+  if (
+    hasMultiplePages() &&
+    pageModeCustom?.checked &&
+    pageRangeInput &&
+    !pageRangeInput.checkValidity()
+  ) {
     quoteRequestVersion += 1;
     currentPrintQuote = null;
     quoteError = pageRangeInput.validationMessage || 'Invalid page range.';
@@ -928,7 +1071,7 @@ copiesInput?.addEventListener('change', () => {
 });
 
 updateSummary();
-syncPageRangeUI();
+syncPageRangeAvailability();
 clampSinglePage();
 syncCustomRangeValidity();
 setPrintContinueState();
@@ -984,6 +1127,7 @@ async function loadPreview(): Promise<void> {
 
   await preview.load(sessionId, selectedFile ?? undefined);
   if (sessionId) await applyColorAnalysis(sessionId, selectedFile);
+  syncPageRangeAvailability();
   clampSinglePage();
   updateSummary();
   await refreshPrintQuote();
@@ -1086,11 +1230,13 @@ continueBtn?.addEventListener('click', () => {
   if (mode === 'print' && !sessionId) return;
   if (mode === 'print' && !currentPrintQuote) return;
   if (mode === 'copy' && !copyPreviewPath) return;
-  if (mode === 'print' && pageModeCustom?.checked) {
+  if (mode === 'print' && hasMultiplePages() && pageModeCustom?.checked) {
     syncCustomRangeValidity();
     if (pageRangeInput && !pageRangeInput.checkValidity()) {
-      pageRangeInput.reportValidity();
-      pageRangeInput.focus();
+      quoteError = pageRangeInput.validationMessage || 'Invalid page range.';
+      currentPrintQuote = null;
+      updateSummary();
+      setPrintContinueState();
       return;
     }
   }
@@ -1109,7 +1255,7 @@ continueBtn?.addEventListener('click', () => {
     paperSize: cfg.paperSize,
     pageRange: getPageRange(),
     totalPages: preview.pageCount,
-    quote: mode === 'print' ? currentPrintQuote ?? undefined : undefined,
+    quote: mode === 'print' ? (currentPrintQuote ?? undefined) : undefined,
   };
 
   sessionStorage.setItem('printbit.mode', mode);

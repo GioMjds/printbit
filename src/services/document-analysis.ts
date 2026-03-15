@@ -1,13 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { createCanvas } from 'canvas';
 import {
   COLOR_SATURATION_THRESHOLD,
   MAX_PIXELS_TO_SAMPLE,
-  PDF_RENDER_SCALE,
 } from '../config/document-analysis.config';
-  
 
 export type AnalyzedFileType = 'pdf' | 'docx' | 'doc' | 'image' | 'unknown';
 
@@ -36,6 +33,22 @@ interface RgbaFrame {
   data: Uint8Array | Uint8ClampedArray;
   width: number;
   height: number;
+}
+
+interface PdfOperatorList {
+  fnArray: number[];
+  argsArray: unknown[];
+}
+
+interface PdfOps {
+  setFillRGBColor?: number;
+  setStrokeRGBColor?: number;
+  setFillCMYKColor?: number;
+  setStrokeCMYKColor?: number;
+  paintImageXObject?: number;
+  paintInlineImageXObject?: number;
+  paintImageMaskXObject?: number;
+  paintJpegXObject?: number;
 }
 
 function resolveFileType(
@@ -123,6 +136,7 @@ async function analyzePdfFile(
   fileType: AnalyzedFileType,
 ): Promise<DocumentAnalysisResult> {
   const pdfjs = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as any;
+  const ops = (pdfjs.OPS ?? {}) as PdfOps;
   const data = new Uint8Array(await fs.promises.readFile(pdfPath));
   const doc = await pdfjs.getDocument({ data, verbosity: 0 }).promise;
 
@@ -131,27 +145,21 @@ async function analyzePdfFile(
   try {
     for (let pageNum = 1; pageNum <= doc.numPages; pageNum += 1) {
       const page = await doc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: PDF_RENDER_SCALE });
-      const canvas = createCanvas(
-        Math.max(1, Math.ceil(viewport.width)),
-        Math.max(1, Math.ceil(viewport.height)),
-      );
-      const context = canvas.getContext('2d');
-
-      await page.render({
-        canvasContext: context,
-        viewport,
-      }).promise;
-
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const isColor = isColorFrame({
-        data: imageData.data,
-        width: canvas.width,
-        height: canvas.height,
-      });
+      let isColor = true;
+      try {
+        const opList = (await page.getOperatorList()) as PdfOperatorList;
+        isColor = isPdfPageColorByOperatorList(opList, ops);
+      } catch (error) {
+        console.warn(
+          `[document-analysis] Page ${pageNum} operator scan failed; defaulting to colored.`,
+          error,
+        );
+        isColor = true;
+      } finally {
+        page.cleanup();
+      }
 
       pages.push({ index: pageNum, isColor });
-      page.cleanup();
     }
   } finally {
     await doc.destroy();
@@ -168,6 +176,82 @@ async function analyzePdfFile(
     bwPages: totalPages - colorPages,
     totalPages,
   };
+}
+
+function parseRgbArgs(args: unknown): [number, number, number] | null {
+  if (!Array.isArray(args) || args.length === 0) return null;
+
+  if (typeof args[0] === 'string' && args[0].startsWith('#')) {
+    const hex = args[0].slice(1);
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return [r, g, b];
+    }
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      return [r, g, b];
+    }
+    return null;
+  }
+
+  if (
+    args.length >= 3 &&
+    typeof args[0] === 'number' &&
+    typeof args[1] === 'number' &&
+    typeof args[2] === 'number'
+  ) {
+    return [
+      Math.round(args[0] * 255),
+      Math.round(args[1] * 255),
+      Math.round(args[2] * 255),
+    ];
+  }
+
+  return null;
+}
+
+function isPdfPageColorByOperatorList(
+  opList: PdfOperatorList,
+  ops: PdfOps,
+): boolean {
+  const imagePaintOps = new Set(
+    [
+      ops.paintImageXObject,
+      ops.paintInlineImageXObject,
+      ops.paintImageMaskXObject,
+      ops.paintJpegXObject,
+    ].filter((op): op is number => typeof op === 'number'),
+  );
+
+  for (let i = 0; i < opList.fnArray.length; i += 1) {
+    const op = opList.fnArray[i];
+    const args = opList.argsArray[i];
+
+    if (imagePaintOps.has(op)) {
+      // Conservative pricing safety rule: treat image-heavy pages as colored.
+      return true;
+    }
+
+    if (op === ops.setFillRGBColor || op === ops.setStrokeRGBColor) {
+      const rgb = parseRgbArgs(args);
+      if (!rgb) continue;
+      const [r, g, b] = rgb;
+      const spread = Math.max(r, g, b) - Math.min(r, g, b);
+      if (spread > 10) return true;
+    }
+
+    if (op === ops.setFillCMYKColor || op === ops.setStrokeCMYKColor) {
+      if (!Array.isArray(args) || args.length < 4) continue;
+      const [c, m, y] = args as number[];
+      if (c > 0.01 || m > 0.01 || y > 0.01) return true;
+    }
+  }
+
+  return false;
 }
 
 export async function analyzeDocument(
