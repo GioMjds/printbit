@@ -1,6 +1,6 @@
 import { SummaryResponse, apiFetch, setMessage, initAuth } from '../shared';
 
-// ── Existing element refs (unchanged) ────────────────────────────────────────
+// ── DOM refs ────────────────────────────────────────
 
 const serverStatus = document.getElementById('serverStatus') as HTMLElement;
 const serverBadge = document.getElementById(
@@ -97,8 +97,10 @@ let lastPrinterSnapshot: PrinterTelemetryExt | null = null;
 function mergePrinterSnapshot(
   patch: PrinterTelemetryPatch,
 ): PrinterTelemetryExt | null {
-  if (!lastPrinterSnapshot &&
-      (patch.connected === undefined || patch.status === undefined)) {
+  if (
+    !lastPrinterSnapshot &&
+    (patch.connected === undefined || patch.status === undefined)
+  ) {
     return null;
   }
 

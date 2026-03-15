@@ -1,22 +1,22 @@
-import { LogsResponse, apiFetch, setMessage, initAuth } from "../shared";
+import { LogsResponse, apiFetch, setMessage, initAuth } from '../shared';
 
-const logsBody = document.getElementById("logsBody") as HTMLElement;
-const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
+const logsBody = document.getElementById('logsBody') as HTMLElement;
+const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 const exportLogsBtn = document.getElementById(
-  "exportLogsBtn",
+  'exportLogsBtn',
 ) as HTMLButtonElement;
 const clearLogsBtn = document.getElementById(
-  "clearLogsBtn",
+  'clearLogsBtn',
 ) as HTMLButtonElement;
-const prevPageBtn = document.getElementById("prevPageBtn") as HTMLButtonElement;
-const nextPageBtn = document.getElementById("nextPageBtn") as HTMLButtonElement;
-const pageInfo = document.getElementById("pageInfo") as HTMLElement;
+const prevPageBtn = document.getElementById('prevPageBtn') as HTMLButtonElement;
+const nextPageBtn = document.getElementById('nextPageBtn') as HTMLButtonElement;
+const pageInfo = document.getElementById('pageInfo') as HTMLElement;
 
 const PAGE_SIZE = 20;
 let refreshTimer: number | null = null;
 let currentPage = 1;
 let totalLogs = 0;
-let allLogs: LogsResponse["logs"] = [];
+let allLogs: LogsResponse['logs'] = [];
 
 function totalPages(): number {
   return Math.max(1, Math.ceil(totalLogs / PAGE_SIZE));
@@ -36,18 +36,18 @@ function renderPage(): void {
   updatePaginationControls();
 }
 
-function applyLogs(logs: LogsResponse["logs"]): void {
-  logsBody.innerHTML = "";
+function applyLogs(logs: LogsResponse['logs']): void {
+  logsBody.innerHTML = '';
 
   if (logs.length === 0) {
-    const tr = document.createElement("tr");
+    const tr = document.createElement('tr');
     tr.innerHTML = `<td colspan="4" style="text-align:center;color:var(--ink-muted);padding:24px">No log entries.</td>`;
     logsBody.appendChild(tr);
     return;
   }
 
   for (const log of logs) {
-    const tr = document.createElement("tr");
+    const tr = document.createElement('tr');
     tr.dataset.logId = log.id;
     tr.innerHTML = `
       <td class="logs-td logs-td--ts">${new Date(log.timestamp).toLocaleString()}</td>
@@ -64,10 +64,10 @@ function applyLogs(logs: LogsResponse["logs"]): void {
   }
 
   logsBody
-    .querySelectorAll<HTMLButtonElement>(".log-delete-btn")
+    .querySelectorAll<HTMLButtonElement>('.log-delete-btn')
     .forEach((btn) => {
       btn.addEventListener(
-        "click",
+        'click',
         () => void deleteSingleLog(btn.dataset.id!),
       );
     });
@@ -75,17 +75,17 @@ function applyLogs(logs: LogsResponse["logs"]): void {
 
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 async function loadData(): Promise<void> {
-  const res = await apiFetch("/api/admin/logs?limit=1000");
+  const res = await apiFetch('/api/admin/logs?limit=1000');
   if (!res.ok) {
-    if (res.status === 401) throw new Error("Invalid admin PIN.");
-    throw new Error("Failed to load logs.");
+    if (res.status === 401) throw new Error('Invalid admin PIN.');
+    throw new Error('Failed to load logs.');
   }
   const data = (await res.json()) as LogsResponse;
   allLogs = data.logs;
@@ -95,78 +95,78 @@ async function loadData(): Promise<void> {
 }
 
 async function deleteSingleLog(id: string): Promise<void> {
-  setMessage("Deleting entry…");
+  setMessage('Deleting entry…');
   const res = await apiFetch(`/api/admin/logs/${encodeURIComponent(id)}`, {
-    method: "DELETE",
+    method: 'DELETE',
   });
   if (!res.ok) {
-    setMessage("Failed to delete entry.");
+    setMessage('Failed to delete entry.');
     return;
   }
   allLogs = allLogs.filter((l) => l.id !== id);
   totalLogs = allLogs.length;
   if (currentPage > totalPages()) currentPage = totalPages();
   renderPage();
-  setMessage("Entry deleted.");
+  setMessage('Entry deleted.');
 }
 
 async function clearAllLogs(): Promise<void> {
-  if (!confirm("Delete ALL log entries? This cannot be undone.")) return;
-  setMessage("Clearing logs…");
-  const res = await apiFetch("/api/admin/logs", { method: "DELETE" });
+  if (!confirm('Delete ALL log entries? This cannot be undone.')) return;
+  setMessage('Clearing logs…');
+  const res = await apiFetch('/api/admin/logs', { method: 'DELETE' });
   if (!res.ok) {
-    setMessage("Failed to clear logs.");
+    setMessage('Failed to clear logs.');
     return;
   }
   allLogs = [];
   totalLogs = 0;
   currentPage = 1;
   renderPage();
-  setMessage("All logs cleared.");
+  setMessage('All logs cleared.');
 }
 
-refreshBtn.addEventListener("click", () => {
-  setMessage("Refreshing...");
+refreshBtn.addEventListener('click', () => {
+  setMessage('Refreshing...');
   void loadData()
-    .then(() => setMessage("Logs refreshed."))
+    .then(() => setMessage('Logs refreshed.'))
     .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : "Refresh failed."),
+      setMessage(e instanceof Error ? e.message : 'Refresh failed.'),
     );
 });
 
-exportLogsBtn.addEventListener("click", () => {
-  setMessage("Preparing logs export...");
-  void apiFetch("/api/admin/logs/export.csv")
+exportLogsBtn.addEventListener('click', () => {
+  setMessage('Preparing logs export...');
+  void apiFetch('/api/admin/logs/export.csv')
     .then(async (response) => {
-      if (!response.ok) throw new Error("Failed to export logs.");
+      if (!response.ok) throw new Error('Failed to export logs.');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
+      const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `printbit-admin-logs-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
-      setMessage("Logs exported.");
+      setMessage('Logs exported.');
     })
     .catch((error: unknown) => {
       const msg =
-        error instanceof Error ? error.message : "Failed to export logs.";
+        error instanceof Error ? error.message : 'Failed to export logs.';
       setMessage(msg);
     });
 });
 
-clearLogsBtn.addEventListener("click", () => void clearAllLogs());
+clearLogsBtn.addEventListener('click', () => void clearAllLogs());
 
-prevPageBtn.addEventListener("click", () => {
+prevPageBtn.addEventListener('click', () => {
   if (currentPage > 1) {
     currentPage--;
     renderPage();
   }
 });
 
-nextPageBtn.addEventListener("click", () => {
+nextPageBtn.addEventListener('click', () => {
   if (currentPage < totalPages()) {
     currentPage++;
     renderPage();

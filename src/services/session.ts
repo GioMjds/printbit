@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import type { Request } from 'express';
-import { PUBLIC_URL } from '../config/http';
+import { PUBLIC_URL } from '@/config/http';
 
 export interface DocumentPageAnalysis {
   index: number;

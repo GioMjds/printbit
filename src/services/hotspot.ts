@@ -6,13 +6,10 @@ import {
   MYPUBLICWIFI_PATH,
   HOTSPOT_SSID,
   HOTSPOT_PASSWORD,
-  PORT,
-} from "../config/http";
+} from "@/config/http";
 
 const MPWF_EXE = path.join(MYPUBLICWIFI_PATH, "MyPublicWiFi.exe");
 const MPWF_DB = path.join(MYPUBLICWIFI_PATH, "Data.db");
-const MPWF_LOGIN = path.join(MYPUBLICWIFI_PATH, "Web", "login.html");
-const MPWF_LOGIN_BACKUP = path.join(MYPUBLICWIFI_PATH, "Web", "login.html.bak");
 
 function ipToInt32(ip: string): number {
   const parts = ip.split(".").map(Number);

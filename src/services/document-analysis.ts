@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import {
   COLOR_SATURATION_THRESHOLD,
   MAX_PIXELS_TO_SAMPLE,
-} from '../config/document-analysis.config';
+} from '@/config/document-analysis.config';
 
 export type AnalyzedFileType = 'pdf' | 'docx' | 'doc' | 'image' | 'unknown';
 

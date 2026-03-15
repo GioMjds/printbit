@@ -12,7 +12,7 @@
  * Escapes backslashes, open/close parentheses, and strips non-Latin1 chars.
  */
 function pdfStr(text: string): string {
-  let latin1only = "";
+  let latin1only = '';
 
   for (const ch of text) {
     if (ch.charCodeAt(0) <= 0xff) latin1only += ch;
@@ -88,8 +88,7 @@ export function generateTestPagePdf(now: Date = new Date()): Buffer {
 
     // ── Footer ─────────────────────────────────────────────────────────────
     '/F1 9 Tf',
-    S(50, 424, 'PrintBit Kiosk Management System'),
-    S(50, 412, 'https://github.com/GioMjds/printbit'),
+    S(50, 424, 'PrintBit'),
 
     'ET',
   ].join('\n');

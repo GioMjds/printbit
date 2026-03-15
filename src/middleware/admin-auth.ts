@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import { db } from '../services/db';
+import { db } from '@/services/db';
 import { validateAdminSession } from '@/utils/admin-session';
 
 function isPrivateIpv4(ip: string): boolean {

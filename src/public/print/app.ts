@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import {
   initializePageIdleTimeout,
   setupPageIdleWarningButton,
-} from '../../services/idle-timeout';
+} from '@/services/idle-timeout';
 
 type UploadedFile = {
   documentId?: string;

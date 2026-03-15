@@ -1,7 +1,7 @@
 import {
   initializePageIdleTimeout,
   setupPageIdleWarningButton,
-} from '../../services/idle-timeout';
+} from '@/services/idle-timeout';
 
 export {};
 

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import * as XLSX from "xlsx";
-import { PREVIEW_CACHE_DIR } from "../config/http";
+import { PREVIEW_CACHE_DIR } from "@/config/http";
 
 const execFileAsync = promisify(execFile);
 

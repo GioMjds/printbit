@@ -31,7 +31,9 @@ const statTotal = document.getElementById('statTotal') as HTMLElement;
 const statOpen = document.getElementById('statOpen') as HTMLElement;
 const statResolved = document.getElementById('statResolved') as HTMLElement;
 const openBadge = document.getElementById('openBadge') as HTMLElement;
-const openBadgeMob = document.getElementById('openBadgeMob') as HTMLElement | null;
+const openBadgeMob = document.getElementById(
+  'openBadgeMob',
+) as HTMLElement | null;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 

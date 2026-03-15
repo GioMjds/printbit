@@ -4,30 +4,32 @@ import {
   setMessage,
   initAuth,
   setAdminPin,
-} from "../shared";
+} from '../shared';
 
-const settingsForm = document.getElementById("settingsForm") as HTMLFormElement;
+const settingsForm = document.getElementById('settingsForm') as HTMLFormElement;
 const settingPrintPerPage = document.getElementById(
-  "settingPrintPerPage",
+  'settingPrintPerPage',
 ) as HTMLInputElement;
 const settingCopyPerPage = document.getElementById(
-  "settingCopyPerPage",
+  'settingCopyPerPage',
 ) as HTMLInputElement;
-const settingScanDocument = document.getElementById("settingScanDocument") as HTMLInputElement;
+const settingScanDocument = document.getElementById(
+  'settingScanDocument',
+) as HTMLInputElement;
 const settingColorSurcharge = document.getElementById(
-  "settingColorSurcharge",
+  'settingColorSurcharge',
 ) as HTMLInputElement;
 const settingIdleTimeout = document.getElementById(
-  "settingIdleTimeout",
+  'settingIdleTimeout',
 ) as HTMLInputElement;
 const settingAdminPin = document.getElementById(
-  "settingAdminPin",
+  'settingAdminPin',
 ) as HTMLInputElement;
 const settingAdminLocalOnly = document.getElementById(
-  "settingAdminLocalOnly",
+  'settingAdminLocalOnly',
 ) as HTMLInputElement;
 
-const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
+const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 let refreshTimer: number | null = null;
 
 function applySettings(settings: SettingsResponse): void {
@@ -41,16 +43,16 @@ function applySettings(settings: SettingsResponse): void {
 }
 
 async function loadData(): Promise<void> {
-  const res = await apiFetch("/api/admin/settings");
+  const res = await apiFetch('/api/admin/settings');
   if (!res.ok) {
-    if (res.status === 401) throw new Error("Invalid admin PIN.");
-    throw new Error("Failed to load settings.");
+    if (res.status === 401) throw new Error('Invalid admin PIN.');
+    throw new Error('Failed to load settings.');
   }
   const settings = (await res.json()) as SettingsResponse;
   applySettings(settings);
 }
 
-settingsForm.addEventListener("submit", (e) => {
+settingsForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const newPin = settingAdminPin.value.trim();
   const payload = {
@@ -65,33 +67,33 @@ settingsForm.addEventListener("submit", (e) => {
     adminLocalOnly: settingAdminLocalOnly.checked,
   };
 
-  setMessage("Saving settings...");
-  void apiFetch("/api/admin/settings", {
-    method: "PUT",
+  setMessage('Saving settings...');
+  void apiFetch('/api/admin/settings', {
+    method: 'PUT',
     body: JSON.stringify(payload),
   })
     .then(async (response) => {
       if (!response.ok) {
         const body = (await response.json()) as { error?: string };
-        throw new Error(body.error ?? "Failed to save settings.");
+        throw new Error(body.error ?? 'Failed to save settings.');
       }
       if (newPin) setAdminPin(newPin);
       await loadData();
-      setMessage("Settings saved.");
+      setMessage('Settings saved.');
     })
     .catch((error: unknown) => {
       const msg =
-        error instanceof Error ? error.message : "Failed to save settings.";
+        error instanceof Error ? error.message : 'Failed to save settings.';
       setMessage(msg);
     });
 });
 
-refreshBtn.addEventListener("click", () => {
-  setMessage("Refreshing...");
+refreshBtn.addEventListener('click', () => {
+  setMessage('Refreshing...');
   void loadData()
-    .then(() => setMessage("Settings refreshed."))
+    .then(() => setMessage('Settings refreshed.'))
     .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : "Refresh failed."),
+      setMessage(e instanceof Error ? e.message : 'Refresh failed.'),
     );
 });
 
