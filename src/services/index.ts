@@ -1,5 +1,7 @@
 export { adminService } from './admin';
 export * from './db';
+export * from './clamd';
+export * from './clamd-process';
 export * from './document-analysis';
 export * from './feedback';
 export * from './hopper';

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { execFile, type ChildProcess } from 'node:child_process';
 import type { ScanJobSettings, PageSource } from './job-store';
 
-export interface ScanResult {
+export interface ScannerJobResult {
   outputPath: string;
   pageCount: number;
   format: string;
@@ -19,7 +19,7 @@ export interface ScannerCapabilities {
 
 export interface ScannerAdapter {
   probe(): Promise<ScannerCapabilities>;
-  scan(settings: ScanJobSettings, outputDir: string): Promise<ScanResult>;
+  scan(settings: ScanJobSettings, outputDir: string): Promise<ScannerJobResult>;
   cancel(): void;
 }
 
@@ -89,7 +89,7 @@ export class StubScannerAdapter implements ScannerAdapter {
   async scan(
     settings: ScanJobSettings,
     outputDir: string,
-  ): Promise<ScanResult> {
+  ): Promise<ScannerJobResult> {
     this.cancelled = false;
     console.log('[SCANNER] ── New stub scan job ─────────────────────────');
     console.log('[SCANNER] Settings:', JSON.stringify(settings));
@@ -169,7 +169,7 @@ export class Naps2ScannerAdapter implements ScannerAdapter {
   async scan(
     settings: ScanJobSettings,
     outputDir: string,
-  ): Promise<ScanResult> {
+  ): Promise<ScannerJobResult> {
     fs.mkdirSync(outputDir, { recursive: true });
 
     const ext =
@@ -189,7 +189,7 @@ export class Naps2ScannerAdapter implements ScannerAdapter {
 
     const startMs = Date.now();
 
-    return new Promise<ScanResult>((resolve, reject) => {
+    return new Promise<ScannerJobResult>((resolve, reject) => {
       const proc = execFile(
         NAPS2_PATH,
         args,

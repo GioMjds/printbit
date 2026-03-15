@@ -1,20 +1,12 @@
 import net from 'node:net';
-import { Readable } from 'node:stream';
 
 const CLAMD_HOST = process.env.CLAMD_HOST ?? '127.0.0.1';
 const CLAMD_PORT = parseInt(process.env.CLAMD_PORT ?? '3310', 10);
 const SCAN_TIMEOUT_MS = 15_000;
 
-export interface ScanResult {
+export interface MalwareScanResult {
   isClean: boolean;
   virusName: string | null;
-}
-
-function bufferToStream(buffer: Buffer): Readable {
-  const stream = new Readable();
-  stream.push(buffer);
-  stream.push(null);
-  return stream;
 }
 
 function buildInstreamChunks(buffer: Buffer): Buffer {
@@ -27,7 +19,7 @@ function buildInstreamChunks(buffer: Buffer): Buffer {
   return Buffer.concat([command, lengthPrefix, buffer, terminator]);
 }
 
-export async function scanBuffer(buffer: Buffer): Promise<ScanResult> {
+export async function scanBuffer(buffer: Buffer): Promise<MalwareScanResult> {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
     let response = '';

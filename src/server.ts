@@ -5,7 +5,6 @@ import http from 'http';
 import { Server } from 'socket.io';
 import multer from 'multer';
 import cookieParser from 'cookie-parser';
-import { startClamd, stopClamd } from './services/clamd-process';
 import {
   PORT,
   PORTAL_ASSETS,
@@ -49,6 +48,7 @@ import {
   resolvePublicBaseUrl,
   runHopperSelfTest,
   startPrinterMonitor,
+  startClamd,
 } from '@/services';
 
 const app = express();
