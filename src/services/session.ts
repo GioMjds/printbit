@@ -99,7 +99,7 @@ const ALLOWED_TYPES = new Map<string, string>([
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB
 
 // Session limits
-const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const SESSION_WARNING_SECONDS = 60;
 const MAX_FILES_PER_SESSION = 10;
 const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024; // 50MB total per session

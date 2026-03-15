@@ -325,6 +325,12 @@ export function registerWirelessSessionRoutes(
       }
 
       deps.sessionStore.touchSession(req.params.sessionId as string);
+      if (!deps.sessionStore.touchSession(req.params.sessionId as string)) {
+        return res.status(410).json({
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new session.',
+        });
+      }
 
       const absolutePath = path.resolve(target.filePath);
       const extension = path.extname(absolutePath).toLowerCase();
@@ -404,6 +410,13 @@ export function registerWirelessSessionRoutes(
       }
 
       deps.sessionStore.touchSession(req.params.sessionId as string);
+
+      if (!deps.sessionStore.touchSession(req.params.sessionId as string)) {
+        return res.status(410).json({
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new session.',
+        });
+      }
 
       const absolutePath = path.resolve(target.filePath);
       const extension = path.extname(absolutePath).toLowerCase();

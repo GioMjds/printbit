@@ -189,6 +189,12 @@ function applySessionCountdown(remainingSeconds: number): void {
     appState !== 'all-done'
   ) {
     setStatus(`Session expires in ${countdown}. Finish upload soon.`, 'info');
+    return;
+  }
+
+  const current = statusBox.textContent ?? '';
+  if (current.startsWith('Session expires in ')) {
+    clearStatus();
   }
 }
 
