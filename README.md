@@ -26,6 +26,8 @@ It is designed for campus usage (students, faculty, and staff) with phone-to-kio
 Troubleshooting:
 
 - If no file appears, start a new session and upload again.
+- If you see a session expiry countdown, complete upload/selection before it reaches zero or start a fresh session.
+- Only one phone can actively own an upload session at a time; if ownership conflict appears, generate a new kiosk session.
 - If balance is insufficient, insert more coins before confirming.
 
 ### Copy

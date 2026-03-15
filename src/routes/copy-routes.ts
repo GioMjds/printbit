@@ -1,16 +1,16 @@
+import path from 'node:path';
+import fs from 'node:fs';
 import type { Express, Request, Response } from 'express';
 import type { Server } from 'socket.io';
-import { jobStore } from '../services/job-store';
-import { printFile, type PrintJobOptions } from '../services/printer';
+import { jobStore } from '@/services/job-store';
+import { printFile, type PrintJobOptions } from '@/services/printer';
 import {
   db,
   acquireIdempotencyKey,
   storeIdempotencyKey,
   releaseIdempotencyKey,
-} from '../services/db';
-import { adminService } from '../services/admin';
-import path from 'node:path';
-import fs from 'node:fs';
+} from '@/services/db';
+import { adminService } from '@/services/admin';
 import {
   getPrinterTelemetry,
   settlementService,

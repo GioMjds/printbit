@@ -6,14 +6,14 @@ import {
   acquireIdempotencyKey,
   storeIdempotencyKey,
   releaseIdempotencyKey,
-} from '../services/db';
+} from '@/services/db';
 import { getPrinterTelemetry } from '@/services';
-import { adminService } from '../services/admin';
-import { settlementService } from '../services/settlement';
-import { printFile, type PrintJobOptions } from '../services/printer';
-import { monitorSpoolerJob } from '../services/print-spooler';
-import type { SessionStore, UploadedDocument } from '../services/session';
-import { buildPrintQuote } from '../services/print-quote';
+import { adminService } from '@/services/admin';
+import { settlementService } from '@/services/settlement';
+import { printFile, type PrintJobOptions } from '@/services/printer';
+import { monitorSpoolerJob } from '@/services/print-spooler';
+import type { SessionStore, UploadedDocument } from '@/services/session';
+import { buildPrintQuote } from '@/services/print-quote';
 import { randomUUID } from 'node:crypto';
 import { BLOCKED_STATUSES } from '@/utils';
 
@@ -75,13 +75,28 @@ export function registerFinancialRoutes(
       return res.status(400).json({ error: 'Print session is required' });
     }
 
+    const sessionState = deps.sessionStore.getSessionState(sessionId);
+    if (sessionState === 'expired') {
+      return res.status(410).json({
+        code: 'SESSION_EXPIRED',
+        error: 'Session has expired. Please start a new upload session.',
+      });
+    }
+    if (sessionState === 'missing') {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
     const session = deps.sessionStore.tryGetSession(
       sessionId,
       deps.resolvePublicBaseUrl(req),
     );
     if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
+      return res.status(410).json({
+        code: 'SESSION_EXPIRED',
+        error: 'Session has expired. Please start a new upload session.',
+      });
     }
+    deps.sessionStore.touchSession(sessionId);
 
     const target = resolveTargetDocument(session, documentId);
     if (!target) {
@@ -376,16 +391,14 @@ export function registerFinancialRoutes(
     let serverFilename: string | null = null;
     let targetDocumentId: string | null = null;
     let printOptions: PrintJobOptions | null = null;
-    let printQuotePages:
-      | {
-          selectedPages: number;
-          selectedColorPages: number;
-          selectedBwPages: number;
-          billableColorPages: number;
-          billableBwPages: number;
-          effectiveColorMode: 'colored' | 'grayscale';
-        }
-      | null = null;
+    let printQuotePages: {
+      selectedPages: number;
+      selectedColorPages: number;
+      selectedBwPages: number;
+      billableColorPages: number;
+      billableBwPages: number;
+      effectiveColorMode: 'colored' | 'grayscale';
+    } | null = null;
 
     if (mode === 'print') {
       if (!sessionId) {
@@ -395,6 +408,27 @@ export function registerFinancialRoutes(
           { transactionId },
         );
         return sendResponse(400, { error: 'Print session is required' });
+      }
+
+      const sessionState = deps.sessionStore.getSessionState(sessionId);
+      if (sessionState === 'expired') {
+        void adminService.appendAdminLog(
+          'payment_failed',
+          'Confirm payment failed: session expired.',
+          { transactionId, sessionId },
+        );
+        return sendResponse(410, {
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new upload session.',
+        });
+      }
+      if (sessionState === 'missing') {
+        void adminService.appendAdminLog(
+          'payment_failed',
+          'Confirm payment failed: session not found.',
+          { transactionId, sessionId },
+        );
+        return sendResponse(404, { error: 'Session not found' });
       }
 
       const session = deps.sessionStore.tryGetSession(
@@ -407,8 +441,12 @@ export function registerFinancialRoutes(
           'Confirm payment failed: session not found.',
           { transactionId, sessionId },
         );
-        return sendResponse(404, { error: 'Session not found' });
+        return sendResponse(410, {
+          code: 'SESSION_EXPIRED',
+          error: 'Session has expired. Please start a new upload session.',
+        });
       }
+      deps.sessionStore.touchSession(sessionId);
 
       const target = resolveTargetDocument(session, documentId);
       if (!target) {
