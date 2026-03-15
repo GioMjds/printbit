@@ -72,12 +72,16 @@ const tokenFromPath = window.location.pathname.split('/')[2];
 const token = window.uploadToken || tokenFromPath;
 const CLIENT_ID_STORAGE_KEY = 'printbit.uploadClientId';
 const SESSION_MONITOR_INTERVAL_MS = 5000;
+const SESSION_COUNTDOWN_TICK_MS = 1000;
 const DEFAULT_WARNING_SECONDS = 60;
 
 let sessionId: string | null = null;
 let appState: UploadState = 'session-loading';
 let sessionWarningThresholdSeconds = DEFAULT_WARNING_SECONDS;
 let monitorHandle: number | null = null;
+let countdownBaselineSeconds: number | null = null;
+let countdownSyncedAtMs: number | null = null;
+let countdownHandle: number | null = null;
 let isSessionUnavailable = false;
 
 function getOrCreateUploadClientId(): string {
@@ -176,7 +180,28 @@ function stopSessionMonitor(): void {
   }
 }
 
-function applySessionCountdown(remainingSeconds: number): void {
+function stopSessionCountdownTicker(): void {
+  if (countdownHandle !== null) {
+    window.clearInterval(countdownHandle);
+    countdownHandle = null;
+  }
+}
+
+function resetSessionCountdown(): void {
+  stopSessionCountdownTicker();
+  countdownBaselineSeconds = null;
+  countdownSyncedAtMs = null;
+}
+
+function getCurrentRemainingSeconds(): number | null {
+  if (countdownBaselineSeconds === null || countdownSyncedAtMs === null) {
+    return null;
+  }
+  const elapsedSeconds = Math.floor((Date.now() - countdownSyncedAtMs) / 1000);
+  return Math.max(countdownBaselineSeconds - elapsedSeconds, 0);
+}
+
+function renderSessionCountdown(remainingSeconds: number): void {
   if (!sessionId) return;
   const countdown = formatCountdown(remainingSeconds);
   setSessionUI(
@@ -198,12 +223,36 @@ function applySessionCountdown(remainingSeconds: number): void {
   }
 }
 
+function startSessionCountdownTicker(): void {
+  if (countdownHandle !== null) return;
+  countdownHandle = window.setInterval(() => {
+    if (!sessionId || isSessionUnavailable) {
+      resetSessionCountdown();
+      return;
+    }
+    const remainingSeconds = getCurrentRemainingSeconds();
+    if (remainingSeconds === null) return;
+    renderSessionCountdown(remainingSeconds);
+    if (remainingSeconds === 0) {
+      stopSessionCountdownTicker();
+    }
+  }, SESSION_COUNTDOWN_TICK_MS);
+}
+
+function applySessionCountdown(remainingSeconds: number): void {
+  countdownBaselineSeconds = Math.max(0, Math.floor(remainingSeconds));
+  countdownSyncedAtMs = Date.now();
+  renderSessionCountdown(countdownBaselineSeconds);
+  startSessionCountdownTicker();
+}
+
 function setSessionUnavailable(message: string): void {
   isSessionUnavailable = true;
   setAppState('session-error');
   setSessionUI('Session unavailable', 'error');
   setStatus(message, 'error');
   stopSessionMonitor();
+  resetSessionCountdown();
 }
 
 async function refreshSessionLease(): Promise<void> {
@@ -385,6 +434,7 @@ function clearQueueForRetry(): void {
 
 async function initSession(): Promise<void> {
   isSessionUnavailable = false;
+  resetSessionCountdown();
   setAppState('session-loading');
   setSessionUI('Connecting to session…', 'idle');
   setStatus('Connecting to kiosk session…', 'info');
@@ -421,6 +471,7 @@ async function initSession(): Promise<void> {
     if (typeof session.remainingSeconds === 'number') {
       applySessionCountdown(session.remainingSeconds);
     } else {
+      resetSessionCountdown();
       setSessionUI(`Session ${sessionId.slice(0, 8)}…`, 'active');
     }
     clearStatus();

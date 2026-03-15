@@ -80,6 +80,10 @@ let lastRenderedFileSignature = '';
 let attachedSessionId: string | null = null;
 let hotspotConfig: HotspotConfig | null = null;
 let sessionWarningThresholdSeconds = 60;
+const SESSION_COUNTDOWN_TICK_MS = 1000;
+let sessionCountdownBaselineSeconds: number | null = null;
+let sessionCountdownSyncedAtMs: number | null = null;
+let sessionCountdownHandle: number | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -98,8 +102,34 @@ function formatCountdown(totalSeconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-function updateSessionCountdown(remainingSeconds?: number): void {
-  if (!activeSessionId || typeof remainingSeconds !== 'number') return;
+function stopSessionCountdownTicker(): void {
+  if (sessionCountdownHandle !== null) {
+    window.clearInterval(sessionCountdownHandle);
+    sessionCountdownHandle = null;
+  }
+}
+
+function resetSessionCountdown(): void {
+  stopSessionCountdownTicker();
+  sessionCountdownBaselineSeconds = null;
+  sessionCountdownSyncedAtMs = null;
+}
+
+function getCurrentSessionRemainingSeconds(): number | null {
+  if (
+    sessionCountdownBaselineSeconds === null ||
+    sessionCountdownSyncedAtMs === null
+  ) {
+    return null;
+  }
+  const elapsedSeconds = Math.floor(
+    (Date.now() - sessionCountdownSyncedAtMs) / 1000,
+  );
+  return Math.max(sessionCountdownBaselineSeconds - elapsedSeconds, 0);
+}
+
+function renderSessionCountdown(remainingSeconds: number): void {
+  if (!activeSessionId) return;
   const countdown = formatCountdown(remainingSeconds);
   setSessionText(`${activeSessionId} • Expires in ${countdown}`);
   if (!footerHint) return;
@@ -114,6 +144,30 @@ function updateSessionCountdown(remainingSeconds?: number): void {
     ? `"${selectedFilename}" selected.`
     : 'Select a file above to continue.';
   footerHint.classList.add('ready');
+}
+
+function startSessionCountdownTicker(): void {
+  if (sessionCountdownHandle !== null) return;
+  sessionCountdownHandle = window.setInterval(() => {
+    if (!activeSessionId) {
+      resetSessionCountdown();
+      return;
+    }
+    const remainingSeconds = getCurrentSessionRemainingSeconds();
+    if (remainingSeconds === null) return;
+    renderSessionCountdown(remainingSeconds);
+    if (remainingSeconds === 0) {
+      stopSessionCountdownTicker();
+    }
+  }, SESSION_COUNTDOWN_TICK_MS);
+}
+
+function updateSessionCountdown(remainingSeconds?: number): void {
+  if (!activeSessionId || typeof remainingSeconds !== 'number') return;
+  sessionCountdownBaselineSeconds = Math.max(0, Math.floor(remainingSeconds));
+  sessionCountdownSyncedAtMs = Date.now();
+  renderSessionCountdown(sessionCountdownBaselineSeconds);
+  startSessionCountdownTicker();
 }
 
 function setFilesCount(n: number): void {
@@ -404,6 +458,9 @@ async function createSession(): Promise<void> {
     window.clearInterval(pollHandle);
     pollHandle = null;
   }
+  resetSessionCountdown();
+  activeSessionId = '';
+  activeSessionToken = '';
 
   // Fetch hotspot config (for Wi-Fi QR code)
   if (!hotspotConfig) {
@@ -477,6 +534,7 @@ async function checkUploadStatus(): Promise<void> {
     if (response.status === 404 || response.status === 410) {
       activeSessionId = '';
       activeSessionToken = '';
+      resetSessionCountdown();
       sessionStorage.removeItem('printbit.sessionId');
       sessionStorage.removeItem('printbit.sessionToken');
       setSessionActive(false);
@@ -594,6 +652,7 @@ dialogConfirmBtn?.addEventListener('click', () => {
 // ── Session restore ───────────────────────────────────────────────────────────
 
 async function restoreSession(sid: string): Promise<void> {
+  resetSessionCountdown();
   activeSessionId = sid;
   activeSessionToken = sessionStorage.getItem('printbit.sessionToken') ?? '';
 
