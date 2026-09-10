@@ -38,6 +38,7 @@ void initializePageIdleTimeout({
 type ScanSource = 'feeder' | 'glass';
 type ScanColor = 'color' | 'grayscale';
 type ScanDpi = '150' | '300' | '600';
+type ScanPaperSize = 'A4' | 'Letter' | 'Legal';
 
 interface ScanResponse {
   pages: string[];
@@ -58,6 +59,7 @@ interface StoredScanConfig {
   scanReleaseToken?: string | null;
   scannedPages?: string[];
   currentPage?: number;
+  paperSize?: string;
 }
 
 const previewHint = document.getElementById('previewHint') as HTMLElement;
@@ -153,7 +155,33 @@ let scanDocumentPrice = 5;
 
 const SCAN_SOURCE: ScanSource = 'feeder';
 const SCAN_COLOR: ScanColor = 'color';
-const SCAN_DPI: ScanDpi = '600';
+const SCAN_DPI: ScanDpi = '300';
+
+const scanSourcePaperSizeRadios = document.querySelectorAll<HTMLInputElement>(
+  'input[name="scanSourcePaperSize"]',
+);
+
+function getSelectedScanPaperSize(): ScanPaperSize {
+  const checked = document.querySelector<HTMLInputElement>(
+    'input[name="scanSourcePaperSize"]:checked',
+  );
+  if (checked?.value === 'Letter' || checked?.value === 'Legal') {
+    return checked.value;
+  }
+  return 'A4';
+}
+
+function setScanSourcePaperSize(paperSize: ScanPaperSize): void {
+  for (const radio of scanSourcePaperSizeRadios) {
+    radio.checked = radio.value === paperSize;
+  }
+}
+
+function setScanSourceRadiosDisabled(disabled: boolean): void {
+  for (const radio of scanSourcePaperSizeRadios) {
+    radio.disabled = disabled;
+  }
+}
 
 const RELEASE_TIMEOUT_MS = 1_500;
 
@@ -321,7 +349,9 @@ async function loadPricing(): Promise<void> {
   }
 }
 
-function saveScanStateToSession(): void {
+function saveScanStateToSession(
+  paperSize: ScanPaperSize = getSelectedScanPaperSize(),
+): void {
   if (!scanFilename) return;
   sessionStorage.setItem(
     'printbit.config',
@@ -335,7 +365,7 @@ function saveScanStateToSession(): void {
       colorMode: 'colored',
       copies: 1,
       orientation: 'portrait',
-      paperSize: 'A4',
+      paperSize,
       rotationDeg: 0,
     }),
   );
@@ -388,6 +418,15 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
   currentPage = typeof storedConfig.currentPage === 'number' ? storedConfig.currentPage : 0;
   currentPage = Math.max(0, Math.min(scannedPages.length - 1, currentPage));
 
+  if (
+    storedConfig.paperSize === 'A4' ||
+    storedConfig.paperSize === 'Letter' ||
+    storedConfig.paperSize === 'Legal'
+  ) {
+    setScanSourcePaperSize(storedConfig.paperSize);
+  }
+  setScanSourceRadiosDisabled(true);
+
   showPreview('result', 'Restored your scanned document preview.');
   hideScanTroubleshooting();
   updatePager();
@@ -404,6 +443,7 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
 }
 
 async function startScan(): Promise<void> {
+  const paperSize = getSelectedScanPaperSize();
   const previousPages = scannedPages.slice();
   const previousPage = currentPage;
   const previousFilename = scanFilename;
@@ -412,6 +452,7 @@ async function startScan(): Promise<void> {
     previousPages.length > 0 && Boolean(previousFilename);
 
   setBackNavigationLocked(true);
+  setScanSourceRadiosDisabled(true);
   hideScanTroubleshooting();
   showPreview('scanning', 'Scanning your document…');
   scanBtn.disabled = true;
@@ -441,6 +482,7 @@ async function startScan(): Promise<void> {
         source: SCAN_SOURCE,
         color: SCAN_COLOR,
         dpi: SCAN_DPI,
+        paperSize,
       }),
     });
 
@@ -465,7 +507,7 @@ async function startScan(): Promise<void> {
     scanReleaseToken = data.releaseToken;
     currentPage = 0;
 
-    saveScanStateToSession();
+    saveScanStateToSession(paperSize);
 
     if (previousReleaseToken && previousReleaseToken !== data.releaseToken) {
       void releaseScanFile(previousReleaseToken, 'scan_replaced_by_new_scan');
@@ -518,6 +560,7 @@ async function startScan(): Promise<void> {
       return;
     }
 
+    setScanSourceRadiosDisabled(false);
     errorText.textContent = userFriendlyTitle;
     showPreview('error', userFriendlyTitle);
     scanBtn.disabled = false;
@@ -552,6 +595,7 @@ function clearScan(): void {
 
   sessionStorage.removeItem('printbit.config');
 
+  setScanSourceRadiosDisabled(false);
   hideScanTroubleshooting();
   showPreview('idle', 'Insert document into the feeder and press Scan');
   previewControls.style.display = 'none';

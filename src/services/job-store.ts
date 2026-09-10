@@ -40,7 +40,7 @@ export interface ScanJobSettings {
   colorMode: 'colored' | 'grayscale';
   duplex: boolean;
   format: ScanFormat;
-  paperSize?: 'A4' | 'Letter' | 'Legal';
+  paperSize: 'A4' | 'Letter' | 'Legal';
 }
 
 export interface BaseJob {
