@@ -1069,16 +1069,20 @@
           Preparing your print job…
         </p>
         <p class="printing-progress-text" id="printingProgressText" hidden>
-          Page
+          Pages printed:
           <span id="printingProgressCurrent">0</span>
-          of
+          /
           <span id="printingProgressTotal">0</span>
         </p>
         <div
           class="printing-progress-bar"
           id="printingProgressBar"
           hidden
-          aria-hidden="true"
+          role="progressbar"
+          aria-label="Pages printed"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
         >
           <div
             class="printing-progress-bar__fill"

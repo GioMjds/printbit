@@ -17,7 +17,11 @@ import {
   isMaintenancePrintFailure,
 } from './maintenance-receipt';
 import { getMaintenanceGuidance } from './recovery-guidance';
-import { getPrintingStage } from './printing-stage';
+import {
+  getExpectedPrintPages,
+  getMonotonicPrintedPages,
+  getPrintingStage,
+} from './printing-stage';
 import { presentMaintenanceError } from './maintenance-view';
 import {
   attachPowerSafetyOverlay,
@@ -96,6 +100,8 @@ interface WorkerJobPayload {
   errorType?: string | null;
   reason?: string | null;
   printError?: PrintError | null;
+  pagesPrinted?: number;
+  totalPages?: number;
 }
 
 let socket: SocketLike | null = null;
@@ -500,6 +506,7 @@ document.addEventListener('keydown', (e) => {
 let currentPrinterError: PrintError | null = null;
 let lastKnownPagesPrinted = 0;
 let lastKnownTotalPages = 0;
+let displayedPrintPages = 0;
 let confirmationOutcome = createConfirmationOutcomeState();
 
 function hasActiveJob(): boolean {
@@ -667,6 +674,29 @@ function renderPrinterError(err: PrintError): void {
     printerErrorBlock.removeAttribute('hidden');
   }
   applyConfirmGate();
+}
+
+function renderAmbiguousWorkerFailure(input: {
+  message?: string | null;
+  spoolerCorrelationKey?: string | null;
+}): void {
+  hideOverlay(printingOverlay);
+  hidePrintProgress();
+  isProcessingPayment = false;
+  powerSafetyOverlay.notifyPrintCompleted();
+  renderPrinterError({
+    code: 'WORKER_PRINT_FAILED',
+    severity: 'recoverable',
+    userMessage:
+      input.message ??
+      'The worker could not verify that every page completed. Your document may have printed.',
+    hint:
+      'Please ask kiosk staff to verify the output before retrying or requesting a refund.',
+    timestamp: new Date().toISOString(),
+    canRetry: false,
+    canDismiss: false,
+    spoolerCorrelationKey: input.spoolerCorrelationKey ?? null,
+  });
 }
 
 function clearPrinterError(): void {
@@ -1389,7 +1419,7 @@ function renderPrintProgress(input: {
     Number.isFinite(input.pagesPrinted)
       ? Math.max(0, Math.floor(input.pagesPrinted))
       : null;
-  if (pagesPrinted === null || pagesPrinted <= 0) return;
+  if (pagesPrinted === null) return;
 
   const totalPages =
     typeof input.totalPages === 'number' &&
@@ -1398,18 +1428,37 @@ function renderPrintProgress(input: {
       ? Math.floor(input.totalPages)
       : null;
 
+  const currentPage = getMonotonicPrintedPages({
+    displayedPages: displayedPrintPages,
+    incomingPages: pagesPrinted,
+    totalPages,
+  });
+  displayedPrintPages = currentPage;
+
   if (printingProgressCurrent) {
-    printingProgressCurrent.textContent = String(pagesPrinted);
+    printingProgressCurrent.textContent = String(currentPage);
   }
   if (printingProgressTotal) {
     printingProgressTotal.textContent =
       totalPages !== null ? String(totalPages) : '—';
   }
 
-  const stage = getPrintingStage({ pagesPrinted, totalPages });
+  const stage = getPrintingStage({ pagesPrinted: currentPage, totalPages });
   if (printingStage) printingStage.textContent = stage.label;
   if (printingProgressFill && stage.progress !== null) {
-    printingProgressFill.style.setProperty('--progress', `${stage.progress}%`);
+    printingProgressFill.style.setProperty(
+      '--progress-scale',
+      String(stage.progress / 100),
+    );
+  }
+  if (printingProgressBar && stage.progress !== null) {
+    printingProgressBar.setAttribute('aria-valuenow', String(stage.progress));
+    printingProgressBar.setAttribute(
+      'aria-valuetext',
+      totalPages === null
+        ? `${currentPage} pages printed`
+        : `${currentPage} of ${totalPages} pages printed`,
+    );
   }
 
   if (printingProgressText) printingProgressText.removeAttribute('hidden');
@@ -1421,13 +1470,32 @@ function renderPrintProgress(input: {
  * (printed / failed / paused) so the next session starts clean.
  */
 function hidePrintProgress(): void {
+  displayedPrintPages = 0;
   if (printingProgressText) printingProgressText.setAttribute('hidden', '');
   if (printingProgressBar) printingProgressBar.setAttribute('hidden', '');
   if (printingProgressFill) {
-    printingProgressFill.style.setProperty('--progress', '0%');
+    printingProgressFill.style.setProperty('--progress-scale', '0');
+  }
+  if (printingProgressBar) {
+    printingProgressBar.setAttribute('aria-valuenow', '0');
+    printingProgressBar.removeAttribute('aria-valuetext');
   }
   if (printingProgressCurrent) printingProgressCurrent.textContent = '0';
   if (printingProgressTotal) printingProgressTotal.textContent = '0';
+}
+
+function showInitialPrintProgress(): void {
+  if (config.mode !== 'print') return;
+
+  const selectedPages =
+    currentPrintQuote?.selectedPages ?? config.totalPages ?? 1;
+  renderPrintProgress({
+    pagesPrinted: 0,
+    totalPages: getExpectedPrintPages({
+      selectedPages,
+      copies: config.copies,
+    }),
+  });
 }
 
 async function fetchInitialBalance(): Promise<void> {
@@ -1887,6 +1955,7 @@ function enterWorkerPendingState(transactionId: string | null): void {
   // Show the printing overlay in a worker-pending state
   showOverlay(printingOverlay);
   setPrintingPhase('printing');
+  showInitialPrintProgress();
 }
 
 function matchesPendingWorkerEvent(payload: {
@@ -2124,6 +2193,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
   isProcessingPayment = true;
   showOverlay(printingOverlay);
   setPrintingPhase('printing');
+  showInitialPrintProgress();
 
   try {
     if (config.mode === 'scan') {
@@ -2422,10 +2492,13 @@ if (typeof ioFactory === 'function') {
   connectedSocket.on('printLifecycleState', (payload: unknown) => {
     const lifecycle = payload as PrintLifecycleStatePayload;
     if (typeof lifecycle.pagesPrinted === 'number') {
-      lastKnownPagesPrinted = lifecycle.pagesPrinted;
+      lastKnownPagesPrinted = Math.max(
+        lastKnownPagesPrinted,
+        lifecycle.pagesPrinted,
+      );
     }
     if (typeof lifecycle.totalPages === 'number') {
-      lastKnownTotalPages = lifecycle.totalPages;
+      lastKnownTotalPages = Math.max(lastKnownTotalPages, lifecycle.totalPages);
     }
     const isHardwareError = Boolean(
       (lifecycle.printError &&
@@ -2501,20 +2574,25 @@ if (typeof ioFactory === 'function') {
         return;
       }
 
-      hideOverlay(printingOverlay);
-      hidePrintProgress();
-      isProcessingPayment = false;
-      activeSpoolerCorrelationKey = null;
-      clearPendingPaymentSessionState();
-      powerSafetyOverlay.notifyPrintCompleted();
-      applyConfirmGate(
-        lifecycle.reason ?? 'The worker could not complete this print job.',
-      );
+      renderAmbiguousWorkerFailure({
+        message: lifecycle.reason,
+        spoolerCorrelationKey:
+          lifecycle.spoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
+      });
+      return;
     }
     if (lifecycle.printError) {
       if (hasActiveJob()) renderPrinterError(lifecycle.printError);
     } else if (lifecycle.state === 'printed' || lifecycle.state === 'failed') {
-      if (lifecycle.state === 'printed') hidePrintProgress();
+      if (
+        lifecycle.state === 'printed' &&
+        typeof lifecycle.totalPages === 'number'
+      ) {
+        renderPrintProgress({
+          pagesPrinted: lifecycle.pagesPrinted ?? lifecycle.totalPages,
+          totalPages: lifecycle.totalPages,
+        });
+      }
       if (!isHardwareError) {
         clearPrinterError();
       }
@@ -2599,6 +2677,28 @@ if (typeof ioFactory === 'function') {
     }
   });
 
+  // Raw worker telemetry is emitted by the pipe bridge immediately. Render it
+  // here so the customer is not waiting for lifecycle persistence to finish.
+  connectedSocket.on('workerPrintProgress', (payload: unknown) => {
+    const job = payload as WorkerJobPayload | null;
+    if (!matchesPendingWorkerEvent(job ?? {})) return;
+    if (confirmationOutcome.outcome === 'maintenance') return;
+    if (typeof job?.pagesPrinted !== 'number') return;
+
+    lastKnownPagesPrinted = Math.max(
+      lastKnownPagesPrinted,
+      job.pagesPrinted,
+    );
+    if (typeof job.totalPages === 'number') {
+      lastKnownTotalPages = Math.max(lastKnownTotalPages, job.totalPages);
+    }
+
+    renderPrintProgress({
+      pagesPrinted: job.pagesPrinted,
+      totalPages: job.totalPages ?? null,
+    });
+  });
+
   connectedSocket.on('workerJobPaused', (payload: unknown) => {
     const job = payload as WorkerJobPayload | null;
     if (!matchesPendingWorkerEvent(job ?? {})) return;
@@ -2629,6 +2729,23 @@ if (typeof ioFactory === 'function') {
   connectedSocket.on('workerPrintSucceeded', (payload: unknown) => {
     const job = payload as WorkerJobPayload | null;
     if (!matchesPendingWorkerEvent(job ?? {})) return;
+    if (
+      config.mode === 'print' &&
+      typeof job?.totalPages === 'number' &&
+      job.totalPages > 0
+    ) {
+      renderPrintProgress({
+        pagesPrinted: job.pagesPrinted ?? job.totalPages,
+        totalPages: job.totalPages,
+      });
+      window.setTimeout(() => {
+        finalizePrintSuccess(
+          job.transactionId ?? null,
+          job.spoolerCorrelationKey ?? null,
+        );
+      }, 450);
+      return;
+    }
     finalizePrintSuccess(
       job?.transactionId ?? null,
       job?.spoolerCorrelationKey ?? null,
@@ -2692,16 +2809,14 @@ if (typeof ioFactory === 'function') {
       return;
     }
 
-    // Non-hardware failure: abort as before
-    hideOverlay(printingOverlay);
-    hidePrintProgress();
-    isProcessingPayment = false;
-    activeSpoolerCorrelationKey = null;
-    clearPendingPaymentSessionState();
-    powerSafetyOverlay.notifyPrintCompleted();
-    applyConfirmGate(
-      job?.message ?? 'The worker reported a terminal print failure.',
-    );
+    // A terminal verification failure is ambiguous: some or all pages may
+    // already be in the output tray. Keep the transaction available for staff
+    // verification instead of silently returning to the confirmation screen.
+    renderAmbiguousWorkerFailure({
+      message: job?.errorMessage ?? job?.message ?? job?.reason,
+      spoolerCorrelationKey:
+        job?.spoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
+    });
   });
 }
 

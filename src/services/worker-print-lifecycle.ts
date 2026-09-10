@@ -560,6 +560,17 @@ async function processWorkerReturnPrintEvent(input: {
         spoolerJobId: parseSpoolerJobId(input.evt.spoolerJobId),
         printerName: input.evt.printerName ?? null,
         reason: input.evt.message ?? null,
+        pagesPrinted:
+          typeof input.evt.pagesPrinted === 'number' &&
+          Number.isFinite(input.evt.pagesPrinted)
+            ? input.evt.pagesPrinted
+            : undefined,
+        totalPages:
+          typeof input.evt.totalPages === 'number' &&
+          Number.isFinite(input.evt.totalPages) &&
+          input.evt.totalPages > 0
+            ? input.evt.totalPages
+            : undefined,
       },
       {
         requiredAmount,

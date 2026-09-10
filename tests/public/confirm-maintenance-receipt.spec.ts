@@ -11,6 +11,7 @@ describe('maintenance receipt presentation', () => {
     'PRINTER_DOOR_OPEN',
     'PRINTER_HARDWARE_ERROR',
     'WORKER_HARDWARE_ERROR',
+    'WORKER_PRINT_FAILED',
   ])('routes %s to staff-assisted resolution', (code) => {
     expect(isMaintenancePrintFailure(code)).toBe(true);
   });

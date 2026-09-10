@@ -3,10 +3,13 @@ const getSpoolerLifecycleRecord = jest.fn();
 const getRecoverySession = jest.fn();
 const appendUsageEvent = jest.fn();
 
-jest.mock('../../src/services', () => ({
+jest.mock('../../src/services/recovery', () => ({
   checkpointRecoverySession: jest.fn(),
   getRecoverySession,
   getSpoolerLifecycleRecord,
+}));
+
+jest.mock('../../src/services/print-lifecycle-state', () => ({
   persistAndEmitPrintLifecycleState,
 }));
 
@@ -123,6 +126,37 @@ describe('worker PrinterError lifecycle', () => {
     });
 
     expect(persistAndEmitPrintLifecycleState).not.toHaveBeenCalled();
+  });
+
+  test('persists the worker final page count on successful completion', async () => {
+    getSpoolerLifecycleRecord.mockReturnValue({
+      currentState: 'processing',
+      spoolerCorrelationKey: 'spool-complete',
+    });
+
+    await handleWorkerReturnPrintEvent({
+      evt: {
+        type: 'PrintSucceeded',
+        transactionId: 'tx-complete',
+        spoolerCorrelationKey: 'spool-complete',
+        printerName: 'EPSON L5290 Series',
+        pagesPrinted: 4,
+        totalPages: 4,
+        timestampUtc: '2026-09-11T00:00:01.000Z',
+      },
+      io: {} as never,
+      sessionStore: {} as never,
+    });
+
+    expect(persistAndEmitPrintLifecycleState).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        state: 'printed',
+        pagesPrinted: 4,
+        totalPages: 4,
+      }),
+      expect.anything(),
+    );
   });
 
   test('waits for a correlated hardware failure to persist before processing success', async () => {

@@ -60,7 +60,7 @@ export interface WorkerPrintEvent {
   outcome?: WorkerTerminalOutcome;
   /**
    * Pages printed so far, reported by the worker's Win32_PrintJob poller.
-   * Only populated on `PrintProgress` events.
+   * Populated on `PrintProgress` and terminal print events when available.
    */
   pagesPrinted?: number;
   /**

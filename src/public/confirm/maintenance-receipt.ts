@@ -20,6 +20,7 @@ const MAINTENANCE_PRINT_FAILURE_CODES = new Set([
   'PRINTER_DOOR_OPEN',
   'PRINTER_HARDWARE_ERROR',
   'WORKER_HARDWARE_ERROR',
+  'WORKER_PRINT_FAILED',
 ]);
 
 function normalizeOptionalValue(value: string | null | undefined): string | null {
