@@ -133,6 +133,73 @@ document.getElementById('documentCareClose')?.addEventListener('click', () => { 
 documentCareModal?.addEventListener('click', (event) => { if (event.target === documentCareModal) document.getElementById('documentCareClose')?.click(); });
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') document.getElementById('documentCareClose')?.click(); });
 
+type CopyPaperSize = 'A4' | 'Letter' | 'Legal';
+
+const copySourcePaperSizeRadios = document.querySelectorAll<HTMLInputElement>(
+  'input[name="copySourcePaperSize"]',
+);
+const copyStep1Desc = document.getElementById('copyStep1Desc');
+const copyFooterNote = document.getElementById('copyFooterNote');
+const copyOverlaySub = document.getElementById('copyOverlaySub');
+const copyPlaceholderLabel = document.getElementById('copyPlaceholderLabel');
+
+function getSelectedCopyPaperSize(): CopyPaperSize {
+  const checked = document.querySelector<HTMLInputElement>(
+    'input[name="copySourcePaperSize"]:checked',
+  );
+  if (checked?.value === 'Letter' || checked?.value === 'Legal') {
+    return checked.value;
+  }
+  return 'A4';
+}
+
+function updateCopySourceInstructions(paperSize: CopyPaperSize): void {
+  const isAdf = paperSize === 'Legal';
+  if (copyStep1Desc) {
+    copyStep1Desc.textContent = isAdf
+      ? 'Insert document face-up into the ADF, short edge first'
+      : 'Align the paper face-down on the glass scanner';
+  }
+  if (copyFooterNote) {
+    copyFooterNote.textContent = isAdf
+      ? 'Insert document face-up into the ADF, short edge first.'
+      : 'Ensure your document is flat and fully on the glass.';
+  }
+  if (copyOverlaySub) {
+    copyOverlaySub.textContent = isAdf
+      ? 'Please keep the document straight in the feeder.'
+      : 'Please keep the document flat on the glass.';
+  }
+  if (copyPlaceholderLabel) {
+    copyPlaceholderLabel.innerHTML = isAdf
+      ? 'Insert document face-up in the ADF,<br />then tap <strong>Check Document</strong>'
+      : 'Place your document face-down,<br />then tap <strong>Check Document</strong>';
+  }
+}
+
+function setCopySourcePaperSize(paperSize: CopyPaperSize): void {
+  for (const radio of copySourcePaperSizeRadios) {
+    radio.checked = radio.value === paperSize;
+  }
+  updateCopySourceInstructions(paperSize);
+}
+
+function setCopySourceRadiosDisabled(disabled: boolean): void {
+  for (const radio of copySourcePaperSizeRadios) {
+    radio.disabled = disabled;
+  }
+}
+
+copySourcePaperSizeRadios.forEach((radio) => {
+  radio.addEventListener('change', () => {
+    if (radio.checked) {
+      const size = getSelectedCopyPaperSize();
+      sessionStorage.setItem('printbit.copySourcePaperSize', size);
+      updateCopySourceInstructions(size);
+    }
+  });
+});
+
 const copyLoadingController =
   copyLoadingAnimation && copyLoadingCanvas
     ? mountLoadingAnimation({
@@ -571,6 +638,7 @@ async function showPreview(filename: string): Promise<void> {
     previewStatusText.textContent = 'Ready to copy';
     previewStatusText.setAttribute('data-status', 'ready');
   }
+  setCopySourceRadiosDisabled(true);
 }
 
 function clearAndRescan(): void {
@@ -586,8 +654,10 @@ function clearAndRescan(): void {
   // Clear session storage
   sessionStorage.removeItem('printbit.copyPreviewPath');
   sessionStorage.removeItem('printbit.copyPreviewReleaseToken');
+  sessionStorage.removeItem('printbit.copySourcePaperSize');
 
   // Reset UI back to initial state
+  setCopySourceRadiosDisabled(false);
   hideError();
   resetPreviewSurfaces();
   if (previewSection) previewSection.style.display = 'none';
@@ -610,14 +680,21 @@ function clearAndRescan(): void {
 clearRescanBtn?.addEventListener('click', () => clearAndRescan());
 
 async function checkForDocument(): Promise<void> {
+  const paperSize = getSelectedCopyPaperSize();
+  sessionStorage.setItem('printbit.copySourcePaperSize', paperSize);
   hideError();
   setBackNavigationLocked(true);
+  setCopySourceRadiosDisabled(true);
   showOverlay(true);
   if (checkDocBtn) checkDocBtn.disabled = true;
   if (clearRescanBtn) clearRescanBtn.disabled = true;
 
   try {
-    const res = await fetch('/api/scan/preview', { method: 'POST' });
+    const res = await fetch('/api/scan/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paperSize }),
+    });
     const data = (await res.json()) as {
       detected: boolean;
       previewPath?: string;
@@ -645,6 +722,7 @@ async function checkForDocument(): Promise<void> {
 
       await showPreview(data.previewPath);
     } else {
+      setCopySourceRadiosDisabled(false);
       showError(
         data.error ??
           'No document detected. Place your document face-down on the scanner glass and try again.',
@@ -652,6 +730,7 @@ async function checkForDocument(): Promise<void> {
     }
   } catch {
     showOverlay(false);
+    setCopySourceRadiosDisabled(false);
     showError('Could not reach the scanner. Please try again.');
   } finally {
     setBackNavigationLocked(false);
@@ -684,6 +763,13 @@ continueBtn?.addEventListener('click', () => {
 window.addEventListener('beforeunload', clearPreviewImageUrl);
 
 async function initializeCopyPage(): Promise<void> {
+  const savedSourceSize = sessionStorage.getItem('printbit.copySourcePaperSize');
+  if (savedSourceSize === 'A4' || savedSourceSize === 'Letter' || savedSourceSize === 'Legal') {
+    setCopySourcePaperSize(savedSourceSize);
+  } else {
+    updateCopySourceInstructions('A4');
+  }
+
   previewPath = sessionStorage.getItem('printbit.copyPreviewPath');
   previewReleaseToken = sessionStorage.getItem(
     'printbit.copyPreviewReleaseToken',
@@ -691,6 +777,7 @@ async function initializeCopyPage(): Promise<void> {
 
   if (previewPath) {
     console.log('[COPY] Restoring preview from session:', previewPath);
+    setCopySourceRadiosDisabled(true);
     await showPreview(previewPath);
   }
 }
