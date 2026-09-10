@@ -33,6 +33,7 @@ $ScriptsDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BatPath = Join-Path $ScriptsDir "start-kiosk.bat"
 $ServerStartupScript = Join-Path $ScriptsDir "start-kiosk-server.ps1"
 $ProjectDir = Split-Path -Parent $ScriptsDir
+$WorkerClientIdentityEnvironmentVariable = "Ipc__WorkerCommandAllowedClientIdentity"
 
 function Resolve-TaskAccount {
     param(
@@ -110,6 +111,16 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 $kioskUserNormalized = if ([string]::IsNullOrWhiteSpace($KioskUser)) { $null } else { $KioskUser.Trim() }
 $kioskAccount = if ($kioskUserNormalized) { Resolve-TaskAccount -UserInput $kioskUserNormalized } else { $null }
 $resolvedKioskUser = if ($kioskAccount) { $kioskAccount.AccountName } else { $null }
+$workerAllowedClientIdentity = if ($kioskAccount) { $kioskAccount.Sid } else { $null }
+
+# The worker runs as LocalSystem and reads this machine-scoped configuration.
+# Only an explicitly selected kiosk account is added; SYSTEM/administrator modes
+# already match the worker's built-in ACL entries.
+[Environment]::SetEnvironmentVariable(
+    $WorkerClientIdentityEnvironmentVariable,
+    $workerAllowedClientIdentity,
+    "Machine")
+
 $Action = if ($kioskUserNormalized) {
     New-ScheduledTaskAction `
         -Execute "powershell.exe" `
@@ -180,6 +191,7 @@ Write-Host "[PrintBit] Scheduled task '$TaskName' installed!" -ForegroundColor G
 if ($kioskUserNormalized) {
     Write-Host "[PrintBit]   Runs at logon as $resolvedKioskUser (interactive token)." -ForegroundColor Cyan
     Write-Host "[PrintBit]   Resolved SID: $($kioskAccount.Sid)" -ForegroundColor Gray
+    Write-Host "[PrintBit]   Worker pipe client SID configured in machine environment." -ForegroundColor Cyan
     Write-Host "[PrintBit]   Mode: server-only startup for Assigned Access Edge (use http://192.168.4.2:3000/loading)." -ForegroundColor Cyan
     Write-Host "[PrintBit]   Startup logs: uploads\logs\kiosk-server-startup.log" -ForegroundColor Gray
     Write-Host "[PrintBit]   Optional recovery: .\scripts\install-watchdog.ps1 -AtStartup" -ForegroundColor DarkGray
@@ -189,6 +201,7 @@ if ($kioskUserNormalized) {
     } else {
         Write-Host "[PrintBit]   Runs at logon as SYSTEM." -ForegroundColor Cyan
     }
+    Write-Host "[PrintBit]   Worker pipe uses its built-in SYSTEM/Administrators ACL." -ForegroundColor Cyan
 } else {
     Write-Host "[PrintBit]   Runs at logon as $env:USERNAME with admin privileges." -ForegroundColor Cyan
 }

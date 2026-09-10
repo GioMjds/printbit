@@ -34,7 +34,8 @@
     "updates:revert": "powershell -ExecutionPolicy Bypass -File .\\scripts\\revert-controlled-updates.ps1",
     "driver:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-printer-driver-version.ps1",
     "upload-storage:secure": "powershell -ExecutionPolicy Bypass -File .\\scripts\\configure-upload-storage-acl.ps1",
-    "defender:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-defender-upload-gate.ps1"
+    "defender:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-defender-upload-gate.ps1",
+    "worker-pipe:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-worker-command-pipe.ps1"
   },
   "keywords": [],
   "author": "GioMjds",
