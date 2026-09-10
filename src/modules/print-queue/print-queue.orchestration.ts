@@ -30,11 +30,11 @@ import {
   WORKER_PRECHECKS_ENABLED,
   WORKER_QUEUE_DIR,
 } from '@/config';
-import { handoffToWorker, WorkerHandoffError } from '@/services/worker-handoff';
+import { handoffToWorker, WorkerHandoffError } from '@/infrastructure/worker';
 import {
   buildWorkerErrorPayload,
   sendWorkerError,
-} from '@/services/worker-error-pipe';
+} from '@/infrastructure/worker';
 import { powerSafetyService } from '@/services/power-safety';
 
 /**

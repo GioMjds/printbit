@@ -21,8 +21,8 @@ import { persistAndEmitPrintLifecycleState } from '@/services/print-lifecycle-st
 import {
   getPrinterTelemetry,
   refreshPrinterTelemetry,
-  recordSpoolerLifecycleTransition,
-} from '@/services';
+} from '@/services/printer-state-projection';
+import { recordSpoolerLifecycleTransition } from '@/services/recovery';
 import { BLOCKED_STATUSES } from '@/utils';
 import {
   WORKER_COMMAND_PIPE_NAME,

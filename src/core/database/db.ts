@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { finiteOr } from '@/utils';
-import { ANALYSIS_ALGORITHM_VERSION } from '@/services';
+import { ANALYSIS_ALGORITHM_VERSION } from '@/services/document-analysis';
 import {
   clearLowDbImportMarker,
   clearStalePricingAnalysisCache,

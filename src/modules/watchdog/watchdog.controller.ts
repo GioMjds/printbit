@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import { WatchdogService } from './watchdog.service';
 import { isLoopbackRequest } from '@/utils/network';
 import { WATCHDOG_ALERT_THRESHOLD } from '@/config/watchdog.config';
-import { adminService, anomalyService } from '@/services';
+import { adminService } from '@/services/admin';
+import { anomalyService } from '@/services/anomaly';
 import { buildAnomalyFingerprint } from '@/services/anomaly';
 
 export interface WatchdogControllerDeps {

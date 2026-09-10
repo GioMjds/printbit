@@ -21,11 +21,11 @@ import {
 import { adminService } from '@/services/admin';
 import {
   evaluateInkPreflight,
-  persistAndEmitPrintLifecycleState,
   refreshPrinterTelemetry,
-  settlementService,
   watchJobForMalfunction,
-} from '@/services';
+} from '@/services/printer-state-projection';
+import { persistAndEmitPrintLifecycleState } from '@/services/print-lifecycle-state';
+import { settlementService } from '@/services/settlement';
 import { BLOCKED_STATUSES } from '@/utils';
 import { financialLedgerService } from '@/services/financial-ledger';
 import {

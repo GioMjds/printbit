@@ -2,13 +2,15 @@ import path from 'node:path';
 import fs from 'node:fs';
 import {
   reportIssueService,
-  type LogMeta,
-  type ReportIssueAttachmentEntry,
-  type ReportIssueCategory,
-  type ReportIssueEntry,
-  type ReportIssueSessionEntry,
-  type ReportIssueStatus,
-} from '@/services';
+} from '@/services/report-issue';
+import type {
+  LogMeta,
+  ReportIssueAttachmentEntry,
+  ReportIssueCategory,
+  ReportIssueEntry,
+  ReportIssueSessionEntry,
+  ReportIssueStatus,
+} from '@/services/db';
 import type { AdminQueueView } from './report.schema';
 import { serializeForInlineScript } from '@/utils/helpers';
 import { promoteStagedUpload } from '@/services/upload-staging';

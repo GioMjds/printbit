@@ -441,4 +441,3 @@ export function createDefenderScanner(
   }
   return new DefaultDefenderScanner(deps);
 }
-

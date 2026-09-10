@@ -26,44 +26,48 @@ import {
 } from '@/middleware/socket-access';
 import { registerAppModules } from '@/app.module';
 import { getJobProcessor } from '@/modules/print-queue';
+import { initDB } from '@/core/database/db';
+import { detectDefaultPrinter } from '@/services/printer';
+import { detectScanner } from '@/services/scanner';
+import { startScanStorageCleanup } from '@/services/scan-storage';
+import { cleanupTransientFilesOnStartup } from '@/services/transient-file-cleanup';
+import { convertToPdfArtifact } from '@/services/preview';
 import {
-  initDB,
-  detectDefaultPrinter,
-  detectScanner,
-  startScanStorageCleanup,
-  cleanupTransientFilesOnStartup,
-  convertToPdfArtifact,
   getHopperStatus,
   getSerialStatus,
   initSerial,
-  isHotspotRunning,
-  startHotspot,
-  SessionStore,
-  resolvePublicBaseUrl,
-  runHopperSelfTest,
-  anomalyService,
-  adminService,
-  startTrustedTimeMonitor,
-  stopTrustedTimeMonitor,
-  verifyTrustedClockSync,
-  getPrinterTelemetry,
-  startWatchdogHealthMonitor,
-  stopWatchdogHealthMonitor,
   isCoinSlotLocked,
   getCoinSlotLockOwnerId,
   getCoinSlotLockedAt,
   lockCoinSlot,
   unlockOwnedCoinSlot,
+} from '@/services/hardware-state-projection';
+import { isHotspotRunning, startHotspot } from '@/services/hotspot';
+import { SessionStore, resolvePublicBaseUrl } from '@/services/session';
+import { runHopperSelfTest } from '@/services/hopper';
+import { anomalyService } from '@/services/anomaly';
+import { adminService } from '@/services/admin';
+import {
+  startTrustedTimeMonitor,
+  stopTrustedTimeMonitor,
+  verifyTrustedClockSync,
+} from '@/services/time-source';
+import { getPrinterTelemetry } from '@/services/printer-state-projection';
+import {
+  startWatchdogHealthMonitor,
+  stopWatchdogHealthMonitor,
+} from '@/services/watchdog-health';
+import {
   markRecoveryShutdown,
   markRecoveryStartup,
   reconcileRecoverySessionsOnStartup,
   getRecoveryStatusSnapshot,
-} from '@/services';
+} from '@/services/recovery';
 import { buildAnomalyFingerprint } from '@/services/anomaly';
 import {
   startWorkerReturnPipeServer,
   mapWorkerEventToSocket,
-} from '@/services/worker-return-pipe';
+} from '@/infrastructure/worker';
 import { handleWorkerReturnPrintEvent } from '@/services/worker-print-lifecycle';
 import { translateHardwarePrinterError } from '@/services/printer-error-translation';
 import {

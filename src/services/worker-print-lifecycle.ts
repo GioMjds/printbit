@@ -9,8 +9,8 @@ import {
   checkpointRecoverySession,
   getRecoverySession,
   getSpoolerLifecycleRecord,
-  persistAndEmitPrintLifecycleState,
-} from '@/services';
+} from '@/services/recovery';
+import { persistAndEmitPrintLifecycleState } from '@/services/print-lifecycle-state';
 import {
   PendingRefundServiceError,
   upsertSpoolerFailureRefund,

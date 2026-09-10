@@ -9,7 +9,7 @@ import {
   PORTAL_DIR,
   UPLOAD_DIR,
 } from '@/config';
-import { getHotspotConfig } from '@/services';
+import { getHotspotConfig } from '@/services/hotspot';
 import { powerSafetyService } from '@/services/power-safety';
 import {
   createKioskAccessMiddleware,

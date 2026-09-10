@@ -19,10 +19,12 @@ import {
   evaluateInkPreflight,
   getPrinterTelemetry,
   refreshPrinterTelemetry,
+} from '@/services/printer-state-projection';
+import {
   isCoinSlotLocked,
   isCoinSlotLockedBy,
   getCoinSlotLockOwnerId,
-} from '@/services';
+} from '@/services/hardware-state-projection';
 import {
   powerSafetyService,
   type PowerSafetyService,

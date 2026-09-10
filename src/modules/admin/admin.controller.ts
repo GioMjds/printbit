@@ -38,7 +38,7 @@ import {
 } from '@/services/printer-state-projection';
 import { getExternalWatchdogState } from '@/services/watchdog-health';
 import { detectDefaultPrinter } from '@/services/printer';
-import { handoffToWorker } from '@/services/worker-handoff';
+import { handoffToWorker } from '@/infrastructure/worker';
 import { WORKER_QUEUE_DIR } from '@/config';
 import { getScannerStatus } from '@/services/scanner';
 import {

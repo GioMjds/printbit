@@ -22,7 +22,7 @@ import { jobStore, type ScanJobSettings } from '@/services/job-store';
 import { ReceiptService } from '@/modules/receipt/receipt.service';
 import { adminService } from '@/services/admin';
 import { db } from '@/services/db';
-import { settlementService } from '@/services';
+import { settlementService } from '@/services/settlement';
 import { financialLedgerService } from '@/services/financial-ledger';
 import {
   assertTrustedTimeForFinancialOperation,
