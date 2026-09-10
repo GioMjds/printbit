@@ -43,6 +43,7 @@ const VALID_SOURCES = new Set(['adf', 'flatbed']);
 const VALID_DPI = new Set([150, 300, 600]);
 const VALID_COLOR_MODES = new Set(['colored', 'grayscale']);
 const VALID_FORMATS = new Set(['pdf', 'jpg', 'png']);
+const VALID_PAPER_SIZES = new Set(['A4', 'Letter', 'Legal']);
 
 const FORMAT_CONTENT_TYPES: Record<string, string> = {
   pdf: 'application/pdf',
@@ -56,6 +57,12 @@ const SCAN_RELEASE_TOKEN_TTL_MS = 45 * 60 * 1000;
 
 type ScannerPageSource = 'feeder' | 'glass';
 type ScannerPageColor = 'color' | 'grayscale';
+type ScannerPaperSize = 'A4' | 'Letter' | 'Legal';
+
+const toCopyPreviewSource = (
+  paperSize: ScannerPaperSize,
+): 'adf' | 'flatbed' =>
+  paperSize === 'Legal' ? 'adf' : 'flatbed';
 
 export interface ScannerStatusResponse {
   connected: boolean;
@@ -74,6 +81,7 @@ export interface InteractiveScanInput {
   source: ScannerPageSource;
   color: ScannerPageColor;
   dpi: string | number;
+  paperSize: ScannerPaperSize;
 }
 
 export interface InteractiveScanResult {
@@ -121,6 +129,7 @@ export interface ScanJobInput {
   colorMode: string;
   duplex: boolean;
   format: string;
+  paperSize: string;
 }
 
 export interface ColorAnalysisResult {
@@ -312,15 +321,7 @@ export class ScannerService {
   async interactiveScan(
     input: InteractiveScanInput,
   ): Promise<InteractiveScanResult> {
-    const { source, color, dpi } = input;
-
-    const runtime = getScannerStatus();
-    if (!runtime.connected && !runtime.usingStub) {
-      throw new Error(
-        runtime.lastError ??
-          'No scanner device is currently available. Please check your Epson scanner connection.',
-      );
-    }
+    const { source, color, dpi, paperSize } = input;
 
     if (!source || (source !== 'feeder' && source !== 'glass')) {
       throw new Error('Invalid source. Accepted: "feeder", "glass"');
@@ -338,6 +339,17 @@ export class ScannerService {
     if (!VALID_DPI.has(safeDpi)) {
       throw new Error('Invalid dpi. Accepted: 150, 300, 600');
     }
+    if (!VALID_PAPER_SIZES.has(paperSize)) {
+      throw new Error('Invalid paperSize. Accepted: "A4", "Letter", "Legal"');
+    }
+
+    const runtime = getScannerStatus();
+    if (!runtime.connected && !runtime.usingStub) {
+      throw new Error(
+        runtime.lastError ??
+          'No scanner device is currently available. Please check your Epson scanner connection.',
+      );
+    }
 
     const settings = {
       source: this.toScanSource(source),
@@ -345,6 +357,7 @@ export class ScannerService {
       colorMode: this.toColorMode(color),
       duplex: false,
       format: 'jpg' as const,
+      paperSize,
     };
 
     const result = await getAdapter().scan(settings, 'uploads/scans');
@@ -658,7 +671,7 @@ export class ScannerService {
   }
 
   validateScanJobInput(input: ScanJobInput): ScanJobSettings {
-    const { source, dpi, colorMode, duplex, format } = input;
+    const { source, dpi, colorMode, duplex, format, paperSize } = input;
 
     if (!source || !VALID_SOURCES.has(source)) {
       throw new Error('Invalid source. Accepted: "adf", "flatbed"');
@@ -675,6 +688,9 @@ export class ScannerService {
     if (!format || !VALID_FORMATS.has(format)) {
       throw new Error('Invalid format. Accepted: "pdf", "jpg", "png"');
     }
+    if (!VALID_PAPER_SIZES.has(paperSize)) {
+      throw new Error('Invalid paperSize. Accepted: "A4", "Letter", "Legal"');
+    }
 
     return {
       source: source as 'adf' | 'flatbed',
@@ -682,6 +698,7 @@ export class ScannerService {
       colorMode: colorMode as 'colored' | 'grayscale',
       duplex,
       format: format as 'pdf' | 'jpg' | 'png',
+      paperSize: paperSize as ScannerPaperSize,
     };
   }
 
@@ -694,6 +711,7 @@ export class ScannerService {
       dpi: settings.dpi,
       colorMode: settings.colorMode,
       format: settings.format,
+      paperSize: settings.paperSize,
     });
 
     // Start scan asynchronously
@@ -736,21 +754,26 @@ export class ScannerService {
     return { absPath, format: job.settings.format };
   }
 
-  async previewScan(): Promise<{
+  async previewScan(paperSize: ScannerPaperSize): Promise<{
     detected: boolean;
     previewPath?: string;
     releaseToken?: string;
     pageCount?: number;
     error?: string;
   }> {
+    if (!VALID_PAPER_SIZES.has(paperSize)) {
+      throw new Error('Invalid paperSize. Accepted: "A4", "Letter", "Legal"');
+    }
+
     console.log('[SCAN-PREVIEW] Starting copy pre-scan (300 DPI color)…');
 
     const previewSettings = {
-      source: 'flatbed' as const,
+      source: toCopyPreviewSource(paperSize),
       dpi: 300,
       colorMode: 'colored' as const,
       duplex: false,
       format: 'pdf' as const,
+      paperSize,
     };
 
     try {

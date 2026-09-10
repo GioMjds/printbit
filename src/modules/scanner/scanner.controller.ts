@@ -21,6 +21,7 @@ type InteractiveScanBody = {
   source?: 'feeder' | 'glass';
   color?: 'color' | 'grayscale';
   dpi?: string | number;
+  paperSize?: 'A4' | 'Letter' | 'Legal';
 };
 
 type ScanJobBody = {
@@ -29,6 +30,7 @@ type ScanJobBody = {
   colorMode?: string;
   duplex?: boolean;
   format?: string;
+  paperSize?: string;
 };
 
 type ReleaseScanBody = {
@@ -109,12 +111,13 @@ export class ScannerController {
       return;
     }
 
-    const body = req.body as InteractiveScanBody;
+    const body = (req.body ?? {}) as InteractiveScanBody;
     try {
       const result = await this.scannerService.interactiveScan({
         source: body.source as 'feeder' | 'glass',
         color: body.color as 'color' | 'grayscale',
         dpi: body.dpi as string | number,
+        paperSize: body.paperSize as 'A4' | 'Letter' | 'Legal',
       });
       res.json(result);
     } catch (error) {
@@ -128,7 +131,8 @@ export class ScannerController {
       if (
         message.startsWith('Invalid source') ||
         message.startsWith('Invalid color') ||
-        message.startsWith('Invalid dpi')
+        message.startsWith('Invalid dpi') ||
+        message.startsWith('Invalid paperSize')
       ) {
         res.status(400).json({ error: message });
         return;
@@ -418,6 +422,7 @@ export class ScannerController {
         colorMode: body.colorMode ?? '',
         duplex: body.duplex as boolean,
         format: body.format ?? '',
+        paperSize: body.paperSize ?? '',
       });
       const job = await this.scannerService.createScanJob(settings);
       res.status(201).json(job);
@@ -464,7 +469,7 @@ export class ScannerController {
     fs.createReadStream(result.absPath).pipe(res);
   };
 
-  private previewScan = async (_req: Request, res: Response): Promise<void> => {
+  private previewScan = async (req: Request, res: Response): Promise<void> => {
     if (!this.powerSafety.canAcceptCustomerWork()) {
       res.status(503).json({
         code: 'POWER_EMERGENCY',
@@ -473,8 +478,22 @@ export class ScannerController {
       return;
     }
 
-    const preview = await this.scannerService.previewScan();
-    res.json(preview);
+    const body = (req.body ?? {}) as {
+      paperSize?: 'A4' | 'Letter' | 'Legal';
+    };
+    try {
+      const preview = await this.scannerService.previewScan(
+        body.paperSize as 'A4' | 'Letter' | 'Legal',
+      );
+      res.json(preview);
+    } catch (error) {
+      const message = this.getErrorMessage(error, 'Unknown scan preview error');
+      if (message.startsWith('Invalid paperSize')) {
+        res.status(400).json({ error: message });
+        return;
+      }
+      throw error;
+    }
   };
 
   private getPreviewFile = (req: Request, res: Response): void => {
