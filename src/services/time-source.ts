@@ -1,5 +1,18 @@
 import { runPowerShell } from '@/utils';
 import type { TrustedTimestampMeta } from './db';
+import { getPlatformWorkerFlags } from '@/config/platform-worker.config';
+import {
+  platformWorkerClient,
+  type PlatformWorkerClient,
+} from '@/services/platform-worker-client';
+
+export interface TrustedTimeVerificationDeps {
+  env?: NodeJS.ProcessEnv;
+  workerClient?: Pick<PlatformWorkerClient, 'getTrustedTimeStatus'>;
+  runPowerShell?: typeof runPowerShell;
+  now?: () => Date;
+  logger?: Pick<Console, 'warn'>;
+}
 
 const DEFAULT_MAX_DRIFT_MS = 60_000;
 const DEFAULT_REVALIDATION_MS = 5 * 60 * 1_000;
@@ -57,24 +70,24 @@ let statusCache = {
   lastSuccessfulSyncAt: null,
 } as TrustedTimeStatus;
 
-function readConfiguredOffsetMs(): number | null {
-  const raw = process.env.PRINTBIT_NTP_OFFSET_MS;
+function readConfiguredOffsetMs(env: NodeJS.ProcessEnv = process.env): number | null {
+  const raw = env.PRINTBIT_NTP_OFFSET_MS;
   if (typeof raw !== 'string' || !raw.trim()) return null;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed);
 }
 
-function readMaxDriftMs(): number {
-  const raw = process.env.PRINTBIT_TRUSTED_TIME_MAX_DRIFT_MS;
+function readMaxDriftMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.PRINTBIT_TRUSTED_TIME_MAX_DRIFT_MS;
   if (typeof raw !== 'string' || !raw.trim()) return DEFAULT_MAX_DRIFT_MS;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_MAX_DRIFT_MS;
   return Math.floor(parsed);
 }
 
-function readRevalidationIntervalMs(): number {
-  const raw = process.env.PRINTBIT_TRUSTED_TIME_REVALIDATE_MS;
+function readRevalidationIntervalMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.PRINTBIT_TRUSTED_TIME_REVALIDATE_MS;
   if (typeof raw !== 'string' || !raw.trim()) return DEFAULT_REVALIDATION_MS;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 5_000)
@@ -82,8 +95,8 @@ function readRevalidationIntervalMs(): number {
   return Math.floor(parsed);
 }
 
-function readEnforceFlag(): boolean {
-  const raw = process.env.PRINTBIT_TRUSTED_TIME_ENFORCE;
+function readEnforceFlag(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.PRINTBIT_TRUSTED_TIME_ENFORCE;
   if (typeof raw === 'string' && raw.trim().length > 0) {
     const normalized = raw.trim().toLowerCase();
     if (normalized === 'false' || normalized === '0' || normalized === 'no') {
@@ -97,8 +110,8 @@ function readEnforceFlag(): boolean {
   return false;
 }
 
-function readNtpServerOverride(): string | null {
-  const raw = process.env.PRINTBIT_TRUSTED_TIME_NTP_SERVER;
+function readNtpServerOverride(env: NodeJS.ProcessEnv = process.env): string | null {
+  const raw = env.PRINTBIT_TRUSTED_TIME_NTP_SERVER;
   if (typeof raw !== 'string') return null;
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : null;
@@ -154,8 +167,9 @@ function updateStatus(next: TrustedTimeStatus): TrustedTimeStatus {
 function buildStatusFromOffset(
   offsetMs: number | null,
   detail: string,
+  env: NodeJS.ProcessEnv = process.env,
 ): TrustedTimeStatus {
-  const maxDriftMs = readMaxDriftMs();
+  const maxDriftMs = readMaxDriftMs(env);
   const synced = offsetMs !== null;
   const driftExceeded =
     synced && offsetMs !== null ? Math.abs(offsetMs) > maxDriftMs : false;
@@ -165,7 +179,7 @@ function buildStatusFromOffset(
     offsetMs,
     driftExceeded,
     maxDriftMs,
-    enforceForFinancial: readEnforceFlag(),
+    enforceForFinancial: readEnforceFlag(env),
     checkedAt: new Date().toISOString(),
     detail: driftExceeded
       ? `Clock drift ${Math.abs(offsetMs ?? 0)}ms exceeds threshold ${maxDriftMs}ms.`
@@ -192,21 +206,80 @@ export function updateTrustedClockOffset(offsetMs: number | null): void {
   );
 }
 
-export async function verifyTrustedClockSync(): Promise<TrustedTimeStatus> {
-  const configuredOffsetMs = readConfiguredOffsetMs();
+export async function verifyTrustedClockSync(
+  deps: TrustedTimeVerificationDeps = {},
+): Promise<TrustedTimeStatus> {
+  const env = deps.env ?? process.env;
+  const configuredOffsetMs = readConfiguredOffsetMs(env);
   if (configuredOffsetMs !== null) {
     return updateStatus(
       buildStatusFromOffset(
         configuredOffsetMs,
         'Using PRINTBIT_NTP_OFFSET_MS as trusted clock offset.',
+        env,
       ),
     );
   }
 
-  const maxDriftMs = readMaxDriftMs();
-  const enforceForFinancial = readEnforceFlag();
+  const maxDriftMs = readMaxDriftMs(env);
+  const enforceForFinancial = readEnforceFlag(env);
+  const flags = getPlatformWorkerFlags(env);
+  const logger = deps.logger ?? console;
+
+  if (flags.trustedTime) {
+    const workerClient = deps.workerClient ?? platformWorkerClient;
+    const ntpOverride = readNtpServerOverride(env);
+    let workerRes;
+    try {
+      workerRes = await workerClient.getTrustedTimeStatus({
+        ntpServer: ntpOverride,
+        maxDriftMs,
+      });
+    } catch {
+      workerRes = null;
+    }
+
+    if (!workerRes || workerRes.errorCode === 'NOT_IMPLEMENTED') {
+      logger.warn(
+        '[TRUSTED_TIME] Worker backend unavailable; using temporary Node fallback.',
+      );
+    } else {
+      const checkedTime = Date.parse(workerRes.checkedAt);
+      const syncTime = workerRes.lastSuccessfulSyncAt
+        ? Date.parse(workerRes.lastSuccessfulSyncAt)
+        : null;
+
+      if (
+        Number.isNaN(checkedTime) ||
+        (workerRes.lastSuccessfulSyncAt && syncTime !== null && Number.isNaN(syncTime))
+      ) {
+        logger.warn(
+          '[TRUSTED_TIME] Worker returned invalid timestamp; using temporary Node fallback.',
+        );
+      } else {
+        return updateStatus({
+          source: (workerRes.source as TrustedTimestampMeta['source']) || 'system',
+          synced: workerRes.synced,
+          offsetMs: workerRes.offsetMs ?? null,
+          driftExceeded: workerRes.driftExceeded,
+          maxDriftMs: workerRes.maxDriftMs,
+          enforceForFinancial,
+          checkedAt: workerRes.checkedAt,
+          detail:
+            workerRes.detail ||
+            (workerRes.synced
+              ? `Trusted time synchronized (offset ${workerRes.offsetMs}ms).`
+              : 'Windows Time is not synchronized.'),
+          ntpSource: workerRes.ntpSource ?? null,
+          lastSuccessfulSyncAt: workerRes.lastSuccessfulSyncAt ?? null,
+        });
+      }
+    }
+  }
+
+  const runPs = deps.runPowerShell ?? runPowerShell;
   try {
-    const rawStatus = await runPowerShell('w32tm /query /status', 3_000);
+    const rawStatus = await runPs('w32tm /query /status', 3_000);
     const source = parseStatusValue(rawStatus, 'Source');
     const lastSuccessfulSyncAt = parseStatusValue(
       rawStatus,
@@ -221,7 +294,7 @@ export async function verifyTrustedClockSync(): Promise<TrustedTimeStatus> {
         driftExceeded: false,
         maxDriftMs,
         enforceForFinancial,
-        checkedAt: new Date().toISOString(),
+        checkedAt: (deps.now ? deps.now() : new Date()).toISOString(),
         detail: `Windows Time is not synchronized (source: ${source ?? 'unknown'}).`,
         ntpSource: source,
         lastSuccessfulSyncAt: lastSuccessfulSyncAt ?? null,
@@ -230,9 +303,9 @@ export async function verifyTrustedClockSync(): Promise<TrustedTimeStatus> {
 
     const ntpTarget =
       normalizeW32ComputerName(source) ??
-      normalizeW32ComputerName(readNtpServerOverride()) ??
+      normalizeW32ComputerName(readNtpServerOverride(env)) ??
       'time.windows.com';
-    const rawStripchart = await runPowerShell(
+    const rawStripchart = await runPs(
       `w32tm /stripchart /computer:${ntpTarget} /samples:1 /dataonly`,
       3_000,
     );
@@ -247,8 +320,8 @@ export async function verifyTrustedClockSync(): Promise<TrustedTimeStatus> {
       offsetMs,
       driftExceeded,
       maxDriftMs,
-      enforceForFinancial: readEnforceFlag(),
-      checkedAt: new Date().toISOString(),
+      enforceForFinancial,
+      checkedAt: (deps.now ? deps.now() : new Date()).toISOString(),
       detail:
         offsetMs === null
           ? `Failed to parse NTP offset from w32tm stripchart output (source: ${source ?? ntpTarget}).`
@@ -260,7 +333,7 @@ export async function verifyTrustedClockSync(): Promise<TrustedTimeStatus> {
         synced && (lastSuccessfulSyncAt ?? null)
           ? lastSuccessfulSyncAt
           : synced
-            ? new Date().toISOString()
+            ? (deps.now ? deps.now() : new Date()).toISOString()
             : null,
     });
   } catch (error) {
@@ -270,8 +343,8 @@ export async function verifyTrustedClockSync(): Promise<TrustedTimeStatus> {
       offsetMs: null,
       driftExceeded: false,
       maxDriftMs,
-      enforceForFinancial: readEnforceFlag(),
-      checkedAt: new Date().toISOString(),
+      enforceForFinancial,
+      checkedAt: (deps.now ? deps.now() : new Date()).toISOString(),
       detail: `Trusted time verification failed: ${error instanceof Error ? error.message : String(error)}`,
       ntpSource: null,
       lastSuccessfulSyncAt: null,
