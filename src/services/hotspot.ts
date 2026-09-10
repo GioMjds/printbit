@@ -11,15 +11,18 @@ import {
   ESP32_KIOSK_IP,
   PORT,
 } from '@/config/http.config';
-import {
-  findMatchingIpv4ForSubnet,
-  getLocalIPv4,
-} from '@/utils/network';
+import { findMatchingIpv4ForSubnet, getLocalIPv4 } from '@/utils/network';
 import { sendKioskIpAnnouncement } from './hardware-state-projection';
 import {
   markWatchdogHeartbeat,
   setWatchdogComponentState,
 } from './watchdog-health';
+import { getPlatformWorkerFlags } from '@/config/platform-worker.config';
+import {
+  platformWorkerClient,
+  type PlatformWorkerClient,
+} from './platform-worker-client';
+import { platformNetworkStateProjection } from './platform-network-state-projection';
 
 const ESP32_REGISTER_ROUTE = '/kiosk/register';
 const ESP32_REGISTER_INTERVAL_MS = 15_000;
@@ -81,6 +84,11 @@ export function detectEsp32KioskIp(
     return ESP32_KIOSK_IP.trim();
   }
 
+  const projectedIp = platformNetworkStateProjection.getSnapshot()?.kioskIp;
+  if (projectedIp && isValidIpv4Address(projectedIp)) {
+    return projectedIp.trim();
+  }
+
   const preferredPrefixes: string[] = [];
   if (ESP32_KIOSK_SUBNET_PREFIX.trim().length > 0) {
     preferredPrefixes.push(ESP32_KIOSK_SUBNET_PREFIX.trim());
@@ -98,7 +106,9 @@ export function detectEsp32KioskIp(
   return getLocalIPv4(undefined, customInterfaces);
 }
 
-export async function registerKioskWithEsp32(targetIp?: string): Promise<boolean> {
+export async function registerKioskWithEsp32(
+  targetIp?: string,
+): Promise<boolean> {
   const kioskIp = targetIp?.trim() || detectEsp32KioskIp();
 
   if (!kioskIp) {
@@ -155,10 +165,43 @@ export async function registerKioskWithEsp32(targetIp?: string): Promise<boolean
   }
 }
 
-class HotspotService {
+export type HotspotServiceDeps = {
+  env?: NodeJS.ProcessEnv;
+  workerClient?: PlatformWorkerClient;
+  registerKiosk?: (targetIp?: string) => Promise<boolean>;
+  ensureFirewall?: () => void;
+  logger?: {
+    log: (message: string) => void;
+    warn: (message: string) => void;
+    error: (message: string) => void;
+  };
+};
+
+export class HotspotService {
   private running = false;
   private esp32RegistrationTimer: NodeJS.Timeout | null = null;
   private lastRegisteredIp: string | null = null;
+  private readonly deps: {
+    env?: NodeJS.ProcessEnv;
+    workerClient?: PlatformWorkerClient;
+    registerKiosk: (targetIp?: string) => Promise<boolean>;
+    ensureFirewall: () => void;
+    logger: {
+      log: (message: string) => void;
+      warn: (message: string) => void;
+      error: (message: string) => void;
+    };
+  };
+
+  constructor(deps: HotspotServiceDeps = {}) {
+    this.deps = {
+      env: deps.env,
+      workerClient: deps.workerClient,
+      registerKiosk: deps.registerKiosk ?? registerKioskWithEsp32,
+      ensureFirewall: deps.ensureFirewall ?? ensureFirewallRules,
+      logger: deps.logger ?? console,
+    };
+  }
 
   private stopEsp32RegistrationLoop(): void {
     if (this.esp32RegistrationTimer) {
@@ -171,7 +214,7 @@ class HotspotService {
     this.stopEsp32RegistrationLoop();
 
     const initialIp = detectEsp32KioskIp();
-    const registered = await registerKioskWithEsp32(initialIp ?? undefined);
+    const registered = await this.deps.registerKiosk(initialIp ?? undefined);
     if (registered && initialIp) {
       this.lastRegisteredIp = initialIp;
     }
@@ -181,10 +224,10 @@ class HotspotService {
       const needsImmediateUpdate =
         Boolean(currentIp) && currentIp !== this.lastRegisteredIp;
 
-      const success = await registerKioskWithEsp32(currentIp ?? undefined);
+      const success = await this.deps.registerKiosk(currentIp ?? undefined);
       if (success && currentIp) {
         if (needsImmediateUpdate) {
-          console.log(
+          this.deps.logger.log(
             `[HOTSPOT] → Kiosk IP changed from ${this.lastRegisteredIp ?? 'none'} to ${currentIp}; ESP32 updated.`,
           );
         }
@@ -199,7 +242,7 @@ class HotspotService {
 
   async start(): Promise<void> {
     if (this.running) {
-      console.log('[HOTSPOT] Already running — skipping');
+      this.deps.logger.log('[HOTSPOT] Already running — skipping');
       markWatchdogHeartbeat('hotspot', { running: true, provider: 'esp32' });
       setWatchdogComponentState(
         'hotspot',
@@ -213,9 +256,46 @@ class HotspotService {
       return;
     }
 
-    ensureFirewallRules();
+    const flags = getPlatformWorkerFlags(this.deps.env);
+    if (flags.networking) {
+      const client = this.deps.workerClient ?? platformWorkerClient;
+      const prefixes: string[] = [];
+      if (ESP32_KIOSK_SUBNET_PREFIX.trim().length > 0) {
+        prefixes.push(ESP32_KIOSK_SUBNET_PREFIX.trim());
+      }
+      const esp32SubnetPrefix = extractEsp32SubnetPrefix();
+      if (esp32SubnetPrefix && !prefixes.includes(esp32SubnetPrefix)) {
+        prefixes.push(esp32SubnetPrefix);
+      }
+
+      let response;
+      try {
+        response = await client.prepareHotspotPlatform({
+          preferredSubnetPrefixes: prefixes,
+          port: PORT,
+        });
+      } catch {
+        response = null;
+      }
+
+      if (response && response.errorCode !== 'NOT_IMPLEMENTED') {
+        platformNetworkStateProjection.apply({
+          kioskIp: response.kioskIp ?? null,
+          firewallReady: response.firewallReady,
+          detail: response.detail ?? null,
+        });
+      } else {
+        this.deps.logger.warn(
+          '[HOTSPOT] Worker backend unavailable; using temporary Node fallback.',
+        );
+        this.deps.ensureFirewall();
+      }
+    } else {
+      this.deps.ensureFirewall();
+    }
+
     this.running = true;
-    console.log('[HOTSPOT] ESP32 provider enabled');
+    this.deps.logger.log('[HOTSPOT] ESP32 provider enabled');
     await this.startEsp32RegistrationLoop();
     markWatchdogHeartbeat('hotspot', { running: true, provider: 'esp32' });
     setWatchdogComponentState(
@@ -233,7 +313,7 @@ class HotspotService {
     if (!this.running) return;
     this.running = false;
     this.stopEsp32RegistrationLoop();
-    console.log('[HOTSPOT] ESP32 provider stop requested');
+    this.deps.logger.log('[HOTSPOT] ESP32 provider stop requested');
     markWatchdogHeartbeat('hotspot', { running: false, provider: 'esp32' });
     setWatchdogComponentState(
       'hotspot',
@@ -247,7 +327,13 @@ class HotspotService {
   }
 }
 
-export const hotspotService = new HotspotService();
+export function createHotspotService(
+  deps: HotspotServiceDeps = {},
+): HotspotService {
+  return new HotspotService(deps);
+}
+
+export const hotspotService = createHotspotService();
 
 export async function startHotspot(): Promise<void> {
   return hotspotService.start();

@@ -1239,6 +1239,38 @@ body {
   transform: scale(0.97);
 }
 
+/* Clear button — resets to idle; matches rescan-btn visually with a subtle destructive tint */
+.clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(250, 128, 114, 0.25);
+  background: rgba(250, 128, 114, 0.07);
+  color: rgba(250, 160, 150, 0.9);
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 150ms,
+    border-color 150ms;
+  -webkit-tap-highlight-color: transparent;
+}
+.clear-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.clear-btn:hover {
+  background: rgba(250, 128, 114, 0.14);
+  border-color: rgba(250, 128, 114, 0.45);
+  color: #ffa07a;
+}
+.clear-btn:active {
+  transform: scale(0.97);
+}
+
 /* Primary scan button */
 .scan-btn {
   display: inline-flex;

@@ -74,6 +74,9 @@ const continueBtn = document.getElementById(
 const checkDocBtn = document.getElementById(
   'checkDocBtn',
 ) as HTMLButtonElement | null;
+const clearRescanBtn = document.getElementById(
+  'clearRescanBtn',
+) as HTMLButtonElement | null;
 const scanOverlay = document.getElementById(
   'scanOverlay',
 ) as HTMLElement | null;
@@ -430,6 +433,7 @@ function showError(msg: string): void {
   if (errorBanner) errorBanner.style.display = '';
   if (errorText) errorText.textContent = safeMessage;
   if (checkDocBtn) checkDocBtn.style.display = '';
+  if (clearRescanBtn) clearRescanBtn.style.display = 'none';
   if (previewSection) previewSection.style.display = 'none';
   if (previewPlaceholder) previewPlaceholder.style.display = '';
   if (continueBtn) {
@@ -562,17 +566,55 @@ async function showPreview(filename: string): Promise<void> {
     continueBtn.disabled = false;
   }
   if (checkDocBtn) checkDocBtn.style.display = 'none';
+  if (clearRescanBtn) clearRescanBtn.style.display = '';
   if (previewStatusText) {
     previewStatusText.textContent = 'Ready to copy';
     previewStatusText.setAttribute('data-status', 'ready');
   }
 }
 
+function clearAndRescan(): void {
+  // Release the preview file server-side (best-effort)
+  if (previewReleaseToken) {
+    void releaseCopyPreviewFile(previewReleaseToken, 'copy_clear_and_rescan');
+  }
+
+  // Reset module-level state
+  previewPath = null;
+  previewReleaseToken = null;
+
+  // Clear session storage
+  sessionStorage.removeItem('printbit.copyPreviewPath');
+  sessionStorage.removeItem('printbit.copyPreviewReleaseToken');
+
+  // Reset UI back to initial state
+  hideError();
+  resetPreviewSurfaces();
+  if (previewSection) previewSection.style.display = 'none';
+  if (previewPlaceholder) previewPlaceholder.style.display = '';
+  if (continueBtn) {
+    continueBtn.style.display = 'none';
+    continueBtn.disabled = true;
+  }
+  if (clearRescanBtn) clearRescanBtn.style.display = 'none';
+  if (checkDocBtn) {
+    checkDocBtn.style.display = '';
+    checkDocBtn.disabled = false;
+  }
+  if (previewStatusText) {
+    previewStatusText.textContent = 'Waiting for scan';
+    previewStatusText.removeAttribute('data-status');
+  }
+}
+
+clearRescanBtn?.addEventListener('click', () => clearAndRescan());
+
 async function checkForDocument(): Promise<void> {
   hideError();
   setBackNavigationLocked(true);
   showOverlay(true);
   if (checkDocBtn) checkDocBtn.disabled = true;
+  if (clearRescanBtn) clearRescanBtn.disabled = true;
 
   try {
     const res = await fetch('/api/scan/preview', { method: 'POST' });
@@ -614,6 +656,7 @@ async function checkForDocument(): Promise<void> {
   } finally {
     setBackNavigationLocked(false);
     if (checkDocBtn) checkDocBtn.disabled = false;
+    if (clearRescanBtn) clearRescanBtn.disabled = false;
   }
 }
 

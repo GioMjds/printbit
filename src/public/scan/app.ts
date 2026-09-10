@@ -90,6 +90,7 @@ const pagerLabel = document.getElementById('pagerLabel') as HTMLElement;
 const scanBtn = document.getElementById('scanBtn') as HTMLButtonElement;
 const scanBtnLabel = document.getElementById('scanBtnLabel') as HTMLElement;
 const rescanBtn = document.getElementById('rescanBtn') as HTMLButtonElement;
+const clearBtn = document.getElementById('clearBtn') as HTMLButtonElement | null;
 const proceedBtn = document.getElementById('proceedBtn') as HTMLButtonElement;
 const proceedBtnLabel = document.getElementById(
   'proceedBtnLabel',
@@ -391,6 +392,7 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
   hideScanTroubleshooting();
   updatePager();
   updateSoftCopyPricingUi();
+  if (clearBtn) clearBtn.style.display = 'flex';
   rescanBtn.style.display = 'flex';
   proceedBtn.style.display = 'flex';
   proceedBtn.disabled = false;
@@ -415,6 +417,7 @@ async function startScan(): Promise<void> {
   scanBtn.disabled = true;
   scanBtn.setAttribute('aria-disabled', 'true');
   rescanBtn.style.display = 'none';
+  if (clearBtn) clearBtn.style.display = 'none';
   proceedBtn.style.display = 'none';
   scanProgress.textContent = 'Feeding document…';
 
@@ -472,6 +475,7 @@ async function startScan(): Promise<void> {
     updatePager();
     updateSoftCopyPricingUi();
 
+    if (clearBtn) clearBtn.style.display = 'flex';
     rescanBtn.style.display = 'flex';
     proceedBtn.style.display = 'flex';
     proceedBtn.disabled = false;
@@ -504,6 +508,7 @@ async function startScan(): Promise<void> {
       );
       updatePager();
       updateSoftCopyPricingUi();
+      if (clearBtn) clearBtn.style.display = 'flex';
       rescanBtn.style.display = 'flex';
       proceedBtn.style.display = 'flex';
       proceedBtn.disabled = false;
@@ -518,6 +523,7 @@ async function startScan(): Promise<void> {
     scanBtn.disabled = false;
     scanBtn.setAttribute('aria-disabled', 'false');
     rescanBtn.style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'none';
   } finally {
     setBackNavigationLocked(false);
   }
@@ -532,6 +538,38 @@ scanBtn.addEventListener('click', () => {
 
 rescanBtn.addEventListener('click', () => {
   if (!scanBtn.disabled) void startScan();
+});
+
+function clearScan(): void {
+  if (scanReleaseToken) {
+    void releaseScanFile(scanReleaseToken, 'scan_clear');
+    scanReleaseToken = null;
+  }
+
+  scannedPages = [];
+  currentPage = 0;
+  scanFilename = null;
+
+  sessionStorage.removeItem('printbit.config');
+
+  hideScanTroubleshooting();
+  showPreview('idle', 'Insert document into the feeder and press Scan');
+  previewControls.style.display = 'none';
+  pageCountBadge.style.display = 'none';
+  scannedImage.src = '';
+  scannedImage.removeAttribute('data-gray');
+  if (clearBtn) clearBtn.style.display = 'none';
+  rescanBtn.style.display = 'none';
+  proceedBtn.style.display = 'none';
+  proceedBtn.disabled = true;
+  proceedBtn.setAttribute('aria-disabled', 'true');
+  scanBtnLabel.textContent = 'Scan Document';
+  scanBtn.disabled = false;
+  scanBtn.setAttribute('aria-disabled', 'false');
+}
+
+clearBtn?.addEventListener('click', () => {
+  if (!scanBtn.disabled) clearScan();
 });
 
 proceedBtn.addEventListener('click', () => {

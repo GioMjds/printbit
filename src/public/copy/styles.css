@@ -746,6 +746,41 @@ body {
   cursor: not-allowed;
 }
 
+/* Clear & Rescan button — appears after a successful scan; ghost style matching check-btn */
+.clear-rescan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 22px;
+  border: none;
+  border-radius: 16px;
+  background: rgba(250, 128, 114, 0.08);
+  border: 1.5px solid rgba(250, 128, 114, 0.22);
+  color: rgba(250, 160, 150, 0.9);
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 150ms,
+    border-color 150ms,
+    transform 120ms;
+  -webkit-tap-highlight-color: transparent;
+}
+.clear-rescan-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.clear-rescan-btn:hover {
+  background: rgba(250, 128, 114, 0.15);
+  border-color: rgba(250, 128, 114, 0.4);
+  color: #ffa07a;
+}
+.clear-rescan-btn:active {
+  transform: scale(0.97);
+}
+
 /* Continue button */
 .continue-btn {
   display: inline-flex;
