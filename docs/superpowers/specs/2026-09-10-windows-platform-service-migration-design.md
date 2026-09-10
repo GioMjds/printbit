@@ -106,14 +106,14 @@ C# does not contact the ESP32, publish kiosk URLs, manage Node watchdog state, o
 
 Add a focused `WorkerPlatformCommands.cs` alongside the existing worker IPC contracts. Extend the strict parser and command dispatcher with:
 
-| Command | Purpose | Response |
-| --- | --- | --- |
-| `GetDefenderHealth` | Read Defender availability and signature freshness | Status, signature age, detail |
-| `ScanFileSecurity` | Scan one authorized staged file | Clean/infected/unavailable/stale/timeout/failed, detection name, detail |
-| `ListUsbDrives` | List removable volumes | Normalized drive records |
-| `ExportScanToUsb` | Copy one authorized scan to a removable volume | Export path, drive, or typed failure |
-| `GetTrustedTimeStatus` | Observe Windows/NTP synchronization | Source, synchronization, offset, timestamps, detail |
-| `PrepareHotspotPlatform` | Ensure firewall readiness and resolve the kiosk interface | Kiosk IP, firewall state, detail |
+| Command                  | Purpose                                                   | Response                                                                |
+| ------------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `GetDefenderHealth`      | Read Defender availability and signature freshness        | Status, signature age, detail                                           |
+| `ScanFileSecurity`       | Scan one authorized staged file                           | Clean/infected/unavailable/stale/timeout/failed, detection name, detail |
+| `ListUsbDrives`          | List removable volumes                                    | Normalized drive records                                                |
+| `ExportScanToUsb`        | Copy one authorized scan to a removable volume            | Export path, drive, or typed failure                                    |
+| `GetTrustedTimeStatus`   | Observe Windows/NTP synchronization                       | Source, synchronization, offset, timestamps, detail                     |
+| `PrepareHotspotPlatform` | Ensure firewall readiness and resolve the kiosk interface | Kiosk IP, firewall state, detail                                        |
 
 Every command and response carries the incoming `requestId`. Placeholder handlers return `success: false` and `errorCode: "NOT_IMPLEMENTED"` where an operation cannot yet be performed.
 
