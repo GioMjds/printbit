@@ -47,6 +47,10 @@ export interface WorkerCommandPayload {
 export interface SendWorkerCommandOptions {
   pipeName?: string;
   timeoutMs?: number;
+  connectRetry?: {
+    initialDelayMs?: number;
+    maxDelayMs?: number;
+  };
   logger?: Pick<Console, 'warn' | 'error' | 'log'>;
 }
 
@@ -61,85 +65,152 @@ export interface WorkerHardwareResponse {
   [key: string]: unknown;
 }
 
+const RETRYABLE_CONNECT_CODES = new Set(['ENOENT', 'ECONNREFUSED', 'EBUSY']);
+
+function getErrorCode(error: Error): string | undefined {
+  return (error as NodeJS.ErrnoException).code;
+}
+
 export async function sendWorkerRequest<TResponse = WorkerHardwareResponse>(
   payload: Record<string, unknown>,
   options?: SendWorkerCommandOptions,
 ): Promise<TResponse | null> {
   const pipeName = options?.pipeName ?? 'printbit-worker-commands';
   const timeoutMs = options?.timeoutMs ?? 15000;
+  const initialRetryDelayMs = Math.max(
+    1,
+    options?.connectRetry?.initialDelayMs ?? 50,
+  );
+  const maxRetryDelayMs = Math.max(
+    initialRetryDelayMs,
+    options?.connectRetry?.maxDelayMs ?? 500,
+  );
   const logger = options?.logger ?? console;
   const pipePath = pipeName.startsWith('\\\\.\\pipe\\')
     ? pipeName
     : `\\\\.\\pipe\\${pipeName}`;
 
-  return new Promise<TResponse | null>((resolve) => {
-    let resolved = false;
-    let buffer = '';
-    const socket = net.connect(pipePath);
+  let frame: string;
+  try {
+    frame = `${JSON.stringify(payload)}\n`;
+  } catch (err) {
+    logger.warn(
+      `[WORKER_COMMAND_PIPE] Serialization failure: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return null;
+  }
 
-    const finish = (result: TResponse | null) => {
+  return new Promise<TResponse | null>((resolve) => {
+    const startedAt = Date.now();
+    const deadlineAt = startedAt + timeoutMs;
+    let attempts = 0;
+    let resolved = false;
+    let activeSocket: net.Socket | null = null;
+    let retryTimer: NodeJS.Timeout | null = null;
+
+    const finish = (result: TResponse | null, message?: string) => {
       if (resolved) return;
       resolved = true;
-      socket.setTimeout(0);
-      socket.destroy();
+      if (retryTimer) clearTimeout(retryTimer);
+      clearTimeout(deadlineTimer);
+      activeSocket?.destroy();
+      if (message) logger.warn(message);
       resolve(result);
     };
 
-    socket.setTimeout(timeoutMs, () => {
-      logger.warn(`[WORKER_COMMAND_PIPE] Connection timeout to ${pipePath}`);
-      finish(null);
-    });
+    const deadlineTimer = setTimeout(() => {
+      finish(
+        null,
+        `[WORKER_COMMAND_PIPE] Request deadline exceeded for ${pipePath} ` +
+          `after ${attempts} attempt(s) and ${Date.now() - startedAt}ms`,
+      );
+    }, timeoutMs);
 
-    socket.on('connect', () => {
-      try {
-        const frame = JSON.stringify(payload) + '\n';
+    const connect = () => {
+      if (resolved) return;
+
+      attempts += 1;
+      let connected = false;
+      let retryScheduled = false;
+      let buffer = '';
+      const socket = net.connect(pipePath);
+      activeSocket = socket;
+
+      socket.once('connect', () => {
+        connected = true;
         socket.write(frame, 'utf-8', (err) => {
           if (err) {
-            logger.warn(`[WORKER_COMMAND_PIPE] Write error: ${err.message}`);
-            finish(null);
+            finish(
+              null,
+              `[WORKER_COMMAND_PIPE] Write error on ${pipePath}: ${err.message}`,
+            );
           }
         });
-      } catch (err) {
-        logger.warn(
-          `[WORKER_COMMAND_PIPE] Serialization failure: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-        finish(null);
-      }
-    });
+      });
 
-    socket.on('data', (chunk) => {
-      buffer += chunk.toString();
-      const newlineIdx = buffer.indexOf('\n');
-      if (newlineIdx >= 0) {
+      socket.on('data', (chunk) => {
+        buffer += chunk.toString();
+        const newlineIdx = buffer.indexOf('\n');
+        if (newlineIdx < 0) return;
+
         const line = buffer.slice(0, newlineIdx).trim();
         try {
-          const parsed = JSON.parse(line) as TResponse;
-          finish(parsed);
+          finish(JSON.parse(line) as TResponse);
         } catch (err) {
-          logger.warn(
-            `[WORKER_COMMAND_PIPE] JSON parse error: ${
+          finish(
+            null,
+            `[WORKER_COMMAND_PIPE] JSON parse error from ${pipePath}: ${
               err instanceof Error ? err.message : String(err)
             }`,
           );
-          finish(null);
         }
-      }
-    });
+      });
 
-    socket.on('error', (err) => {
-      logger.warn(
-        `[WORKER_COMMAND_PIPE] Socket error connecting to ${pipePath}: ${err.message}`,
-      );
-      finish(null);
-    });
+      socket.once('error', (err) => {
+        const errorCode = getErrorCode(err);
+        const remainingMs = deadlineAt - Date.now();
+        if (
+          !connected &&
+          errorCode &&
+          RETRYABLE_CONNECT_CODES.has(errorCode) &&
+          remainingMs > 0
+        ) {
+          retryScheduled = true;
+          activeSocket = null;
+          socket.destroy();
+          const exponentialDelay = Math.min(
+            maxRetryDelayMs,
+            initialRetryDelayMs * 2 ** Math.max(0, attempts - 1),
+          );
+          const jitteredDelay = Math.ceil(
+            exponentialDelay * (1 + Math.random() * 0.25),
+          );
+          retryTimer = setTimeout(connect, Math.min(jitteredDelay, remainingMs));
+          return;
+        }
 
-    socket.on('close', () => {
-      if (!resolved) {
-        finish(null);
-      }
-    });
+        finish(
+          null,
+          `[WORKER_COMMAND_PIPE] Socket failure on ${pipePath} after ${attempts} ` +
+            `attempt(s) and ${Date.now() - startedAt}ms` +
+            `${errorCode ? ` (${errorCode})` : ''}: ${err.message}`,
+        );
+      });
+
+      socket.once('close', () => {
+        if (!resolved && !retryScheduled) {
+          finish(
+            null,
+            `[WORKER_COMMAND_PIPE] Connection closed by ${pipePath} after ${attempts} ` +
+              `attempt(s) and ${Date.now() - startedAt}ms`,
+          );
+        }
+      });
+    };
+
+    connect();
   });
 }
 
