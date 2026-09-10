@@ -272,6 +272,41 @@
 
         <!-- RIGHT — Scan info panel -->
         <section class="controls-col" aria-label="Scan info">
+          <!-- Document Size Picker Card -->
+          <div class="source-size-card" id="scanSourceSizeGroup">
+            <div class="source-size-card__header">
+              <span class="source-size-card__title">Document Size</span>
+              <span class="source-size-card__hint">Feeder paper size</span>
+            </div>
+            <div class="source-size-options" role="radiogroup" aria-label="Original document size">
+              <label class="source-size-option">
+                <input
+                  type="radio"
+                  name="scanSourcePaperSize"
+                  value="A4"
+                  checked
+                />
+                <span class="source-size-option__label">A4</span>
+              </label>
+              <label class="source-size-option">
+                <input
+                  type="radio"
+                  name="scanSourcePaperSize"
+                  value="Letter"
+                />
+                <span class="source-size-option__label">Short Bond</span>
+              </label>
+              <label class="source-size-option">
+                <input
+                  type="radio"
+                  name="scanSourcePaperSize"
+                  value="Legal"
+                />
+                <span class="source-size-option__label">Long Bond</span>
+              </label>
+            </div>
+          </div>
+
           <!-- Scan info card -->
           <div class="scan-info-card">
             <div class="scan-info-card__icon" aria-hidden="true">
