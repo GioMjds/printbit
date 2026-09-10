@@ -9,6 +9,10 @@ import {
   destroyPdfLoadingTask,
   type PdfLoadingTask,
 } from '../shared/pdfjs-loading-task-cleanup';
+import {
+  getCopyTroubleshootingGuide,
+  isAdfPaperJam,
+} from './troubleshooting';
 
 export {};
 
@@ -387,18 +391,24 @@ function hideCopyTroubleshooting(): void {
   if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = 'none';
 }
 
-function showCopyTroubleshooting(rawMessage: string): string {
+function showCopyTroubleshooting(
+  rawMessage: string,
+  usesAdf: boolean,
+): string {
+  const isPaperJam = isAdfPaperJam(rawMessage, usesAdf);
+  const paperJamGuide = getCopyTroubleshootingGuide(rawMessage, usesAdf);
   const safeMessage = sanitizeUserFacingError(rawMessage);
   const cause = classifyCopyFailure(rawMessage);
-  const guide = COPY_FAILURE_GUIDES[cause];
+  const guide = isPaperJam ? paperJamGuide : COPY_FAILURE_GUIDES[cause];
+  const userFacingMessage = isPaperJam ? paperJamGuide.summary : safeMessage;
 
   if (copyTroubleshootSummary) {
-    copyTroubleshootSummary.textContent = safeMessage;
+    copyTroubleshootSummary.textContent = userFacingMessage;
   }
   replaceListItems(copyTroubleshootCauses, guide.causes);
   replaceListItems(copyTroubleshootSteps, guide.steps);
   if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = '';
-  return safeMessage;
+  return userFacingMessage;
 }
 
 function setBackNavigationLocked(locked: boolean): void {
@@ -495,8 +505,8 @@ function resetPreviewSurfaces(): void {
   clearPreviewImageUrl();
 }
 
-function showError(msg: string): void {
-  const safeMessage = showCopyTroubleshooting(msg);
+function showError(msg: string, usesAdf = false): void {
+  const safeMessage = showCopyTroubleshooting(msg, usesAdf);
   if (errorBanner) errorBanner.style.display = '';
   if (errorText) errorText.textContent = safeMessage;
   if (checkDocBtn) checkDocBtn.style.display = '';
@@ -726,12 +736,13 @@ async function checkForDocument(): Promise<void> {
       showError(
         data.error ??
           'No document detected. Place your document face-down on the scanner glass and try again.',
+        paperSize === 'Legal',
       );
     }
   } catch {
     showOverlay(false);
     setCopySourceRadiosDisabled(false);
-    showError('Could not reach the scanner. Please try again.');
+    showError('Could not reach the scanner. Please try again.', paperSize === 'Legal');
   } finally {
     setBackNavigationLocked(false);
     if (checkDocBtn) checkDocBtn.disabled = false;

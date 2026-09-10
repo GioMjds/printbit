@@ -14,11 +14,11 @@ type ScanFailureCause =
 
 const GUIDES: Record<ScanFailureCause, ScanTroubleshootingGuide> = {
   paper_jam: {
-    title: 'Paper may be stuck',
-    summary: 'Take the paper out, check the top tray, then try again.',
+    title: 'Paper jam in the feeder',
+    summary: 'Remove the paper, clear the feeder, then try again.',
     checks: [
-      'Remove the paper from the top tray.',
-      'Make sure no torn paper is left inside.',
+      'Remove the paper from the top feeder tray.',
+      'Make sure no torn paper is left inside the feeder.',
       'Load the paper straight, then try again.',
     ],
   },
