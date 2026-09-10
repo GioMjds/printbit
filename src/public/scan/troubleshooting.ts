@@ -12,7 +12,7 @@ type ScanFailureCause =
   | 'connection'
   | 'unknown';
 
-const GUIDES: Record<ScanFailureCause, ScanTroubleshootingGuide> = {
+const GUIDES = {
   paper_jam: {
     title: 'Paper jam in the feeder',
     summary: 'Remove the paper, clear the feeder, then try again.',
@@ -67,7 +67,7 @@ const GUIDES: Record<ScanFailureCause, ScanTroubleshootingGuide> = {
       'Load it again, then try again.',
     ],
   },
-};
+} satisfies Record<ScanFailureCause, ScanTroubleshootingGuide>;
 
 function classifyScanFailure(rawMessage: string): ScanFailureCause {
   const message = rawMessage.toLowerCase();

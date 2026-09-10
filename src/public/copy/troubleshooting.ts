@@ -4,7 +4,7 @@ export interface CopyTroubleshootingGuide {
   steps: string[];
 }
 
-const ADF_PAPER_JAM_GUIDE: CopyTroubleshootingGuide = {
+const ADF_PAPER_JAM_GUIDE = {
   summary: 'Paper may be stuck in the feeder. Clear it, then try again.',
   causes: [
     'Paper is stuck or torn inside the document feeder.',
@@ -15,13 +15,13 @@ const ADF_PAPER_JAM_GUIDE: CopyTroubleshootingGuide = {
     'Open the feeder and gently remove any stuck or torn paper.',
     'Load flat, undamaged pages straight, then tap Retry.',
   ],
-};
+} satisfies CopyTroubleshootingGuide;
 
-const NON_FEEDER_FAILURE_GUIDE: CopyTroubleshootingGuide = {
+const NON_FEEDER_FAILURE_GUIDE = {
   summary: 'Could not complete scanner check. Please try again.',
   causes: [],
   steps: [],
-};
+} satisfies CopyTroubleshootingGuide;
 
 export function isAdfPaperJam(rawMessage: string, usesAdf: boolean): boolean {
   if (!usesAdf) return false;
