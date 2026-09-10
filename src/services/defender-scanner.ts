@@ -5,6 +5,11 @@ import {
   getDefenderConfig,
   type DefenderConfig,
 } from '@/config/defender.config';
+import { getPlatformWorkerFlags } from '@/config/platform-worker.config';
+import {
+  platformWorkerClient,
+  type PlatformWorkerClient,
+} from '@/services/platform-worker-client';
 
 export type DefenderScanStatus =
   | 'clean'
@@ -57,6 +62,9 @@ export interface DefenderScannerDeps {
   readonly runner?: CommandRunner;
   readonly config?: DefenderConfig;
   readonly fsAdapter?: FsAdapter;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly workerClient?: Pick<PlatformWorkerClient, 'getDefenderHealth' | 'scanFileSecurity'>;
+  readonly logger?: Pick<Console, 'warn' | 'error' | 'log'>;
 }
 
 const DEFAULT_RUNNER: CommandRunner = {
@@ -359,8 +367,78 @@ export class DefaultDefenderScanner implements DefenderScanner {
   }
 }
 
+export class MigratingDefenderScanner implements DefenderScanner {
+  private readonly legacyScanner: DefenderScanner;
+  private readonly workerClient: Pick<PlatformWorkerClient, 'getDefenderHealth' | 'scanFileSecurity'>;
+  private readonly logger: Pick<Console, 'warn' | 'error' | 'log'>;
+
+  constructor(deps: DefenderScannerDeps = {}) {
+    this.legacyScanner = new DefaultDefenderScanner(deps);
+    this.workerClient = deps.workerClient ?? platformWorkerClient;
+    this.logger = deps.logger ?? console;
+  }
+
+  async getHealth(): Promise<DefenderHealth> {
+    let res;
+    try {
+      res = await this.workerClient.getDefenderHealth();
+    } catch {
+      res = null;
+    }
+
+    if (!res || res.errorCode === 'NOT_IMPLEMENTED') {
+      this.logger.warn(
+        '[DEFENDER] Worker backend unavailable; using temporary Node fallback.',
+      );
+      return this.legacyScanner.getHealth();
+    }
+
+    const validStatus = (res.status === 'clean' || res.status === 'stale' || res.status === 'unavailable')
+      ? res.status
+      : 'unavailable';
+
+    return {
+      status: validStatus,
+      signatureAgeHours: res.signatureAgeHours ?? null,
+      detail: res.detail ?? null,
+    };
+  }
+
+  async scanFile(stagedPath: string): Promise<DefenderScanResult> {
+    let res;
+    try {
+      res = await this.workerClient.scanFileSecurity(stagedPath);
+    } catch {
+      res = null;
+    }
+
+    if (!res || res.errorCode === 'NOT_IMPLEMENTED') {
+      this.logger.warn(
+        '[DEFENDER] Worker backend unavailable; using temporary Node fallback.',
+      );
+      return this.legacyScanner.scanFile(stagedPath);
+    }
+
+    const validStatuses: DefenderScanStatus[] = ['clean', 'infected', 'unavailable', 'stale', 'timeout', 'failed'];
+    const status: DefenderScanStatus = validStatuses.includes(res.status as DefenderScanStatus)
+      ? (res.status as DefenderScanStatus)
+      : 'failed';
+
+    return {
+      status,
+      detectionName: res.detectionName ?? null,
+      detail: res.detail ?? null,
+    };
+  }
+}
+
 export function createDefenderScanner(
   deps: DefenderScannerDeps = {},
 ): DefenderScanner {
+  const flags = getPlatformWorkerFlags(deps.env);
+  if (flags.defender) {
+    return new MigratingDefenderScanner(deps);
+  }
   return new DefaultDefenderScanner(deps);
 }
+
