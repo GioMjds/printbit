@@ -12,7 +12,13 @@ export type WorkerCommandType =
   | 'GetScannerStatus'
   | 'ProbeScanner'
   | 'StartScan'
-  | 'CancelScan';
+  | 'CancelScan'
+  | 'GetDefenderHealth'
+  | 'ScanFileSecurity'
+  | 'ListUsbDrives'
+  | 'ExportScanToUsb'
+  | 'GetTrustedTimeStatus'
+  | 'PrepareHotspotPlatform';
 
 export interface WorkerCommandPayload {
   type: WorkerCommandType;
@@ -29,6 +35,12 @@ export interface WorkerCommandPayload {
   ip?: string;
   port?: number;
   path?: string;
+  filePath?: string;
+  sourcePath?: string;
+  drive?: string;
+  ntpServer?: string | null;
+  maxDriftMs?: number;
+  preferredSubnetPrefixes?: string[];
   [key: string]: unknown;
 }
 
@@ -135,6 +147,9 @@ export async function sendWorkerCommand(
   payload: WorkerCommandPayload,
   options?: SendWorkerCommandOptions,
 ): Promise<boolean> {
-  const resp = await sendWorkerRequest<WorkerHardwareResponse>(payload, options);
+  const resp = await sendWorkerRequest<WorkerHardwareResponse>(
+    payload,
+    options,
+  );
   return resp !== null && resp.success !== false;
 }
