@@ -1,12 +1,29 @@
 import fs from "node:fs";
 import path from "node:path";
 import { runPowerShell } from "@/utils";
+import { getPlatformWorkerFlags } from "@/config/platform-worker.config";
+import {
+  platformWorkerClient,
+  type PlatformWorkerClient,
+} from "@/services/platform-worker-client";
 
 export interface RemovableDrive {
   drive: string;
   label: string | null;
   freeBytes: number;
   totalBytes: number;
+}
+
+export interface UsbDriveServiceDeps {
+  env?: NodeJS.ProcessEnv;
+  workerClient?: Pick<PlatformWorkerClient, "listUsbDrives" | "exportScanToUsb">;
+  runPowerShell?: typeof runPowerShell;
+  logger?: Pick<Console, "warn" | "error" | "log">;
+}
+
+export interface IUsbDriveService {
+  listRemovable(): Promise<RemovableDrive[]>;
+  exportScanTo(sourcePath: string, drive: string): Promise<{ exportPath: string; drive: string }>;
 }
 
 function parseDriveValue(value: unknown): number {
@@ -65,11 +82,17 @@ async function uniqueDestinationPath(directory: string, filename: string): Promi
   return candidate;
 }
 
-class UsbDriveService {
+export class DefaultUsbDriveService implements IUsbDriveService {
+  private readonly runPs: typeof runPowerShell;
+
+  constructor(deps: UsbDriveServiceDeps = {}) {
+    this.runPs = deps.runPowerShell ?? runPowerShell;
+  }
+
   async listRemovable(): Promise<RemovableDrive[]> {
     const command =
       "Get-CimInstance Win32_LogicalDisk -Filter \"DriveType = 2\" | Select-Object DeviceID, VolumeName, FreeSpace, Size | ConvertTo-Json -Compress";
-    const raw = await runPowerShell(command);
+    const raw = await this.runPs(command);
     if (!raw) return [];
     return normalizeDrives(JSON.parse(raw) as unknown);
   }
@@ -98,7 +121,89 @@ class UsbDriveService {
   }
 }
 
-export const usbDriveService = new UsbDriveService();
+export class MigratingUsbDriveService implements IUsbDriveService {
+  private readonly legacy: IUsbDriveService;
+  private readonly workerClient: Pick<PlatformWorkerClient, "listUsbDrives" | "exportScanToUsb">;
+  private readonly logger: Pick<Console, "warn" | "error" | "log">;
+
+  constructor(deps: UsbDriveServiceDeps = {}) {
+    this.legacy = new DefaultUsbDriveService(deps);
+    this.workerClient = deps.workerClient ?? platformWorkerClient;
+    this.logger = deps.logger ?? console;
+  }
+
+  async listRemovable(): Promise<RemovableDrive[]> {
+    let res;
+    try {
+      res = await this.workerClient.listUsbDrives();
+    } catch {
+      res = null;
+    }
+
+    if (!res || res.errorCode === "NOT_IMPLEMENTED") {
+      this.logger.warn(
+        "[USB] Worker backend unavailable; using temporary Node fallback.",
+      );
+      return this.legacy.listRemovable();
+    }
+
+    if (!res.success && res.errorCode) {
+      throw new Error(res.message || `Worker error: ${res.errorCode}`);
+    }
+
+    return (res.drives ?? [])
+      .filter((d) => typeof d.drive === "string" && /^[A-Z]:$/i.test(d.drive.trim()))
+      .map((d) => ({
+        drive: d.drive.toUpperCase().trim(),
+        label: d.label ?? null,
+        freeBytes: parseDriveValue(d.freeBytes),
+        totalBytes: parseDriveValue(d.totalBytes),
+      }))
+      .sort((a, b) => a.drive.localeCompare(b.drive));
+  }
+
+  async exportScanTo(sourcePath: string, drive: string): Promise<{ exportPath: string; drive: string }> {
+    const safeDrive = ensureSafeDrive(drive);
+    let res;
+    try {
+      res = await this.workerClient.exportScanToUsb(sourcePath, safeDrive);
+    } catch {
+      res = null;
+    }
+
+    if (!res || res.errorCode === "NOT_IMPLEMENTED") {
+      this.logger.warn(
+        "[USB] Worker backend unavailable; using temporary Node fallback.",
+      );
+      return this.legacy.exportScanTo(sourcePath, drive);
+    }
+
+    if (!res.success) {
+      if (res.errorCode === "DRIVE_NOT_FOUND") {
+        throw new Error("USB drive not found. Please reinsert and refresh.");
+      }
+      if (res.errorCode === "SOURCE_FILE_NOT_FOUND") {
+        throw new Error("Source scan file not found");
+      }
+      throw new Error(res.message || `USB export failed: ${res.errorCode || "UNKNOWN_ERROR"}`);
+    }
+
+    return {
+      exportPath: res.exportPath || path.join(`${safeDrive}\\`, "PrintBit", "Scans", path.basename(sourcePath)),
+      drive: safeDrive,
+    };
+  }
+}
+
+export function createUsbDriveService(deps: UsbDriveServiceDeps = {}): IUsbDriveService {
+  const flags = getPlatformWorkerFlags(deps.env);
+  if (flags.usb) {
+    return new MigratingUsbDriveService(deps);
+  }
+  return new DefaultUsbDriveService(deps);
+}
+
+export const usbDriveService = createUsbDriveService();
 
 export async function listRemovableDrives(): Promise<RemovableDrive[]> {
   return usbDriveService.listRemovable();
