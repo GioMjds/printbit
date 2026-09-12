@@ -3,8 +3,20 @@ import { db } from './db';
 import { adminService } from './admin';
 import { financialLedgerService } from './financial-ledger';
 import type { WorkerPrintEvent } from './worker-return-pipe';
-import { sendWorkerCommand } from './worker-command-pipe';
+import {
+  sendWorkerCommand,
+  type WorkerHardwareResponse,
+} from './worker-command-pipe';
 import { coinSimulation } from './coin-simulation';
+
+export const CUSTOMER_PAYMENT_LOCK_OWNER = 'customer-payment';
+
+interface HardwareStateProjectionDeps {
+  sendWorkerCommand?: (
+    command: Record<string, unknown>,
+  ) => Promise<WorkerHardwareResponse | null>;
+  now?: () => string;
+}
 
 export interface SerialStatus {
   connected: boolean;
@@ -26,6 +38,12 @@ export interface HopperStatus {
 }
 
 export class HardwareStateProjection {
+  private readonly sendWorkerCommand: (
+    command: Record<string, unknown>,
+  ) => Promise<WorkerHardwareResponse | null>;
+
+  private readonly now: () => string;
+
   private serialStatus: SerialStatus = {
     connected: false,
     portPath: null,
@@ -47,6 +65,14 @@ export class HardwareStateProjection {
 
   private coinSlotLocks = new Map<string, string>();
   private io: Server | Socket | { emit: (event: string, ...args: unknown[]) => void } | null = null;
+
+  public constructor(deps: HardwareStateProjectionDeps = {}) {
+    this.sendWorkerCommand = deps.sendWorkerCommand ?? (async (command) => ({
+      success: await sendWorkerCommand(command as any),
+    }));
+    this.now = deps.now ?? (() => new Date().toISOString());
+    this.coinSlotLocks.set(CUSTOMER_PAYMENT_LOCK_OWNER, this.now());
+  }
 
   public setSocketIo(
     io: Server | Socket | { emit: (event: string, ...args: unknown[]) => void } | null,
@@ -88,6 +114,57 @@ export class HardwareStateProjection {
 
   public resetCoinSlotLocks(): void {
     this.coinSlotLocks.clear();
+  }
+
+  public async initializeCustomerPaymentLock(): Promise<boolean> {
+    this.coinSlotLocks.set(CUSTOMER_PAYMENT_LOCK_OWNER, this.now());
+    try {
+      const response = await this.sendWorkerCommand({
+        type: 'LockCoinSlot',
+        requestId: `customer-payment-lock-${Date.now()}`,
+        ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
+        reason: 'customer_payment_initialize',
+        timestampUtc: this.now(),
+      });
+      return response?.success === true;
+    } catch {
+      return false;
+    }
+  }
+
+  public async armCustomerPayment(): Promise<boolean> {
+    try {
+      const response = await this.sendWorkerCommand({
+        type: 'UnlockCoinSlot',
+        requestId: `customer-payment-unlock-${Date.now()}`,
+        ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
+        reason: 'customer_payment_arm',
+        timestampUtc: this.now(),
+      });
+      if (response?.success !== true) {
+        return false;
+      }
+      this.coinSlotLocks.delete(CUSTOMER_PAYMENT_LOCK_OWNER);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public async disarmCustomerPayment(reason: string): Promise<boolean> {
+    this.coinSlotLocks.set(CUSTOMER_PAYMENT_LOCK_OWNER, this.now());
+    try {
+      const response = await this.sendWorkerCommand({
+        type: 'LockCoinSlot',
+        requestId: `customer-payment-lock-${Date.now()}`,
+        ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
+        reason,
+        timestampUtc: this.now(),
+      });
+      return response?.success === true;
+    } catch {
+      return false;
+    }
   }
 
   public lockCoinSlot(ownerId: string, reason?: string): void {
