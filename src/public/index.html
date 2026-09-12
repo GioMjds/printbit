@@ -63,9 +63,29 @@
             </div>
           </div>
           <div class="wifi-inline-card__text">
-            <span class="wifi-inline-card__step">Step 1</span>
-            <h2 class="wifi-inline-card__title">Scan to connect to PrintBit</h2>
-            <p class="wifi-inline-card__sub">Join the kiosk hotspot with your phone camera before printing, copying, or scanning.</p>
+            <div class="wifi-inline-card__header">
+              <span class="wifi-inline-card__step">Step 1</span>
+              <h2 class="wifi-inline-card__title">Scan to connect to PrintBit</h2>
+              <p class="wifi-inline-card__sub">Join the kiosk hotspot with your phone camera before printing, copying, or scanning.</p>
+            </div>
+            <div class="wifi-inline-card__meta">
+              <div class="wifi-inline-card__alt">
+                <span class="wifi-inline-card__pill wifi-inline-card__pill--alt">Alternative</span>
+                <div class="wifi-inline-card__alt-content">
+                  <div class="wifi-inline-card__alt-network">
+                    <span class="wifi-inline-card__alt-label">Wi-Fi Network:</span>
+                    <strong id="wifiSsidVal" class="wifi-inline-card__ssid">PrintBit</strong>
+                    <span class="wifi-inline-card__divider" aria-hidden="true">•</span>
+                    <span id="wifiPasswordVal" class="wifi-inline-card__password">Open (No password required)</span>
+                  </div>
+                  <p class="wifi-inline-card__alt-note">If QR auto-connect doesn't work, join the network manually in Wi-Fi settings. You can continue even without internet (select "Keep Connected" if prompted).</p>
+                </div>
+              </div>
+              <div class="wifi-inline-card__tip">
+                <span class="wifi-inline-card__pill wifi-inline-card__pill--tip">Tip</span>
+                <p class="wifi-inline-card__tip-text">Turn off mobile data to access kiosk upload and printing steps.</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -144,8 +164,8 @@
                 <circle cx="44" cy="31" r="3" fill="var(--peach)" />
               </svg>
             </div>
-            <h2 class="action-card__title">Print</h2>
-            <p class="action-card__sub">Upload your file to print</p>
+            <h2 class="action-card__title">Upload</h2>
+            <p class="action-card__sub">Upload your file(s) to print</p>
           </button>
 
           <!-- Copy Card -->

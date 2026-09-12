@@ -328,11 +328,138 @@ body {
   max-width: 56ch;
 }
 
+.wifi-inline-card__header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.wifi-inline-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(167, 170, 225, 0.16);
+  width: 100%;
+}
+
+.wifi-inline-card__alt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.wifi-inline-card__pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.wifi-inline-card__pill--alt {
+  background: rgba(167, 170, 225, 0.16);
+  border: 1px solid rgba(167, 170, 225, 0.35);
+  color: var(--lavender);
+}
+
+.wifi-inline-card__pill--tip {
+  background: rgba(251, 146, 60, 0.16);
+  border: 1px solid rgba(251, 146, 60, 0.38);
+  color: #fb923c;
+}
+
+.wifi-inline-card__alt-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+}
+
+.wifi-inline-card__alt-network {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.wifi-inline-card__alt-label {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+.wifi-inline-card__ssid {
+  color: var(--white);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.wifi-inline-card__divider {
+  color: rgba(167, 170, 225, 0.4);
+  font-size: 11px;
+}
+
+.wifi-inline-card__password {
+  color: var(--lavender);
+  font-weight: 500;
+  font-size: 12.5px;
+}
+
+.wifi-inline-card__alt-note {
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.35;
+  margin: 0;
+  max-width: 68ch;
+}
+
+.wifi-inline-card__tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wifi-inline-card__tip-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #fde68a;
+  line-height: 1.35;
+  margin: 0;
+  max-width: 68ch;
+}
+
 /* On short kiosk viewports, tighten the vertical rhythm so the card
    doesn't push the action-grid toward clipping (see .action-area gap) */
 @media (max-height: 760px) {
   .wifi-inline-card {
-    padding: clamp(10px, 1.2vw, 14px) clamp(18px, 2vw, 24px);
+    padding: clamp(8px, 1.2vw, 12px) clamp(16px, 2vw, 22px);
+    gap: clamp(12px, 1.5vw, 18px);
+  }
+  .wifi-inline-card__title {
+    font-size: clamp(16px, 1.8vw, 20px);
+  }
+  .wifi-inline-card__meta {
+    margin-top: 5px;
+    padding-top: 5px;
+    gap: 5px;
+  }
+  .wifi-inline-card__alt-note,
+  .wifi-inline-card__tip-text {
+    font-size: 11px;
+    line-height: 1.25;
+  }
+  .wifi-inline-card__alt-network {
+    font-size: 12px;
   }
   .qr-frame--sm canvas {
     width: 88px !important;

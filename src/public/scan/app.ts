@@ -2,6 +2,10 @@ import { initializePageIdleTimeout } from '@/services/idle-timeout';
 import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import { mountLoadingAnimation } from '../shared/loading-animation';
+import {
+  destroyPdfLoadingTask,
+  type PdfLoadingTask,
+} from '../shared/pdfjs-loading-task-cleanup';
 import { getScanTroubleshootingGuide } from './troubleshooting';
 
 export {};
@@ -39,6 +43,7 @@ type ScanSource = 'feeder' | 'glass';
 type ScanColor = 'color' | 'grayscale';
 type ScanDpi = '150' | '300' | '600';
 type ScanPaperSize = 'A4' | 'Letter' | 'Legal';
+export type ScanExportFormat = 'pdf' | 'jpg' | 'png';
 
 interface ScanResponse {
   pages: string[];
@@ -60,7 +65,27 @@ interface StoredScanConfig {
   scannedPages?: string[];
   currentPage?: number;
   paperSize?: string;
+  scanFormat?: ScanExportFormat;
 }
+
+type PdfjsLib = {
+  GlobalWorkerOptions: { workerSrc: string };
+  getDocument: (src: { data: ArrayBuffer }) => PdfLoadingTask & {
+    promise: Promise<{
+      numPages: number;
+      getPage: (num: number) => Promise<{
+        getViewport: (options: { scale: number }) => {
+          width: number;
+          height: number;
+        };
+        render: (options: {
+          canvasContext: CanvasRenderingContext2D;
+          viewport: { width: number; height: number };
+        }) => { promise: Promise<void> };
+      }>;
+    }>;
+  };
+};
 
 const previewHint = document.getElementById('previewHint') as HTMLElement;
 const stateIdle = document.getElementById('stateIdle') as HTMLElement;
@@ -79,6 +104,12 @@ const errorText = document.getElementById('errorText') as HTMLElement;
 const scannedImage = document.getElementById(
   'scannedImage',
 ) as HTMLImageElement;
+const scannedPdfCanvas = document.getElementById(
+  'scannedPdfCanvas',
+) as HTMLCanvasElement | null;
+const scannedResult = document.getElementById(
+  'scannedResult',
+) as HTMLElement | null;
 const pageCountBadge = document.getElementById('pageCountBadge') as HTMLElement;
 const pageCountText = document.getElementById('pageCountText') as HTMLElement;
 
@@ -181,6 +212,116 @@ function setScanSourceRadiosDisabled(disabled: boolean): void {
   for (const radio of scanSourcePaperSizeRadios) {
     radio.disabled = disabled;
   }
+}
+
+const scanExportFormatRadios = document.querySelectorAll<HTMLInputElement>(
+  'input[name="scanExportFormat"]',
+);
+
+function getSelectedScanFormat(): ScanExportFormat {
+  const checked = document.querySelector<HTMLInputElement>(
+    'input[name="scanExportFormat"]:checked',
+  );
+  if (checked?.value === 'jpg' || checked?.value === 'png') {
+    return checked.value;
+  }
+  return 'pdf';
+}
+
+function setScanExportFormat(format: ScanExportFormat): void {
+  for (const radio of scanExportFormatRadios) {
+    radio.checked = radio.value === format;
+  }
+}
+
+function setScanFormatRadiosDisabled(disabled: boolean): void {
+  for (const radio of scanExportFormatRadios) {
+    radio.disabled = disabled;
+  }
+}
+
+let currentPdfLoadingTask: PdfLoadingTask | null = null;
+let currentPdfDoc: {
+  numPages: number;
+  getPage: (num: number) => Promise<{
+    getViewport: (options: { scale: number }) => {
+      width: number;
+      height: number;
+    };
+    render: (options: {
+      canvasContext: CanvasRenderingContext2D;
+      viewport: { width: number; height: number };
+    }) => { promise: Promise<void> };
+  }>;
+} | null = null;
+let pdfPageCount = 0;
+
+async function loadAndDisplayPdf(previewUrl: string, targetPage = 0): Promise<void> {
+  const dynImport = new Function('u', 'return import(u)') as (
+    u: string,
+  ) => Promise<Record<string, unknown>>;
+  const mod = await dynImport('/libs/pdfjs/pdf.min.mjs');
+  const pdfjs = (mod.default ?? mod) as PdfjsLib;
+  pdfjs.GlobalWorkerOptions.workerSrc = `${window.location.origin}/libs/pdfjs/pdf.worker.min.mjs`;
+
+  const res = await fetch(previewUrl);
+  if (!res.ok) throw new Error('Could not fetch PDF preview');
+  const buf = await res.arrayBuffer();
+
+  if (currentPdfLoadingTask) {
+    await destroyPdfLoadingTask(currentPdfLoadingTask);
+    currentPdfLoadingTask = null;
+  }
+
+  const loadingTask = pdfjs.getDocument({ data: buf });
+  currentPdfLoadingTask = loadingTask;
+  currentPdfDoc = await loadingTask.promise;
+  pdfPageCount = currentPdfDoc.numPages;
+
+  await renderPdfPage(targetPage);
+}
+
+async function renderPdfPage(n: number): Promise<void> {
+  if (!currentPdfDoc || !scannedPdfCanvas) return;
+  n = Math.max(0, Math.min(pdfPageCount - 1, n));
+  currentPage = n;
+
+  const page = await currentPdfDoc.getPage(n + 1);
+  const baseViewport = page.getViewport({ scale: 1 });
+
+  const container = scannedResult || document.getElementById('scannedResult');
+  const targetWidth = Math.max((container?.clientWidth ?? 480) - 16, 200);
+  const targetHeight = Math.max((container?.clientHeight ?? 600) - 16, 260);
+
+  const dpr = window.devicePixelRatio || 1;
+  const scale = Math.min(
+    targetWidth / baseViewport.width,
+    targetHeight / baseViewport.height,
+  ) * dpr;
+
+  const viewport = page.getViewport({ scale: Math.max(scale, 0.5) });
+  scannedPdfCanvas.width = Math.floor(viewport.width);
+  scannedPdfCanvas.height = Math.floor(viewport.height);
+
+  const ctx = scannedPdfCanvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, scannedPdfCanvas.width, scannedPdfCanvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+  }
+
+  scannedImage.style.display = 'none';
+  scannedPdfCanvas.style.display = 'block';
+
+  pagerLabel.textContent = `${n + 1} / ${pdfPageCount}`;
+  pagePrev.disabled = n <= 0;
+  pageNext.disabled = n >= pdfPageCount - 1;
+  pageCountText.textContent = `${pdfPageCount} page${pdfPageCount !== 1 ? 's' : ''}`;
+
+  const multi = pdfPageCount > 1;
+  previewControls.style.display = multi ? 'flex' : 'none';
+  pageCountBadge.style.display = multi ? 'inline-flex' : 'none';
+
+  saveScanStateToSession();
 }
 
 const RELEASE_TIMEOUT_MS = 1_500;
@@ -300,6 +441,14 @@ function showPreview(
 }
 
 function goToPage(n: number): void {
+  if (currentPdfDoc) {
+    void renderPdfPage(n);
+    return;
+  }
+
+  if (scannedPdfCanvas) scannedPdfCanvas.style.display = 'none';
+  scannedImage.style.display = 'block';
+
   n = Math.max(0, Math.min(scannedPages.length - 1, n));
   currentPage = n;
   scannedImage.src = scannedPages[n];
@@ -351,6 +500,7 @@ async function loadPricing(): Promise<void> {
 
 function saveScanStateToSession(
   paperSize: ScanPaperSize = getSelectedScanPaperSize(),
+  scanFormat: ScanExportFormat = getSelectedScanFormat(),
 ): void {
   if (!scanFilename) return;
   sessionStorage.setItem(
@@ -366,6 +516,7 @@ function saveScanStateToSession(
       copies: 1,
       orientation: 'portrait',
       paperSize,
+      scanFormat,
       rotationDeg: 0,
     }),
   );
@@ -427,9 +578,29 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
   }
   setScanSourceRadiosDisabled(true);
 
-  showPreview('result', 'Restored your scanned document preview.');
+  if (
+    storedConfig.scanFormat === 'pdf' ||
+    storedConfig.scanFormat === 'jpg' ||
+    storedConfig.scanFormat === 'png'
+  ) {
+    setScanExportFormat(storedConfig.scanFormat);
+  }
+  setScanFormatRadiosDisabled(true);
+
+  if (restoredFilename.toLowerCase().endsWith('.pdf')) {
+    try {
+      await loadAndDisplayPdf(previewUrl, currentPage);
+      showPreview('result', 'Restored your scanned document preview.');
+    } catch {
+      showPreview('result', 'Restored your scanned document preview.');
+    }
+  } else {
+    if (scannedPdfCanvas) scannedPdfCanvas.style.display = 'none';
+    scannedImage.style.display = 'block';
+    showPreview('result', 'Restored your scanned document preview.');
+    updatePager();
+  }
   hideScanTroubleshooting();
-  updatePager();
   updateSoftCopyPricingUi();
   if (clearBtn) clearBtn.style.display = 'flex';
   rescanBtn.style.display = 'flex';
@@ -444,6 +615,7 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
 
 async function startScan(): Promise<void> {
   const paperSize = getSelectedScanPaperSize();
+  const scanFormat = getSelectedScanFormat();
   const previousPages = scannedPages.slice();
   const previousPage = currentPage;
   const previousFilename = scanFilename;
@@ -453,6 +625,7 @@ async function startScan(): Promise<void> {
 
   setBackNavigationLocked(true);
   setScanSourceRadiosDisabled(true);
+  setScanFormatRadiosDisabled(true);
   hideScanTroubleshooting();
   showPreview('scanning', 'Scanning your document…');
   scanBtn.disabled = true;
@@ -483,6 +656,7 @@ async function startScan(): Promise<void> {
         color: SCAN_COLOR,
         dpi: SCAN_DPI,
         paperSize,
+        format: scanFormat,
       }),
     });
 
@@ -507,14 +681,26 @@ async function startScan(): Promise<void> {
     scanReleaseToken = data.releaseToken;
     currentPage = 0;
 
-    saveScanStateToSession(paperSize);
+    saveScanStateToSession(paperSize, scanFormat);
 
     if (previousReleaseToken && previousReleaseToken !== data.releaseToken) {
       void releaseScanFile(previousReleaseToken, 'scan_replaced_by_new_scan');
     }
 
-    showPreview('result', `Page 1 of ${data.pages.length}`);
-    updatePager();
+    if (data.filename.toLowerCase().endsWith('.pdf')) {
+      try {
+        await loadAndDisplayPdf(data.pages[0], 0);
+        showPreview('result', `Page 1 of ${pdfPageCount || 1}`);
+      } catch (pdfErr) {
+        console.warn('[SCAN] PDF preview render error:', pdfErr);
+        showPreview('result', 'Scanned document ready');
+      }
+    } else {
+      if (scannedPdfCanvas) scannedPdfCanvas.style.display = 'none';
+      scannedImage.style.display = 'block';
+      showPreview('result', `Page 1 of ${data.pages.length}`);
+      updatePager();
+    }
     updateSoftCopyPricingUi();
 
     if (clearBtn) clearBtn.style.display = 'flex';
@@ -561,6 +747,7 @@ async function startScan(): Promise<void> {
     }
 
     setScanSourceRadiosDisabled(false);
+    setScanFormatRadiosDisabled(false);
     errorText.textContent = userFriendlyTitle;
     showPreview('error', userFriendlyTitle);
     scanBtn.disabled = false;
@@ -589,6 +776,15 @@ function clearScan(): void {
     scanReleaseToken = null;
   }
 
+  if (currentPdfLoadingTask) {
+    void destroyPdfLoadingTask(currentPdfLoadingTask);
+    currentPdfLoadingTask = null;
+  }
+  currentPdfDoc = null;
+  pdfPageCount = 0;
+  if (scannedPdfCanvas) scannedPdfCanvas.style.display = 'none';
+  scannedImage.style.display = 'block';
+
   scannedPages = [];
   currentPage = 0;
   scanFilename = null;
@@ -596,6 +792,7 @@ function clearScan(): void {
   sessionStorage.removeItem('printbit.config');
 
   setScanSourceRadiosDisabled(false);
+  setScanFormatRadiosDisabled(false);
   hideScanTroubleshooting();
   showPreview('idle', 'Insert document into the feeder and press Scan');
   previewControls.style.display = 'none';

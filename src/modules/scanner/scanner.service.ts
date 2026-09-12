@@ -82,6 +82,7 @@ export interface InteractiveScanInput {
   color: ScannerPageColor;
   dpi: string | number;
   paperSize: ScannerPaperSize;
+  format?: 'pdf' | 'jpg' | 'png';
 }
 
 export interface InteractiveScanResult {
@@ -351,12 +352,21 @@ export class ScannerService {
       );
     }
 
+    if (input.format && !VALID_FORMATS.has(input.format)) {
+      throw new Error('Invalid format. Accepted: "pdf", "jpg", "png"');
+    }
+
+    const scanFormat =
+      input.format && VALID_FORMATS.has(input.format)
+        ? (input.format as 'pdf' | 'jpg' | 'png')
+        : 'pdf';
+
     const settings = {
       source: this.toScanSource(source),
       dpi: safeDpi,
       colorMode: this.toColorMode(color),
       duplex: false,
-      format: 'jpg' as const,
+      format: scanFormat,
       paperSize,
     };
 

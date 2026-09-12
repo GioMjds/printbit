@@ -565,7 +565,7 @@
               </div>
             </div>
 
-            <!-- Right: Receipt QR Card (Matches Success Modal QR Card Design) -->
+            <!-- Right: Receipt QR Card (Enlarged High-Visibility QR for Staff & User) -->
             <div class="maintenance-resolution__qr-col">
               <div
                 class="qr-card qr-card--receipt qr-card--maintenance"
@@ -573,23 +573,26 @@
                 hidden
               >
                 <div class="qr-card__header">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"
-                    />
-                    <path d="M16 8h-8M16 12h-8M12 16h-4" />
-                  </svg>
-                  <span>Transaction E-Receipt</span>
+                  <div class="qr-card__header-title">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"
+                      />
+                      <path d="M16 8h-8M16 12h-8M12 16h-4" />
+                    </svg>
+                    <span>Transaction E-Receipt</span>
+                  </div>
+                  <span class="qr-card__format-tag qr-card__format-tag--maintenance">Staff Proof</span>
                 </div>
-                <p class="qr-card__hint">Scan to view/save receipt for staff verification</p>
+                <p class="qr-card__hint">Scan to view or present to staff for assistance</p>
                 <div class="qr-card__canvas-box">
                   <canvas
                     id="maintenanceReceiptQrCanvas"
@@ -597,10 +600,17 @@
                     aria-label="Transaction receipt QR code"
                   ></canvas>
                 </div>
-                <p
-                  class="scan-qr-expiry"
-                  id="maintenanceReceiptQrExpiry"
-                ></p>
+                <div class="qr-card__expiry-wrap">
+                  <svg class="qr-card__expiry-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6" />
+                    <path d="M8 5v3.5l2.5 1.5" />
+                  </svg>
+                  <span
+                    class="scan-qr-expiry"
+                    id="maintenanceReceiptQrExpiry"
+                  >Valid for 15 minutes</span>
+                </div>
+                <span class="qr-card__scan-prompt">Point camera to scan receipt</span>
                 <button
                   type="button"
                   class="qr-troubleshoot-btn qr-troubleshoot-btn--maintenance"
@@ -622,7 +632,7 @@
                     <path d="M6.8 11.5a5 5 0 0 1 6.4 0" />
                     <circle cx="10" cy="15" r="1" fill="currentColor" />
                   </svg>
-                  <span>QR code not opening? Check Wi-Fi</span>
+                  <span>QR not opening? Check Wi-Fi</span>
                 </button>
               </div>
 
@@ -1172,52 +1182,81 @@
             hidden
           >
             <div class="qr-card__header">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>Download File</span>
+              <div class="qr-card__header-title">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="18" x2="12" y2="12" />
+                  <polyline points="9 15 12 18 15 15" />
+                </svg>
+                <span id="scanDownloadTitle">Download as PDF</span>
+              </div>
+              <span class="qr-card__format-tag" id="scanDownloadFormatTag">PDF</span>
             </div>
-            <p class="qr-card__hint">Scan to download to your phone</p>
+            <p class="qr-card__hint" id="scanDownloadHint">Direct scan to download soft copy to your phone</p>
             <div class="qr-card__canvas-box">
-              <canvas id="scanDownloadQrCanvas" class="scan-qr-canvas"></canvas>
+              <canvas
+                id="scanDownloadQrCanvas"
+                class="scan-qr-canvas"
+                aria-label="Download scanned PDF QR code"
+              ></canvas>
             </div>
-            <p class="scan-qr-expiry" id="scanDownloadQrExpiry"></p>
+            <div class="qr-card__expiry-wrap">
+              <svg class="qr-card__expiry-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 5v3.5l2.5 1.5" />
+              </svg>
+              <span class="scan-qr-expiry" id="scanDownloadQrExpiry">Valid for 15 minutes</span>
+            </div>
+            <span class="qr-card__scan-prompt">Point phone camera to scan &amp; download</span>
           </div>
 
           <!-- 2. Transaction E-Receipt CTA -->
           <div class="qr-card qr-card--receipt" id="receiptCtaContainer" hidden>
             <div class="qr-card__header">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path
-                  d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"
-                />
-                <path d="M16 8h-8M16 12h-8M12 16h-4" />
-              </svg>
-              <span>E-Receipt</span>
+              <div class="qr-card__header-title">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"
+                  />
+                  <path d="M16 8h-8M16 12h-8M12 16h-4" />
+                </svg>
+                <span>Official E-Receipt</span>
+              </div>
+              <span class="qr-card__format-tag qr-card__format-tag--receipt">Verified</span>
             </div>
-            <p class="qr-card__hint">Scan to view/save official receipt</p>
+            <p class="qr-card__hint">Scan to view or save official transaction receipt</p>
             <div class="qr-card__canvas-box">
-              <canvas id="receiptQrCanvas" class="scan-qr-canvas"></canvas>
+              <canvas
+                id="receiptQrCanvas"
+                class="scan-qr-canvas"
+                aria-label="Official transaction receipt QR code"
+              ></canvas>
             </div>
-            <p class="scan-qr-expiry" id="receiptQrExpiry"></p>
+            <div class="qr-card__expiry-wrap">
+              <svg class="qr-card__expiry-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 5v3.5l2.5 1.5" />
+              </svg>
+              <span class="scan-qr-expiry" id="receiptQrExpiry">Valid for 15 minutes</span>
+            </div>
+            <span class="qr-card__scan-prompt">Point phone camera to open E-Receipt</span>
           </div>
         </div>
 
@@ -1243,7 +1282,7 @@
             <path d="M6.8 11.5a5 5 0 0 1 6.4 0" />
             <circle cx="10" cy="15" r="1" fill="currentColor" />
           </svg>
-          <span>QR code not opening on phone? Check Wi-Fi</span>
+          <span>Need phone Wi-Fi to open QR? Connect here</span>
         </button>
 
         <!-- Remaining files continuation prompt (print mode only) -->

@@ -1630,3 +1630,33 @@ body {
   cursor: not-allowed;
   pointer-events: none;
 }
+
+/* ── Format options & canvas styling ──────────────────────── */
+.source-size-option__label--format {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.format-option-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  opacity: 0.8;
+  transition: opacity 150ms, color 150ms;
+}
+
+.source-size-option:has(input:checked) .format-option-icon {
+  opacity: 1;
+  color: var(--peach, #ffaa75);
+}
+
+.scanned-result__canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}

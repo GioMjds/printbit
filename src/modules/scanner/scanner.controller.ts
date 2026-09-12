@@ -22,6 +22,7 @@ type InteractiveScanBody = {
   color?: 'color' | 'grayscale';
   dpi?: string | number;
   paperSize?: 'A4' | 'Letter' | 'Legal';
+  format?: 'pdf' | 'jpg' | 'png';
 };
 
 type ScanJobBody = {
@@ -118,6 +119,7 @@ export class ScannerController {
         color: body.color as 'color' | 'grayscale',
         dpi: body.dpi as string | number,
         paperSize: body.paperSize as 'A4' | 'Letter' | 'Legal',
+        format: body.format as 'pdf' | 'jpg' | 'png' | undefined,
       });
       res.json(result);
     } catch (error) {
@@ -132,7 +134,8 @@ export class ScannerController {
         message.startsWith('Invalid source') ||
         message.startsWith('Invalid color') ||
         message.startsWith('Invalid dpi') ||
-        message.startsWith('Invalid paperSize')
+        message.startsWith('Invalid paperSize') ||
+        message.startsWith('Invalid format')
       ) {
         res.status(400).json({ error: message });
         return;

@@ -466,9 +466,9 @@ function renderConfirmWifiTroubleshoot(): void {
   }
   if (confirmWifiQrCanvas) {
     void QRCode.toCanvas(confirmWifiQrCanvas, details.qrPayload, {
-      width: 180,
-      margin: 1,
-      color: { dark: '#1a1a2e', light: '#ffffff' },
+      width: 200,
+      margin: 2,
+      color: { dark: '#0e0d1f', light: '#ffffff' },
       errorCorrectionLevel: 'M',
     });
   }
@@ -1721,10 +1721,14 @@ function renderReceiptCta(): void {
     }
   }
 
+  const isDual = thankYouModalSheet?.classList.contains('modal-sheet--dual-qr');
+  const qrSize = isDual ? 200 : 220;
+
   QRCode.toCanvas(receiptQrCanvas, receipt.url, {
-    width: 125,
-    margin: 1,
-    color: { dark: '#1a1a2e', light: '#ffffff' },
+    width: qrSize,
+    margin: 2,
+    color: { dark: '#0e0d1f', light: '#ffffff' },
+    errorCorrectionLevel: 'M',
   }).catch(console.error);
 }
 
@@ -1755,9 +1759,10 @@ function renderMaintenanceResolution(): void {
   }
 
   QRCode.toCanvas(maintenanceReceiptQrCanvas, view.receipt.url, {
-    width: 140,
-    margin: 1,
-    color: { dark: '#1a1a2e', light: '#ffffff' },
+    width: 220,
+    margin: 2,
+    color: { dark: '#0e0d1f', light: '#ffffff' },
+    errorCorrectionLevel: 'M',
   }).catch(console.error);
 }
 
@@ -1804,9 +1809,10 @@ function renderScanDownloadCta(): void {
   }
 
   QRCode.toCanvas(scanDownloadQrCanvas, currentScanDownloadUrl, {
-    width: 125,
-    margin: 1,
-    color: { dark: '#1a1a2e', light: '#ffffff' },
+    width: 200,
+    margin: 2,
+    color: { dark: '#0e0d1f', light: '#ffffff' },
+    errorCorrectionLevel: 'M',
   }).catch(console.error);
 }
 

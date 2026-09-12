@@ -155,6 +155,11 @@
                     src=""
                     alt="Scanned document preview"
                   />
+                  <canvas
+                    id="scannedPdfCanvas"
+                    class="scanned-result__canvas"
+                    style="display: none"
+                  ></canvas>
                   <div
                     class="scanned-result__badge"
                     id="pageCountBadge"
@@ -303,6 +308,56 @@
                   value="Legal"
                 />
                 <span class="source-size-option__label">Long Bond</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Soft Copy Format Picker Card -->
+          <div class="source-size-card" id="scanFormatGroup">
+            <div class="source-size-card__header">
+              <span class="source-size-card__title">File Format</span>
+              <span class="source-size-card__hint">Soft copy output type</span>
+            </div>
+            <div class="source-size-options source-size-options--formats" role="radiogroup" aria-label="Soft copy export format">
+              <label class="source-size-option">
+                <input
+                  type="radio"
+                  name="scanExportFormat"
+                  value="pdf"
+                  checked
+                />
+                <span class="source-size-option__label source-size-option__label--format">
+                  <svg class="format-option-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                  </svg>
+                  <span>PDF Document</span>
+                </span>
+              </label>
+              <label class="source-size-option">
+                <input
+                  type="radio"
+                  name="scanExportFormat"
+                  value="jpg"
+                />
+                <span class="source-size-option__label source-size-option__label--format">
+                  <svg class="format-option-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                  </svg>
+                  <span>JPG Photo</span>
+                </span>
+              </label>
+              <label class="source-size-option">
+                <input
+                  type="radio"
+                  name="scanExportFormat"
+                  value="png"
+                />
+                <span class="source-size-option__label source-size-option__label--format">
+                  <svg class="format-option-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                  </svg>
+                  <span>PNG Image</span>
+                </span>
               </label>
             </div>
           </div>
@@ -477,8 +532,6 @@
         <h2 id="idleWarningTitle" class="idle-warning-title">Session Timeout</h2>
         <p class="idle-warning-subtitle">No activity detected. Your session will close soon.</p>
         <div class="idle-warning-tap-hint">Tap anywhere to continue</div>
-      </div>
-    </div>
       </div>
     </div>
 
