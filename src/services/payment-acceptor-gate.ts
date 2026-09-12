@@ -127,9 +127,13 @@ export class PaymentAcceptorGate {
     if (!Number.isFinite(balance) || balance >= input.amount) return null;
 
     if (this.activeLease) {
-      return this.activeLease.capability === input.capability
-        ? this.activeLease
-        : null;
+      if (this.activeLease.expiresAt <= this.now()) {
+        await this.disarmForSafetyInternal('heartbeat_timeout');
+      } else {
+        return this.activeLease.capability === input.capability
+          ? this.activeLease
+          : null;
+      }
     }
 
     let armed = false;
@@ -160,7 +164,7 @@ export class PaymentAcceptorGate {
     return lease;
   }
 
-  private hasValidCapability(capability: string): boolean {
+  public hasValidCapability(capability: string): boolean {
     const expiresAt = this.capabilities.get(capability);
     if (expiresAt === undefined) return false;
     if (expiresAt <= this.now()) {
@@ -168,6 +172,12 @@ export class PaymentAcceptorGate {
       return false;
     }
     return true;
+  }
+
+  public hasActiveLeaseConflict(capability: string): boolean {
+    if (!this.activeLease) return false;
+    if (this.activeLease.expiresAt <= this.now()) return false;
+    return this.activeLease.capability !== capability;
   }
 
   private purgeExpiredCapabilities(): void {

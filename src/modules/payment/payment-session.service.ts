@@ -34,10 +34,16 @@ export class PaymentSessionService {
     body: unknown,
   ): Promise<PaymentSessionResponse> {
     const capability = this.getCapability(req);
-    if (!capability) return this.error(401, 'Confirmation capability is required.');
+    if (!capability || !this.deps.paymentAcceptorGate.hasValidCapability(capability)) {
+      return this.error(401, 'Confirmation capability is invalid or expired.');
+    }
 
     const input = this.parseArmInput(body);
     if (!input) return this.error(400, 'Invalid payment session request.');
+
+    if (this.deps.paymentAcceptorGate.hasActiveLeaseConflict(capability)) {
+      return this.error(409, 'Payment lease conflict.');
+    }
 
     if (input.mode === 'print') {
       const state = this.deps.sessionStore.getSessionState(input.sessionId);
@@ -57,7 +63,15 @@ export class PaymentSessionService {
       amount: input.amount,
       sessionId: input.sessionId,
     });
-    if (!lease) return this.error(503, 'Payment hardware is unavailable.');
+    if (!lease) {
+      if (!this.deps.paymentAcceptorGate.hasValidCapability(capability)) {
+        return this.error(401, 'Confirmation capability is invalid or expired.');
+      }
+      if (this.deps.paymentAcceptorGate.hasActiveLeaseConflict(capability)) {
+        return this.error(409, 'Payment lease conflict.');
+      }
+      return this.error(503, 'Payment hardware is unavailable.');
+    }
 
     return {
       statusCode: 200,
