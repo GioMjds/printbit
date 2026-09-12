@@ -5,6 +5,7 @@ import { financialLedgerService } from './financial-ledger';
 import type { WorkerPrintEvent } from './worker-return-pipe';
 import {
   sendWorkerCommand,
+  sendWorkerRequest,
   type WorkerHardwareResponse,
 } from './worker-command-pipe';
 import { coinSimulation } from './coin-simulation';
@@ -44,6 +45,10 @@ export class HardwareStateProjection {
 
   private readonly now: () => string;
 
+  private customerPaymentTransition: Promise<void> = Promise.resolve();
+
+  private customerPaymentGeneration = 0;
+
   private serialStatus: SerialStatus = {
     connected: false,
     portPath: null,
@@ -67,9 +72,8 @@ export class HardwareStateProjection {
   private io: Server | Socket | { emit: (event: string, ...args: unknown[]) => void } | null = null;
 
   public constructor(deps: HardwareStateProjectionDeps = {}) {
-    this.sendWorkerCommand = deps.sendWorkerCommand ?? (async (command) => ({
-      success: await sendWorkerCommand(command as any),
-    }));
+    this.sendWorkerCommand = deps.sendWorkerCommand ?? ((command) =>
+      sendWorkerRequest(command as any));
     this.now = deps.now ?? (() => new Date().toISOString());
     this.coinSlotLocks.set(CUSTOMER_PAYMENT_LOCK_OWNER, this.now());
   }
@@ -116,55 +120,76 @@ export class HardwareStateProjection {
     this.coinSlotLocks.clear();
   }
 
+  private enqueueCustomerPaymentTransition(
+    transition: () => Promise<boolean>,
+  ): Promise<boolean> {
+    const result = this.customerPaymentTransition.then(transition, transition);
+    this.customerPaymentTransition = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   public async initializeCustomerPaymentLock(): Promise<boolean> {
+    const generation = ++this.customerPaymentGeneration;
     this.coinSlotLocks.set(CUSTOMER_PAYMENT_LOCK_OWNER, this.now());
-    try {
-      const response = await this.sendWorkerCommand({
-        type: 'LockCoinSlot',
-        requestId: `customer-payment-lock-${Date.now()}`,
-        ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
-        reason: 'customer_payment_initialize',
-        timestampUtc: this.now(),
-      });
-      return response?.success === true;
-    } catch {
-      return false;
-    }
+    return this.enqueueCustomerPaymentTransition(async () => {
+      if (generation !== this.customerPaymentGeneration) return false;
+      try {
+        const response = await this.sendWorkerCommand({
+          type: 'LockCoinSlot',
+          requestId: `customer-payment-lock-${Date.now()}`,
+          ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
+          reason: 'customer_payment_initialize',
+          timestampUtc: this.now(),
+        });
+        return response?.success === true;
+      } catch {
+        return false;
+      }
+    });
   }
 
   public async armCustomerPayment(): Promise<boolean> {
-    try {
-      const response = await this.sendWorkerCommand({
-        type: 'UnlockCoinSlot',
-        requestId: `customer-payment-unlock-${Date.now()}`,
-        ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
-        reason: 'customer_payment_arm',
-        timestampUtc: this.now(),
-      });
-      if (response?.success !== true) {
+    const generation = this.customerPaymentGeneration;
+    return this.enqueueCustomerPaymentTransition(async () => {
+      try {
+        const response = await this.sendWorkerCommand({
+          type: 'UnlockCoinSlot',
+          requestId: `customer-payment-unlock-${Date.now()}`,
+          ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
+          reason: 'customer_payment_arm',
+          timestampUtc: this.now(),
+        });
+        if (response?.success !== true || generation !== this.customerPaymentGeneration) {
+          return false;
+        }
+        this.coinSlotLocks.delete(CUSTOMER_PAYMENT_LOCK_OWNER);
+        return true;
+      } catch {
         return false;
       }
-      this.coinSlotLocks.delete(CUSTOMER_PAYMENT_LOCK_OWNER);
-      return true;
-    } catch {
-      return false;
-    }
+    });
   }
 
   public async disarmCustomerPayment(reason: string): Promise<boolean> {
+    ++this.customerPaymentGeneration;
     this.coinSlotLocks.set(CUSTOMER_PAYMENT_LOCK_OWNER, this.now());
-    try {
-      const response = await this.sendWorkerCommand({
-        type: 'LockCoinSlot',
-        requestId: `customer-payment-lock-${Date.now()}`,
-        ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
-        reason,
-        timestampUtc: this.now(),
-      });
-      return response?.success === true;
-    } catch {
-      return false;
-    }
+    return this.enqueueCustomerPaymentTransition(async () => {
+      try {
+        const response = await this.sendWorkerCommand({
+          type: 'LockCoinSlot',
+          requestId: `customer-payment-lock-${Date.now()}`,
+          ownerId: CUSTOMER_PAYMENT_LOCK_OWNER,
+          reason,
+          timestampUtc: this.now(),
+        });
+        return response?.success === true;
+      } catch {
+        return false;
+      }
+    });
   }
 
   public lockCoinSlot(ownerId: string, reason?: string): void {
