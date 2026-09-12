@@ -338,6 +338,14 @@ const DEFAULT_DATA: Schema = {
       },
       printerOverrides: {},
     },
+    scanFilenameFormat: {
+      prefix: 'PrintBit-Scan',
+      dateFormat: 'YYYYMMDD',
+      timeFormat: 'HHmmss',
+      includeRandomSuffix: false,
+      customPatternEnabled: false,
+      customPattern: '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}',
+    },
   },
   coinStats: {
     one: 0,
@@ -477,6 +485,7 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const inkMonitoring = data?.settings?.inkMonitoring;
   const consumablesForecasting = data?.settings?.consumablesForecasting;
   const consumableEstimation = data?.settings?.consumableEstimation;
+  const scanFilenameFormat = data?.settings?.scanFilenameFormat;
   const normalizedPaperTrayCapacitySheets = Math.max(
     1,
     Math.floor(
@@ -1394,6 +1403,38 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
               ] => entry !== null,
             ),
         ),
+      },
+      scanFilenameFormat: {
+        prefix:
+          typeof scanFilenameFormat?.prefix === 'string'
+            ? scanFilenameFormat.prefix.trim() || DEFAULT_DATA.settings.scanFilenameFormat.prefix
+            : DEFAULT_DATA.settings.scanFilenameFormat.prefix,
+        dateFormat:
+          scanFilenameFormat?.dateFormat === 'YYYY-MM-DD' ||
+          scanFilenameFormat?.dateFormat === 'YYYYMMDD' ||
+          scanFilenameFormat?.dateFormat === 'DD-MM-YYYY' ||
+          scanFilenameFormat?.dateFormat === 'none'
+            ? scanFilenameFormat.dateFormat
+            : DEFAULT_DATA.settings.scanFilenameFormat.dateFormat,
+        timeFormat:
+          scanFilenameFormat?.timeFormat === 'HH-mm-ss' ||
+          scanFilenameFormat?.timeFormat === 'HHmmss' ||
+          scanFilenameFormat?.timeFormat === 'HHmm' ||
+          scanFilenameFormat?.timeFormat === 'none'
+            ? scanFilenameFormat.timeFormat
+            : DEFAULT_DATA.settings.scanFilenameFormat.timeFormat,
+        includeRandomSuffix:
+          typeof scanFilenameFormat?.includeRandomSuffix === 'boolean'
+            ? scanFilenameFormat.includeRandomSuffix
+            : DEFAULT_DATA.settings.scanFilenameFormat.includeRandomSuffix,
+        customPatternEnabled:
+          typeof scanFilenameFormat?.customPatternEnabled === 'boolean'
+            ? scanFilenameFormat.customPatternEnabled
+            : DEFAULT_DATA.settings.scanFilenameFormat.customPatternEnabled,
+        customPattern:
+          typeof scanFilenameFormat?.customPattern === 'string' && scanFilenameFormat.customPattern.trim()
+            ? scanFilenameFormat.customPattern.trim()
+            : DEFAULT_DATA.settings.scanFilenameFormat.customPattern,
       },
     },
     coinStats: {

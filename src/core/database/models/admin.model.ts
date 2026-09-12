@@ -73,6 +73,18 @@ export interface ConsumableEstimationSettings {
   printerOverrides: Record<string, Partial<ConsumableEstimationCoefficients>>;
 }
 
+export type ScanFilenameDateFormat = 'YYYY-MM-DD' | 'YYYYMMDD' | 'DD-MM-YYYY' | 'none';
+export type ScanFilenameTimeFormat = 'HH-mm-ss' | 'HHmmss' | 'HHmm' | 'none';
+
+export interface ScanFilenameFormatSettings {
+  prefix: string;
+  dateFormat: ScanFilenameDateFormat;
+  timeFormat: ScanFilenameTimeFormat;
+  includeRandomSuffix: boolean;
+  customPatternEnabled: boolean;
+  customPattern: string;
+}
+
 export interface KioskPreferences {
   language: SupportedLanguage;
   highContrast: boolean;
@@ -120,6 +132,7 @@ export interface AdminSettings {
   inkMonitoring: InkMonitoringSettings;
   consumablesForecasting: ConsumablesForecastingSettings;
   consumableEstimation: ConsumableEstimationSettings;
+  scanFilenameFormat: ScanFilenameFormatSettings;
 }
 
 export interface AdminLogEntry {

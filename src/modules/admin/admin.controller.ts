@@ -58,6 +58,10 @@ import {
   MAX_ATTEMPTS,
 } from '@/utils/lockout';
 import { hashPassword, verifyPassword } from '@/utils/hash';
+import {
+  DEFAULT_SCAN_FILENAME_FORMAT,
+  validateScanFilenameFormatSettings,
+} from '@/services/scan-filename';
 import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
 import type { AlertSettings } from './admin.schema';
 import type { AdminQueueView } from '@/modules/anomaly/anomaly.schema';
@@ -1254,7 +1258,8 @@ export class AdminController {
           }
         >;
       };
-      pricingEngine?: {
+      scanFilenameFormat?: unknown;
+    pricingEngine?: {
         paperProfiles?: {
           a4?: { baseBwPrice?: number; baseColorPrice?: number };
           shortBond?: { baseBwPrice?: number; baseColorPrice?: number };
@@ -1357,6 +1362,9 @@ export class AdminController {
       kioskPreferences: { ...originalSettings.kioskPreferences },
       inkMonitoring: { ...originalSettings.inkMonitoring },
       consumablesForecasting: { ...originalSettings.consumablesForecasting },
+      scanFilenameFormat: {
+        ...(originalSettings.scanFilenameFormat || DEFAULT_SCAN_FILENAME_FORMAT),
+      },
       pricingEngine: {
         paperProfiles: {
           a4: {
@@ -1947,6 +1955,19 @@ export class AdminController {
       }
 
       nextSettings.pricingEngine = next;
+    }
+
+    if (body.scanFilenameFormat !== undefined) {
+      const parsedFormat = validateScanFilenameFormatSettings(
+        body.scanFilenameFormat,
+        nextSettings.scanFilenameFormat,
+      );
+      if (parsedFormat.error || !parsedFormat.value) {
+        return res.status(400).json({
+          error: parsedFormat.error || 'Invalid scanFilenameFormat settings.',
+        });
+      }
+      nextSettings.scanFilenameFormat = parsedFormat.value;
     }
 
     db.data!.settings = nextSettings;

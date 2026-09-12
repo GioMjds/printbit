@@ -10,6 +10,8 @@ import {
   type PowerSafetyService,
 } from '@/services/power-safety';
 import { ScannerService } from './scanner.service';
+import { db } from '@/core/database/db';
+import { formatCustomerScanFilename } from '@/services/scan-filename';
 
 interface ScannerControllerDeps {
   io: SocketIOServer;
@@ -400,10 +402,14 @@ export class ScannerController {
 
     const ext = path.extname(session.filename).slice(1).toLowerCase();
     const contentType = this.scannerService.getContentType(ext);
+    const customerFilename = formatCustomerScanFilename(
+      db.data?.settings?.scanFilenameFormat,
+      ext,
+    );
     res.setHeader('Content-Type', contentType);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${session.filename}"`,
+      `attachment; filename="${customerFilename}"`,
     );
     res.sendFile(path.resolve(session.filePath));
   };

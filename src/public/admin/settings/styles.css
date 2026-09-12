@@ -161,3 +161,108 @@ select.field__input option {
     grid-template-columns: 1fr;
   }
 }
+
+/* Scan Filename Formatting & Preview */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--white);
+  user-select: none;
+}
+
+.checkbox-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--indigo);
+  cursor: pointer;
+}
+
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+.token-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.token-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(105, 111, 199, 0.15);
+  border: 1px solid rgba(105, 111, 199, 0.3);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lavender, #c3c7db);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.token-tag:hover {
+  background: rgba(105, 111, 199, 0.35);
+  border-color: var(--indigo);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(10, 10, 24, 0.85);
+  border: 1px solid rgba(105, 111, 199, 0.25);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.preview-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preview-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--indigo, #696fc7);
+  background: rgba(105, 111, 199, 0.12);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.preview-ext-note {
+  font-size: 11px;
+  color: var(--ink-muted, #94a3b8);
+  opacity: 0.7;
+}
+
+.preview-card__filename {
+  font-size: 14px;
+  font-weight: 600;
+  color: #38bdf8;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px dashed rgba(56, 189, 248, 0.3);
+}

@@ -252,6 +252,14 @@ export type SettingsResponse = {
       securityMs: number;
     };
   };
+  scanFilenameFormat?: {
+    prefix: string;
+    dateFormat: 'YYYY-MM-DD' | 'YYYYMMDD' | 'DD-MM-YYYY' | 'none';
+    timeFormat: 'HH-mm-ss' | 'HHmmss' | 'HHmm' | 'none';
+    includeRandomSuffix: boolean;
+    customPatternEnabled: boolean;
+    customPattern: string;
+  };
 };
 
 export type LogsResponse = {

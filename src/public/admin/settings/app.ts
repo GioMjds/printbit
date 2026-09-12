@@ -57,6 +57,33 @@ const settingHighQualitySurcharge = document.getElementById(
   'settingHighQualitySurcharge',
 ) as HTMLInputElement | null;
 
+// ── Scan Filename Format settings ────────────
+const settingScanFilenamePrefix = document.getElementById(
+  'settingScanFilenamePrefix',
+) as HTMLInputElement | null;
+const settingScanFilenameDateFormat = document.getElementById(
+  'settingScanFilenameDateFormat',
+) as HTMLSelectElement | null;
+const settingScanFilenameTimeFormat = document.getElementById(
+  'settingScanFilenameTimeFormat',
+) as HTMLSelectElement | null;
+const settingScanFilenameIncludeRandom = document.getElementById(
+  'settingScanFilenameIncludeRandom',
+) as HTMLInputElement | null;
+const settingScanFilenameCustomPatternEnabled = document.getElementById(
+  'settingScanFilenameCustomPatternEnabled',
+) as HTMLInputElement | null;
+const customPatternContainer = document.getElementById(
+  'customPatternContainer',
+) as HTMLElement | null;
+const settingScanFilenameCustomPattern = document.getElementById(
+  'settingScanFilenameCustomPattern',
+) as HTMLInputElement | null;
+const scanFilenamePreviewText = document.getElementById(
+  'scanFilenamePreviewText',
+) as HTMLElement | null;
+
+
 // ── Optional sections (may be commented out in HTML) ─────────────────────────
 const settingIdleTimeout = document.getElementById(
   'settingIdleTimeout',
@@ -126,6 +153,105 @@ const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 let refreshTimer: number | null = null;
 let loadedAdminLocalOnly: boolean = false;
 let settingsDirty: boolean = false;
+
+function renderScanFilenamePreview(): void {
+  if (!scanFilenamePreviewText) return;
+
+  const now = new Date();
+  const YYYY = String(now.getFullYear());
+  const MM = String(now.getMonth() + 1).padStart(2, '0');
+  const DD = String(now.getDate()).padStart(2, '0');
+  const HH = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const RANDOM = 'A1B2';
+
+  const prefix = settingScanFilenamePrefix?.value.trim() || 'PrintBit-Scan';
+  const customEnabled = settingScanFilenameCustomPatternEnabled?.checked ?? false;
+  const customPattern = settingScanFilenameCustomPattern?.value.trim() || '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
+  const dateFormat = settingScanFilenameDateFormat?.value ?? 'YYYYMMDD';
+  const timeFormat = settingScanFilenameTimeFormat?.value ?? 'HHmmss';
+  const includeRandom = settingScanFilenameIncludeRandom?.checked ?? false;
+
+  let baseName = '';
+  if (customEnabled) {
+    baseName = customPattern
+      .replace(/\{PREFIX\}/gi, prefix)
+      .replace(/\{YYYY\}/g, YYYY)
+      .replace(/\{MM\}/g, MM)
+      .replace(/\{DD\}/g, DD)
+      .replace(/\{HH\}/g, HH)
+      .replace(/\{mm\}/g, mm)
+      .replace(/\{ss\}/g, ss)
+      .replace(/\{RANDOM\}/gi, RANDOM);
+  } else {
+    const parts: string[] = [];
+    if (prefix) parts.push(prefix);
+
+    if (dateFormat === 'YYYY-MM-DD') parts.push(`${YYYY}-${MM}-${DD}`);
+    else if (dateFormat === 'YYYYMMDD') parts.push(`${YYYY}${MM}${DD}`);
+    else if (dateFormat === 'DD-MM-YYYY') parts.push(`${DD}-${MM}-${YYYY}`);
+
+    if (timeFormat === 'HH-mm-ss') parts.push(`${HH}-${mm}-${ss}`);
+    else if (timeFormat === 'HHmmss') parts.push(`${HH}${mm}${ss}`);
+    else if (timeFormat === 'HHmm') parts.push(`${HH}${mm}`);
+
+    if (includeRandom) parts.push(RANDOM);
+
+    baseName = parts.filter(Boolean).join('-');
+  }
+
+  const cleaned = baseName
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .trim();
+
+  const finalName = (cleaned.length > 0 ? cleaned : 'PrintBit-Scan') + '.pdf';
+  scanFilenamePreviewText.textContent = finalName;
+}
+
+const scanFormatInputs = [
+  settingScanFilenamePrefix,
+  settingScanFilenameDateFormat,
+  settingScanFilenameTimeFormat,
+  settingScanFilenameIncludeRandom,
+  settingScanFilenameCustomPatternEnabled,
+  settingScanFilenameCustomPattern,
+];
+
+scanFormatInputs.forEach((el) => {
+  if (!el) return;
+  const update = () => {
+    if (el === settingScanFilenameCustomPatternEnabled) {
+      if (customPatternContainer) {
+        customPatternContainer.classList.toggle(
+          'hidden',
+          !settingScanFilenameCustomPatternEnabled.checked,
+        );
+      }
+    }
+    renderScanFilenamePreview();
+  };
+  el.addEventListener('input', update);
+  el.addEventListener('change', update);
+});
+
+document.querySelectorAll('.token-tag').forEach((tag) => {
+  tag.addEventListener('click', () => {
+    const token = tag.getAttribute('data-token');
+    if (!token || !settingScanFilenameCustomPattern) return;
+    const start = settingScanFilenameCustomPattern.selectionStart ?? settingScanFilenameCustomPattern.value.length;
+    const end = settingScanFilenameCustomPattern.selectionEnd ?? settingScanFilenameCustomPattern.value.length;
+    const current = settingScanFilenameCustomPattern.value;
+    settingScanFilenameCustomPattern.value = current.slice(0, start) + token + current.slice(end);
+    settingScanFilenameCustomPattern.focus();
+    settingScanFilenameCustomPattern.setSelectionRange(start + token.length, start + token.length);
+    renderScanFilenamePreview();
+  });
+});
+
 
 function applySettings(settings: SettingsResponse): void {
   settingAdminPin.value = '';
@@ -239,6 +365,26 @@ function applySettings(settings: SettingsResponse): void {
     alertEmailUsername.value = settings.alerts.email.username;
   if (alertEmailFrom) alertEmailFrom.value = settings.alerts.email.from;
   if (alertEmailTo) alertEmailTo.value = settings.alerts.email.to;
+
+  // Scan Filename Format
+  if (settings.scanFilenameFormat) {
+    const sff = settings.scanFilenameFormat;
+    if (settingScanFilenamePrefix) settingScanFilenamePrefix.value = sff.prefix ?? 'PrintBit-Scan';
+    if (settingScanFilenameDateFormat) settingScanFilenameDateFormat.value = sff.dateFormat ?? 'YYYYMMDD';
+    if (settingScanFilenameTimeFormat) settingScanFilenameTimeFormat.value = sff.timeFormat ?? 'HHmmss';
+    if (settingScanFilenameIncludeRandom) settingScanFilenameIncludeRandom.checked = Boolean(sff.includeRandomSuffix);
+    if (settingScanFilenameCustomPatternEnabled) {
+      settingScanFilenameCustomPatternEnabled.checked = Boolean(sff.customPatternEnabled);
+      if (customPatternContainer) {
+        customPatternContainer.classList.toggle('hidden', !sff.customPatternEnabled);
+      }
+    }
+    if (settingScanFilenameCustomPattern) {
+      settingScanFilenameCustomPattern.value = sff.customPattern ?? '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
+    }
+    renderScanFilenamePreview();
+  }
+
 }
 
 function buildAlertPayload(): {
@@ -464,6 +610,29 @@ settingsForm.addEventListener('submit', (e) => {
       : loadedAdminLocalOnly,
     ...(newPin ? { adminPin: newPin } : {}),
   };
+
+  if (settingScanFilenamePrefix) {
+    const prefixVal = settingScanFilenamePrefix.value.trim();
+    if (prefixVal.length > 50) {
+      setMessage('Scan filename prefix cannot exceed 50 characters.');
+      return;
+    }
+    const customPatternVal = settingScanFilenameCustomPattern?.value.trim() ?? '';
+    if (customPatternVal.length > 100) {
+      setMessage('Scan filename custom pattern cannot exceed 100 characters.');
+      return;
+    }
+
+    payload.scanFilenameFormat = {
+      prefix: prefixVal || 'PrintBit-Scan',
+      dateFormat: settingScanFilenameDateFormat?.value || 'YYYYMMDD',
+      timeFormat: settingScanFilenameTimeFormat?.value || 'HHmmss',
+      includeRandomSuffix: settingScanFilenameIncludeRandom?.checked ?? false,
+      customPatternEnabled: settingScanFilenameCustomPatternEnabled?.checked ?? false,
+      customPattern: customPatternVal || '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}',
+    };
+  }
+
 
   if (settingIdleTimeout) {
     const idleTimeoutValue = Number(settingIdleTimeout.value);

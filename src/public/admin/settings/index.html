@@ -631,6 +631,128 @@
                 </div>
               </div> -->
 
+              <!-- Customer Scan Filename Format -->
+              <div class="sg">
+                <div class="sg__head">
+                  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2V6.414A2 2 0 0013.414 5L11 2.586A2 2 0 009.586 2H4zm5 2.5V7h2.5L9 4.5zM4 5a1 1 0 011-1h3v3.5A1.5 1.5 0 009.5 9H13v3a1 1 0 01-1 1H4a1 1 0 01-1-1V5zm2 5a.75.75 0 000 1.5h4a.75.75 0 000-1.5H6z" clip-rule="evenodd" />
+                  </svg>
+                  <h3 class="sg__title">Customer Scan Filename Format</h3>
+                </div>
+                <div class="fields">
+                  <div class="field">
+                    <label class="field__lbl" for="settingScanFilenamePrefix">Filename Prefix</label>
+                    <input
+                      id="settingScanFilenamePrefix"
+                      type="text"
+                      maxlength="50"
+                      class="field__input"
+                      placeholder="e.g. PrintBit-Scan"
+                      value="PrintBit-Scan"
+                    />
+                    <p class="field__hint">
+                      Prefix applied at the start of downloaded scans (max 50 chars)
+                    </p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingScanFilenameDateFormat">Date Format</label>
+                    <select
+                      id="settingScanFilenameDateFormat"
+                      class="field__input"
+                    >
+                      <option value="YYYYMMDD">YYYYMMDD (e.g. 20260912)</option>
+                      <option value="YYYY-MM-DD">YYYY-MM-DD (e.g. 2026-09-12)</option>
+                      <option value="DD-MM-YYYY">DD-MM-YYYY (e.g. 12-09-2026)</option>
+                      <option value="none">None (Exclude date)</option>
+                    </select>
+                    <p class="field__hint">Timestamp date component style</p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingScanFilenameTimeFormat">Time Format</label>
+                    <select
+                      id="settingScanFilenameTimeFormat"
+                      class="field__input"
+                    >
+                      <option value="HHmmss">HHmmss (e.g. 143000)</option>
+                      <option value="HH-mm-ss">HH-mm-ss (e.g. 14-30-00)</option>
+                      <option value="HHmm">HHmm (e.g. 1430)</option>
+                      <option value="none">None (Exclude time)</option>
+                    </select>
+                    <p class="field__hint">Timestamp time component style</p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingScanFilenameIncludeRandom">Collision Safeguard</label>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingScanFilenameIncludeRandom">
+                        <input
+                          type="checkbox"
+                          id="settingScanFilenameIncludeRandom"
+                          class="checkbox-input"
+                        />
+                        <span>Append 4-char random suffix (e.g. -A1B2)</span>
+                      </label>
+                    </div>
+                    <p class="field__hint">
+                      Guarantees uniqueness if multiple scans occur at the same timestamp
+                    </p>
+                  </div>
+
+                  <div class="field field--stretch">
+                    <label class="field__lbl" for="settingScanFilenameCustomPatternEnabled">Custom Pattern Template</label>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingScanFilenameCustomPatternEnabled">
+                        <input
+                          type="checkbox"
+                          id="settingScanFilenameCustomPatternEnabled"
+                          class="checkbox-input"
+                        />
+                        <span>Enable custom token pattern template (overrides date/time presets)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div id="customPatternContainer" class="field field--stretch hidden">
+                    <label class="field__lbl" for="settingScanFilenameCustomPattern">Custom Pattern</label>
+                    <input
+                      id="settingScanFilenameCustomPattern"
+                      type="text"
+                      maxlength="100"
+                      class="field__input font-mono"
+                      placeholder="{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}"
+                    />
+                    <div class="token-tags">
+                      <span class="token-tag" data-token="{PREFIX}">{PREFIX}</span>
+                      <span class="token-tag" data-token="{YYYY}">{YYYY}</span>
+                      <span class="token-tag" data-token="{MM}">{MM}</span>
+                      <span class="token-tag" data-token="{DD}">{DD}</span>
+                      <span class="token-tag" data-token="{HH}">{HH}</span>
+                      <span class="token-tag" data-token="{mm}">{mm}</span>
+                      <span class="token-tag" data-token="{ss}">{ss}</span>
+                      <span class="token-tag" data-token="{RANDOM}">{RANDOM}</span>
+                    </div>
+                    <p class="field__hint">
+                      Click any token tag to insert it into your pattern template
+                    </p>
+                  </div>
+
+                  <div class="field field--stretch">
+                    <label class="field__lbl">Download Filename Live Preview</label>
+                    <div class="preview-card">
+                      <div class="preview-card__header">
+                        <span class="preview-badge">Customer Soft-Copy</span>
+                        <span class="preview-ext-note">Delivered via Phone QR download (.pdf / image)</span>
+                      </div>
+                      <div id="scanFilenamePreviewText" class="preview-card__filename font-mono">
+                        PrintBit-Scan-20260912-143000.pdf
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Security -->
               <div class="sg">
                 <div class="sg__head">
