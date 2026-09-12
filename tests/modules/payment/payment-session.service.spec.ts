@@ -4,6 +4,11 @@ jest.mock('@/services/db', () => ({ db: { data: null } }));
 jest.mock('@/services/worker-command-pipe', () => ({
   sendWorkerRequest: jest.fn(),
 }));
+jest.mock('@/services/recovery', () => ({
+  checkpointRecoverySession: jest.fn().mockResolvedValue(undefined),
+  getSpoolerLifecycleRecord: jest.fn().mockReturnValue(null),
+  reconcileFinalizedCopySession: jest.fn().mockResolvedValue(undefined),
+}));
 
 import { sendWorkerRequest } from '../../../src/services/worker-command-pipe';
 import { coinSimulation } from '../../../src/services/coin-simulation';
@@ -21,6 +26,7 @@ import type { SessionStore } from '../../../src/services/session';
 import { PageController } from '../../../src/modules/page/page.controller';
 import { FinancialController } from '../../../src/modules/financial/financial.controller';
 import { FinancialService } from '../../../src/modules/financial/financial.service';
+import { registerControlSocketHandlers } from '../../../src/services/control-socket';
 import { PaymentSessionService } from '../../../src/modules/payment/payment-session.service';
 
 const publicBaseUrl = new URL('http://printbit.test');
@@ -405,6 +411,123 @@ describe('local coin simulation boundary', () => {
     expect(gateHeartbeatSpy).not.toHaveBeenCalled();
     expect(gateDisarmSpy).not.toHaveBeenCalled();
     expect(isCoinSlotLockedBy(CUSTOMER_PAYMENT_LOCK_OWNER)).toBe(true);
+  });
+});
+
+describe('final payment disarm and socket authority', () => {
+  it('disarms active payment lease before charge/print in confirmPayment', async () => {
+    const disarmSpy = jest.fn().mockResolvedValue(true);
+    const dummyGate = {
+      disarm: disarmSpy,
+    } as unknown as PaymentAcceptorGate;
+
+    const financialService = new FinancialService({
+      io: {} as unknown as any,
+      sessionStore: {} as unknown as SessionStore,
+      resolvePublicBaseUrl: () => publicBaseUrl,
+      powerSafetyService: {
+        canAcceptCustomerWork: () => true,
+      } as unknown as any,
+      paymentAcceptorGate: dummyGate,
+    });
+
+    let statusCode = 200;
+    const res = {
+      status: jest.fn((code: number) => {
+        statusCode = code;
+        return res;
+      }),
+      json: jest.fn(() => res),
+      sendStatus: jest.fn((code: number) => {
+        statusCode = code;
+        return res;
+      }),
+    } as unknown as Response;
+
+    const req = {
+      body: {
+        amount: 10,
+        mode: 'print',
+        paymentLeaseId: 'test-lease-id',
+      },
+      get: () => null,
+    } as unknown as Request;
+
+    await financialService.confirmPayment(req, res);
+
+    expect(disarmSpy).toHaveBeenCalledWith('test-lease-id', 'confirm_payment');
+  });
+
+  it('rejects confirmPayment with 503 when lease disarm fails', async () => {
+    const disarmSpy = jest.fn().mockResolvedValue(false);
+    const dummyGate = {
+      disarm: disarmSpy,
+    } as unknown as PaymentAcceptorGate;
+
+    const financialService = new FinancialService({
+      io: {} as unknown as any,
+      sessionStore: {} as unknown as SessionStore,
+      resolvePublicBaseUrl: () => publicBaseUrl,
+      powerSafetyService: {
+        canAcceptCustomerWork: () => true,
+      } as unknown as any,
+      paymentAcceptorGate: dummyGate,
+    });
+
+    let statusCode = 200;
+    let jsonBody: unknown = null;
+    const res = {
+      status: jest.fn((code: number) => {
+        statusCode = code;
+        return res;
+      }),
+      json: jest.fn((data: unknown) => {
+        jsonBody = data;
+        return res;
+      }),
+      sendStatus: jest.fn((code: number) => {
+        statusCode = code;
+        return res;
+      }),
+    } as unknown as Response;
+
+    const req = {
+      body: {
+        amount: 10,
+        mode: 'copy',
+        paymentLeaseId: 'failing-lease-id',
+      },
+      get: () => null,
+    } as unknown as Request;
+
+    await financialService.confirmPayment(req, res);
+
+    expect(disarmSpy).toHaveBeenCalledWith('failing-lease-id', 'confirm_payment');
+    expect(statusCode).toBe(503);
+    expect(jsonBody).toMatchObject({
+      code: 'PAYMENT_DISARM_FAILED',
+    });
+  });
+
+  it('does not register or permit client unlockCoinSlot via socket control', () => {
+    const listeners: Record<string, (...args: unknown[]) => void> = {};
+    const fakeSocket = {
+      data: { principal: { kind: 'kiosk', role: 'admin' } },
+      emit: jest.fn(),
+      join: jest.fn(),
+      disconnect: jest.fn(),
+      on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+        listeners[event] = handler;
+      }),
+    };
+
+    registerControlSocketHandlers(fakeSocket as unknown as any, {
+      io: { emit: jest.fn() } as unknown as any,
+      sessionStore: { getSessionState: () => 'active' } as unknown as SessionStore,
+      powerSafetyService: { getEffectiveEvent: () => ({}) } as unknown as any,
+    });
+
+    expect(listeners['unlockCoinSlot']).toBeUndefined();
   });
 });
 

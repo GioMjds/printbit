@@ -88,12 +88,14 @@ import {
   enqueuePrintJob,
   PrintJobEnqueueError,
 } from '@/modules/print-queue';
+import type { PaymentAcceptorGate } from '@/services/payment-acceptor-gate';
 
 export interface FinancialServiceDeps {
   io: Server;
   sessionStore: SessionStore;
   resolvePublicBaseUrl: (req: Request) => URL;
   powerSafetyService?: PowerSafetyService;
+  paymentAcceptorGate?: PaymentAcceptorGate;
 }
 
 interface UploadDeletionResult {
@@ -117,6 +119,7 @@ interface ConfirmPaymentBody {
   paperSize?: 'A4' | 'Letter' | 'Legal';
   pageRange?: unknown;
   duplex?: boolean;
+  paymentLeaseId?: string;
 }
 
 const LEGACY_UPLOAD_STAGING_DIR = path.resolve('uploads/staging/legacy');
@@ -318,9 +321,11 @@ async function deleteUploadByStoredFilename(
 export class FinancialService {
   private readonly receiptService = new ReceiptService();
   private readonly powerSafety: PowerSafetyService;
+  private readonly paymentAcceptorGate?: PaymentAcceptorGate;
 
   constructor(private readonly deps: FinancialServiceDeps) {
     this.powerSafety = deps.powerSafetyService ?? powerSafetyService;
+    this.paymentAcceptorGate = deps.paymentAcceptorGate;
   }
 
   private incrementCoinStats(state: Schema, coinValue: number): void {
@@ -1163,6 +1168,25 @@ export class FinancialService {
         message: 'Power emergency active; customer work suspended',
       });
       return;
+    }
+
+    const { paymentLeaseId } = (req.body ?? {}) as ConfirmPaymentBody;
+    if (
+      this.paymentAcceptorGate &&
+      typeof paymentLeaseId === 'string' &&
+      paymentLeaseId.length > 0
+    ) {
+      const disarmed = await this.paymentAcceptorGate.disarm(
+        paymentLeaseId,
+        'confirm_payment',
+      );
+      if (!disarmed) {
+        res.status(503).json({
+          code: 'PAYMENT_DISARM_FAILED',
+          error: 'Failed to disarm coin acceptor. Please retry.',
+        });
+        return;
+      }
     }
 
     const idempotencyKey = req.get('Idempotency-Key') ?? '';

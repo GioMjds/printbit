@@ -144,6 +144,7 @@ export function registerAppModules(app: Express, deps: AppModuleDeps): void {
     sessionStore: deps.sessionStore,
     resolvePublicBaseUrl: deps.resolvePublicBaseUrl,
     powerSafetyService,
+    paymentAcceptorGate,
   });
   registerReceiptModule(app);
   registerUploadPortalModule(app, {

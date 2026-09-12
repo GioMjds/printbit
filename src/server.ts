@@ -36,12 +36,12 @@ import {
   getHopperStatus,
   getSerialStatus,
   initSerial,
-  isCoinSlotLocked,
-  getCoinSlotLockOwnerId,
-  getCoinSlotLockedAt,
-  lockCoinSlot,
-  unlockOwnedCoinSlot,
+  hardwareStateProjection,
 } from '@/services/hardware-state-projection';
+import { PaymentAcceptorGate } from '@/services/payment-acceptor-gate';
+import { BLOCKED_STATUSES } from '@/utils';
+import { db } from '@/services/db';
+import { registerControlSocketHandlers } from '@/services/control-socket';
 import { isHotspotRunning, startHotspot } from '@/services/hotspot';
 import { SessionStore, resolvePublicBaseUrl } from '@/services/session';
 import { runHopperSelfTest } from '@/services/hopper';
@@ -195,6 +195,19 @@ if (CAPTIVE_PORTAL_ENABLED) {
   app.use(createCaptivePortalMiddleware());
 }
 
+const paymentAcceptorGate = new PaymentAcceptorGate({
+  armCustomerPayment: () => hardwareStateProjection.armCustomerPayment(),
+  disarmCustomerPayment: (reason) =>
+    hardwareStateProjection.disarmCustomerPayment(reason),
+  canAcceptCustomerWork: () => powerSafetyService.canAcceptCustomerWork(),
+  isPrinterReady: () => {
+    const telemetry = getPrinterTelemetry();
+    return telemetry.connected && !BLOCKED_STATUSES.has(telemetry.status);
+  },
+  isSerialConnected: () => getSerialStatus().connected,
+  getBalance: () => db.data?.balance ?? 0,
+});
+
 registerAppModules(app, {
   io,
   sessionIo,
@@ -211,85 +224,14 @@ registerAppModules(app, {
   },
   resolvePublicBaseUrl,
   convertToPdfArtifact,
+  paymentAcceptorGate,
 });
 
 io.on('connection', (socket) => {
-  const principal = socket.data.principal as SocketPrincipal | undefined;
-  if (!principal) {
-    socket.disconnect(true);
-    return;
-  }
-
-  const locked = isCoinSlotLocked();
-  const ownerId = getCoinSlotLockOwnerId();
-  if (locked) {
-    socket.emit('coinSlotLocked', {
-      lockedAt: getCoinSlotLockedAt() ?? new Date().toISOString(),
-      ownerId,
-    });
-  }
-
-  socket.emit(
-    'workerPowerStatusChanged',
-    powerSafetyService.getEffectiveEvent(),
-  );
-
-  socket.on('joinSession', (sessionId: string) => {
-    if (
-      !canJoinSessionRoom(principal, sessionId) ||
-      sessionStore.getSessionState(sessionId) !== 'active'
-    ) {
-      socket.emit('sessionJoinDenied', { reason: 'unauthorized_session' });
-      return;
-    }
-    socket.join(`session:${sessionId}`);
-  });
-
-  socket.on('lockCoinSlot', () => {
-    if (!canControlCoinSlot(principal)) {
-      socket.emit('coinSlotLockDenied', { reason: 'unauthorized_socket' });
-      return;
-    }
-    const currentOwnerId = getCoinSlotLockOwnerId();
-    if (
-      isCoinSlotLocked() &&
-      currentOwnerId &&
-      currentOwnerId !== socket.id &&
-      currentOwnerId !== 'power-safety'
-    ) {
-      socket.emit('coinSlotLockDenied', {
-        reason: 'lock_owned_by_another_socket',
-      });
-      return;
-    }
-
-    lockCoinSlot(socket.id);
-    io.emit('coinSlotLocked', {
-      lockedAt: new Date().toISOString(),
-      ownerId: socket.id,
-    });
-  });
-
-  socket.on('unlockCoinSlot', () => {
-    if (!canControlCoinSlot(principal)) {
-      socket.emit('coinSlotUnlockDenied', { reason: 'unauthorized_socket' });
-      return;
-    }
-    const unlocked = unlockOwnedCoinSlot(socket.id);
-    if (!unlocked) {
-      socket.emit('coinSlotUnlockDenied', {
-        reason: 'lock_owned_by_another_socket',
-      });
-      return;
-    }
-    io.emit('coinSlotUnlocked', { reason: 'client_request' });
-  });
-
-  socket.on('disconnect', () => {
-    if (!canControlCoinSlot(principal)) return;
-    const unlocked = unlockOwnedCoinSlot(socket.id);
-    if (!unlocked) return;
-    io.emit('coinSlotUnlocked', { reason: 'owner_disconnect' });
+  registerControlSocketHandlers(socket, {
+    io,
+    sessionStore,
+    powerSafetyService,
   });
 });
 
@@ -337,6 +279,7 @@ async function initializePrintBit(): Promise<void> {
         }
 
         if (evt.type === 'PrinterOffline') {
+          void paymentAcceptorGate.disarmForSafety('printer_unavailable');
           io.emit('printerMalfunction', {
             printError: {
               code: 'PRINTER_OFFLINE',
@@ -369,6 +312,7 @@ async function initializePrintBit(): Promise<void> {
         // modal. The worker formats the message as:
         //   "Printer hardware error detected (<Description>, code <N>). ..."
         if (evt.type === 'PrinterError') {
+          void paymentAcceptorGate.disarmForSafety('printer_unavailable');
           const translated = translateHardwarePrinterError({
             message: evt.errorMessage ?? evt.message ?? null,
             errorCode: evt.errorCode ?? null,
@@ -410,6 +354,7 @@ async function initializePrintBit(): Promise<void> {
     // marked failed — preventing the kiosk from running without a working IPC
     // channel to the C# hardware service.
     await workerReturnPipe.ready;
+    await hardwareStateProjection.initializeCustomerPaymentLock();
 
     const startupMarker = await markRecoveryStartup('server_start');
     const startupTrustedTime = await verifyTrustedClockSync();
@@ -682,12 +627,20 @@ async function start(): Promise<void> {
 
 let shuttingDown = false;
 
-function gracefulShutdown(signal: NodeJS.Signals): void {
+async function gracefulShutdown(signal: NodeJS.Signals): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[SERVER] Received ${signal}. Shutting down gracefully...`);
   stopTrustedTimeMonitor();
   stopWatchdogHealthMonitor();
+  try {
+    await paymentAcceptorGate.shutdown();
+  } catch (error) {
+    console.error(
+      '[SERVER] Error while shutting down payment acceptor gate.',
+      error,
+    );
+  }
   void markRecoveryShutdown(signal)
     .catch((error) => {
       console.error('[RECOVERY] Failed to write shutdown marker.', {
@@ -708,15 +661,17 @@ function gracefulShutdown(signal: NodeJS.Signals): void {
     });
 }
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
 
-void start().catch((error) => {
-  const startupErrorMessage =
-    error instanceof Error ? error.message : String(error);
-  console.error('[SERVER] Fatal startup error.', {
-    error: startupErrorMessage,
+if (process.env.NODE_ENV !== 'test') {
+  void start().catch((error) => {
+    const startupErrorMessage =
+      error instanceof Error ? error.message : String(error);
+    console.error('[SERVER] Fatal startup error.', {
+      error: startupErrorMessage,
+    });
+    markStartupFailed('Server failed to bind. Check startup logs.');
+    process.exit(1);
   });
-  markStartupFailed('Server failed to bind. Check startup logs.');
-  process.exit(1);
-});
+}
