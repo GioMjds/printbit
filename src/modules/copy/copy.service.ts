@@ -565,6 +565,11 @@ export class CopyService {
         context: {
           previewFilename,
           filename: path.join('scans', previewFilename),
+          copies: quote.copies,
+          colorMode: quote.effectiveColorMode,
+          selectedPage: quote.selectedPages,
+          billableColorPages: quote.billableColorPages,
+          billableBwPages: quote.billableBwPages,
         },
       });
     } catch (checkpointError) {

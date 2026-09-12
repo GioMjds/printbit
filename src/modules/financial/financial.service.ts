@@ -1,5 +1,8 @@
 import type { Request, Response } from 'express';
-import { coinSimulation, CoinSimulationError } from '@/services/coin-simulation';
+import {
+  coinSimulation,
+  CoinSimulationError,
+} from '@/services/coin-simulation';
 import path from 'node:path';
 import fs from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
@@ -868,14 +871,23 @@ export class FinancialService {
     }
     let balance: number;
     try {
-      if (isCoinSlotLockedBy('power-safety') || !this.powerSafety.canAcceptCustomerWork()) {
-        throw new CoinSimulationError(409, 'power_emergency', 'Power emergency active; coin simulation suspended.');
+      if (
+        isCoinSlotLockedBy('power-safety') ||
+        !this.powerSafety.canAcceptCustomerWork()
+      ) {
+        throw new CoinSimulationError(
+          409,
+          'power_emergency',
+          'Power emergency active; coin simulation suspended.',
+        );
       }
       balance = await coinSimulation.insert(coinValue);
     } catch (error) {
       if (error instanceof CoinSimulationError) {
         return res.status(error.statusCode).json({
-          error: 'Coin simulation failed', reason: error.reason, details: error.message,
+          error: 'Coin simulation failed',
+          reason: error.reason,
+          details: error.message,
         });
       }
       if (error instanceof CoinCreditRejectedError) {
@@ -1267,12 +1279,19 @@ export class FinancialService {
     const duplex = req.body?.duplex === true;
     let requiredAmount =
       mode === 'copy'
-        ? adminService.calculateJobAmount('copy', colorMode, copies, paperSize, quality)
+        ? adminService.calculateJobAmount(
+            'copy',
+            colorMode,
+            copies,
+            paperSize,
+            quality,
+          )
         : 0;
 
     let serverFilename: string | null = null;
     let targetDocumentId: string | null = null;
-    let originalDocumentName: string | null = mode === 'copy' ? 'Scanned Document' : null;
+    let originalDocumentName: string | null =
+      mode === 'copy' ? 'Scanned Document' : null;
     let printOptions: PrintJobOptions | null = null;
     let printQuotePages: {
       selectedPages: number;
@@ -1448,6 +1467,18 @@ export class FinancialService {
         },
         quality,
       );
+    } else if (mode === 'copy') {
+      const isColor = colorMode === 'colored';
+      printQuotePages = {
+        selectedPages: 1,
+        selectedColorPages: isColor ? 1 : 0,
+        selectedBwPages: isColor ? 0 : 1,
+        billableColorPages: isColor ? 1 : 0,
+        billableBwPages: isColor ? 0 : 1,
+        effectiveColorMode: isColor ? 'colored' : 'grayscale',
+        billingPageDetection: 'fallback-assumptions',
+        analysisConfidence: 'medium',
+      };
     }
 
     await checkpointRecoverySession({
@@ -1462,6 +1493,9 @@ export class FinancialService {
         copies,
         colorMode: printOptions?.colorMode ?? colorMode,
         duplex: printOptions?.duplex ?? false,
+        selectedPages: printQuotePages?.selectedPages ?? 1,
+        billableColorPages: printQuotePages?.billableColorPages ?? 0,
+        billableBwPages: printQuotePages?.billableBwPages ?? 0,
       },
     });
 
@@ -1629,6 +1663,9 @@ export class FinancialService {
         changeState: settlement.change.state,
         changeRequested: settlement.change.requested,
         changeDispensed: settlement.change.dispensed,
+        selectedPages: printQuotePages?.selectedPages ?? 1,
+        billableColorPages: printQuotePages?.billableColorPages ?? 0,
+        billableBwPages: printQuotePages?.billableBwPages ?? 0,
       },
     });
 
@@ -1636,8 +1673,11 @@ export class FinancialService {
       const initialStatus: ReceiptRecordStatus =
         mode === 'print' ? 'settled_pending_terminal' : 'printed';
       const printConfig = {
-        copies: typeof copies === 'number' && Number.isFinite(copies) ? copies : 1,
-        colorMode: printOptions?.colorMode ?? (colorMode === 'colored' ? 'colored' : 'grayscale'),
+        copies:
+          typeof copies === 'number' && Number.isFinite(copies) ? copies : 1,
+        colorMode:
+          printOptions?.colorMode ??
+          (colorMode === 'colored' ? 'colored' : 'grayscale'),
         paperSize,
         quality,
         duplex: printOptions?.duplex ?? duplex,
@@ -1649,18 +1689,19 @@ export class FinancialService {
               ? req.body.pageRange
               : null,
       };
+      const safeCopies = printConfig.copies > 0 ? printConfig.copies : 1;
       let snapshot = this.receiptService.upsertReceiptSnapshot({
         transactionId,
         mode,
         chargedAmount: settlement.chargedAmount,
-        // persist color/BW counts when known from quote
+        // persist color/BW counts (per-copy page count * no. of copies)
         colorPages:
           typeof printQuotePages?.billableColorPages === 'number'
-            ? printQuotePages?.billableColorPages
+            ? printQuotePages?.billableColorPages * safeCopies
             : null,
         bwPages:
           typeof printQuotePages?.billableBwPages === 'number'
-            ? printQuotePages?.billableBwPages
+            ? printQuotePages?.billableBwPages * safeCopies
             : null,
         coinsInserted: settlement.previousBalance,
         documentName: originalDocumentName,
@@ -1771,22 +1812,20 @@ export class FinancialService {
     const settledOwedChangeId = settlement.change.owedChangeId ?? null;
     const settledChangeMessage = settlement.change.message ?? null;
     const settledRemainingBalance = settlement.remainingBalance;
+
     function appendConsumableUsageEvent(eventMode: 'print' | 'copy'): void {
       const isPrintMode = eventMode === 'print';
-      const selectedPages = isPrintMode
-        ? Math.max(1, printQuotePages?.selectedPages ?? 1)
-        : 1;
+      const selectedPages = Math.max(1, printQuotePages?.selectedPages ?? 1);
       const duplexEnabled = isPrintMode ? Boolean(printOptions?.duplex) : false;
-      const billableColorPages = isPrintMode
-        ? Math.max(0, printQuotePages?.billableColorPages ?? 0)
-        : colorMode === 'colored'
-          ? 1
-          : 0;
-      const billableBwPages = isPrintMode
-        ? Math.max(0, printQuotePages?.billableBwPages ?? 0)
-        : billableColorPages > 0
-          ? 0
-          : 1;
+      const billableColorPages = Math.max(
+        0,
+        printQuotePages?.billableColorPages ??
+          (colorMode === 'colored' ? 1 : 0),
+      );
+      const billableBwPages = Math.max(
+        0,
+        printQuotePages?.billableBwPages ?? (colorMode === 'colored' ? 0 : 1),
+      );
       const estimatedSheetsUsed =
         Math.max(1, copies) *
         Math.ceil(selectedPages / (duplexEnabled ? 2 : 1));
@@ -1848,8 +1887,11 @@ export class FinancialService {
           printerName: telemetry.name ?? undefined,
         },
         requiredAmount,
-        billedColorPages: printQuotePages?.billableColorPages ?? 0,
-        billedBwPages: printQuotePages?.billableBwPages ?? 0,
+        billedColorPages:
+          (printQuotePages?.billableColorPages ?? 0) *
+          (printOptions.copies ?? 1),
+        billedBwPages:
+          (printQuotePages?.billableBwPages ?? 0) * (printOptions.copies ?? 1),
         printerName: telemetry.name ?? null,
         spoolerCorrelationKey,
       });

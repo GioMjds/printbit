@@ -174,10 +174,10 @@ export class ConsumablesSqliteStore {
     const row = getSqliteDb()
       .prepare(
         `SELECT
-          SUM(COALESCE(billable_color_pages, 0)) AS color_sum,
-          SUM(COALESCE(billable_bw_pages, 0)) AS bw_sum
-         FROM consumable_usage_events
-         WHERE source = ?${sinceTimestamp ? ' AND timestamp >= ?' : ''}`,
+          SUM(COALESCE(billable_color_pages, 0) * COALESCE(copies, 1)) AS color_sum,
+          SUM(COALESCE(billable_bw_pages, 0) * COALESCE(copies, 1)) AS bw_sum
+          FROM consumable_usage_events
+          WHERE source = ?${sinceTimestamp ? ' AND timestamp >= ?' : ''}`,
       )
       .get(...(sinceTimestamp ? [source, sinceTimestamp] : [source])) as
       | Record<string, unknown>
@@ -246,7 +246,8 @@ export class ConsumablesSqliteStore {
     );
     getSqliteDb();
     if (!runtimeDb.data) await runtimeDb.read();
-    if (!runtimeDb.data) throw new Error('Runtime database was not initialized properly.');
+    if (!runtimeDb.data)
+      throw new Error('Runtime database was not initialized properly.');
     runtimeDb.data!.settings.consumablesForecasting.paperTrayCapacitySheets =
       normalizedCapacity;
     runtimeDb.data!.settings.consumablesForecasting.paperCurrentSheets =
