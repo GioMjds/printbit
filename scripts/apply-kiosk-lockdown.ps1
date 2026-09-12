@@ -74,6 +74,11 @@ Set-DwordValue -Path $policyEdgeUi   -Name 'AllowEdgeSwipe'            -Value 0
 # (Charms/Action Center era) and does NOT affect Microsoft Edge's own touch
 # back/forward gesture. This is the correct Edge-browser policy for that:
 Set-DwordValue -Path $policyEdgeBrowser -Name 'EdgeSwipeNavigationEnabled' -Value 0
+# Edge kiosk startup acceleration: prevent first-run dialogs, background tasks, and telemetry at boot
+Set-DwordValue -Path $policyEdgeBrowser -Name 'HideFirstRunExperience'     -Value 1
+Set-DwordValue -Path $policyEdgeBrowser -Name 'MetricsReportingEnabled'    -Value 0
+Set-DwordValue -Path $policyEdgeBrowser -Name 'AutoImportAtFirstRun'       -Value 4
+Set-DwordValue -Path $policyEdgeBrowser -Name 'BackgroundModeEnabled'      -Value 0
 
 # Settings / shell / shortcut hardening
 Set-DwordValue -Path $legacyExplorer -Name 'NoControlPanel' -Value 1

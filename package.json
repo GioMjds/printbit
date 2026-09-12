@@ -22,6 +22,7 @@
     "ensure-network": "powershell -ExecutionPolicy Bypass -File .\\scripts\\ensure-esp32-network.ps1",
     "install-startup": "powershell -ExecutionPolicy Bypass -File .\\scripts\\install-startup.ps1 -AtStartup -MultipleInstances IgnoreNew",
     "uninstall-startup": "powershell -ExecutionPolicy Bypass -File .\\scripts\\install-startup.ps1 -Uninstall",
+    "boot:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-kiosk-boot.ps1",
     "watchdog:install": "powershell -ExecutionPolicy Bypass -File .\\scripts\\install-watchdog.ps1 -AtStartup",
     "watchdog:uninstall": "powershell -ExecutionPolicy Bypass -File .\\scripts\\install-watchdog.ps1 -Uninstall",
     "watchdog:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-watchdog.ps1",

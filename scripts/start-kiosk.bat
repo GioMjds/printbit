@@ -61,28 +61,18 @@ if /I "%PRINTBIT_NETWORK_PROVIDER%"=="esp32" (
 )
 
 if not exist "%PROJECT_DIR%\dist\server.js" (
-    echo [PrintBit] Compiled server bundle missing. Building dist\server.js...
-    where pnpm >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo [PrintBit] ERROR: pnpm is required to build dist\server.js.
-        echo [PrintBit]        Run "pnpm run build" once from project root.
-        pause
-        exit /b 1
-    )
-    pushd "%PROJECT_DIR%"
-    call pnpm run build
-    if %errorlevel% neq 0 (
-        popd
-        echo [PrintBit] ERROR: build failed.
-        pause
-        exit /b 1
-    )
-    popd
+    echo [PrintBit] ERROR: Compiled server bundle missing at "%PROJECT_DIR%\dist\server.js".
+    echo [PrintBit]        Run "pnpm run build" first.
+    pause
+    exit /b 1
 )
 
 :: Start PrintBit server
 echo [PrintBit] Starting compiled server...
-for /f %%P in ('powershell -NoProfile -Command "$c = Get-NetTCPConnection -State Listen -LocalPort %PORT% -ErrorAction SilentlyContinue | Select-Object -First 1; if ($c) { $c.OwningProcess }"') do set "EXISTING_SERVER_PID=%%P"
+set "EXISTING_SERVER_PID="
+for /f "tokens=5" %%P in ('netstat -ano -p tcp ^| findstr /R /C:":%PORT% .*LISTENING"') do (
+    set "EXISTING_SERVER_PID=%%P"
+)
 if defined EXISTING_SERVER_PID (
     echo [PrintBit] Server already listening on port %PORT% (PID %EXISTING_SERVER_PID%). Skipping new launch.
 ) else (

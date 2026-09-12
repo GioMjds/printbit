@@ -25,6 +25,16 @@ function Get-NodeExecutableCandidates {
     $candidates = [System.Collections.Generic.List[string]]::new()
     $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
+    # 1. Standard Program Files installation path (fastest on Windows, avoids PATH scan)
+    foreach ($root in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if ([string]::IsNullOrWhiteSpace($root)) { continue }
+        $candidate = Join-Path $root "nodejs\node.exe"
+        if ((Test-Path $candidate) -and $seen.Add($candidate)) {
+            $candidates.Add($candidate) | Out-Null
+        }
+    }
+
+    # 2. PATH resolution fallback
     foreach ($name in @("node.exe", "node")) {
         $resolved = Get-Command $name -ErrorAction SilentlyContinue
         if ($null -eq $resolved) { continue }
@@ -35,61 +45,7 @@ function Get-NodeExecutableCandidates {
         }
     }
 
-    foreach ($root in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
-        if ([string]::IsNullOrWhiteSpace($root)) { continue }
-        $candidate = Join-Path $root "nodejs\node.exe"
-        if ((Test-Path $candidate) -and $seen.Add($candidate)) {
-            $candidates.Add($candidate) | Out-Null
-        }
-    }
-
     return [string[]]$candidates
-}
-
-function Get-BuildCommandCandidates {
-    $candidates = [System.Collections.Generic.List[object]]::new()
-    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-
-    $commands = @(
-        @{ Name = "pnpm.cmd"; Args = @("run", "build") },
-        @{ Name = "pnpm"; Args = @("run", "build") },
-        @{ Name = "corepack.cmd"; Args = @("pnpm", "run", "build") },
-        @{ Name = "corepack"; Args = @("pnpm", "run", "build") }
-    )
-
-    foreach ($entry in $commands) {
-        $resolved = Get-Command $entry.Name -ErrorAction SilentlyContinue
-        if ($null -eq $resolved) { continue }
-        $path = [string]$resolved.Source
-        if ([string]::IsNullOrWhiteSpace($path)) { continue }
-        $key = "$path|$($entry.Args -join ' ')"
-        if (-not $seen.Add($key)) { continue }
-        $candidates.Add([pscustomobject]@{
-            Label = $entry.Name
-            Path = $path
-            Args = [string[]]$entry.Args
-        }) | Out-Null
-    }
-
-    foreach ($root in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
-        if ([string]::IsNullOrWhiteSpace($root)) { continue }
-        foreach ($entry in @(
-            @{ Relative = "nodejs\pnpm.cmd"; Label = "programfiles-pnpm.cmd"; Args = @("run", "build") },
-            @{ Relative = "nodejs\corepack.cmd"; Label = "programfiles-corepack.cmd"; Args = @("pnpm", "run", "build") }
-        )) {
-            $path = Join-Path $root $entry.Relative
-            if (-not (Test-Path $path)) { continue }
-            $key = "$path|$($entry.Args -join ' ')"
-            if (-not $seen.Add($key)) { continue }
-            $candidates.Add([pscustomobject]@{
-                Label = $entry.Label
-                Path = $path
-                Args = [string[]]$entry.Args
-            }) | Out-Null
-        }
-    }
-
-    return $candidates
 }
 
 function Ensure-ServerBundle {
@@ -98,30 +54,9 @@ function Ensure-ServerBundle {
         return
     }
 
-    Write-StartupLog "Server bundle missing at $ServerBundlePath. Attempting build."
-    $candidates = Get-BuildCommandCandidates
-    if ($candidates.Count -eq 0) {
-        throw "[PrintBit] Missing dist\server.js and no pnpm/corepack build command is available."
-    }
-
-    Set-Location -Path $ProjectDir
-    foreach ($candidate in $candidates) {
-        $display = "$($candidate.Path) $($candidate.Args -join ' ')"
-        Write-StartupLog "Attempting build with: $display"
-        try {
-            & $candidate.Path @($candidate.Args) 2>&1 | Tee-Object -FilePath $LogPath -Append
-            $exitCode = $LASTEXITCODE
-            if (($null -eq $exitCode -or $exitCode -eq 0) -and (Test-Path $ServerBundlePath)) {
-                Write-StartupLog "Build succeeded with: $display"
-                return
-            }
-            Write-StartupLog "Build failed with exit code ${exitCode}: $display"
-        } catch {
-            Write-StartupLog "Build command failed: $display :: $($_.Exception.Message)"
-        }
-    }
-
-    throw "[PrintBit] Unable to create dist\server.js. Run 'pnpm run build' from project root and retry."
+    $msg = "[PrintBit] FATAL: Server bundle missing at '$ServerBundlePath'. Production boot will not build during startup. Run 'pnpm run build' during installation."
+    Write-StartupLog $msg
+    throw $msg
 }
 
 Set-Location -Path $ProjectDir

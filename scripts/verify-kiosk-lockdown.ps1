@@ -55,6 +55,10 @@ $noTrayContextMenu         = Get-DwordOrNull -Path $policyExplorer  -Name 'NoTra
 $noTrayItemsDisplay        = Get-DwordOrNull -Path $policyExplorer  -Name 'NoTrayItemsDisplay'
 $allowEdgeSwipe            = Get-DwordOrNull -Path $policyEdgeUi    -Name 'AllowEdgeSwipe'
 $edgeSwipeNavigation       = Get-DwordOrNull -Path $policyEdgeBrowser -Name 'EdgeSwipeNavigationEnabled'
+$hideFirstRun              = Get-DwordOrNull -Path $policyEdgeBrowser -Name 'HideFirstRunExperience'
+$metricsReporting          = Get-DwordOrNull -Path $policyEdgeBrowser -Name 'MetricsReportingEnabled'
+$autoImportAtFirstRun      = Get-DwordOrNull -Path $policyEdgeBrowser -Name 'AutoImportAtFirstRun'
+$backgroundMode            = Get-DwordOrNull -Path $policyEdgeBrowser -Name 'BackgroundModeEnabled'
 $noControlPanel            = Get-DwordOrNull -Path $legacyExplorer  -Name 'NoControlPanel'
 $noWinKeys                 = Get-DwordOrNull -Path $legacyExplorer  -Name 'NoWinKeys'
 $noAltTab                  = Get-DwordOrNull -Path $legacyExplorer  -Name 'NoAltTab'
@@ -69,6 +73,9 @@ $checks += [pscustomobject]@{ Name = 'Tray context blocked';          Passed = (
 $checks += [pscustomobject]@{ Name = 'Tray items hidden';             Passed = ($noTrayItemsDisplay -eq 1);        Detail = "NoTrayItemsDisplay=$noTrayItemsDisplay" }
 $checks += [pscustomobject]@{ Name = 'Shell edge-swipe blocked';      Passed = ($allowEdgeSwipe -eq 0);            Detail = "AllowEdgeSwipe=$allowEdgeSwipe" }
 $checks += [pscustomobject]@{ Name = 'Edge browser swipe-nav blocked';Passed = ($edgeSwipeNavigation -eq 0);       Detail = "EdgeSwipeNavigationEnabled=$edgeSwipeNavigation" }
+$checks += [pscustomobject]@{ Name = 'Edge first-run exp hidden';     Passed = ($hideFirstRun -eq 1);              Detail = "HideFirstRunExperience=$hideFirstRun" }
+$checks += [pscustomobject]@{ Name = 'Edge telemetry disabled';       Passed = ($metricsReporting -eq 0);          Detail = "MetricsReportingEnabled=$metricsReporting" }
+$checks += [pscustomobject]@{ Name = 'Edge background mode disabled'; Passed = ($backgroundMode -eq 0);            Detail = "BackgroundModeEnabled=$backgroundMode" }
 $checks += [pscustomobject]@{ Name = 'Settings/Control Panel blocked';Passed = ($noControlPanel -eq 1);           Detail = "NoControlPanel=$noControlPanel" }
 $checks += [pscustomobject]@{ Name = 'Windows shortcut keys blocked'; Passed = ($noWinKeys -eq 1);                Detail = "NoWinKeys=$noWinKeys" }
 $checks += [pscustomobject]@{ Name = 'Alt+Tab blocked';               Passed = ($noAltTab -eq 1);                 Detail = "NoAltTab=$noAltTab" }

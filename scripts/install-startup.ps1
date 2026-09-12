@@ -102,6 +102,12 @@ if (-not (Test-Path $ServerStartupScript)) {
     return
 }
 
+$ServerBundlePath = Join-Path $ProjectDir "dist\server.js"
+if (-not (Test-Path $ServerBundlePath)) {
+    Write-Warning "[PrintBit] WARNING: Compiled server bundle not found at: $ServerBundlePath"
+    Write-Warning "[PrintBit]          Run 'pnpm run build' before rebooting, or the kiosk server will fail to start."
+}
+
 # Remove existing task if present (idempotent)
 if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
@@ -121,7 +127,7 @@ $workerAllowedClientIdentity = if ($kioskAccount) { $kioskAccount.Sid } else { $
     $workerAllowedClientIdentity,
     "Machine")
 
-$Action = if ($kioskUserNormalized) {
+$Action = if ($AtStartup -or $kioskUserNormalized) {
     New-ScheduledTaskAction `
         -Execute "powershell.exe" `
         -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$ServerStartupScript`"" `
@@ -141,8 +147,9 @@ $Trigger = if ($kioskUserNormalized) {
     New-ScheduledTaskTrigger -AtLogOn
 }
 
+$taskPriority = if ($AtStartup -or $kioskUserNormalized) { 1 } else { 4 }
 $Settings = New-ScheduledTaskSettingsSet `
-    -Priority 4 `
+    -Priority $taskPriority `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -MultipleInstances $MultipleInstances `
@@ -172,7 +179,7 @@ $Principal = if ($kioskUserNormalized) {
 $TaskDescription = if ($kioskUserNormalized) {
     "Starts PrintBit server at kiosk-user logon ($resolvedKioskUser)."
 } elseif ($AtStartup) {
-    "Starts PrintBit kiosk launcher at machine startup (SYSTEM principal)."
+    "Starts PrintBit kiosk server at machine startup (SYSTEM principal, high priority)."
 } elseif ($RunAsSystem) {
     "Starts PrintBit kiosk launcher at logon using SYSTEM principal."
 } else {
@@ -198,7 +205,8 @@ if ($kioskUserNormalized) {
     Write-Host "[PrintBit]   Optional recovery: .\scripts\install-watchdog.ps1 -AtStartup" -ForegroundColor DarkGray
 } elseif ($useSystemPrincipal) {
     if ($AtStartup) {
-        Write-Host "[PrintBit]   Runs at machine startup as SYSTEM." -ForegroundColor Cyan
+        Write-Host "[PrintBit]   Runs at machine startup as SYSTEM (server-only mode via start-kiosk-server.ps1, Priority $taskPriority)." -ForegroundColor Cyan
+        Write-Host "[PrintBit]   Assigned Access opens Edge at http://127.0.0.1:3000/loading when kiosk user signs in." -ForegroundColor Cyan
     } else {
         Write-Host "[PrintBit]   Runs at logon as SYSTEM." -ForegroundColor Cyan
     }

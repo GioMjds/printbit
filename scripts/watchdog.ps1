@@ -461,7 +461,16 @@ function Ensure-EdgeRunning {
         Write-Warning "[Watchdog] Failed to inspect Edge command line: $($_.Exception.Message)"
     }
     try {
-        Start-Process "msedge.exe" -ArgumentList @("--kiosk", $currentKioskUrl, "--edge-kiosk-type=fullscreen", "--no-first-run", "--disable-infobars")
+        Start-Process "msedge.exe" -ArgumentList @(
+            "--kiosk", $currentKioskUrl,
+            "--edge-kiosk-type=fullscreen",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-infobars",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--disable-features=TranslateUI"
+        )
         $State.lastAction = "edge_started"
         $State.lastError = $null
         return $true

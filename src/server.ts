@@ -293,20 +293,22 @@ io.on('connection', (socket) => {
   });
 });
 
-async function start() {
-  await new Promise<void>((resolve, reject) => {
+async function startHttpServer(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     server.listen(PORT, '0.0.0.0', () => {
       const localIP = getLocalIPv4();
       if (localIP) {
-        console.log(`→ Network: http://${localIP}:${PORT}`);
+        console.log(`[BOOT] HTTP server ready: http://${localIP}:${PORT}`);
       } else {
-        console.log('→ Network IP not detected');
+        console.log(`[BOOT] HTTP server ready on port ${PORT}`);
       }
       resolve();
     });
     server.once('error', reject);
   });
+}
 
+async function initializePrintBit(): Promise<void> {
   try {
     await initDB();
 
@@ -668,6 +670,14 @@ async function start() {
       'Startup initialization failed. Waiting for automatic recovery.',
     );
   }
+}
+
+async function start(): Promise<void> {
+  await startHttpServer();
+  console.log(
+    '[BOOT] Express HTTP server listening; /loading and /api/startup/ready are available.',
+  );
+  void initializePrintBit();
 }
 
 let shuttingDown = false;
