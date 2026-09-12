@@ -354,7 +354,9 @@ async function initializePrintBit(): Promise<void> {
     // marked failed — preventing the kiosk from running without a working IPC
     // channel to the C# hardware service.
     await workerReturnPipe.ready;
-    await hardwareStateProjection.initializeCustomerPaymentLock();
+    if (!await hardwareStateProjection.initializeCustomerPaymentLock()) {
+      throw new Error('Customer payment lock was not acknowledged by the worker.');
+    }
 
     const startupMarker = await markRecoveryStartup('server_start');
     const startupTrustedTime = await verifyTrustedClockSync();

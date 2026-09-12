@@ -1171,11 +1171,7 @@ export class FinancialService {
     }
 
     const { paymentLeaseId } = (req.body ?? {}) as ConfirmPaymentBody;
-    if (
-      this.paymentAcceptorGate &&
-      typeof paymentLeaseId === 'string' &&
-      paymentLeaseId.length > 0
-    ) {
+    if (this.paymentAcceptorGate) {
       const disarmed = await this.paymentAcceptorGate.disarm(
         paymentLeaseId,
         'confirm_payment',

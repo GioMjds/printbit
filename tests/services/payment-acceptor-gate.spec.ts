@@ -224,4 +224,17 @@ describe('PaymentAcceptorGate', () => {
     expect(disarmCustomerPayment).toHaveBeenNthCalledWith(1, 'page_exit');
     expect(disarmCustomerPayment).toHaveBeenNthCalledWith(2, 'shutdown');
   });
+
+  it('retains an active lease until a failed physical disarm is acknowledged on retry', async () => {
+    const gate = createGate();
+    const lease = await arm(gate, gate.issueConfirmCapability());
+    disarmCustomerPayment.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    await expect(gate.disarm(lease!.leaseId, 'confirm_payment')).resolves.toBe(false);
+    await expect(gate.disarm(lease!.leaseId, 'confirm_payment')).resolves.toBe(true);
+
+    expect(disarmCustomerPayment).toHaveBeenCalledTimes(2);
+    expect(disarmCustomerPayment).toHaveBeenNthCalledWith(1, 'confirm_payment');
+    expect(disarmCustomerPayment).toHaveBeenNthCalledWith(2, 'confirm_payment');
+  });
 });

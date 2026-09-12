@@ -51,10 +51,6 @@ void initializePageIdleTimeout({
       '[PAGE IDLE] Confirm page timeout reached, redirecting to home',
     );
     await releaseTransientFilesForCurrentMode('confirm_idle_timeout');
-    // Release the coin slot lock before leaving
-    if (coinSlotIsLocked) {
-      socket?.emit('unlockCoinSlot', { reason: 'timeout' });
-    }
     const sessionId = sessionStorage.getItem('printbit.sessionId');
     const sessionToken = sessionStorage.getItem('printbit.sessionToken');
     if (sessionId && sessionToken) {
@@ -1128,10 +1124,6 @@ function syncCoinSlotLockState(): void {
   if (shouldLock === coinSlotIsLocked) return;
 
   applyLockState(shouldLock);
-  socket?.emit(
-    shouldLock ? 'lockCoinSlot' : 'unlockCoinSlot',
-    shouldLock ? { threshold: totalPrice } : { reason: 'balance_dropped' },
-  );
 }
 
 function updateChangeDisplay(balance: number): void {

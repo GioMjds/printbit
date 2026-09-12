@@ -9,6 +9,15 @@ jest.mock('@/services/recovery', () => ({
   getSpoolerLifecycleRecord: jest.fn().mockReturnValue(null),
   reconcileFinalizedCopySession: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('@/services/settlement', () => ({
+  settlementService: { settle: jest.fn() },
+}));
+jest.mock('@/modules/print-queue', () => ({
+  enqueuePrintJob: jest.fn(),
+}));
+jest.mock('@/services/printer', () => ({
+  printFile: jest.fn(),
+}));
 
 import { sendWorkerRequest } from '../../../src/services/worker-command-pipe';
 import { coinSimulation } from '../../../src/services/coin-simulation';
@@ -28,6 +37,11 @@ import { FinancialController } from '../../../src/modules/financial/financial.co
 import { FinancialService } from '../../../src/modules/financial/financial.service';
 import { registerControlSocketHandlers } from '../../../src/services/control-socket';
 import { PaymentSessionService } from '../../../src/modules/payment/payment-session.service';
+import { settlementService } from '../../../src/services/settlement';
+import { enqueuePrintJob } from '../../../src/modules/print-queue';
+import { printFile } from '../../../src/services/printer';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const publicBaseUrl = new URL('http://printbit.test');
 
@@ -511,6 +525,10 @@ describe('local coin simulation boundary', () => {
 });
 
 describe('final payment disarm and socket authority', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('disarms active payment lease before charge/print in confirmPayment', async () => {
     const disarmSpy = jest.fn().mockResolvedValue(true);
     const dummyGate = {
@@ -603,6 +621,42 @@ describe('final payment disarm and socket authority', () => {
     expect(jsonBody).toMatchObject({
       code: 'PAYMENT_DISARM_FAILED',
     });
+    expect(settlementService.settle).not.toHaveBeenCalled();
+    expect(enqueuePrintJob).not.toHaveBeenCalled();
+    expect(printFile).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before settlement or dispatch when an active payment omits its lease id', async () => {
+    const disarmSpy = jest.fn().mockResolvedValue(false);
+    const financialService = new FinancialService({
+      io: {} as unknown as any,
+      sessionStore: {} as unknown as SessionStore,
+      resolvePublicBaseUrl: () => publicBaseUrl,
+      powerSafetyService: {
+        canAcceptCustomerWork: () => true,
+      } as unknown as any,
+      paymentAcceptorGate: { disarm: disarmSpy } as unknown as PaymentAcceptorGate,
+    });
+    let statusCode = 200;
+    const res = {
+      status: jest.fn((code: number) => {
+        statusCode = code;
+        return res;
+      }),
+      json: jest.fn(() => res),
+    } as unknown as Response;
+    const req = {
+      body: { amount: 10, mode: 'invalid' },
+      get: () => null,
+    } as unknown as Request;
+
+    await financialService.confirmPayment(req, res);
+
+    expect(disarmSpy).toHaveBeenCalledWith(undefined, 'confirm_payment');
+    expect(statusCode).toBe(503);
+    expect(settlementService.settle).not.toHaveBeenCalled();
+    expect(enqueuePrintJob).not.toHaveBeenCalled();
+    expect(printFile).not.toHaveBeenCalled();
   });
 
   it('does not register or permit client unlockCoinSlot via socket control', () => {
@@ -624,5 +678,20 @@ describe('final payment disarm and socket authority', () => {
     });
 
     expect(listeners['unlockCoinSlot']).toBeUndefined();
+  });
+
+  it('does not emit generic coin-slot socket controls from the confirm browser page', () => {
+    const confirmApp = fs.readFileSync(path.resolve('src/public/confirm/app.ts'), 'utf8');
+
+    expect(confirmApp).not.toMatch(/emit\(\s*['"]lockCoinSlot['"]/);
+    expect(confirmApp).not.toMatch(/emit\(\s*['"]unlockCoinSlot['"]/);
+  });
+
+  it('requires a physical customer-payment lock acknowledgement before startup can become ready', () => {
+    const serverSource = fs.readFileSync(path.resolve('src/server.ts'), 'utf8');
+
+    expect(serverSource).toMatch(
+      /if\s*\(\s*!\s*await\s+hardwareStateProjection\.initializeCustomerPaymentLock\(\)\s*\)/,
+    );
   });
 });
