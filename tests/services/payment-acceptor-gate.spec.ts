@@ -128,16 +128,26 @@ describe('PaymentAcceptorGate', () => {
     expect(disarmCustomerPayment).not.toHaveBeenCalled();
   });
 
-  it('keeps the lease absent when hardware arm is not acknowledged', async () => {
+  it('compensates with a disarm when hardware arm is not acknowledged', async () => {
     armCustomerPayment.mockResolvedValue(false);
     const gate = createGate();
     const capability = gate.issueConfirmCapability();
 
     await expect(arm(gate, capability)).resolves.toBeNull();
+
+    expect(armCustomerPayment).toHaveBeenCalledTimes(1);
+    expect(disarmCustomerPayment).toHaveBeenCalledWith('arm_failed');
+  });
+
+  it('compensates with a disarm when hardware arm rejects', async () => {
+    armCustomerPayment.mockRejectedValue(new Error('worker timeout'));
+    const gate = createGate();
+    const capability = gate.issueConfirmCapability();
+
     await expect(arm(gate, capability)).resolves.toBeNull();
 
-    expect(armCustomerPayment).toHaveBeenCalledTimes(2);
-    expect(disarmCustomerPayment).not.toHaveBeenCalled();
+    expect(armCustomerPayment).toHaveBeenCalledTimes(1);
+    expect(disarmCustomerPayment).toHaveBeenCalledWith('arm_failed');
   });
 
   it('rejects a second active lease from a different capability', async () => {

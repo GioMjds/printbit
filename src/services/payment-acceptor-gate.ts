@@ -132,9 +132,18 @@ export class PaymentAcceptorGate {
         : null;
     }
 
+    let armed = false;
     try {
-      if (await this.deps.armCustomerPayment() !== true) return null;
+      armed = await this.deps.armCustomerPayment() === true;
     } catch {
+      // The arm command may have reached hardware before its reply failed.
+    }
+    if (!armed) {
+      try {
+        await this.deps.disarmCustomerPayment('arm_failed');
+      } catch {
+        // Task 1's disarm path retains the customer lock before dispatching.
+      }
       return null;
     }
 
