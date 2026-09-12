@@ -422,6 +422,15 @@ const scanDownloadQrCanvas = document.getElementById(
 const scanDownloadQrExpiry = document.getElementById(
   'scanDownloadQrExpiry',
 ) as HTMLElement | null;
+const scanDownloadTitle = document.getElementById(
+  'scanDownloadTitle',
+) as HTMLElement | null;
+const scanDownloadFormatTag = document.getElementById(
+  'scanDownloadFormatTag',
+) as HTMLElement | null;
+const scanDownloadHint = document.getElementById(
+  'scanDownloadHint',
+) as HTMLElement | null;
 
 // Receipt CTA Elements
 const receiptCtaContainer = document.getElementById(
@@ -1795,6 +1804,43 @@ function renderScanDownloadCta(): void {
   )
     return;
   scanDownloadCtaContainer.removeAttribute('hidden');
+
+  let scanFormat = 'pdf';
+  try {
+    const raw = sessionStorage.getItem('printbit.config');
+    if (raw) {
+      const cfg = JSON.parse(raw) as { scanFormat?: string; scanFilename?: string };
+      if (cfg.scanFormat) {
+        scanFormat = cfg.scanFormat.toLowerCase();
+      } else if (cfg.scanFilename) {
+        const ext = cfg.scanFilename.split('.').pop()?.toLowerCase();
+        if (ext === 'jpg' || ext === 'jpeg') scanFormat = 'jpg';
+        else if (ext === 'png') scanFormat = 'png';
+      }
+    }
+  } catch {
+    // default to pdf
+  }
+
+  if (scanDownloadTitle && scanDownloadFormatTag && scanDownloadHint) {
+    if (scanFormat === 'jpg') {
+      scanDownloadFormatTag.textContent = 'JPG';
+      scanDownloadFormatTag.className = 'qr-card__format-tag qr-card__format-tag--jpg';
+      scanDownloadTitle.textContent = 'Download as Image (JPG)';
+      scanDownloadHint.textContent = 'Direct scan to save photo to your phone camera roll';
+    } else if (scanFormat === 'png') {
+      scanDownloadFormatTag.textContent = 'PNG';
+      scanDownloadFormatTag.className = 'qr-card__format-tag qr-card__format-tag--png';
+      scanDownloadTitle.textContent = 'Download as Image (PNG)';
+      scanDownloadHint.textContent = 'Direct scan to save lossless image to your phone';
+    } else {
+      scanDownloadFormatTag.textContent = 'PDF';
+      scanDownloadFormatTag.className = 'qr-card__format-tag';
+      scanDownloadTitle.textContent = 'Download as PDF';
+      scanDownloadHint.textContent = 'Direct scan to download soft copy to your phone';
+    }
+  }
+
   if (scanDownloadQrExpiry) {
     if (currentScanDownloadExpiry) {
       try {
