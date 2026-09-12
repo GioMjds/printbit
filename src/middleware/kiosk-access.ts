@@ -11,7 +11,15 @@ function normalizeIp(value: string): string {
   return ip.startsWith('::ffff:') ? ip.slice(7) : ip;
 }
 
+let cachedLocalIps: Set<string> | null = null;
+let lastLocalIpsRefreshedAt = 0;
+const LOCAL_IPS_CACHE_TTL_MS = 30_000;
+
 function getLocalMachineIps(): Set<string> {
+  const now = Date.now();
+  if (cachedLocalIps && now - lastLocalIpsRefreshedAt < LOCAL_IPS_CACHE_TTL_MS) {
+    return cachedLocalIps;
+  }
   const localIps = new Set<string>(['127.0.0.1', '::1', 'localhost']);
   try {
     const interfaces = os.networkInterfaces();
@@ -26,6 +34,8 @@ function getLocalMachineIps(): Set<string> {
   } catch {
     // ignore interface enumeration errors
   }
+  cachedLocalIps = localIps;
+  lastLocalIpsRefreshedAt = now;
   return localIps;
 }
 

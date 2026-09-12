@@ -1,5 +1,5 @@
 import os from 'node:os';
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import {
   HOTSPOT_SSID,
   HOTSPOT_PASSWORD,
@@ -57,23 +57,23 @@ function ensureFirewallRules(): void {
   const rules = [{ name: 'PrintBit-Server-3000', port: 3000, proto: 'TCP' }];
 
   for (const { name, port, proto } of rules) {
-    try {
-      const check = execSync(
-        `netsh advfirewall firewall show rule name="${name}"`,
-        { stdio: 'pipe', timeout: 5_000, encoding: 'utf-8' },
-      );
-      if (check.includes('No rules match')) throw new Error('missing');
-    } catch {
-      try {
-        execSync(
-          `netsh advfirewall firewall add rule name="${name}" dir=in action=allow protocol=${proto} localport=${port}`,
-          { stdio: 'ignore', timeout: 5_000 },
-        );
-        console.log(`[HOTSPOT] → Firewall rule added: ${name}`);
-      } catch {
-        /* not admin or exists */
-      }
-    }
+    exec(
+      `netsh advfirewall firewall show rule name="${name}"`,
+      { timeout: 5_000, windowsHide: true },
+      (checkErr, stdout) => {
+        if (checkErr || (stdout && stdout.includes('No rules match'))) {
+          exec(
+            `netsh advfirewall firewall add rule name="${name}" dir=in action=allow protocol=${proto} localport=${port}`,
+            { timeout: 5_000, windowsHide: true },
+            (addErr) => {
+              if (!addErr) {
+                console.log(`[HOTSPOT] → Firewall rule added: ${name}`);
+              }
+            },
+          );
+        }
+      },
+    );
   }
 }
 
@@ -296,7 +296,11 @@ export class HotspotService {
 
     this.running = true;
     this.deps.logger.log('[HOTSPOT] ESP32 provider enabled');
-    await this.startEsp32RegistrationLoop();
+    void this.startEsp32RegistrationLoop().catch((error) => {
+      this.deps.logger.warn(
+        `[HOTSPOT] Initial registration attempt failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
     markWatchdogHeartbeat('hotspot', { running: true, provider: 'esp32' });
     setWatchdogComponentState(
       'hotspot',

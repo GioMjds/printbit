@@ -228,6 +228,15 @@ if (-not (Test-Ipv4Address -Value $gateway)) {
 
 Write-NetworkLog "Ensuring ESP32 Wi-Fi profile. ssid='$ssid' staticIp='$kioskIp' netmask='$netmask' gateway='$gateway'"
 
+# Fast path: check if already connected and already configured with desired static IP and gateway
+$existingInterface = if (-not [string]::IsNullOrWhiteSpace($wifiInterface)) { $wifiInterface } else { Get-ConnectedWifiInterfaceName -Ssid $ssid }
+if (-not [string]::IsNullOrWhiteSpace($existingInterface)) {
+    if (Test-StaticIpProfile -InterfaceAlias $existingInterface -IpAddress $kioskIp -Gateway $gateway) {
+        Write-NetworkLog "Interface '$existingInterface' is already connected to '$ssid' and configured with static IP '$kioskIp' (gw '$gateway'). Skipping reconfiguration."
+        return
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($wifiInterface)) {
     Write-NetworkLog "Connecting to Wi-Fi profile '$ssid'..."
     & netsh wlan connect name="$ssid" 2>&1 | ForEach-Object { Write-NetworkLog "$_" }

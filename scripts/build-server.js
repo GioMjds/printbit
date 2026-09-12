@@ -1,7 +1,10 @@
-const { execSync } = require('child_process');
+const path = require('node:path');
+const { execSync } = require('node:child_process');
 
-const command = [
-  'esbuild',
+const esbuildCmd = process.platform === 'win32' ? 'esbuild.cmd' : 'esbuild';
+const esbuildPath = path.resolve(__dirname, '..', 'node_modules', '.bin', esbuildCmd);
+
+const args = [
   'src/server.ts',
   '--bundle',
   '--platform=node',
@@ -9,13 +12,15 @@ const command = [
   '--packages=external',
   '--target=node22',
   '--outfile=dist/server.js',
-].join(' ');
+];
+
+const fullCommand = `"${esbuildPath}" ${args.join(' ')}`;
+console.log(`[BUILD] Running: ${fullCommand}`);
 
 try {
-  console.log(`Running: ${command}`);
-  execSync(command, { stdio: 'inherit' });
-  console.log('Server build completed successfully.');
+  execSync(fullCommand, { stdio: 'inherit' });
+  console.log('[BUILD] Server build completed successfully.');
 } catch (error) {
-  console.error('Server build failed:', error);
-  process.exit(1);
+  console.error('[BUILD] Server build failed.');
+  process.exit(error.status || 1);
 }

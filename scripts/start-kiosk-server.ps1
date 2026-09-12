@@ -177,8 +177,15 @@ $nodePath = $nodeCandidates[0]
 Write-StartupLog "Launching compiled server: $nodePath `"$ServerBundlePath`""
 
 try {
-    & $nodePath $ServerBundlePath 2>&1 | Tee-Object -FilePath $LogPath -Append
-    $exitCode = $LASTEXITCODE
+    Write-StartupLog "Launching server with direct stream logging to $LogPath..."
+    $proc = Start-Process `
+        -FilePath "cmd.exe" `
+        -ArgumentList @("/c", "`"$nodePath`" `"$ServerBundlePath`" >> `"$LogPath`" 2>&1") `
+        -WorkingDirectory $ProjectDir `
+        -WindowStyle Hidden `
+        -PassThru `
+        -Wait
+    $exitCode = $proc.ExitCode
     if ($null -ne $exitCode -and $exitCode -ne 0) {
         $message = "[PrintBit] Compiled server exited with code $exitCode."
         Write-StartupLog $message

@@ -226,8 +226,15 @@ if ($networkProvider -eq "esp32") {
     $localIP = if ($preferred) { $preferred.IPAddress } else { $null }
 }
 
-$kioskUrl = if ($localIP) { "http://${localIP}:${Port}/loading" } else { "http://localhost:${Port}/loading" }
+$kioskHost = [Environment]::GetEnvironmentVariable("PRINTBIT_KIOSK_HOST")
+if ([string]::IsNullOrWhiteSpace($kioskHost)) {
+    $kioskHost = "127.0.0.1"
+}
+$kioskUrl = "http://${kioskHost}:${Port}/loading"
 Write-Host "[PrintBit] Kiosk URL: $kioskUrl" -ForegroundColor Cyan
+if ($localIP) {
+    Write-Host "[PrintBit] External Wi-Fi IP (for clients): http://${localIP}:${Port}/" -ForegroundColor Gray
+}
 
 # ── 8. LAUNCH EDGE IN KIOSK MODE ─────────────────────────────────────────────
 function Is-Truthy {
@@ -247,7 +254,7 @@ if (-not [string]::IsNullOrWhiteSpace($configuredKioskUser)) {
 }
 
 if ($isSystemAccount -or $skipEdgeLaunch) {
-    $assignedAccessHost = "localhost"
+    $assignedAccessHost = "127.0.0.1"
     if ($isSystemAccount) {
         Write-Host "[PrintBit] Running as SYSTEM. Skipping Edge launch in Session 0." -ForegroundColor Yellow
     } else {
@@ -260,7 +267,11 @@ if ($isSystemAccount -or $skipEdgeLaunch) {
         "--kiosk", $kioskUrl,
         "--edge-kiosk-type=fullscreen",
         "--no-first-run",
-        "--disable-infobars"
+        "--no-default-browser-check",
+        "--disable-infobars",
+        "--disable-background-networking",
+        "--disable-sync",
+        "--disable-features=TranslateUI"
     )
 }
 

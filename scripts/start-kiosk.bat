@@ -96,27 +96,20 @@ if /I "%NETWORK_PROVIDER%"=="esp32" (
     echo [PrintBit] ESP32 mode detected. Using kiosk IP: %LOCAL_IP%
 ) else (
     call :detect_ip
-    set "INITIAL_IP=%LOCAL_IP%"
-    timeout /t 3 /nobreak >nul
-    call :detect_ip
-    set "NEW_IP=%LOCAL_IP%"
-
-    set "LOCAL_IP=%INITIAL_IP%"
-    if not "%NEW_IP%"=="" (
-        echo %NEW_IP% | findstr /R "^192\.168\.4\." >nul && set "LOCAL_IP=%NEW_IP%"
-        echo %NEW_IP% | findstr /R "^192\.168\.137\." >nul && set "LOCAL_IP=%NEW_IP%"
-        if "%LOCAL_IP%"=="" set "LOCAL_IP=%NEW_IP%"
-    )
-    set "INITIAL_IP="
-    set "NEW_IP="
     if "%LOCAL_IP%"=="" (
         echo [PrintBit] WARNING: Could not detect local IP. Falling back to localhost.
         set "LOCAL_IP=localhost"
     )
 )
 
-set "KIOSK_URL=http://%LOCAL_IP%:%PORT%/loading"
+if "%PRINTBIT_KIOSK_HOST%"=="" (
+    set "KIOSK_HOST=127.0.0.1"
+) else (
+    set "KIOSK_HOST=%PRINTBIT_KIOSK_HOST%"
+)
+set "KIOSK_URL=http://%KIOSK_HOST%:%PORT%/loading"
 echo [PrintBit] Kiosk URL: %KIOSK_URL%
+if not "%LOCAL_IP%"=="" echo [PrintBit] External Wi-Fi IP (for clients): http://%LOCAL_IP%:%PORT%/
 
 set "SKIP_EDGE=0"
 if /I "%PRINTBIT_SKIP_EDGE_LAUNCH%"=="1" set "SKIP_EDGE=1"
@@ -136,9 +129,9 @@ if "%SKIP_EDGE%"=="1" (
     goto :eof
 )
 
-:: Launch Edge in kiosk mode pointed at the dynamic IP
+:: Launch Edge in kiosk mode pointed at loopback
 echo [PrintBit] Launching kiosk browser...
-start "" msedge.exe --kiosk %KIOSK_URL% --edge-kiosk-type=fullscreen
+start "" msedge.exe --kiosk %KIOSK_URL% --edge-kiosk-type=fullscreen --no-first-run --no-default-browser-check --disable-infobars --disable-background-networking --disable-sync --disable-features=TranslateUI
 
 echo [PrintBit] Kiosk started successfully at %KIOSK_URL%.
 goto :eof

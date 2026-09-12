@@ -348,6 +348,10 @@ function Get-BackoffDelayMs {
 
 function Get-NodeServerProcess {
     try {
+        $nodeProcs = @(Get-Process -Name "node" -ErrorAction SilentlyContinue)
+        if ($nodeProcs.Count -eq 0) {
+            return $null
+        }
         $candidates = Get-CimInstance Win32_Process -Filter "Name='node.exe'"
         foreach ($proc in $candidates) {
             $cmd = [string]$proc.CommandLine
@@ -570,7 +574,7 @@ try {
                 $state.nextRecoveryAt = $null
                 $state.lastAction = "health_ok"
                 $state.lastError = $null
-                $null = Ensure-ServerRunning -State $state -Reason "health_ok_ensure"
+                # Server responded 200 OK — skip expensive WMI process queries
                 if ($ManageEdge) {
                     $null = Ensure-EdgeRunning -State $state
                 }

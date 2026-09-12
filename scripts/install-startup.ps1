@@ -142,6 +142,7 @@ $Trigger = if ($kioskUserNormalized) {
 }
 
 $Settings = New-ScheduledTaskSettingsSet `
+    -Priority 4 `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -MultipleInstances $MultipleInstances `
@@ -192,7 +193,7 @@ if ($kioskUserNormalized) {
     Write-Host "[PrintBit]   Runs at logon as $resolvedKioskUser (interactive token)." -ForegroundColor Cyan
     Write-Host "[PrintBit]   Resolved SID: $($kioskAccount.Sid)" -ForegroundColor Gray
     Write-Host "[PrintBit]   Worker pipe client SID configured in machine environment." -ForegroundColor Cyan
-    Write-Host "[PrintBit]   Mode: server-only startup for Assigned Access Edge (use http://192.168.4.2:3000/loading)." -ForegroundColor Cyan
+    Write-Host "[PrintBit]   Mode: server-only startup for Assigned Access Edge (use http://127.0.0.1:3000/loading)." -ForegroundColor Cyan
     Write-Host "[PrintBit]   Startup logs: uploads\logs\kiosk-server-startup.log" -ForegroundColor Gray
     Write-Host "[PrintBit]   Optional recovery: .\scripts\install-watchdog.ps1 -AtStartup" -ForegroundColor DarkGray
 } elseif ($useSystemPrincipal) {
