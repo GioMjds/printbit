@@ -5,6 +5,12 @@ import {
 } from '@/core/database/power-safety-store';
 import { serialService } from './hardware-state-projection';
 
+// Development-only hardware bypass. This is deliberately opt-in so a missing
+// worker power event still fails closed by default. It does not bypass printer
+// preflight checks or make a print possible without a printer.
+const POWER_SAFETY_BYPASS_ENABLED =
+  process.env.PRINTBIT_POWER_SAFETY_BYPASS?.trim().toLowerCase() === 'true';
+
 export type PowerState =
   | 'Operational'
   | 'PowerEmergency'
@@ -96,7 +102,7 @@ export class PowerSafetyService extends EventEmitter {
   }
 
   canAcceptCustomerWork(): boolean {
-    return this.state.canAcceptCustomerWork;
+    return POWER_SAFETY_BYPASS_ENABLED || this.state.canAcceptCustomerWork;
   }
 
   getState(): PowerSafetyState {
@@ -108,6 +114,18 @@ export class PowerSafetyService extends EventEmitter {
   }
 
   getEffectiveEvent(): WorkerPowerEvent {
+    if (POWER_SAFETY_BYPASS_ENABLED && !this.state.canAcceptCustomerWork) {
+      return {
+        type: 'PowerStatusSnapshot',
+        powerStatus: { acLineStatus: 'Online' },
+        operationalState: 'Operational',
+        acceptingTransactions: true,
+        powerSourceInstanceId: 'development-bypass',
+        powerSequence: 0,
+        timestampUtc: new Date().toISOString(),
+      };
+    }
+
     return {
       type: 'PowerStatusSnapshot',
       powerStatus: this.state.powerStatus ?? { acLineStatus: 'Unknown' },

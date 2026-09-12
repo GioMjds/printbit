@@ -154,6 +154,9 @@ printbit.sqlite             # Runtime persisted machine state (SQLite)
   - `legacy`: Sumatra-only behavior
   - `phased`: PDFtoPrinter/GhostScript with Sumatra emergency fallback
   - `new-only`: PDFtoPrinter/GhostScript only
+- `PRINTBIT_POWER_SAFETY_BYPASS=true` (optional, local development only) treats
+  power safety as operational while testing Node.js without the physical
+  printer/UPS. It does not bypass printer preflight checks or enable printing.
 - `PRINTBIT_PDFTOPRINTER_PATH` (or `PDFTOPRINTER_PATH`) default: `bin/PDFtoPrinter.exe`
 - `PRINTBIT_GHOSTSCRIPT_PATH` (or `GHOSTSCRIPT_PATH`) optional explicit path to `gswin64c.exe`
 - `PRINTBIT_SUMATRA_PATH` (or `SUMATRA_PATH`) optional Sumatra fallback path

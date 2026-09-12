@@ -158,7 +158,7 @@ const homePrintController =
     ? mountLoadingAnimation({
         root: homePrintAnimation,
         canvas: homePrintCanvas,
-        mode: 'print',
+        mode: 'upload',
         active: true,
       })
     : null;
@@ -215,6 +215,7 @@ const homeWifiQrCanvas = document.getElementById(
   'homeWifiQrCanvas',
 ) as HTMLCanvasElement | null;
 const openWifiBtn = document.getElementById('openWifiBtn');
+const openWifiHelpBtn = document.getElementById('openWifiHelpBtn');
 const closeWifiBtn = document.getElementById('closeWifiBtn');
 const wifiSsidVal = document.getElementById('wifiSsidVal');
 const wifiPasswordVal = document.getElementById('wifiPasswordVal');
@@ -295,6 +296,7 @@ function closeWifiModal(): void {
 }
 
 openWifiBtn?.addEventListener('click', openWifiModal);
+openWifiHelpBtn?.addEventListener('click', openWifiModal);
 closeWifiBtn?.addEventListener('click', closeWifiModal);
 wifiOverlay?.addEventListener('click', (e) => {
   if (e.target === wifiOverlay) closeWifiModal();

@@ -396,6 +396,20 @@ html[data-high-contrast='true'] body {
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), 0 0 24px rgba(105, 111, 199, 0.28);
 }
 
+/* Wi-Fi Help FAB */
+.wifi-fab {
+  bottom: 152px;
+  right: 24px;
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.28);
+  background: rgba(16, 26, 20, 0.92);
+}
+
+.wifi-fab:hover {
+  border-color: rgba(74, 222, 128, 0.65);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), 0 0 24px rgba(74, 222, 128, 0.28);
+}
+
 /* Responsive FAB Dock */
 @media (max-width: 640px) {
   .printbit-language-fab {
@@ -412,6 +426,10 @@ html[data-high-contrast='true'] body {
   }
   .report-fab {
     bottom: 78px;
+    right: 16px;
+  }
+  .wifi-fab {
+    bottom: 140px;
     right: 16px;
   }
 }

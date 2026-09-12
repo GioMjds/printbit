@@ -63,29 +63,9 @@
             </div>
           </div>
           <div class="wifi-inline-card__text">
-            <div class="wifi-inline-card__header">
-              <span class="wifi-inline-card__step">Step 1</span>
-              <h2 class="wifi-inline-card__title">Scan to connect to PrintBit</h2>
-              <p class="wifi-inline-card__sub">Join the kiosk hotspot with your phone camera before printing, copying, or scanning.</p>
-            </div>
-            <div class="wifi-inline-card__meta">
-              <div class="wifi-inline-card__alt">
-                <span class="wifi-inline-card__pill wifi-inline-card__pill--alt">Alternative</span>
-                <div class="wifi-inline-card__alt-content">
-                  <div class="wifi-inline-card__alt-network">
-                    <span class="wifi-inline-card__alt-label">Wi-Fi Network:</span>
-                    <strong id="wifiSsidVal" class="wifi-inline-card__ssid">PrintBit</strong>
-                    <span class="wifi-inline-card__divider" aria-hidden="true">•</span>
-                    <span id="wifiPasswordVal" class="wifi-inline-card__password">Open (No password required)</span>
-                  </div>
-                  <p class="wifi-inline-card__alt-note">If QR auto-connect doesn't work, join the network manually in Wi-Fi settings. You can continue even without internet (select "Keep Connected" if prompted).</p>
-                </div>
-              </div>
-              <div class="wifi-inline-card__tip">
-                <span class="wifi-inline-card__pill wifi-inline-card__pill--tip">Tip</span>
-                <p class="wifi-inline-card__tip-text">Turn off mobile data to access kiosk upload and printing steps.</p>
-              </div>
-            </div>
+            <span class="wifi-inline-card__step">Step 1</span>
+            <h2 class="wifi-inline-card__title">Scan to connect to PrintBit</h2>
+            <p class="wifi-inline-card__sub">Join the kiosk hotspot with your phone camera before uploading, copying, or scanning.</p>
           </div>
         </div>
 
@@ -117,55 +97,32 @@
                 viewBox="0 0 64 64"
                 aria-hidden="true"
               >
-                <rect
-                  x="14"
-                  y="8"
-                  width="36"
-                  height="20"
-                  rx="3"
+                <path
+                  d="M17 8h21l10 10v38H17a4 4 0 01-4-4V12a4 4 0 014-4z"
                   fill="currentColor"
                   opacity=".9"
                 />
-                <rect
-                  x="8"
-                  y="24"
-                  width="48"
-                  height="22"
-                  rx="4"
-                  fill="currentColor"
+                <path d="M38 8v12h10" fill="var(--white)" opacity=".18" />
+                <path
+                  d="M32 45V27m0 0l-8 8m8-8l8 8"
+                  fill="none"
+                  stroke="var(--peach)"
+                  stroke-width="4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 />
-                <rect
-                  x="14"
-                  y="38"
-                  width="36"
-                  height="18"
-                  rx="3"
-                  fill="var(--white)"
-                  opacity=".15"
+                <path
+                  d="M23 51h18"
+                  fill="none"
+                  stroke="var(--white)"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  opacity=".65"
                 />
-                <rect
-                  x="20"
-                  y="43"
-                  width="24"
-                  height="2.5"
-                  rx="1.25"
-                  fill="var(--white)"
-                  opacity=".7"
-                />
-                <rect
-                  x="20"
-                  y="49"
-                  width="16"
-                  height="2.5"
-                  rx="1.25"
-                  fill="var(--white)"
-                  opacity=".5"
-                />
-                <circle cx="44" cy="31" r="3" fill="var(--peach)" />
               </svg>
             </div>
             <h2 class="action-card__title">Upload</h2>
-            <p class="action-card__sub">Upload your file(s) to print</p>
+            <p class="action-card__sub">Upload your file to print</p>
           </button>
 
           <!-- Copy Card -->
@@ -658,6 +615,116 @@
           aria-label="Close feedback modal"
         >
           Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Wi-Fi Help floating button (Bottom-Right) -->
+    <button
+      class="kiosk-fab wifi-fab"
+      id="openWifiBtn"
+      type="button"
+      aria-label="Wi-Fi connection help"
+      title="Wi-Fi Help"
+    >
+      <svg
+        class="kiosk-fab__icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+        <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
+      </svg>
+      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left">Wi-Fi Help</span>
+    </button>
+
+    <!-- Wi-Fi Help Modal -->
+    <div class="wifi-overlay" id="wifiOverlay" aria-hidden="true">
+      <div
+        class="wifi-modal"
+        role="dialog"
+        aria-labelledby="wifiModalTitle"
+        aria-describedby="wifiModalSub"
+        aria-modal="true"
+      >
+        <div class="wifi-modal__badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+            <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+            <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
+          </svg>
+        </div>
+        <p class="wifi-modal__eyebrow">Step 1 Alternative</p>
+        <h3 class="wifi-modal__title" id="wifiModalTitle">
+          Wi-Fi Connection Help
+        </h3>
+        <p class="wifi-modal__sub" id="wifiModalSub">
+          Follow these steps if scanning the QR code with your phone camera doesn't work.
+        </p>
+
+        <div class="wifi-info-card">
+          <div class="wifi-info-row">
+            <span class="wifi-info-label">Network (SSID)</span>
+            <span class="wifi-info-val" id="wifiSsidVal">PrintBit</span>
+          </div>
+          <div class="wifi-info-row">
+            <span class="wifi-info-label">Password</span>
+            <span class="wifi-info-val" id="wifiPasswordVal">Open (No password required)</span>
+          </div>
+        </div>
+
+        <div class="wifi-modal-steps">
+          <div class="wifi-modal-step">
+            <span class="wifi-modal-step__num">1</span>
+            <div class="wifi-modal-step__content">
+              <strong>Connect manually in Wi-Fi settings</strong>
+              <span>Open your phone Settings &rarr; Wi-Fi and choose the network name above.</span>
+            </div>
+          </div>
+          <div class="wifi-modal-step">
+            <span class="wifi-modal-step__num">2</span>
+            <div class="wifi-modal-step__content">
+              <strong>Open network</strong>
+              <span>PrintBit Wi-Fi is an open network. No password is required.</span>
+            </div>
+          </div>
+          <div class="wifi-modal-step">
+            <span class="wifi-modal-step__num">3</span>
+            <div class="wifi-modal-step__content">
+              <strong>Continue without internet</strong>
+              <span>If your phone prompts &ldquo;No internet connection&rdquo;, select <em>Keep Connected</em> or <em>Continue</em>. You can proceed even without internet.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wifi-modal-tip">
+          <div class="wifi-modal-tip__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <p class="wifi-modal-tip__text">
+            <strong>Important:</strong> Turn off your mobile data (cellular) so your phone doesn't bypass the kiosk connection.
+          </p>
+        </div>
+
+        <button
+          class="wifi-modal__close"
+          type="button"
+          id="closeWifiBtn"
+          aria-label="Close Wi-Fi help modal"
+        >
+          Got it
         </button>
       </div>
     </div>

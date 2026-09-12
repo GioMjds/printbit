@@ -654,7 +654,7 @@ function updateUploadLink(uploadUrl: string): void {
   if (qrStepLabelEl) qrStepLabelEl.textContent = 'Scan upload QR';
   if (mobileGuideTextEl) {
     mobileGuideTextEl.innerHTML =
-      'Join PrintBit Wi-Fi first, then scan the upload QR.<br />If scanning fails, open the Upload link below.';
+      'Join PrintBit Wi-Fi first, then scan the upload QR.';
   }
 
   if (uploadQrCanvas) {
