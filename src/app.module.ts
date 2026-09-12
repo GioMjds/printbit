@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { Namespace } from 'socket.io';
 import type { SessionStore } from '@/services/session';
+import { PaymentAcceptorGate } from '@/services/payment-acceptor-gate';
 import {
   PUBLIC_PAGE_ROUTES,
   PORTAL_ASSETS,
@@ -31,6 +32,7 @@ import { registerAnomalyModule } from '@/modules/anomaly';
 import { registerLanguageModule } from '@/modules/language';
 import { registerUploadPortalModule } from '@/modules/upload-portal';
 import { registerPageModule } from '@/modules/page';
+import { registerPaymentModule } from '@/modules/payment';
 
 export interface AppModuleDeps {
   io: SocketIOServer;
@@ -61,6 +63,7 @@ export interface AppModuleDeps {
     sourcePath: string,
     artifactPath: string,
   ) => Promise<string>;
+  paymentAcceptorGate?: PaymentAcceptorGate;
 }
 
 /**
@@ -68,6 +71,14 @@ export interface AppModuleDeps {
  * This function is called from server.ts during startup.
  */
 export function registerAppModules(app: Express, deps: AppModuleDeps): void {
+  const paymentAcceptorGate = deps.paymentAcceptorGate ?? new PaymentAcceptorGate({
+    armCustomerPayment: async () => false,
+    disarmCustomerPayment: async () => false,
+    canAcceptCustomerWork: () => false,
+    isPrinterReady: () => false,
+    isSerialConnected: () => false,
+    getBalance: () => 0,
+  });
   const requireKiosk = createKioskAccessMiddleware();
   app.use(
     [
@@ -85,6 +96,7 @@ export function registerAppModules(app: Express, deps: AppModuleDeps): void {
       '/api/printer/resume',
       '/api/printer/cancel-remaining',
       '/api/confirm-payment',
+      '/api/payment-session',
       '/api/balance/reset',
       '/api/balance/add-test-coin',
       '/api/hotspot/start',
@@ -102,6 +114,13 @@ export function registerAppModules(app: Express, deps: AppModuleDeps): void {
     io: deps.io,
     sessionStore: deps.sessionStore,
     publicPageRoutes: PUBLIC_PAGE_ROUTES,
+    resolvePublicBaseUrl: deps.resolvePublicBaseUrl,
+    paymentAcceptorGate,
+  });
+  registerPaymentModule(app, {
+    io: deps.io,
+    paymentAcceptorGate,
+    sessionStore: deps.sessionStore,
     resolvePublicBaseUrl: deps.resolvePublicBaseUrl,
   });
 

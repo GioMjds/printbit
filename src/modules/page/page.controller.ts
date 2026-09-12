@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express';
 import path from 'node:path';
 import { requireAdminLocalAccess } from '@/middleware/admin-auth';
 import type { SessionStore } from '@/services/session';
+import {
+  CONFIRM_CAPABILITY_COOKIE,
+  type PaymentAcceptorGate,
+} from '@/services/payment-acceptor-gate';
 import { db } from '@/services/db';
 import {
   createKioskAccessMiddleware,
@@ -17,6 +21,7 @@ export interface PageControllerDeps {
   sessionStore: SessionStore;
   publicPageRoutes: PageRoute[];
   resolvePublicBaseUrl: (req: Request) => URL;
+  paymentAcceptorGate: PaymentAcceptorGate;
   kioskAccessService?: KioskAccessService;
 }
 
@@ -135,6 +140,18 @@ export class PageController {
         page.route,
         ...routeHandlers,
         (_req: Request, res: Response) => {
+          if (page.route === '/confirm') {
+            res.cookie(
+              CONFIRM_CAPABILITY_COOKIE,
+              this.deps.paymentAcceptorGate.issueConfirmCapability(),
+              {
+                httpOnly: true,
+                sameSite: 'strict',
+                path: '/',
+                maxAge: 5 * 60 * 1_000,
+              },
+            );
+          }
           res.sendFile(page.filePath);
         },
       );
