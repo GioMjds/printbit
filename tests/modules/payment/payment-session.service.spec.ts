@@ -137,6 +137,36 @@ describe('PaymentSessionService', () => {
     expect(armCustomerPayment).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['forged', (): string => 'unknown-or-forged-token'],
+    ['expired', (): string => {
+      const capability = gate.issueConfirmCapability();
+      currentTime = 5 * 60 * 1_000 + 1;
+      return capability;
+    }],
+  ] as const)('rejects a %s capability heartbeat with 401 before forwarding to the gate', async (_kind, createCapability) => {
+    const validCapability = gate.issueConfirmCapability();
+    const validRequest = requestWith({ [CONFIRM_CAPABILITY_COOKIE]: validCapability });
+    const armed = await service.arm(validRequest, {
+      mode: 'print',
+      amount: 10,
+      sessionId: 'print-session',
+    });
+    const leaseId = (armed.body as { leaseId: string }).leaseId;
+    const heartbeatSpy = jest.spyOn(gate, 'heartbeat');
+
+    const capability = createCapability();
+    await expect(service.heartbeat(
+      requestWith({ [CONFIRM_CAPABILITY_COOKIE]: capability }),
+      { leaseId },
+    )).resolves.toMatchObject({
+      statusCode: 401,
+      body: { ok: false, error: 'Confirmation capability is invalid or expired.' },
+    });
+
+    expect(heartbeatSpy).not.toHaveBeenCalled();
+  });
+
   it('rejects an arm request when an active lease already exists under a different capability with 409', async () => {
     const firstCapability = gate.issueConfirmCapability();
     const secondCapability = gate.issueConfirmCapability();
@@ -252,6 +282,71 @@ describe('PaymentSessionService', () => {
     });
     expect(disarmCustomerPayment).toHaveBeenCalledTimes(1);
   });
+
+  it('does not allow a forged capability to cancel a known active lease', async () => {
+    const capability = gate.issueConfirmCapability();
+    const request = requestWith({ [CONFIRM_CAPABILITY_COOKIE]: capability });
+    const armed = await service.arm(request, {
+      mode: 'print',
+      amount: 10,
+      sessionId: 'print-session',
+    });
+    const leaseId = (armed.body as { leaseId: string }).leaseId;
+    const disarmSpy = jest.spyOn(gate, 'disarm');
+
+    await expect(service.cancel(
+      requestWith({ [CONFIRM_CAPABILITY_COOKIE]: 'unknown-or-forged-token' }),
+      { leaseId },
+    )).resolves.toMatchObject({
+      statusCode: 401,
+      body: { ok: false, error: 'Confirmation capability is invalid or expired.' },
+    });
+
+    expect(disarmSpy).not.toHaveBeenCalled();
+    await expect(service.heartbeat(request, { leaseId })).resolves.toMatchObject({ statusCode: 200 });
+  });
+
+  it('does not allow a different valid capability to cancel another capability lease', async () => {
+    const capability = gate.issueConfirmCapability();
+    const request = requestWith({ [CONFIRM_CAPABILITY_COOKIE]: capability });
+    const armed = await service.arm(request, {
+      mode: 'print',
+      amount: 10,
+      sessionId: 'print-session',
+    });
+    const leaseId = (armed.body as { leaseId: string }).leaseId;
+    const otherCapability = gate.issueConfirmCapability();
+
+    await expect(service.cancel(
+      requestWith({ [CONFIRM_CAPABILITY_COOKIE]: otherCapability }),
+      { leaseId },
+    )).resolves.toMatchObject({ statusCode: 409 });
+
+    expect(disarmCustomerPayment).not.toHaveBeenCalled();
+    await expect(service.heartbeat(request, { leaseId })).resolves.toMatchObject({ statusCode: 200 });
+  });
+
+  it('fails closed with 503 when an expired lease safety disarm fails', async () => {
+    const firstCapability = gate.issueConfirmCapability();
+    const secondCapability = gate.issueConfirmCapability();
+    await expect(service.arm(
+      requestWith({ [CONFIRM_CAPABILITY_COOKIE]: firstCapability }),
+      { mode: 'print', amount: 10, sessionId: 'print-session' },
+    )).resolves.toMatchObject({ statusCode: 200 });
+    currentTime = 15_000;
+    disarmCustomerPayment.mockResolvedValueOnce(false);
+
+    await expect(service.arm(
+      requestWith({ [CONFIRM_CAPABILITY_COOKIE]: secondCapability }),
+      { mode: 'print', amount: 10, sessionId: 'print-session' },
+    )).resolves.toMatchObject({
+      statusCode: 503,
+      body: { ok: false, error: 'Payment hardware is unavailable.' },
+    });
+
+    expect(armCustomerPayment).toHaveBeenCalledTimes(1);
+    expect(disarmCustomerPayment).toHaveBeenCalledWith('heartbeat_timeout');
+  });
 });
 
 describe('confirm capability route', () => {
@@ -320,6 +415,17 @@ describe('local coin simulation boundary', () => {
     lockCoinSlot(CUSTOMER_PAYMENT_LOCK_OWNER, 'active customer payment session');
     expect(isCoinSlotLockedBy(CUSTOMER_PAYMENT_LOCK_OWNER)).toBe(true);
 
+    const customerPaymentGate = new PaymentAcceptorGate({
+      armCustomerPayment: jest.fn().mockResolvedValue(true),
+      disarmCustomerPayment: jest.fn().mockResolvedValue(true),
+      canAcceptCustomerWork: () => true,
+      isPrinterReady: () => true,
+      isSerialConnected: () => true,
+      getBalance: () => 0,
+    });
+    const gateArmSpy = jest.spyOn(customerPaymentGate, 'arm');
+    const gateHeartbeatSpy = jest.spyOn(customerPaymentGate, 'heartbeat');
+    const gateDisarmSpy = jest.spyOn(customerPaymentGate, 'disarm');
     const financialService = new FinancialService({
       io: {} as unknown as any,
       sessionStore: {} as unknown as SessionStore,
@@ -327,6 +433,7 @@ describe('local coin simulation boundary', () => {
       powerSafetyService: {
         canAcceptCustomerWork: () => true,
       } as unknown as any,
+      paymentAcceptorGate: customerPaymentGate,
     });
     const financialController = new FinancialController(financialService);
 
@@ -380,18 +487,6 @@ describe('local coin simulation boundary', () => {
       }),
     } as unknown as Response;
 
-    const dummyGate = new PaymentAcceptorGate({
-      armCustomerPayment: jest.fn().mockResolvedValue(true),
-      disarmCustomerPayment: jest.fn().mockResolvedValue(true),
-      canAcceptCustomerWork: () => true,
-      isPrinterReady: () => true,
-      isSerialConnected: () => true,
-      getBalance: () => 0,
-    });
-    const gateArmSpy = jest.spyOn(dummyGate, 'arm');
-    const gateHeartbeatSpy = jest.spyOn(dummyGate, 'heartbeat');
-    const gateDisarmSpy = jest.spyOn(dummyGate, 'disarm');
-
     await layer!.route!.stack.at(-1)!.handle(req, res);
 
     expect(responseStatus).toBe(200);
@@ -411,6 +506,7 @@ describe('local coin simulation boundary', () => {
     expect(gateHeartbeatSpy).not.toHaveBeenCalled();
     expect(gateDisarmSpy).not.toHaveBeenCalled();
     expect(isCoinSlotLockedBy(CUSTOMER_PAYMENT_LOCK_OWNER)).toBe(true);
+    await customerPaymentGate.shutdown();
   });
 });
 
@@ -530,4 +626,3 @@ describe('final payment disarm and socket authority', () => {
     expect(listeners['unlockCoinSlot']).toBeUndefined();
   });
 });
-

@@ -90,7 +90,9 @@ export class PaymentSessionService {
     body: unknown,
   ): Promise<PaymentSessionResponse> {
     const capability = this.getCapability(req);
-    if (!capability) return this.error(401, 'Confirmation capability is required.');
+    if (!capability || !this.deps.paymentAcceptorGate.hasValidCapability(capability)) {
+      return this.error(401, 'Confirmation capability is invalid or expired.');
+    }
     const leaseId = this.parseLeaseId(body);
     if (!leaseId) return this.error(400, 'Invalid payment lease.');
 
@@ -107,11 +109,14 @@ export class PaymentSessionService {
     body: unknown,
   ): Promise<PaymentSessionResponse> {
     const capability = this.getCapability(req);
-    if (!capability) return this.error(401, 'Confirmation capability is required.');
+    if (!capability || !this.deps.paymentAcceptorGate.hasValidCapability(capability)) {
+      return this.error(401, 'Confirmation capability is invalid or expired.');
+    }
     const leaseId = this.parseLeaseId(body);
     if (!leaseId) return this.error(400, 'Invalid payment lease.');
 
-    const disarmed = await this.deps.paymentAcceptorGate.disarm(
+    const disarmed = await this.deps.paymentAcceptorGate.cancel(
+      capability,
       leaseId,
       'payment_session_cancelled',
     );

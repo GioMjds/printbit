@@ -99,6 +99,24 @@ export class PaymentAcceptorGate {
     });
   }
 
+  public cancel(
+    capability: string,
+    leaseId: string,
+    reason: string,
+  ): Promise<boolean> {
+    return this.enqueue(async () => {
+      if (!this.hasValidCapability(capability)) return false;
+      if (!this.activeLease) return true;
+      if (
+        this.activeLease.capability !== capability
+        || this.activeLease.leaseId !== leaseId
+      ) {
+        return false;
+      }
+      return this.disarmForSafetyInternal(reason);
+    });
+  }
+
   public disarmForSafety(reason: string): Promise<boolean> {
     return this.enqueue(() => this.disarmForSafetyInternal(reason));
   }
@@ -128,7 +146,7 @@ export class PaymentAcceptorGate {
 
     if (this.activeLease) {
       if (this.activeLease.expiresAt <= this.now()) {
-        await this.disarmForSafetyInternal('heartbeat_timeout');
+        if (!await this.disarmForSafetyInternal('heartbeat_timeout')) return null;
       } else {
         return this.activeLease.capability === input.capability
           ? this.activeLease
@@ -198,17 +216,18 @@ export class PaymentAcceptorGate {
     const lease = this.activeLease;
     if (!lease) return true;
 
+    try {
+      if (await this.deps.disarmCustomerPayment(reason) !== true) return false;
+    } catch {
+      return false;
+    }
+
     this.activeLease = null;
     this.capabilities.delete(lease.capability);
     if (this.expiryTimer) {
       clearTimeout(this.expiryTimer);
       this.expiryTimer = null;
     }
-
-    try {
-      return await this.deps.disarmCustomerPayment(reason);
-    } catch {
-      return false;
-    }
+    return true;
   }
 }
