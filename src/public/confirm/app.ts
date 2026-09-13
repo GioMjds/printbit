@@ -768,6 +768,7 @@ let currentPrintQuote: PrintQuote | null = null;
 let coinSlotIsLocked: boolean = false;
 let printerReady = false;
 let paymentLeaseId: string | null = null;
+let paymentLeaseIdForFinalization: string | null = null;
 let paymentLeaseExpiresAt = 0;
 let paymentArmInFlight = false;
 let paymentHeartbeatTimer: number | null = null;
@@ -1198,6 +1199,7 @@ async function armPaymentLease(): Promise<void> {
       return;
     }
 
+    paymentLeaseIdForFinalization = null;
     paymentLeaseId = lease.leaseId;
     paymentLeaseExpiresAt = lease.expiresAt;
     paymentHeartbeatTimer = window.setInterval(() => {
@@ -1245,7 +1247,11 @@ async function releasePaymentLease(
   keepalive = false,
 ): Promise<void> {
   const leaseId = paymentLeaseId;
-  void reason;
+  if (reason === 'target_reached' && leaseId) {
+    paymentLeaseIdForFinalization = leaseId;
+  } else if (reason !== 'confirm_payment') {
+    paymentLeaseIdForFinalization = null;
+  }
   paymentLeaseGeneration += 1;
   stopPaymentHeartbeat();
   paymentLeaseId = null;
@@ -2335,6 +2341,7 @@ function hideOverlay(el: HTMLElement | null): void {
 
 function clearConfirmSessionStorage(): void {
   confirmationOutcome = createConfirmationOutcomeState();
+  paymentLeaseIdForFinalization = null;
   setTransactionReference(null);
   pendingOwedChange = null;
   if (owedChangeAlert) {
@@ -2399,7 +2406,8 @@ modalConfirmBtn?.addEventListener('click', async () => {
   showInitialPrintProgress();
 
   try {
-    const paymentLeaseIdForFinalization = paymentLeaseId;
+    const finalPaymentLeaseId =
+      paymentLeaseIdForFinalization ?? paymentLeaseId;
     if (config.mode === 'print' || config.mode === 'copy') {
       await releasePaymentLease('confirm_payment');
     }
@@ -2531,7 +2539,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         },
         body: JSON.stringify({
           amount: totalPrice,
-          paymentLeaseId: paymentLeaseIdForFinalization,
+          paymentLeaseId: finalPaymentLeaseId,
           mode: config.mode,
           sessionId: config.sessionId,
           documentId: config.documentId,

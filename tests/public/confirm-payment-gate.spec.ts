@@ -20,6 +20,23 @@ describe('confirm payment gate and scc boundary', () => {
     expect(confirmContent).toMatch(/\/api\/confirm-payment/);
   });
 
+  it('retains the target-reached lease ID for final payment disarm', () => {
+    const confirmContent = fs.readFileSync(confirmAppPath, 'utf8');
+
+    expect(confirmContent).toContain(
+      'let paymentLeaseIdForFinalization: string | null = null;',
+    );
+    expect(confirmContent).toMatch(
+      /reason === 'target_reached' && leaseId[\s\S]*paymentLeaseIdForFinalization = leaseId/,
+    );
+    expect(confirmContent).toMatch(
+      /const finalPaymentLeaseId\s*=\s*paymentLeaseIdForFinalization \?\? paymentLeaseId/,
+    );
+    expect(confirmContent).toContain(
+      'paymentLeaseId: finalPaymentLeaseId,',
+    );
+  });
+
   it('does not emit unlockCoinSlot or lockCoinSlot socket events from confirm page', () => {
     const confirmContent = fs.readFileSync(confirmAppPath, 'utf8');
 
