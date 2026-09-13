@@ -1,4 +1,12 @@
 import { initializePageIdleTimeout } from '@/services/idle-timeout';
+import {
+  calculatePrintLayout,
+  DEFAULT_PRINT_SCALING,
+  PAPER_POINTS,
+  type PrintScaling,
+  type PaperSize,
+  type Orientation,
+} from '../../shared/print-configuration';
 import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import { createConfigPreparationLoadingController } from './loading-state';
@@ -16,9 +24,7 @@ import {
   formatLargePrintDisclaimer,
   isLargePrintDocument,
 } from '../shared/large-print-warning';
-import {
-  buildColorDetectionEvidence,
-} from './detection-evidence';
+import { buildColorDetectionEvidence } from './detection-evidence';
 import {
   detectOrientationFromDimensions,
   detectPaperSizeFromDimensions,
@@ -61,8 +67,6 @@ void initializePageIdleTimeout({
 });
 type ColorMode = 'colored' | 'grayscale';
 type PrintQuality = 'standard' | 'high';
-type Orientation = 'portrait' | 'landscape';
-type PaperSize = 'A4' | 'Letter' | 'Legal';
 type RotationDeg = 0 | 90 | 180 | 270;
 type WorkflowMode = 'print' | 'copy' | 'scan';
 
@@ -74,6 +78,7 @@ type PageRangeSelection =
   | { type: 'single'; page: number };
 
 interface PrintConfig {
+  scaling: PrintScaling;
   mode: 'print' | 'copy' | 'scan';
   sessionId: string | null;
   documentId: string | null;
@@ -122,6 +127,7 @@ interface PrintQuote {
 }
 
 interface PreviewConfig {
+  scaling: PrintScaling;
   colorMode: ColorMode;
   orientation: Orientation;
   paperSize: PaperSize;
@@ -179,20 +185,13 @@ interface PDFViewport {
   height: number;
 }
 
-const PAPER_MM: Record<PaperSize, [number, number]> = {
-  A4: [210, 297], // A4 Bond Paper
-  Letter: [216, 279], // Short Bond Paper (8.5" × 11")
-  Legal: [216, 356], // Long Bond Paper / US Legal (8.5" × 14")
-};
-
 /** Return [widthPx, heightPx] of the paper sheet at 96 dpi,
  *  capped so the preview column (≤ 100%) never overflows.
  *  Portrait = narrow side first; Landscape = tall side first. */
 function paperPx(size: PaperSize, orientation: Orientation): [number, number] {
-  const MM_TO_PX = 96 / 25.4;
-  let [wMM, hMM] = PAPER_MM[size];
-  if (orientation === 'landscape') [wMM, hMM] = [hMM, wMM];
-  return [Math.round(wMM * MM_TO_PX), Math.round(hMM * MM_TO_PX)];
+  let [width, height] = PAPER_POINTS[size];
+  if (orientation === 'landscape') [width, height] = [height, width];
+  return [(width * 96) / 72, (height * 96) / 72];
 }
 
 function normalizeRotationDeg(value: unknown): RotationDeg | null {
@@ -291,6 +290,13 @@ function syncPreviewPageWithRange(): void {
 }
 
 class PrintPreview {
+  private printConfig: PreviewConfig = {
+    paperSize: 'A4',
+    orientation: 'portrait',
+    scaling: DEFAULT_PRINT_SCALING,
+    rotationDeg: 0,
+    colorMode: 'colored',
+  };
   private viewport: HTMLElement;
   private sheet: HTMLElement;
   private canvas: HTMLCanvasElement;
@@ -334,7 +340,10 @@ class PrintPreview {
     return this.latestImageInfo;
   }
 
-  async getNaturalDimensions(): Promise<{ width: number; height: number } | null> {
+  async getNaturalDimensions(): Promise<{
+    width: number;
+    height: number;
+  } | null> {
     if (this.pdfDoc) {
       try {
         const page = await this.pdfDoc.getPage(1);
@@ -413,6 +422,7 @@ class PrintPreview {
     this.resizeObserver = new ResizeObserver(() => {
       this.resizeSheet();
       if (this.pdfDoc) void this.renderPage(this.currentPage);
+      else if (this.latestImageInfo) this.layoutImage();
       else if (this.iframe.style.display !== 'none') this.recalcHtmlPages();
     });
     this.resizeObserver.observe(this.viewport);
@@ -430,9 +440,11 @@ class PrintPreview {
     // PDF.js canvas share the same geometry at every zoom level.
     this.sheet.style.width = `${this.naturalW * finalScale}px`;
     this.sheet.style.height = `${this.naturalH * finalScale}px`;
+    if (this.latestImageInfo) this.layoutImage();
   }
 
   applyConfig(cfg: PreviewConfig): void {
+    this.printConfig = cfg;
     const [w, h] = paperPx(cfg.paperSize, cfg.orientation);
     const rotationScale =
       cfg.rotationDeg === 90 || cfg.rotationDeg === 270
@@ -458,6 +470,8 @@ class PrintPreview {
 
     if (this.pdfDoc) {
       void this.renderPage(this.currentPage);
+    } else if (this.latestImageInfo) {
+      this.layoutImage();
     } else if (this.iframe.style.display !== 'none') {
       this.recalcHtmlPages();
     }
@@ -608,27 +622,46 @@ class PrintPreview {
 
     const renderNow = async () => {
       try {
+        const config = this.printConfig;
         const page = await this.pdfDoc!.getPage(pageNum);
         const sheetBounds = this.sheet.getBoundingClientRect();
         const sheetW = sheetBounds.width || 595;
         const sheetH = sheetBounds.height || 842;
         const baseVP = page.getViewport({ scale: 1 });
 
-        // Scale to fit sheet, accounting for device pixel ratio for crispness
+        // Fit the rotated source once inside the same target inset used by C#.
+        const layout = calculatePrintLayout(
+          baseVP.width,
+          baseVP.height,
+          config,
+        );
         const dpr = window.devicePixelRatio || 1;
-        const scaleW = sheetW / baseVP.width;
-        const scaleH = sheetH / baseVP.height;
-        const scale = Math.min(scaleW, scaleH) * dpr;
+        const pixelsPerPoint = (sheetW / layout.width) * dpr;
+        const scale = layout.scale * pixelsPerPoint;
         const viewport = page.getViewport({ scale });
-
-        // Size the canvas in physical pixels; CSS sizes it to 100%/100%
-        this.canvas.width = Math.max(1, Math.ceil(viewport.width));
-        this.canvas.height = Math.max(1, Math.ceil(viewport.height));
-
+        const sourceCanvas = document.createElement('canvas');
+        sourceCanvas.width = Math.max(1, Math.ceil(viewport.width));
+        sourceCanvas.height = Math.max(1, Math.ceil(viewport.height));
+        await page.render({
+          canvasContext: sourceCanvas.getContext('2d')!,
+          viewport,
+        }).promise;
+        this.canvas.width = Math.max(1, Math.ceil(sheetW * dpr));
+        this.canvas.height = Math.max(1, Math.ceil(sheetH * dpr));
         const ctx = this.canvas.getContext('2d')!;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.save();
+        ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+        ctx.rotate((config.rotationDeg * Math.PI) / 180);
+        ctx.drawImage(
+          sourceCanvas,
+          -viewport.width / 2,
+          -viewport.height / 2,
+          viewport.width,
+          viewport.height,
+        );
+        ctx.restore();
 
         this.showCanvas(true);
         this.showImg(false);
@@ -648,6 +681,21 @@ class PrintPreview {
 
     this.renderTask = renderNow();
     await this.renderTask;
+  }
+
+  private layoutImage(): void {
+    if (!this.latestImageInfo) return;
+    const { naturalWidth, naturalHeight } = this.latestImageInfo;
+    const layout = calculatePrintLayout(
+      naturalWidth,
+      naturalHeight,
+      this.printConfig,
+    );
+    const pixelsPerPoint =
+      this.sheet.getBoundingClientRect().width / layout.width;
+    this.img.style.width = `${naturalWidth * layout.scale * pixelsPerPoint}px`;
+    this.img.style.height = `${naturalHeight * layout.scale * pixelsPerPoint}px`;
+    this.img.style.transform = `translate(-50%, -50%) rotate(${this.printConfig.rotationDeg}deg)`;
   }
 
   private async loadImage(url: string, isBlobUrl = false): Promise<void> {
@@ -675,6 +723,7 @@ class PrintPreview {
         this.currentPage = 1;
         this.updatePager();
         this.showImg(true);
+        this.layoutImage();
         this.showLoading(false);
         this.setHint('Image preview');
         // Revoke blob URL after image loads to free memory
@@ -942,11 +991,15 @@ const continueBtn = document.getElementById(
 const filePillLabel = document.getElementById(
   'filePillLabel',
 ) as HTMLElement | null;
-const footerSummary = document.getElementById('footerSelections') as HTMLElement | null;
+const footerSummary = document.getElementById(
+  'footerSelections',
+) as HTMLElement | null;
 const footerBreakdown = document.getElementById(
   'footerBreakdown',
 ) as HTMLElement | null;
-const footerTotal = document.getElementById('footerTotal') as HTMLElement | null;
+const footerTotal = document.getElementById(
+  'footerTotal',
+) as HTMLElement | null;
 const largePrintDisclaimer = document.getElementById(
   'largePrintDisclaimer',
 ) as HTMLElement | null;
@@ -1170,8 +1223,7 @@ function renderColorDetectionEvidence(): void {
   const pageLabel = evidence.selectedPages === 1 ? 'page' : 'pages';
 
   if (colorDetectionSummary) {
-    colorDetectionSummary.textContent =
-      `Color detected on ${evidence.colorPercentage}% of selected ${pageLabel}`;
+    colorDetectionSummary.textContent = `Color detected on ${evidence.colorPercentage}% of selected ${pageLabel}`;
   }
   if (colorDetectionMeter) {
     colorDetectionMeter.setAttribute(
@@ -1187,8 +1239,7 @@ function renderColorDetectionEvidence(): void {
     colorDetectionMeterFill.style.width = `${evidence.colorPercentage}%`;
   }
   if (colorDetectionCounts) {
-    colorDetectionCounts.textContent =
-      `${evidence.colorPages} Color · ${evidence.grayscalePages} Grayscale`;
+    colorDetectionCounts.textContent = `${evidence.colorPages} Color · ${evidence.grayscalePages} Grayscale`;
   }
   if (colorDetectionConfidence) {
     colorDetectionConfidence.textContent =
@@ -1501,6 +1552,7 @@ function getCopies(): number {
 
 function currentPreviewConfig(): PreviewConfig {
   return {
+    scaling: DEFAULT_PRINT_SCALING,
     colorMode: (getRadio('colorMode') as ColorMode) || 'colored',
     orientation: (getRadio('orientation') as Orientation) || 'portrait',
     paperSize: (getRadio('paperSize') as PaperSize) || 'A4',
@@ -1805,7 +1857,8 @@ function updateSummary(): void {
         `${currentPrintQuote.effectiveColorMode === 'colored' ? 'Color' : 'Grayscale'} · ` +
         `${cfg.paperSize} · ${currentPrintQuote.quality === 'high' ? 'High quality' : 'Standard quality'}`;
     }
-    if (footerTotal) footerTotal.textContent = `₱${currentPrintQuote.requiredAmount}`;
+    if (footerTotal)
+      footerTotal.textContent = `₱${currentPrintQuote.requiredAmount}`;
     return;
   }
 
@@ -1823,11 +1876,13 @@ function updateSummary(): void {
     if (hasCopyPreview) {
       footerSummary.textContent = 'Copy ready';
       if (footerBreakdown)
-        footerBreakdown.textContent = 'Choose settings to calculate your total.';
+        footerBreakdown.textContent =
+          'Choose settings to calculate your total.';
     } else {
       footerSummary.textContent = 'No document detected';
       if (footerBreakdown)
-        footerBreakdown.textContent = 'Go back to scan a document before continuing.';
+        footerBreakdown.textContent =
+          'Go back to scan a document before continuing.';
     }
     if (footerTotal) footerTotal.textContent = '—';
     return;
@@ -2221,7 +2276,6 @@ async function applyColorAnalysis(
       grayRadio.checked = true;
       grayRadio.dispatchEvent(new Event('change', { bubbles: true }));
     }
-
   } catch {
     detectedColorMode = null;
   }
@@ -2235,6 +2289,7 @@ continueBtn?.addEventListener('click', () => {
 
   const cfg = currentPreviewConfig();
   const config: PrintConfig = {
+    scaling: cfg.scaling,
     mode,
     sessionId: mode === 'scan' ? null : sessionId,
     documentId: mode === 'print' ? selectedDocumentId : null,

@@ -380,8 +380,7 @@ body {
   object-fit: contain;
   position: absolute;
   inset: 0;
-  transform: rotate(var(--preview-rotation))
-    scale(var(--preview-rotation-scale));
+  /* PDF rotation and fitting are baked into the target-sized canvas. */
   transform-origin: center;
   transition: transform 220ms ease;
 }
@@ -393,20 +392,21 @@ body {
   display: grid;
   place-items: center;
   background: #fff;
-  transform: rotate(var(--preview-rotation))
-    scale(var(--preview-rotation-scale));
   transform-origin: center;
   transition: transform 220ms ease;
 }
 .paper-img {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: none;
+  max-height: none;
   width: auto;
   height: auto;
   object-fit: contain;
   box-sizing: border-box;
-  padding: 6px;
+  padding: 0;
 }
 
 /* ── iFrame (Word/HTML) ───────────────────────────────────── */

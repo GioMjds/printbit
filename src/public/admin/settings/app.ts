@@ -142,12 +142,6 @@ const alertEmailTo = document.getElementById(
 const testEmailAlertBtn = document.getElementById(
   'testEmailAlertBtn',
 ) as HTMLButtonElement | null;
-const openAlertBadge = document.getElementById(
-  'openAlertBadge',
-) as HTMLElement | null;
-const openAlertBadgeMob = document.getElementById(
-  'openAlertBadgeMob',
-) as HTMLElement | null;
 
 const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 let refreshTimer: number | null = null;
@@ -173,7 +167,7 @@ function renderScanFilenamePreview(): void {
   const timeFormat = settingScanFilenameTimeFormat?.value ?? 'HHmmss';
   const includeRandom = settingScanFilenameIncludeRandom?.checked ?? false;
 
-  let baseName = '';
+  let baseName: string;
   if (customEnabled) {
     baseName = customPattern
       .replace(/\{PREFIX\}/gi, prefix)
@@ -201,15 +195,51 @@ function renderScanFilenamePreview(): void {
     baseName = parts.filter(Boolean).join('-');
   }
 
-  const cleaned = baseName
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+  // eslint-disable-next-line no-control-regex
+  const cleaned = baseName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
     .trim();
 
-  const finalName = (cleaned.length > 0 ? cleaned : 'PrintBit-Scan') + '.pdf';
+  let baseWithoutExt = cleaned.replace(/\.(pdf|jpe?g|png)$/i, '');
+  if (!baseWithoutExt) baseWithoutExt = 'PrintBit-Scan';
+  const finalName = `${baseWithoutExt}.pdf`;
   scanFilenamePreviewText.textContent = finalName;
+}
+
+function syncScanFilenameUI(): void {
+  const customEnabled =
+    settingScanFilenameCustomPatternEnabled?.checked ?? false;
+  if (customPatternContainer) {
+    customPatternContainer.classList.toggle('hidden', !customEnabled);
+  }
+
+  const presetElements: Array<HTMLSelectElement | HTMLInputElement | null> = [
+    settingScanFilenameDateFormat,
+    settingScanFilenameTimeFormat,
+    settingScanFilenameIncludeRandom,
+  ];
+
+  presetElements.forEach((el) => {
+    if (!el) return;
+    el.disabled = customEnabled;
+    const parentField = el.closest('.field');
+    if (parentField) {
+      parentField.classList.toggle('field--disabled', customEnabled);
+    }
+  });
+
+  if (
+    customEnabled &&
+    settingScanFilenameCustomPattern &&
+    !settingScanFilenameCustomPattern.value.trim()
+  ) {
+    settingScanFilenameCustomPattern.value =
+      '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
+  }
+
+  renderScanFilenamePreview();
 }
 
 const scanFormatInputs = [
@@ -225,14 +255,10 @@ scanFormatInputs.forEach((el) => {
   if (!el) return;
   const update = () => {
     if (el === settingScanFilenameCustomPatternEnabled) {
-      if (customPatternContainer) {
-        customPatternContainer.classList.toggle(
-          'hidden',
-          !settingScanFilenameCustomPatternEnabled.checked,
-        );
-      }
+      syncScanFilenameUI();
+    } else {
+      renderScanFilenamePreview();
     }
-    renderScanFilenamePreview();
   };
   el.addEventListener('input', update);
   el.addEventListener('change', update);
@@ -242,15 +268,27 @@ document.querySelectorAll('.token-tag').forEach((tag) => {
   tag.addEventListener('click', () => {
     const token = tag.getAttribute('data-token');
     if (!token || !settingScanFilenameCustomPattern) return;
-    const start = settingScanFilenameCustomPattern.selectionStart ?? settingScanFilenameCustomPattern.value.length;
-    const end = settingScanFilenameCustomPattern.selectionEnd ?? settingScanFilenameCustomPattern.value.length;
+    const start =
+      settingScanFilenameCustomPattern.selectionStart ??
+      settingScanFilenameCustomPattern.value.length;
+    const end =
+      settingScanFilenameCustomPattern.selectionEnd ??
+      settingScanFilenameCustomPattern.value.length;
     const current = settingScanFilenameCustomPattern.value;
-    settingScanFilenameCustomPattern.value = current.slice(0, start) + token + current.slice(end);
+    settingScanFilenameCustomPattern.value =
+      current.slice(0, start) + token + current.slice(end);
     settingScanFilenameCustomPattern.focus();
-    settingScanFilenameCustomPattern.setSelectionRange(start + token.length, start + token.length);
-    renderScanFilenamePreview();
+    settingScanFilenameCustomPattern.setSelectionRange(
+      start + token.length,
+      start + token.length,
+    );
+    settingScanFilenameCustomPattern.dispatchEvent(
+      new Event('input', { bubbles: true }),
+    );
   });
 });
+
+syncScanFilenameUI();
 
 
 function applySettings(settings: SettingsResponse): void {
@@ -367,23 +405,32 @@ function applySettings(settings: SettingsResponse): void {
   if (alertEmailTo) alertEmailTo.value = settings.alerts.email.to;
 
   // Scan Filename Format
-  if (settings.scanFilenameFormat) {
-    const sff = settings.scanFilenameFormat;
-    if (settingScanFilenamePrefix) settingScanFilenamePrefix.value = sff.prefix ?? 'PrintBit-Scan';
-    if (settingScanFilenameDateFormat) settingScanFilenameDateFormat.value = sff.dateFormat ?? 'YYYYMMDD';
-    if (settingScanFilenameTimeFormat) settingScanFilenameTimeFormat.value = sff.timeFormat ?? 'HHmmss';
-    if (settingScanFilenameIncludeRandom) settingScanFilenameIncludeRandom.checked = Boolean(sff.includeRandomSuffix);
-    if (settingScanFilenameCustomPatternEnabled) {
-      settingScanFilenameCustomPatternEnabled.checked = Boolean(sff.customPatternEnabled);
-      if (customPatternContainer) {
-        customPatternContainer.classList.toggle('hidden', !sff.customPatternEnabled);
-      }
-    }
-    if (settingScanFilenameCustomPattern) {
-      settingScanFilenameCustomPattern.value = sff.customPattern ?? '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
-    }
-    renderScanFilenamePreview();
+  const sff = settings.scanFilenameFormat ?? {
+    prefix: 'PrintBit-Scan',
+    dateFormat: 'YYYYMMDD',
+    timeFormat: 'HHmmss',
+    includeRandomSuffix: false,
+    customPatternEnabled: false,
+    customPattern: '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}',
+  };
+  if (settingScanFilenamePrefix)
+    settingScanFilenamePrefix.value = sff.prefix ?? 'PrintBit-Scan';
+  if (settingScanFilenameDateFormat)
+    settingScanFilenameDateFormat.value = sff.dateFormat ?? 'YYYYMMDD';
+  if (settingScanFilenameTimeFormat)
+    settingScanFilenameTimeFormat.value = sff.timeFormat ?? 'HHmmss';
+  if (settingScanFilenameIncludeRandom)
+    settingScanFilenameIncludeRandom.checked = Boolean(sff.includeRandomSuffix);
+  if (settingScanFilenameCustomPatternEnabled) {
+    settingScanFilenameCustomPatternEnabled.checked = Boolean(
+      sff.customPatternEnabled,
+    );
   }
+  if (settingScanFilenameCustomPattern) {
+    settingScanFilenameCustomPattern.value =
+      sff.customPattern ?? '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
+  }
+  syncScanFilenameUI();
 
 }
 

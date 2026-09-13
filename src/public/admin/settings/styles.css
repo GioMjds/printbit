@@ -266,3 +266,21 @@ select.field__input option {
   border-radius: 8px;
   border: 1px dashed rgba(56, 189, 248, 0.3);
 }
+
+/* Disabled preset state styling when custom pattern is active */
+.field--disabled,
+.field--disabled .field__lbl,
+.field--disabled .field__hint,
+.field--disabled .checkbox-label {
+  opacity: 0.45;
+  cursor: not-allowed;
+  user-select: none;
+}
+
+.field__input:disabled,
+.checkbox-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+

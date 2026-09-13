@@ -6,6 +6,12 @@ import { handoffToWorker } from './worker-handoff';
 import { printerStateProjection } from './printer-state-projection';
 import type { RotationDeg } from './document-rotation';
 import type { PrintQuality } from '@/core/database/shared.schema';
+import {
+  DEFAULT_PRINT_SCALING,
+  type PrintScaling,
+  type PaperSize,
+  type Orientation,
+} from '../shared/print-configuration';
 
 export class PrintDispatchError extends Error {
   readonly result: {
@@ -58,8 +64,7 @@ export interface PrintDispatchResult {
 }
 
 export type ColorMode = 'colored' | 'grayscale';
-export type Orientation = 'portrait' | 'landscape';
-export type PaperSize = 'A4' | 'Letter' | 'Legal';
+export type { Orientation, PaperSize } from '../shared/print-configuration';
 
 export interface PrintJobOptions {
   copies: number;
@@ -71,6 +76,7 @@ export interface PrintJobOptions {
   duplex?: boolean;
   printerName?: string;
   quality?: PrintQuality;
+  scaling?: PrintScaling;
 }
 
 export class PrinterService {
@@ -143,7 +149,8 @@ export class PrinterService {
 
     const spoolerCorrelationKey = context.spoolerCorrelationKey || randomUUID();
     const transactionId = context.transactionId || randomUUID();
-    const queueDir = WORKER_QUEUE_DIR || path.resolve('../printbit-worker/queue');
+    const queueDir =
+      WORKER_QUEUE_DIR || path.resolve('../printbit-worker/queue');
 
     const handoffResult = await handoffToWorker({
       sourcePath: filePath,
@@ -159,6 +166,7 @@ export class PrinterService {
         pageRange: options.pageRange,
         duplex: options.duplex,
         quality: options.quality,
+        scaling: options.scaling ?? DEFAULT_PRINT_SCALING,
       },
     });
 

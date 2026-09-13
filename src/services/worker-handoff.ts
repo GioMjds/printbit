@@ -1,5 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {
+  DEFAULT_PRINT_SCALING,
+  type PrintScaling,
+} from '../shared/print-configuration';
 
 export type WorkerHandoffErrorCode =
   | 'WORKER_QUEUE_UNAVAILABLE'
@@ -30,6 +34,7 @@ export async function handoffToWorker(input: {
     rotationDeg?: number;
     paperSize?: 'A4' | 'Letter' | 'Legal';
     quality?: 'standard' | 'high';
+    scaling?: PrintScaling;
   };
 }): Promise<{ targetPath: string; fileName: string }> {
   if (!input.queueDir || input.queueDir.trim().length === 0) {
@@ -93,6 +98,7 @@ export async function handoffToWorker(input: {
       rotationDeg: input.printSettings?.rotationDeg ?? 0,
       paperSize: input.printSettings?.paperSize ?? 'A4',
       quality: input.printSettings?.quality ?? 'standard',
+      scaling: input.printSettings?.scaling ?? DEFAULT_PRINT_SCALING,
       schemaVersion: 2,
       transactionId: input.transactionId,
       spoolerCorrelationKey: input.spoolerCorrelationKey,

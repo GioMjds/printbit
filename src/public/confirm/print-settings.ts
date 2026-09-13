@@ -1,3 +1,5 @@
+import { DEFAULT_PRINT_SCALING } from '../../shared/print-configuration';
+
 export type PageRangeSelection =
   | { type: 'all' }
   | { type: 'custom'; range: string }
@@ -23,6 +25,7 @@ export function buildPhysicalPrintSettings(
     orientation: selection.orientation,
     rotationDeg: selection.rotationDeg ?? 0,
     paperSize: selection.paperSize,
+    scaling: DEFAULT_PRINT_SCALING,
     pageRange: selection.pageRange ?? { type: 'all' as const },
   };
 }
