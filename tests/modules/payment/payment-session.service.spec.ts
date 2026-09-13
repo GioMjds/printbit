@@ -1,6 +1,23 @@
 import type { Request, Response } from 'express';
 
-jest.mock('@/services/db', () => ({ db: { data: null } }));
+jest.mock('@/services/db', () => ({
+  db: {
+    data: {
+      balance: 100,
+      jobStats: { total: 0, print: 0, copy: 0, scan: 0 },
+      settings: {
+        pricing: {
+          printPerPage: 5,
+          copyPerPage: 3,
+          scanDocument: 5,
+          colorSurcharge: 2,
+          highQualitySurcharge: 2,
+        },
+      },
+    },
+    write: jest.fn().mockResolvedValue(undefined),
+  },
+}));
 jest.mock('@/services/worker-command-pipe', () => ({
   sendWorkerRequest: jest.fn(),
 }));
@@ -12,12 +29,43 @@ jest.mock('@/services/recovery', () => ({
 jest.mock('@/services/settlement', () => ({
   settlementService: { settle: jest.fn() },
 }));
+jest.mock('@/services/financial-ledger', () => ({
+  financialLedgerService: { append: jest.fn().mockResolvedValue(undefined) },
+}));
 jest.mock('@/modules/print-queue', () => ({
   enqueuePrintJob: jest.fn(),
+  buildPrintJobEnqueuePayload: jest.fn().mockReturnValue({}),
 }));
 jest.mock('@/services/printer', () => ({
   printFile: jest.fn(),
 }));
+jest.mock('@/services/printer-state-projection', () => {
+  const telemetry = {
+    connected: true,
+    name: 'Test printer',
+    driverName: 'Test driver',
+    portName: 'TEST:',
+    connectionType: 'virtual',
+    status: 'Idle',
+    statusFlags: [],
+    ink: [],
+    inkDetectionMethod: 'none',
+    inkTelemetryAvailable: false,
+    inkTelemetryReason: null,
+    lastCheckedAt: new Date(0).toISOString(),
+    lastError: null,
+  };
+  return {
+    getPrinterTelemetry: jest.fn(() => telemetry),
+    refreshPrinterTelemetry: jest.fn(async () => telemetry),
+    evaluateInkPreflight: jest.fn(() => ({
+      blocked: false,
+      code: 'ok',
+      reason: null,
+      telemetryAvailable: false,
+    })),
+  };
+});
 
 import { sendWorkerRequest } from '../../../src/services/worker-command-pipe';
 import { coinSimulation } from '../../../src/services/coin-simulation';
@@ -529,96 +577,123 @@ describe('final payment disarm and socket authority', () => {
     jest.clearAllMocks();
   });
 
-  it('disarms active payment lease before charge/print in confirmPayment', async () => {
-    const disarmSpy = jest.fn().mockResolvedValue(true);
-    const dummyGate = {
-      disarm: disarmSpy,
-    } as unknown as PaymentAcceptorGate;
-
-    const financialService = new FinancialService({
-      io: {} as unknown as any,
-      sessionStore: {} as unknown as SessionStore,
-      resolvePublicBaseUrl: () => publicBaseUrl,
-      powerSafetyService: {
-        canAcceptCustomerWork: () => true,
-      } as unknown as any,
-      paymentAcceptorGate: dummyGate,
-    });
-
-    let statusCode = 200;
-    const res = {
-      status: jest.fn((code: number) => {
-        statusCode = code;
-        return res;
-      }),
-      json: jest.fn(() => res),
-      sendStatus: jest.fn((code: number) => {
-        statusCode = code;
-        return res;
-      }),
-    } as unknown as Response;
-
-    const req = {
+  const createValidPrintRequest = (paymentLeaseId?: string): Request =>
+    ({
       body: {
-        amount: 10,
+        amount: 3,
         mode: 'print',
-        paymentLeaseId: 'test-lease-id',
+        sessionId: 'finalization-session',
+        documentId: 'finalization-document',
+        paymentLeaseId,
       },
       get: () => null,
-    } as unknown as Request;
+    }) as unknown as Request;
 
-    await financialService.confirmPayment(req, res);
-
-    expect(disarmSpy).toHaveBeenCalledWith('test-lease-id', 'confirm_payment');
-  });
-
-  it('rejects confirmPayment with 503 when lease disarm fails', async () => {
-    const disarmSpy = jest.fn().mockResolvedValue(false);
-    const dummyGate = {
-      disarm: disarmSpy,
-    } as unknown as PaymentAcceptorGate;
-
-    const financialService = new FinancialService({
-      io: {} as unknown as any,
-      sessionStore: {} as unknown as SessionStore,
+  const createFinalizationService = (disarm: jest.Mock): FinancialService =>
+    new FinancialService({
+      io: { emit: jest.fn() } as unknown as any,
+      sessionStore: {
+        getSessionState: jest.fn(() => 'active'),
+        tryGetSession: jest.fn(() => ({
+          documents: [{
+            documentId: 'finalization-document',
+            sessionId: 'finalization-session',
+            filename: 'finalization.pdf',
+            contentType: 'application/pdf',
+            sizeBytes: 1,
+            uploadedAt: new Date(0),
+            filePath: path.resolve('tests/modules/payment/payment-session.service.spec.ts'),
+            convertedPdfPath: path.resolve('tests/modules/payment/payment-session.service.spec.ts'),
+            analysisStatus: 'completed',
+            analysis: {
+              fileType: 'pdf',
+              pageCount: 1,
+              pages: [{ index: 1, isColor: false }],
+              colorPages: 0,
+              bwPages: 1,
+              totalPages: 1,
+              confidence: 'high',
+              analyzedAt: new Date(0),
+            },
+          }],
+        })),
+        touchSession: jest.fn(),
+      } as unknown as SessionStore,
       resolvePublicBaseUrl: () => publicBaseUrl,
       powerSafetyService: {
         canAcceptCustomerWork: () => true,
       } as unknown as any,
-      paymentAcceptorGate: dummyGate,
+      paymentAcceptorGate: { disarm } as unknown as PaymentAcceptorGate,
     });
 
-    let statusCode = 200;
+  const createResponse = (): { response: Response; statusCode: () => number; body: () => unknown } => {
+    let status = 200;
     let jsonBody: unknown = null;
-    const res = {
+    const response = {
       status: jest.fn((code: number) => {
-        statusCode = code;
-        return res;
+        status = code;
+        return response;
       }),
       json: jest.fn((data: unknown) => {
         jsonBody = data;
-        return res;
-      }),
-      sendStatus: jest.fn((code: number) => {
-        statusCode = code;
-        return res;
+        return response;
       }),
     } as unknown as Response;
 
-    const req = {
-      body: {
-        amount: 10,
-        mode: 'copy',
-        paymentLeaseId: 'failing-lease-id',
-      },
-      get: () => null,
-    } as unknown as Request;
+    return {
+      response,
+      statusCode: () => status,
+      body: () => jsonBody,
+    };
+  };
 
-    await financialService.confirmPayment(req, res);
+  const successfulSettlement = {
+    ok: true,
+    chargedAmount: 3,
+    previousBalance: 100,
+    remainingBalance: 97,
+    earnings: 3,
+    change: { requested: 0, dispensed: 0, state: 'none' as const },
+  };
+
+  it('disarms before settlement and worker queue dispatch for a valid print finalization', async () => {
+    const events: string[] = [];
+    const disarmSpy = jest.fn().mockImplementation(async () => {
+      events.push('disarm');
+      return true;
+    });
+    jest.mocked(settlementService.settle).mockImplementation(async () => {
+      events.push('settlement');
+      return successfulSettlement;
+    });
+    jest.mocked(enqueuePrintJob).mockImplementation(async () => {
+      events.push('queue-dispatch');
+      return 'queued-job';
+    });
+    const { response, statusCode } = createResponse();
+
+    await createFinalizationService(disarmSpy).confirmPayment(
+      createValidPrintRequest('test-lease-id'),
+      response,
+    );
+
+    expect(statusCode()).toBe(200);
+    expect(disarmSpy).toHaveBeenCalledWith('test-lease-id', 'confirm_payment');
+    expect(events).toEqual(['disarm', 'settlement', 'queue-dispatch']);
+  });
+
+  it('rejects a valid print finalization with 503 and no settlement or dispatch when disarm fails', async () => {
+    const disarmSpy = jest.fn().mockResolvedValue(false);
+    const { response, statusCode, body } = createResponse();
+
+    await createFinalizationService(disarmSpy).confirmPayment(
+      createValidPrintRequest('failing-lease-id'),
+      response,
+    );
 
     expect(disarmSpy).toHaveBeenCalledWith('failing-lease-id', 'confirm_payment');
-    expect(statusCode).toBe(503);
-    expect(jsonBody).toMatchObject({
+    expect(statusCode()).toBe(503);
+    expect(body()).toMatchObject({
       code: 'PAYMENT_DISARM_FAILED',
     });
     expect(settlementService.settle).not.toHaveBeenCalled();
@@ -628,32 +703,15 @@ describe('final payment disarm and socket authority', () => {
 
   it('fails closed before settlement or dispatch when an active payment omits its lease id', async () => {
     const disarmSpy = jest.fn().mockResolvedValue(false);
-    const financialService = new FinancialService({
-      io: {} as unknown as any,
-      sessionStore: {} as unknown as SessionStore,
-      resolvePublicBaseUrl: () => publicBaseUrl,
-      powerSafetyService: {
-        canAcceptCustomerWork: () => true,
-      } as unknown as any,
-      paymentAcceptorGate: { disarm: disarmSpy } as unknown as PaymentAcceptorGate,
-    });
-    let statusCode = 200;
-    const res = {
-      status: jest.fn((code: number) => {
-        statusCode = code;
-        return res;
-      }),
-      json: jest.fn(() => res),
-    } as unknown as Response;
-    const req = {
-      body: { amount: 10, mode: 'invalid' },
-      get: () => null,
-    } as unknown as Request;
+    const { response, statusCode } = createResponse();
 
-    await financialService.confirmPayment(req, res);
+    await createFinalizationService(disarmSpy).confirmPayment(
+      createValidPrintRequest(),
+      response,
+    );
 
     expect(disarmSpy).toHaveBeenCalledWith(undefined, 'confirm_payment');
-    expect(statusCode).toBe(503);
+    expect(statusCode()).toBe(503);
     expect(settlementService.settle).not.toHaveBeenCalled();
     expect(enqueuePrintJob).not.toHaveBeenCalled();
     expect(printFile).not.toHaveBeenCalled();
