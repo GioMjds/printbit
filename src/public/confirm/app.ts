@@ -50,6 +50,7 @@ void initializePageIdleTimeout({
     console.log(
       '[PAGE IDLE] Confirm page timeout reached, redirecting to home',
     );
+    await releasePaymentLease('idle_timeout', true);
     await releaseTransientFilesForCurrentMode('confirm_idle_timeout');
     const sessionId = sessionStorage.getItem('printbit.sessionId');
     const sessionToken = sessionStorage.getItem('printbit.sessionToken');
@@ -134,6 +135,14 @@ type ConfirmConfig = PrintConfig;
 
 type PricingResponse = {
   scanDocument: number;
+};
+
+type PaymentLease = {
+  ok: true;
+  status: 'AWAITING_PAYMENT';
+  leaseId: string;
+  amount: number;
+  expiresAt: number;
 };
 
 type ReceiptLinkPayload = {
@@ -566,6 +575,9 @@ const COIN_INSERT_GUIDANCE_MESSAGE =
 
 function renderPrinterError(err: PrintError): void {
   currentPrinterError = err;
+  if (err.severity === 'fatal' || err.severity === 'recoverable') {
+    void releasePaymentLease('printer_failure', true);
+  }
   if (!printerErrorBlock) return;
 
   const requiresMaintenance = isMaintenancePrintFailure(
@@ -724,6 +736,7 @@ function clearPrinterError(): void {
   if (errorTechDetails) errorTechDetails.setAttribute('hidden', '');
   maintenanceResolution?.setAttribute('hidden', '');
   applyConfirmGate();
+  syncPaymentLeaseState();
 }
 
 function syncCoinInsertGuidanceMessage(): void {
@@ -754,6 +767,11 @@ let currentBalance = 0;
 let currentPrintQuote: PrintQuote | null = null;
 let coinSlotIsLocked: boolean = false;
 let printerReady = false;
+let paymentLeaseId: string | null = null;
+let paymentLeaseExpiresAt = 0;
+let paymentArmInFlight = false;
+let paymentHeartbeatTimer: number | null = null;
+let paymentLeaseGeneration = 0;
 
 if (!rawConfig) {
   const storedSessionId = sessionStorage.getItem('printbit.sessionId');
@@ -775,6 +793,7 @@ const confirmLoadingController =
     : null;
 
 window.addEventListener('pagehide', (event) => {
+  void releasePaymentLease('pagehide', true);
   if (!event.persisted) {
     confirmLoadingController?.destroy();
     coinLottiePlayer?.destroy();
@@ -1118,12 +1137,145 @@ function applyLockState(locked: boolean): void {
   }
 }
 
-function syncCoinSlotLockState(): void {
-  const shouldLock =
-    pricingLoaded && totalPrice > 0 && currentBalance >= totalPrice;
-  if (shouldLock === coinSlotIsLocked) return;
+function stopPaymentHeartbeat(): void {
+  if (paymentHeartbeatTimer !== null) {
+    window.clearInterval(paymentHeartbeatTimer);
+    paymentHeartbeatTimer = null;
+  }
+}
 
-  applyLockState(shouldLock);
+function hasBlockingPrinterError(): boolean {
+  return (
+    currentPrinterError?.severity === 'fatal' ||
+    currentPrinterError?.severity === 'recoverable'
+  );
+}
+
+function canArmPaymentLease(): boolean {
+  return (
+    (config.mode === 'print' || config.mode === 'copy') &&
+    pricingLoaded &&
+    totalPrice > 0 &&
+    printerReady &&
+    !hasBlockingPrinterError() &&
+    currentBalance < totalPrice &&
+    !isProcessingPayment &&
+    !hasActiveJob()
+  );
+}
+
+async function armPaymentLease(): Promise<void> {
+  if (paymentArmInFlight || paymentLeaseId || !canArmPaymentLease()) return;
+
+  paymentArmInFlight = true;
+  const armGeneration = paymentLeaseGeneration;
+  try {
+    const response = await fetch('/api/payment-session/arm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: config.mode,
+        amount: totalPrice,
+        sessionId: config.sessionId,
+      }),
+    });
+    const lease = (await response.json()) as Partial<PaymentLease>;
+    if (
+      !response.ok ||
+      typeof lease.leaseId !== 'string' ||
+      typeof lease.expiresAt !== 'number'
+    ) {
+      throw new Error('Payment hardware is unavailable.');
+    }
+
+    if (armGeneration !== paymentLeaseGeneration || !canArmPaymentLease()) {
+      void fetch('/api/payment-session/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leaseId: lease.leaseId }),
+        keepalive: true,
+      });
+      return;
+    }
+
+    paymentLeaseId = lease.leaseId;
+    paymentLeaseExpiresAt = lease.expiresAt;
+    paymentHeartbeatTimer = window.setInterval(() => {
+      void sendPaymentHeartbeat();
+    }, 3_000);
+    applyLockState(false);
+  } catch {
+    stopPaymentHeartbeat();
+    paymentLeaseId = null;
+    paymentLeaseExpiresAt = 0;
+    applyLockState(true);
+  } finally {
+    paymentArmInFlight = false;
+  }
+}
+
+async function sendPaymentHeartbeat(): Promise<void> {
+  const leaseId = paymentLeaseId;
+  if (!leaseId) return;
+
+  try {
+    const response = await fetch('/api/payment-session/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leaseId }),
+    });
+    const payload = (await response.json()) as { expiresAt?: number };
+    if (!response.ok || typeof payload.expiresAt !== 'number') {
+      throw new Error('Payment lease heartbeat failed.');
+    }
+    if (paymentLeaseId === leaseId) {
+      paymentLeaseExpiresAt = payload.expiresAt;
+    }
+  } catch {
+    if (paymentLeaseId !== leaseId) return;
+    stopPaymentHeartbeat();
+    paymentLeaseId = null;
+    paymentLeaseExpiresAt = 0;
+    applyLockState(true);
+  }
+}
+
+async function releasePaymentLease(
+  reason: string,
+  keepalive = false,
+): Promise<void> {
+  const leaseId = paymentLeaseId;
+  void reason;
+  paymentLeaseGeneration += 1;
+  stopPaymentHeartbeat();
+  paymentLeaseId = null;
+  paymentLeaseExpiresAt = 0;
+  applyLockState(true);
+  if (!leaseId) return;
+
+  try {
+    await fetch('/api/payment-session/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leaseId }),
+      keepalive,
+    });
+  } catch {
+    // The server lease expiry remains the final cleanup path.
+  }
+}
+
+function syncPaymentLeaseState(): void {
+  if (!canArmPaymentLease()) {
+    if (paymentLeaseId) {
+      void releasePaymentLease('payment_ineligible', true);
+    } else {
+      applyLockState(true);
+    }
+    return;
+  }
+
+  void armPaymentLease();
 }
 
 function updateChangeDisplay(balance: number): void {
@@ -1305,7 +1457,11 @@ function updateBalanceUI(balance: number): void {
   animateBalanceCounter(balance);
   updateBalanceRingArc(balance);
   updateChangeDisplay(balance);
-  syncCoinSlotLockState();
+  if (pricingLoaded && totalPrice > 0 && currentBalance >= totalPrice) {
+    void releasePaymentLease('target_reached');
+  } else {
+    syncPaymentLeaseState();
+  }
   applyConfirmGate();
 }
 
@@ -1560,7 +1716,7 @@ async function loadPricing(): Promise<void> {
       populateJobSummary(config);
       updateBalanceRingArc(currentBalance);
       updateChangeDisplay(currentBalance);
-      syncCoinSlotLockState();
+      syncPaymentLeaseState();
       applyConfirmGate();
     } catch (error) {
       const message =
@@ -1574,7 +1730,7 @@ async function loadPricing(): Promise<void> {
       if (priceValue) priceValue.textContent = 'Unavailable';
       if (actionPriceValue) actionPriceValue.textContent = '₱ 0';
       updateChangeDisplay(currentBalance);
-      syncCoinSlotLockState();
+      syncPaymentLeaseState();
       applyConfirmGate();
     }
     return;
@@ -1594,7 +1750,7 @@ async function loadPricing(): Promise<void> {
   if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
   if (actionPriceValue) actionPriceValue.textContent = `₱ ${totalPrice}`;
   updateChangeDisplay(currentBalance);
-  syncCoinSlotLockState();
+  syncPaymentLeaseState();
   applyConfirmGate();
 }
 
@@ -1871,6 +2027,7 @@ function finalizePrintSuccess(
   spoolerCorrelationKey: string | null =
     activeSpoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
 ): void {
+  void releasePaymentLease('terminal_completion', true);
   const effectiveTxId = transactionId ?? currentTransactionId;
   if (!recordConfirmationTerminalSuccess({ transactionId: effectiveTxId, spoolerCorrelationKey })) {
     console.warn(
@@ -2203,6 +2360,7 @@ async function checkRemainingFilesAndPrompt(): Promise<void> {
 
 confirmBtn?.addEventListener('click', () => showModal());
 modalCancelBtn?.addEventListener('click', () => {
+  void releasePaymentLease('cancel', true);
   // On the review step, "Back to Paper Check" steps back rather than closing —
   // hideModal() stays a full close for everywhere else that calls it
   // (including modalConfirmBtn's handler below, which depends on that).
@@ -2222,6 +2380,7 @@ modalTrayOkBtn?.addEventListener('click', () => {
 });
 
 modalTrayIssueBtn?.addEventListener('click', () => {
+  void releasePaymentLease('cancel', true);
   hideModal();
 });
 
@@ -2240,6 +2399,11 @@ modalConfirmBtn?.addEventListener('click', async () => {
   showInitialPrintProgress();
 
   try {
+    const paymentLeaseIdForFinalization = paymentLeaseId;
+    if (config.mode === 'print' || config.mode === 'copy') {
+      await releasePaymentLease('confirm_payment');
+    }
+
     if (config.mode === 'scan') {
       // Scan Soft Copy fee payment
       const response = await fetchWithTimeout('/api/scanner/soft-copy/charge', {
@@ -2367,6 +2531,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
         },
         body: JSON.stringify({
           amount: totalPrice,
+          paymentLeaseId: paymentLeaseIdForFinalization,
           mode: config.mode,
           sessionId: config.sessionId,
           documentId: config.documentId,
@@ -2414,6 +2579,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
     const message =
       error instanceof Error ? error.message : 'Error processing payment.';
     applyConfirmGate(message);
+    syncPaymentLeaseState();
   }
 });
 
@@ -2660,7 +2826,10 @@ if (typeof ioFactory === 'function') {
         status.status || (status.connected ? 'Ready' : 'Not Found');
       applyConfirmGate();
       if (!printerReady) {
+        void releasePaymentLease('printer_failure', true);
         void loadPrinterStatus();
+      } else {
+        syncPaymentLeaseState();
       }
     } else {
       void loadPrinterStatus();
@@ -2678,6 +2847,7 @@ if (typeof ioFactory === 'function') {
       clearPrinterError();
     }
     applyConfirmGate();
+    syncPaymentLeaseState();
   });
 
   connectedSocket.on('printerStatusRestored', () => {
@@ -2690,6 +2860,7 @@ if (typeof ioFactory === 'function') {
       clearPrinterError();
     }
     applyConfirmGate();
+    syncPaymentLeaseState();
   });
 
   // Re-sync on printer malfunction or spooler failure
@@ -2700,6 +2871,7 @@ if (typeof ioFactory === 'function') {
     if (hasActiveJob() && status?.printError) {
       renderPrinterError(status.printError);
     }
+    void releasePaymentLease('printer_failure', true);
     applyConfirmGate();
   });
   connectedSocket.on('printerSpoolerFailure', (payload: unknown) => {
@@ -2894,6 +3066,11 @@ async function loadPrinterStatus(): Promise<void> {
     latestPrinterStatusLabel =
       data.status || (printerReady ? 'Ready' : 'Not Found');
     applyConfirmGate();
+    if (!printerReady) {
+      void releasePaymentLease('printer_failure', true);
+    } else {
+      syncPaymentLeaseState();
+    }
 
     // If printer is not ready or still in checking phase, schedule a retry
     if (
@@ -2907,6 +3084,7 @@ async function loadPrinterStatus(): Promise<void> {
     }
   } catch {
     printerReady = false;
+    void releasePaymentLease('printer_failure', true);
     applyConfirmGate();
     printerStatusRetryTimer = window.setTimeout(() => {
       void loadPrinterStatus();
