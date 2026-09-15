@@ -25,6 +25,7 @@ export type TransactionLogStatus =
 
 export interface TransactionLogFilters {
   transactionId?: string;
+  exactTransactionId?: string;
   mode?: TransactionLogMode;
   dateFrom?: string;
   dateTo?: string;
@@ -40,6 +41,7 @@ const TRANSACTION_TYPE_PREFIXES = [
   'refund_',
   'settlement_',
 ] as const;
+
 const TRANSACTION_TYPE_EXACT = new Set([
   'hopper_dispense_failed',
   'trusted_time_unsynced',
@@ -294,23 +296,44 @@ export class AdminService {
   }
 
   private filterTransactionLogs(
-    logs: ReadonlyArray<AdminLogEntry>,
+    logs: readonly AdminLogEntry[],
     filters: TransactionLogFilters,
   ): AdminLogEntry[] {
-    const transactionId = filters.transactionId?.trim();
+    const exactTxId = filters.exactTransactionId?.trim();
+    const rawTxId = filters.transactionId?.trim();
+    const query = rawTxId ? rawTxId.toLowerCase() : '';
+    const queryNoHyphens = query.replace(/-/g, '');
     const dateFromMs =
       typeof filters.dateFrom === 'string' ? Date.parse(filters.dateFrom) : NaN;
     const dateToMs =
       typeof filters.dateTo === 'string' ? Date.parse(filters.dateTo) : NaN;
 
     return logs.filter((entry) => {
-      if (transactionId) {
-        const metaTransactionId = entry.meta?.transactionId;
-        const matchedByMeta =
-          typeof metaTransactionId === 'string' &&
-          metaTransactionId === transactionId;
-        const matchedByMessage = entry.message.includes(transactionId);
-        if (!matchedByMeta && !matchedByMessage) return false;
+      if (exactTxId) {
+        const entryTxId = this.getTransactionId(entry);
+        if (entryTxId !== exactTxId) return false;
+      }
+
+      if (query) {
+        const entryTxId = this.getTransactionId(entry);
+        let matched = false;
+        if (entryTxId) {
+          const lowerId = entryTxId.toLowerCase();
+          if (
+            lowerId.includes(query) ||
+            (queryNoHyphens.length >= 3 &&
+              lowerId.replace(/-/g, '').includes(queryNoHyphens))
+          ) {
+            matched = true;
+          }
+        }
+        if (!matched && entry.message.toLowerCase().includes(query)) {
+          matched = true;
+        }
+        if (!matched && entry.id.toLowerCase().includes(query)) {
+          matched = true;
+        }
+        if (!matched) return false;
       }
 
       if (filters.mode) {
@@ -337,6 +360,31 @@ export class AdminService {
 
       return true;
     });
+  }
+
+  resolveTransactionId(query: string): string | null {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) return null;
+    const queryNoHyphens = trimmed.replace(/-/g, '');
+    const logs = this.listAllLogs().filter((entry) =>
+      this.isTransactionLog(entry),
+    );
+    for (const entry of logs) {
+      const txId = this.getTransactionId(entry);
+      if (!txId) continue;
+      const lower = txId.toLowerCase();
+      if (
+        lower === trimmed ||
+        lower.endsWith(trimmed) ||
+        lower.startsWith(trimmed) ||
+        lower.includes(trimmed) ||
+        (queryNoHyphens.length >= 3 &&
+          lower.replace(/-/g, '').includes(queryNoHyphens))
+      ) {
+        return txId;
+      }
+    }
+    return null;
   }
 
   listSystemLogs(limit: number): AdminLogEntry[] {

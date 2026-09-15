@@ -360,15 +360,92 @@
   letter-spacing: 0.02em;
 }
 
+.tx-id-badge-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+}
+
 .tx-id-truncate {
   display: inline-block;
-  max-width: 180px;
+  max-width: 155px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: middle;
-  cursor: help;
   color: #f5d3c4;
+}
+
+.tx-id-filter-btn {
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  color: #f5d3c4;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.tx-id-filter-btn:hover {
+  background: rgba(245, 211, 196, 0.15);
+  color: #fff;
+  text-decoration: underline;
+}
+
+.tx-id-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--ink-muted, #9ca3af);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 140ms ease;
+}
+
+.tx-id-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.tx-id-copy-btn.copied {
+  background: rgba(16, 185, 129, 0.2) !important;
+  color: #34d399 !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+.tx-drawer-id-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tx-text-btn {
+  background: transparent;
+  border: none;
+  color: var(--lavender, #c4b5fd);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  margin-left: 4px;
+}
+
+.tx-text-btn:hover {
+  color: #fff;
 }
 
 .tx-context-missing {

@@ -363,7 +363,7 @@
         <div class="content">
           <section class="page">
             <!-- Operational KPI Ribbon -->
-            <div class="tx-kpi-ribbon" role="region" aria-label="Transaction summary metrics">
+            <!-- <div class="tx-kpi-ribbon" role="region" aria-label="Transaction summary metrics">
               <div class="tx-kpi-card">
                 <div class="tx-kpi-card__label">Total Transactions</div>
                 <div id="kpiTotalCount" class="tx-kpi-card__val">0</div>
@@ -379,7 +379,7 @@
                 <div id="kpiDiscrepancyCount" class="tx-kpi-card__val tx-kpi-card__val--alert">0</div>
                 <div class="tx-kpi-card__sub">Shortages & failures</div>
               </div>
-            </div>
+            </div> -->
 
             <!-- Inverted hierarchy resolved: Filters precede table -->
             <div class="tx-content-order">
@@ -420,13 +420,13 @@
                 </summary>
 
                 <!-- Fast Filter Chips -->
-                <div class="tx-quick-chips" role="group" aria-label="Quick filters">
+                <!-- <div class="tx-quick-chips" role="group" aria-label="Quick filters">
                   <button type="button" class="tx-chip tx-chip--active" data-chip="all">All Transactions</button>
                   <button type="button" class="tx-chip tx-chip--alert" data-chip="attention">Discrepancies & Shortages</button>
                   <button type="button" class="tx-chip" data-chip="print">Print Only</button>
                   <button type="button" class="tx-chip" data-chip="copy">Copy Only</button>
                   <button type="button" class="tx-chip" data-chip="scan">Scan Only</button>
-                </div>
+                </div> -->
 
                 <div class="tx-filters-grid">
                   <label class="tx-filter-field">
@@ -437,7 +437,7 @@
                       type="text"
                       inputmode="search"
                       autocomplete="off"
-                      placeholder="Search by ID or suffix…"
+                      placeholder="Search ID, prefix, or suffix…"
                     />
                   </label>
                   <label class="tx-filter-field">
@@ -650,7 +650,22 @@
                     <dl class="tx-drawer-card__grid">
                       <div class="tx-grid-span-2">
                         <dt>Transaction ID</dt>
-                        <dd id="dTransactionId" class="tx-mono-id">--</dd>
+                        <dd class="tx-drawer-id-row">
+                          <span id="dTransactionId" class="tx-mono-id">--</span>
+                          <button
+                            id="dCopyTxIdBtn"
+                            class="tx-id-copy-btn"
+                            type="button"
+                            title="Copy full Transaction ID"
+                            aria-label="Copy full Transaction ID"
+                          >
+                            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12" aria-hidden="true">
+                              <path d="M4 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H4zm0 1h6a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z"/>
+                              <path d="M6 0a2 2 0 00-2 2v1h1V2a1 1 0 011-1h6a1 1 0 011 1v8a1 1 0 01-1 1h-1v1h1a2 2 0 002-2V2a2 2 0 00-2-2H6z"/>
+                            </svg>
+                            <span>Copy</span>
+                          </button>
+                        </dd>
                       </div>
                       <div>
                         <dt>Generated At</dt>

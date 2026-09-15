@@ -2365,12 +2365,18 @@ export class AdminController {
   };
 
   private handleGetTransactionById = (req: Request, res: Response) => {
-    const transactionId = String(req.params.transactionId ?? '').trim();
-    if (!transactionId) {
+    const rawId = String(req.params.transactionId ?? '').trim();
+    if (!rawId) {
       return res.status(400).json({ error: 'transactionId is required.' });
     }
 
-    const context = this.buildTransactionContextResponse(transactionId);
+    let context = this.buildTransactionContextResponse(rawId);
+    if (!context) {
+      const resolved = this.adminService.resolveTransactionId(rawId);
+      if (resolved && resolved !== rawId) {
+        context = this.buildTransactionContextResponse(resolved);
+      }
+    }
     if (!context) {
       return res.status(404).json({ error: 'Transaction not found.' });
     }
@@ -2395,12 +2401,18 @@ export class AdminController {
   };
 
   private handleGetTransactionContextById = (req: Request, res: Response) => {
-    const transactionId = String(req.params.transactionId ?? '').trim();
-    if (!transactionId) {
+    const rawId = String(req.params.transactionId ?? '').trim();
+    if (!rawId) {
       return res.status(400).json({ error: 'transactionId is required.' });
     }
 
-    const context = this.buildTransactionContextResponse(transactionId);
+    let context = this.buildTransactionContextResponse(rawId);
+    if (!context) {
+      const resolved = this.adminService.resolveTransactionId(rawId);
+      if (resolved && resolved !== rawId) {
+        context = this.buildTransactionContextResponse(resolved);
+      }
+    }
     if (!context) {
       return res.status(404).json({ error: 'Transaction not found.' });
     }
@@ -2474,7 +2486,9 @@ export class AdminController {
       meta: LogMeta;
     }>;
   } | null {
-    const logs = this.adminService.listAllTransactionLogs({ transactionId });
+    const logs = this.adminService.listAllTransactionLogs({
+      exactTransactionId: transactionId,
+    });
     const ledgerEntries = db.data!.financialLedger.filter(
       (entry) => entry.referenceId === transactionId,
     );

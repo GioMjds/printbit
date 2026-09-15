@@ -77,6 +77,9 @@ const txDetailState = document.getElementById(
 ) as HTMLElement | null;
 
 const dTransactionId = document.getElementById('dTransactionId');
+const dCopyTxIdBtn = document.getElementById(
+  'dCopyTxIdBtn',
+) as HTMLButtonElement | null;
 const dMode = document.getElementById('dMode');
 const dAmount = document.getElementById('dAmount');
 const dStatus = document.getElementById('dStatus');
@@ -255,6 +258,34 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed === '—') return false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(trimmed);
+      return true;
+    }
+  } catch {
+    // Fall back to execCommand
+  }
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = trimmed;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    textArea.style.pointerEvents = 'none';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return successful;
+  } catch {
+    return false;
+  }
 }
 
 function inferMode(log: LogsResponse['logs'][number]): string {
@@ -535,8 +566,23 @@ function applyLogs(logs: LogsResponse['logs']): void {
 
   if (logs.length === 0) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="7" style="text-align:center;color:var(--ink-muted);padding:36px">No transaction log entries found.</td>`;
-    logsBody.appendChild(tr);
+    if (filterState.transactionId) {
+      tr.innerHTML = `
+        <td colspan="7" style="text-align:center;color:var(--ink-muted);padding:36px">
+          No transactions found matching "<strong>${escapeHtml(filterState.transactionId)}</strong>".
+          <button type="button" id="emptyClearIdBtn" class="tx-text-btn">Clear search</button>
+        </td>
+      `;
+      logsBody.appendChild(tr);
+      const clearBtn = tr.querySelector('#emptyClearIdBtn');
+      clearBtn?.addEventListener('click', () => {
+        transactionIdInput.value = '';
+        applyFilters();
+      });
+    } else {
+      tr.innerHTML = `<td colspan="7" style="text-align:center;color:var(--ink-muted);padding:36px">No transaction log entries found.</td>`;
+      logsBody.appendChild(tr);
+    }
     return;
   }
 
@@ -553,7 +599,30 @@ function applyLogs(logs: LogsResponse['logs']): void {
       cached?.change?.remaining ?? inferChangeRemaining(log);
 
     const transactionIdCell = transactionContextId
-      ? `<span class="tx-id-truncate" title="${escapeHtml(transactionContextId)}">${escapeHtml(middleTruncate(transactionContextId, 9, 6))}</span>`
+      ? `<div class="tx-id-badge-wrap">
+          <button
+            type="button"
+            class="tx-id-truncate tx-id-filter-btn"
+            data-action="filter-by-id"
+            data-tx-id="${escapeHtml(transactionContextId)}"
+            title="Click to search by ID: ${escapeHtml(transactionContextId)}"
+          >
+            ${escapeHtml(middleTruncate(transactionContextId, 9, 6))}
+          </button>
+          <button
+            type="button"
+            class="tx-id-copy-btn"
+            data-action="copy-id"
+            data-tx-id="${escapeHtml(transactionContextId)}"
+            title="Copy full Transaction ID"
+            aria-label="Copy full Transaction ID"
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12" aria-hidden="true">
+              <path d="M4 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H4zm0 1h6a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z"/>
+              <path d="M6 0a2 2 0 00-2 2v1h1V2a1 1 0 011-1h6a1 1 0 011 1v8a1 1 0 01-1 1h-1v1h1a2 2 0 002-2V2a2 2 0 00-2-2H6z"/>
+            </svg>
+          </button>
+        </div>`
       : '<span class="tx-context-missing">Missing ID context</span>';
 
     const modeBadge = `<span class="tx-mode-badge tx-mode-badge--${escapeHtml(mode.toLowerCase())}">${escapeHtml(formatMode(mode))}</span>`;
@@ -1073,7 +1142,11 @@ logsBody.addEventListener('click', (event) => {
   if (!actionButton) return;
 
   const action = actionButton.dataset.action;
-  const transactionId = actionButton.dataset.transactionId?.trim() ?? '';
+  const transactionId = (
+    actionButton.dataset.transactionId ??
+    actionButton.dataset.txId ??
+    ''
+  ).trim();
 
   if (action === 'view-details') {
     if (!transactionId) {
@@ -1083,9 +1156,53 @@ logsBody.addEventListener('click', (event) => {
     void openTransactionDrawer(transactionId);
     return;
   }
+
+  if (action === 'copy-id') {
+    if (!transactionId) return;
+    void copyToClipboard(transactionId).then((ok) => {
+      if (ok) {
+        actionButton.classList.add('copied');
+        actionButton.title = 'Copied!';
+        showToast('Transaction ID copied to clipboard.');
+        window.setTimeout(() => {
+          actionButton.classList.remove('copied');
+          actionButton.title = 'Copy full Transaction ID';
+        }, 1500);
+      } else {
+        showToast('Failed to copy ID to clipboard.');
+      }
+    });
+    return;
+  }
+
+  if (action === 'filter-by-id') {
+    if (!transactionId) return;
+    transactionIdInput.value = transactionId;
+    applyFilters();
+    return;
+  }
 });
 
 // Drawer Button Listeners
+dCopyTxIdBtn?.addEventListener('click', () => {
+  const text = (
+    reportContext?.transactionId ??
+    dTransactionId?.textContent ??
+    ''
+  ).trim();
+  if (!text || text === '—') return;
+  void copyToClipboard(text).then((ok) => {
+    if (ok) {
+      dCopyTxIdBtn.classList.add('copied');
+      showToast('Transaction ID copied to clipboard.');
+      window.setTimeout(() => {
+        dCopyTxIdBtn?.classList.remove('copied');
+      }, 1500);
+    } else {
+      showToast('Failed to copy ID to clipboard.');
+    }
+  });
+});
 txDetailCloseBtn?.addEventListener('click', closeTransactionDrawer);
 txDrawerDoneBtn?.addEventListener('click', closeTransactionDrawer);
 txDrawerBackdrop?.addEventListener('click', closeTransactionDrawer);
