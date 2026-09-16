@@ -1,19 +1,170 @@
-# Print Spooler Issue
+# PrintBit Printer Spooler Issue Summary
 
-Intermittent print spooler failures in a production environment typically stem from environmental contention, unhandled edge cases in document rendering, or driver instability under concurrency.
+## Environment
 
-## **Primary Probable Causes**
+* PrintBit kiosk runs on a **Windows 10 tablet**.
+* Epson **L5290** is connected to the tablet through USB.
+* The USB cable **remains connected throughout operating hours**.
+* The tablet connects to an **isolated ESP32 Wi-Fi network**, so Internet access may be unavailable.
+* Epson Printer Connection Checker is **not reliable/useful when the kiosk has no Internet**.
 
-- **Driver Crashes & Isolation Settings:** Third-party printer drivers (especially Type 3 / user-mode drivers) running in the main spooler process (`spoolsv.exe` on Windows or filter backends in CUPS) can crash the entire service upon receiving unexpected binary payloads or complex fonts. Enabling **Driver Isolation** (isolated process per driver) often prevents total spooler crashes.
-- **Spool Disk Contention & Security Software Locking:** Under production volume, the spool directory (`/spool/PRINTERS` or `/var/spool/cups`) can experience lock contention. Endpoint Detection and Response (EDR) or real-time antivirus scanners frequently lock temporary `.SPL`, `.SHD`, or temporary spool files while scanning, resulting in `Access Denied` exceptions and dropped jobs.
-- **Stuck Jobs & Memory Leaks Under Concurrency:** Large vector files, complex PDFs, or malformed PostScript/PCL streams can cause rendering deadlocks or unbounded memory spikes, exhausting heap memory and triggering an unhandled spooler termination.
-- **Network Port Exhaustion & Handshake Timeouts:** High throughput to network printers using raw sockets (port 9100) or LPR can exhaust ephemeral TCP ports. If a printer drops offline or network latency spikes during bidirectional status checks (such as SNMP queries), the spooler thread pool can hang waiting for a socket timeout.
-- **Service Account & Registry Permissions:** If PrintBit runs under a dedicated service account, intermittent impersonation or token exhaustion during burst requests can block access to spool registry hives (`SYSTEM\CurrentControlSet\Control\Print`) or RPC endpoints.
+## Observed Symptoms
 
----
+1. Printing sometimes stops working.
+2. **Manual Windows printing also fails**, not just PrintBit printing.
+3. At times, the Epson printer is **not detected properly by Windows**, despite the USB remaining physically connected.
+4. Restarting or troubleshooting the Print Spooler has been part of the investigation.
+5. Epson Printer Connection Checker cannot be relied upon because the kiosk may be completely offline.
 
-To isolate the root cause quickly, please clarify:
+## Important Diagnostic Conclusion
 
-1. **What is the host environment and spooler technology?** (e.g., Windows Server Print Spooler, Linux CUPS, or a custom in-app queue in PrintBit?)
-2. **What are the exact failure symptoms?** (Does the spooler process crash/restart, do print jobs get stuck in `Spooling`/`Error` state, or are jobs silently dropped?)
-3. **What format does PrintBit send to the spooler?** (e.g., Raw EMF/GDI, PDF, PostScript/PCL, or raw ESC/POS commands?)
+The problem should **not automatically be attributed to PrintBit, Node.js, or the C# Worker**.
+
+Your printing pipeline is:
+
+```text
+Epson L5290
+    ↓ USB
+Windows 10 USB / PnP
+    ↓
+Epson Driver / Port
+    ↓
+Windows Print Spooler
+    ↓
+Print Queue
+    ↓
+C# Worker
+    ↓
+PrintBit
+```
+
+Because **manual Windows printing can also fail**, the problem may occur below the PrintBit application layer.
+
+## Most Relevant Failure Areas
+
+### 1. Windows Print Spooler
+
+```text
+Spooler = Running
+Printer = Installed
+USB = Connected
+        ↓
+Printing = Broken
+```
+
+The spooler service can be running while the queue or print-processing path is stuck.
+
+### 2. Epson Driver / Print Processor
+
+```text
+USB = Connected
+        ↓
+Epson driver = unhealthy
+        ↓
+Printing = fails
+```
+
+The physical connection can remain intact while the Windows driver becomes unusable.
+
+### 3. Windows Printer Port / Device State
+
+Windows may still display:
+
+```text
+Epson L5290
+```
+
+while the underlying communication path is no longer functioning correctly.
+
+### 4. USB/PnP State
+
+Even without physically unplugging the printer, Windows could potentially experience a device/driver communication problem.
+
+This should only become the primary suspect if Windows logs or Device Manager show USB/device errors.
+
+## Most Useful Isolation Test
+
+When the failure occurs:
+
+```text
+PrintBit printing      ❌
+Windows manual print   ❌
+```
+
+This points toward:
+
+```text
+Windows / Epson driver / spooler / printer communication
+```
+
+rather than immediately blaming PrintBit.
+
+Compare that with:
+
+```text
+PrintBit printing      ❌
+Windows manual print   ✅
+```
+
+That would shift the investigation toward:
+
+```text
+C# Worker
+    ↓
+PrintBit job handling
+    ↓
+Printer selection
+    ↓
+Spooler API interaction
+```
+
+## Recommended PrintBit Direction
+
+Do **not** make this dependent on:
+
+```text
+PrintBit
+   ↓
+Internet
+   ↓
+Epson Printer Connection Checker
+```
+
+The kiosk should remain functional on:
+
+```text
+Internet = OFF
+ESP32 Wi-Fi = ON
+Epson USB = connected
+```
+
+Instead, the C# Worker should eventually perform **local printer-health diagnostics** and distinguish states such as:
+
+```text
+Healthy
+SpoolerProblem
+PrinterOffline
+QueueStuck
+DriverPortProblem
+Unknown
+```
+
+## Key Question to Answer Next
+
+When the printer fails, determine:
+
+> **Does Windows still recognize the Epson L5290 correctly, and does a manual print job enter the Windows print queue?**
+
+That single observation will help identify whether the failure is primarily in:
+
+```text
+USB/PnP
+   ↓
+Epson Driver/Port
+   ↓
+Print Spooler
+   ↓
+C# Worker / PrintBit
+```
+
+rather than treating every failure as a generic "printer spooler issue."

@@ -374,6 +374,11 @@ export class ScannerService {
     const filename = path.basename(result.outputPath);
     this.clearSoftCopyPaid(filename);
 
+    // Pre-warm analysis in background while customer views scan result
+    void this.analyzeColor(filename).catch((err) => {
+      console.warn('[SCAN] Background analysis pre-warm failed:', err);
+    });
+
     void adminService.appendAdminLog(
       'scan_completed',
       'Interactive scan completed.',
@@ -797,6 +802,11 @@ export class ScannerService {
 
       const filename = path.basename(result.outputPath);
       this.clearSoftCopyPaid(filename);
+
+      // Pre-warm document analysis in background while customer views preview on /copy
+      void this.analyzeColor(filename).catch((err) => {
+        console.warn('[SCAN-PREVIEW] Background analysis pre-warm failed:', err);
+      });
 
       return {
         detected: true,

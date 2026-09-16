@@ -586,15 +586,82 @@ async function analyzeDocumentDirect(
   throw new Error('Unsupported file type for analysis.');
 }
 
+interface AnalysisCacheEntry {
+  mtimeMs: number;
+  size: number;
+  result: DocumentAnalysisResult;
+  timestamp: number;
+}
+
+const analysisCache = new Map<string, AnalysisCacheEntry>();
+const inFlightAnalysis = new Map<string, Promise<DocumentAnalysisResult>>();
+const MAX_CACHE_ENTRIES = 200;
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+export function clearDocumentAnalysisCache(filePath?: string): void {
+  if (filePath) {
+    analysisCache.delete(path.resolve(filePath));
+  } else {
+    analysisCache.clear();
+  }
+}
+
 /**
- * Public entry point for document analysis. Spawns a worker thread for heavy tasks
- * (PDF/Image) to ensure the main event loop remains responsive.
+ * Public entry point for document analysis. Caches results by file mtime and size,
+ * and deduplicates concurrent analysis calls for the same file.
  */
 export async function analyzeDocument(
   input: AnalyzeDocumentInput,
 ): Promise<DocumentAnalysisResult> {
   if (!isMainThread) return analyzeDocumentDirect(input);
-  return analyzeDocumentDirect(input);
+
+  const resolvedPath = path.resolve(input.filePath);
+
+  let stat: fs.Stats | null = null;
+  try {
+    stat = await fs.promises.stat(resolvedPath);
+  } catch {
+    return analyzeDocumentDirect(input);
+  }
+
+  const cached = analysisCache.get(resolvedPath);
+  if (
+    cached &&
+    cached.mtimeMs === stat.mtimeMs &&
+    cached.size === stat.size &&
+    Date.now() - cached.timestamp < CACHE_TTL_MS
+  ) {
+    return cached.result;
+  }
+
+  const inFlight = inFlightAnalysis.get(resolvedPath);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const analysisPromise = (async () => {
+    try {
+      const result = await analyzeDocumentDirect(input);
+      if (stat) {
+        if (analysisCache.size >= MAX_CACHE_ENTRIES) {
+          const firstKey = analysisCache.keys().next().value;
+          if (firstKey) analysisCache.delete(firstKey);
+        }
+        analysisCache.set(resolvedPath, {
+          mtimeMs: stat.mtimeMs,
+          size: stat.size,
+          result,
+          timestamp: Date.now(),
+        });
+      }
+      return result;
+    } finally {
+      inFlightAnalysis.delete(resolvedPath);
+    }
+  })();
+
+  inFlightAnalysis.set(resolvedPath, analysisPromise);
+  return analysisPromise;
 }
 
 // Worker thread entry point

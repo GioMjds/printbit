@@ -2081,32 +2081,39 @@ async function loadPreview(): Promise<void> {
     if (!copyPreview) return;
 
     const url = `/api/scan/preview/${encodeURIComponent(copyPreview)}`;
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) return;
-      const buf = await resp.arrayBuffer();
-      await preview.loadFromBuffer(buf, 'application/pdf');
-      await applyDocumentAutoDetection();
-    } catch {
-      // Preview not critical for copy mode
-    }
 
-    try {
-      const analysisResp = await fetch(
-        `/api/scan/color-analysis/${encodeURIComponent(copyPreview)}`,
-      );
-      if (analysisResp.ok) {
-        const { isGrayscale } = (await analysisResp.json()) as {
-          isGrayscale: boolean;
-        };
-        if (isGrayscale) {
-          resetColorLock(); // ensure clean state
-          lockColorMode();
+    const analysisPromise = (async () => {
+      try {
+        const analysisResp = await fetch(
+          `/api/scan/color-analysis/${encodeURIComponent(copyPreview)}`,
+        );
+        if (analysisResp.ok) {
+          const { isGrayscale } = (await analysisResp.json()) as {
+            isGrayscale: boolean;
+          };
+          if (isGrayscale) {
+            resetColorLock(); // ensure clean state
+            lockColorMode();
+          }
         }
+      } catch {
+        // non-fatal
       }
-    } catch {
-      // non-fatal
-    }
+    })();
+
+    const previewPromise = (async () => {
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) return;
+        const buf = await resp.arrayBuffer();
+        await preview.loadFromBuffer(buf, 'application/pdf');
+        await applyDocumentAutoDetection();
+      } catch {
+        // Preview not critical for copy mode
+      }
+    })();
+
+    await Promise.all([analysisPromise, previewPromise]);
 
     if (footerSummary)
       footerSummary.textContent =
