@@ -27,7 +27,7 @@ export function detectOrientationFromDimensions(
 
 /**
  * Detects paper size from document dimensions in points (72 DPI).
- * - Legal: long dimension > 950 pt (e.g. US Legal @ 1008 pt)
+ * - Legal: long dimension > 880 pt (e.g. Long Bond @ 936 pt, US Legal @ 1008 pt)
  * - Letter: long dimension < 815 pt (e.g. US Letter @ 792 pt)
  * - A4: otherwise (e.g. A4 @ ~842 pt)
  */
@@ -44,7 +44,7 @@ export function detectPaperSizeFromDimensions(
     return null;
   }
   const longDim = Math.max(width, height);
-  if (longDim > 950) return 'Legal';
+  if (longDim > 880) return 'Legal';
   if (longDim < 815) return 'Letter';
   return 'A4';
 }

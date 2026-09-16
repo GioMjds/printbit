@@ -20,4 +20,9 @@ describe('physical page layout', () => {
     expect(layout.scale).toBe(1);
     expect(layout.y).toBe(-108);
   });
+  it('uses 8.5 x 13 inches (612 x 936 pt) for Legal', () => {
+    const layout = calculatePrintLayout(612, 936, { paperSize: 'Legal', orientation: 'portrait', scaling: 'fit', rotationDeg: 0 });
+    expect(layout.width).toBe(612);
+    expect(layout.height).toBe(936);
+  });
 });

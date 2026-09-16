@@ -2,6 +2,7 @@ import net from 'node:net';
 
 export type WorkerCommandType =
   | 'SimulateCoin'
+  | 'RestartPrintSpooler'
   | 'cancel_job'
   | 'pause_job'
   | 'resume_job'

@@ -7,7 +7,7 @@ export const PRINT_MARGIN_POINTS = 14.4;
 export const PAPER_POINTS = {
   A4: [595.28, 841.89],
   Letter: [612, 792],
-  Legal: [612, 1008],
+  Legal: [612, 936],
 } satisfies Record<PaperSize, readonly [number, number]>;
 
 export interface PrintConfiguration {

@@ -37,7 +37,7 @@ One PDF point is 1/72 inch. Portrait target sizes are exact contract constants:
 | --- | ---: | ---: |
 | A4 | 595.28 | 841.89 |
 | Letter | 612 | 792 |
-| Legal | 612 | 1008 |
+| Legal | 612 | 936 |
 
 Landscape swaps target width and height. Native PDF rotation and the user's
 rotation are applied once, before calculating Fit. The visible PDF page is the

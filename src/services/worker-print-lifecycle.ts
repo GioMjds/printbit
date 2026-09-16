@@ -81,7 +81,7 @@ async function deleteUploadByStoredFilename(
 }
 
 function appendConsumableUsageEvent(
-  eventMode: 'print',
+  eventMode: 'print' | 'copy',
   transactionId: string,
   recoveryContext: Record<string, string | number | boolean | null>,
 ): void {
@@ -193,6 +193,7 @@ async function cleanupSuccessfulCopy(input: {
   transactionId: string;
   recoveryContext: Record<string, string | number | boolean | null>;
 }): Promise<void> {
+  appendConsumableUsageEvent('copy', input.transactionId, input.recoveryContext);
   const previewFilename =
     typeof input.recoveryContext.previewFilename === 'string'
       ? input.recoveryContext.previewFilename

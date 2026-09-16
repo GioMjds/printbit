@@ -74,6 +74,7 @@ import {
   writeRuntimeState,
 } from '@/core/database/sqlite-storage';
 import { requestWindowsShutdown } from '@/services/windows-power';
+import { sendWorkerRequest } from '@/services/worker-command-pipe';
 
 export interface AdminControllerDeps {
   io: SocketIOServer;
@@ -386,6 +387,12 @@ const adminShutdownRateLimit = createRateLimit({
   max: 3,
 });
 
+const adminSpoolerRestartRateLimit = createRateLimit({
+  keyPrefix: 'admin-printer-spooler-restart',
+  windowMs: 2 * 60_000,
+  max: 5,
+});
+
 export class AdminController {
   public readonly router: Router;
   private readonly adminService: AdminService;
@@ -446,6 +453,13 @@ export class AdminController {
       requireAdminPin,
       adminShutdownRateLimit,
       this.handleSystemShutdown,
+    );
+    this.router.post(
+      '/printer/restart-spooler',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      adminSpoolerRestartRateLimit,
+      this.handleRestartSpooler,
     );
     this.router.get(
       '/earnings/analytics',
@@ -822,7 +836,7 @@ export class AdminController {
     const recovery = getRecoveryStatusSnapshot();
     const consumablesForecast = this.consumablesService.getForecast();
 
-    // Compute page counts (color / bw) for today and all-time from receipt_records
+    // Compute page counts (color / bw) for today and all-time from consumable_usage_events
     try {
       const sqlite = getSqliteDb();
       const startOfToday = new Date();
@@ -830,16 +844,22 @@ export class AdminController {
       const startIso = startOfToday.toISOString();
       const todayRow = sqlite
         .prepare(
-          `SELECT SUM(COALESCE(color_pages, 0)) AS colorSum, SUM(COALESCE(bw_pages, 0)) AS bwSum
-           FROM receipt_records WHERE mode IN ('print','copy') AND created_at >= ?`,
+          `SELECT
+             SUM(COALESCE(billable_color_pages, 0) * COALESCE(copies, 1)) AS colorSum,
+             SUM(COALESCE(billable_bw_pages, 0) * COALESCE(copies, 1)) AS bwSum
+           FROM consumable_usage_events
+           WHERE mode IN ('print','copy') AND source <> ? AND timestamp >= ?`,
         )
-        .get(startIso) as Record<string, unknown> | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE, startIso) as Record<string, unknown> | undefined;
       const totalRow = sqlite
         .prepare(
-          `SELECT SUM(COALESCE(color_pages, 0)) AS colorSum, SUM(COALESCE(bw_pages, 0)) AS bwSum
-           FROM receipt_records WHERE mode IN ('print','copy')`,
+          `SELECT
+             SUM(COALESCE(billable_color_pages, 0) * COALESCE(copies, 1)) AS colorSum,
+             SUM(COALESCE(billable_bw_pages, 0) * COALESCE(copies, 1)) AS bwSum
+           FROM consumable_usage_events
+           WHERE mode IN ('print','copy') AND source <> ?`,
         )
-        .get() as Record<string, unknown> | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as Record<string, unknown> | undefined;
 
       const baseline = db.data!.inkRefillBaseline;
       const todayAdminTestPages = consumablesStore.sumUsagePagesBySource(
@@ -1081,6 +1101,104 @@ export class AdminController {
         error: 'Windows shutdown could not be scheduled.',
       });
     }
+  };
+
+  private handleRestartSpooler = async (req: Request, res: Response) => {
+    const requestId = randomUUID();
+    const printerName =
+      typeof req.body?.printerName === 'string' && req.body.printerName.trim().length > 0
+        ? req.body.printerName.trim()
+        : undefined;
+
+    let workerResult: {
+      requestId?: string;
+      type?: string;
+      outcome?: string;
+      action?: string | null;
+      spoolerState?: { isRunning: boolean; status: string; errorMessage?: string | null } | null;
+      printerState?: string | null;
+      issueKind?: string | null;
+      message?: string | null;
+      startedAt?: string;
+      completedAt?: string;
+    } | null = null;
+
+    try {
+      workerResult = await sendWorkerRequest<typeof workerResult>(
+        {
+          type: 'RestartPrintSpooler',
+          requestId,
+          ...(printerName != null ? { printerName } : {}),
+          timestampUtc: new Date().toISOString(),
+        },
+        { timeoutMs: 45_000 },
+      );
+    } catch (pipeError) {
+      console.error('[ADMIN] Printer spooler restart pipe error:', pipeError);
+    }
+
+    if (workerResult == null) {
+      void this.adminService.appendAdminLog(
+        'admin_printer_spooler_restart_failed',
+        'Printer spooler restart: worker did not respond or timed out.',
+        { requestId, printerName: printerName ?? null },
+      );
+      return res.status(503).json({
+        ok: false,
+        error: 'Worker did not respond. The C# hardware service may be offline.',
+      });
+    }
+
+    const outcome = workerResult.outcome ?? 'unknown';
+    const succeeded = outcome === 'recovered' || outcome === 'healthy';
+
+    void this.adminService.appendAdminLog(
+      succeeded ? 'admin_printer_spooler_restart_ok' : 'admin_printer_spooler_restart_failed',
+      `Printer spooler restart: outcome=${outcome}. ${workerResult.message ?? ''}`.trim(),
+      {
+        requestId,
+        printerName: printerName ?? null,
+        outcome,
+        action: workerResult.action ?? null,
+        printerState: workerResult.printerState ?? null,
+        issueKind: workerResult.issueKind ?? null,
+      },
+    );
+
+    if (outcome === 'worker_busy') {
+      return res.status(409).json({
+        ok: false,
+        outcome,
+        error: workerResult.message ?? 'Worker is busy with an active print job. Try again shortly.',
+      });
+    }
+
+    if (outcome === 'manual_intervention_required') {
+      return res.status(422).json({
+        ok: false,
+        outcome,
+        message: workerResult.message ?? 'Physical printer fault detected. Manual intervention required.',
+        printerState: workerResult.printerState,
+        issueKind: workerResult.issueKind,
+      });
+    }
+
+    if (!succeeded) {
+      return res.status(502).json({
+        ok: false,
+        outcome,
+        error: workerResult.message ?? 'Print Spooler restart failed.',
+        spoolerState: workerResult.spoolerState,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      outcome,
+      message: workerResult.message ?? 'Print Spooler restarted successfully.',
+      spoolerState: workerResult.spoolerState,
+      printerState: workerResult.printerState,
+    });
   };
 
   private handleGetEarningsAnalytics = (req: Request, res: Response) => {
@@ -2777,10 +2895,13 @@ export class AdminController {
       const sqlite = getSqliteDb();
       const totalRow = sqlite
         .prepare(
-          `SELECT SUM(COALESCE(color_pages, 0)) AS colorSum, SUM(COALESCE(bw_pages, 0)) AS bwSum
-           FROM receipt_records WHERE mode IN ('print','copy')`,
+          `SELECT
+             SUM(COALESCE(billable_color_pages, 0) * COALESCE(copies, 1)) AS colorSum,
+             SUM(COALESCE(billable_bw_pages, 0) * COALESCE(copies, 1)) AS bwSum
+           FROM consumable_usage_events
+           WHERE mode IN ('print','copy') AND source <> ?`,
         )
-        .get() as Record<string, unknown> | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as Record<string, unknown> | undefined;
 
       const adminTestPages = consumablesStore.sumUsagePagesBySource(
         ADMIN_TEST_PAGE_USAGE_SOURCE,

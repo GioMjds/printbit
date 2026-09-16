@@ -57,7 +57,10 @@ export async function convertDocumentViaWorker(
   return new Promise<DocumentConversionResult>((resolve, reject) => {
     let settled = false;
     let buffer = '';
-    const socket = net.connect(pipePath);
+    let socket: net.Socket;
+    let connectAttempts = 0;
+    const maxConnectAttempts = 3;
+    let retryTimer: NodeJS.Timeout | null = null;
 
     const timeoutHandle = setTimeout(() => {
       settle(() =>
@@ -73,64 +76,83 @@ export async function convertDocumentViaWorker(
       if (settled) return;
       settled = true;
       clearTimeout(timeoutHandle);
-      socket.removeAllListeners();
-      socket.destroy?.();
+      if (retryTimer) clearTimeout(retryTimer);
+      socket?.removeAllListeners();
+      socket?.destroy?.();
       fn();
     }
 
-    socket.on('connect', () => {
-      socket.write(JSON.stringify(request) + '\n', 'utf-8', (err) => {
-        if (err) {
-          settle(() =>
-            reject(
-              new Error(`Failed to send conversion request: ${err.message}`),
-            ),
-          );
-        }
+    function tryConnect(): void {
+      if (settled) return;
+      connectAttempts++;
+      socket = net.connect(pipePath);
+
+      socket.on('connect', () => {
+        socket.write(JSON.stringify(request) + '\n', 'utf-8', (err) => {
+          if (err) {
+            settle(() =>
+              reject(
+                new Error(`Failed to send conversion request: ${err.message}`),
+              ),
+            );
+          }
+        });
       });
-    });
 
-    socket.on('data', (chunk: Buffer) => {
-      buffer += chunk.toString('utf-8');
-      const newlineIndex = buffer.indexOf('\n');
-      if (newlineIndex === -1) return;
+      socket.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString('utf-8');
+        const newlineIndex = buffer.indexOf('\n');
+        if (newlineIndex === -1) return;
 
-      const line = buffer.slice(0, newlineIndex);
-      settle(() => {
-        try {
-          resolve(JSON.parse(line) as DocumentConversionResult);
-        } catch (parseError) {
+        const line = buffer.slice(0, newlineIndex);
+        settle(() => {
+          try {
+            resolve(JSON.parse(line) as DocumentConversionResult);
+          } catch (parseError) {
+            reject(
+              new Error(
+                `Document conversion service returned an unreadable response: ${
+                  parseError instanceof Error
+                    ? parseError.message
+                    : String(parseError)
+                }`,
+              ),
+            );
+          }
+        });
+      });
+
+      socket.on('error', (err: NodeJS.ErrnoException) => {
+        if (
+          !settled &&
+          connectAttempts < maxConnectAttempts &&
+          (err.code === 'ENOENT' || err.code === 'ECONNREFUSED' || err.code === 'EBUSY')
+        ) {
+          socket.removeAllListeners();
+          socket.destroy();
+          retryTimer = setTimeout(tryConnect, 500);
+          return;
+        }
+        settle(() =>
           reject(
             new Error(
-              `Document conversion service returned an unreadable response: ${
-                parseError instanceof Error
-                  ? parseError.message
-                  : String(parseError)
-              }`,
+              `Document conversion service is offline (${pipePath}): ${err.message}`,
             ),
-          );
-        }
+          ),
+        );
       });
-    });
 
-    socket.on('error', (err: Error) => {
-      settle(() =>
-        reject(
-          new Error(
-            `Document conversion service is offline (${pipePath}): ${err.message}`,
+      socket.on('close', () => {
+        settle(() =>
+          reject(
+            new Error(
+              'Document conversion service closed the connection before responding.',
+            ),
           ),
-        ),
-      );
-    });
+        );
+      });
+    }
 
-    socket.on('close', () => {
-      settle(() =>
-        reject(
-          new Error(
-            'Document conversion service closed the connection before responding.',
-          ),
-        ),
-      );
-    });
+    tryConnect();
   });
 }

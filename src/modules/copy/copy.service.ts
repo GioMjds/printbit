@@ -567,7 +567,7 @@ export class CopyService {
           filename: path.join('scans', previewFilename),
           copies: quote.copies,
           colorMode: quote.effectiveColorMode,
-          selectedPage: quote.selectedPages,
+          selectedPages: quote.selectedPages,
           billableColorPages: quote.billableColorPages,
           billableBwPages: quote.billableBwPages,
         },
@@ -601,13 +601,32 @@ export class CopyService {
           printerName: telemetry.name ?? undefined,
         },
         requiredAmount,
-        billedColorPages: quote.billableColorPages,
-        billedBwPages: quote.billableBwPages,
+        billedColorPages: quote.billableColorPages * quote.copies,
+        billedBwPages: quote.billableBwPages * quote.copies,
         printerName: telemetry.name ?? null,
         spoolerCorrelationKey: correlationKey,
       });
 
       await getJobProcessor().enqueue(payload);
+
+      try {
+        await adminService.incrementJobStats('copy');
+      } catch (statsError) {
+        console.error('[COPY] Failed to increment copy job stats:', statsError);
+      }
+
+      void adminService.appendAdminLog(
+        'copy_job_enqueued',
+        'Copy job settled and enqueued.',
+        {
+          jobId: job.id,
+          chargedAmount: settlement.chargedAmount,
+          copies: quote.copies,
+          colorMode: quote.effectiveColorMode,
+          billableColorPages: quote.billableColorPages * quote.copies,
+          billableBwPages: quote.billableBwPages * quote.copies,
+        },
+      );
     } catch (error) {
       await upsertSpoolerFailureRefund({
         chargedAmount: settlement.chargedAmount,

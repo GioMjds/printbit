@@ -57,6 +57,9 @@ const printerInkTelemetryStatus = document.getElementById(
 const reDetectBtn = document.getElementById(
   'reDetectBtn',
 ) as HTMLButtonElement | null;
+const restartSpoolerBtn = document.getElementById(
+  'restartSpoolerBtn',
+) as HTMLButtonElement | null;
 const testPrintBtn = document.getElementById(
   'testPrintBtn',
 ) as HTMLButtonElement | null;
@@ -509,6 +512,49 @@ testPrintBtn?.addEventListener('click', () => {
     )
     .finally(() => {
       testPrintBtn.disabled = false;
+    });
+});
+
+
+// ── Restart Print Spooler ───────────────────────────────────────────────────
+
+restartSpoolerBtn?.addEventListener('click', () => {
+  const currentPrinter = lastPrinterSnapshot?.name;
+  const promptText = currentPrinter
+    ? `Restart the Windows Print Spooler for "${currentPrinter}"? Active print jobs will pause briefly.`
+    : 'Restart the Windows Print Spooler service? Active print jobs will pause briefly.';
+
+  if (!window.confirm(promptText)) return;
+
+  restartSpoolerBtn.disabled = true;
+  setMessage('Restarting Windows Print Spooler...');
+
+  void apiFetch('/api/admin/printer/restart-spooler', {
+    method: 'POST',
+    body: JSON.stringify({
+      printerName: currentPrinter ?? undefined,
+    }),
+  })
+    .then(async (res) => {
+      const body = (await res.json()) as {
+        ok: boolean;
+        outcome?: string;
+        message?: string;
+        error?: string;
+        spoolerState?: { isRunning: boolean; status: string };
+        printerState?: string;
+      };
+      if (!res.ok || !body.ok) {
+        throw new Error(body.error ?? body.message ?? 'Print Spooler restart failed.');
+      }
+      setMessage(body.message ?? 'Print Spooler restarted successfully.');
+      void loadData().catch(showRefreshError);
+    })
+    .catch((e: unknown) =>
+      setMessage(e instanceof Error ? e.message : 'Print Spooler restart failed.'),
+    )
+    .finally(() => {
+      restartSpoolerBtn.disabled = false;
     });
 });
 
