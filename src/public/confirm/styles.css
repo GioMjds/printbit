@@ -1507,14 +1507,14 @@ body {
 }
 
 .modal-card {
-  width: 620px;
-  max-width: min(94vw, 640px);
-  max-height: 94vh;
+  width: 630px;
+  max-width: min(90vw, 640px);
+  max-height: min(92vh, 690px);
   overflow: hidden; /* strictly non-scrollable in kiosk mode */
   background: #181730;
   border: 1.5px solid rgba(167, 170, 225, 0.22);
-  border-radius: 28px;
-  padding: 26px 28px 22px;
+  border-radius: 26px;
+  padding: 22px 26px 20px;
   box-shadow:
     0 28px 72px rgba(0, 0, 0, 0.65),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -1525,7 +1525,7 @@ body {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 .modal.is-visible .modal-card {
   transform: translateY(0) scale(1);
@@ -1620,9 +1620,9 @@ body {
   gap: 14px;
 }
 .modal-header__icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 50px;
+  height: 50px;
+  border-radius: 15px;
   background: rgba(105, 111, 199, 0.16);
   border: 1px solid rgba(105, 111, 199, 0.3);
   display: flex;
@@ -1632,23 +1632,23 @@ body {
   flex-shrink: 0;
 }
 .modal-header__icon svg {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
 .modal-header__text {
   flex: 1;
   min-width: 0;
 }
 .modal-title {
-  font-size: 24px;
+  font-size: 26.5px;
   font-weight: 800;
   color: var(--white);
   margin: 0;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
   line-height: 1.2;
 }
 .modal-subtitle {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--ink-muted);
   margin: 3px 0 0;
@@ -1664,7 +1664,7 @@ body {
 .modal-step {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 #confirmModal[data-step='tray'] .modal-step--review,
 #confirmModal[data-step='review'] .modal-step--tray {
@@ -1674,16 +1674,16 @@ body {
 .modal-step--tray {
   align-items: stretch;
   text-align: center;
-  padding: 4px 4px 2px;
-  gap: 10px;
+  padding: 2px 2px 0;
+  gap: 9px;
 }
 .modal-step__badge {
   align-self: center;
-  padding: 4px 12px;
+  padding: 4px 14px;
   border-radius: 999px;
   background: rgba(105, 111, 199, 0.18);
   color: var(--lavender);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -1699,7 +1699,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 .modal-tray-check__icon svg {
   width: 28px;
@@ -1707,10 +1707,10 @@ body {
 }
 .modal-step--tray .modal-title {
   margin-top: 0;
-  font-size: 24px;
+  font-size: 26.5px;
 }
 .modal-step--tray .modal-subtitle {
-  font-size: 15px;
+  font-size: 16px;
   margin: 2px 0 0;
 }
 .modal-step--tray .modal-paper-alert {
@@ -1718,7 +1718,7 @@ body {
   margin-top: 2px;
 }
 .modal-actions--tray {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 /* ── Modal Paper Tray Alert Callout ───────────────────────── */
@@ -1729,7 +1729,7 @@ body {
   background: rgba(251, 191, 36, 0.12);
   border: 1.5px solid rgba(251, 191, 36, 0.38);
   border-radius: 14px;
-  padding: 10px 16px;
+  padding: 9px 16px;
   box-sizing: border-box;
 }
 .modal-paper-alert[hidden] {
@@ -1745,21 +1745,21 @@ body {
   justify-content: center;
 }
 .modal-paper-alert__icon svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 .modal-paper-alert__content {
-  font-size: 14.5px;
+  font-size: 16px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.95);
-  line-height: 1.4;
+  line-height: 1.35;
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
 .modal-paper-alert__title {
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 800;
   color: #fbbf24;
   text-transform: uppercase;
@@ -1781,7 +1781,7 @@ body {
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(167, 170, 225, 0.14);
   border-radius: 14px;
-  padding: 10px 14px;
+  padding: 9px 13px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -1789,8 +1789,8 @@ body {
 }
 .modal-tray-check-item__icon {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: rgba(106, 196, 122, 0.2);
   color: #6ac47a;
@@ -1800,19 +1800,19 @@ body {
   margin-top: 1px;
 }
 .modal-tray-check-item__icon svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 .modal-tray-check-item__content {
-  font-size: 13.5px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.9);
-  line-height: 1.4;
+  line-height: 1.35;
 }
 .modal-tray-check-item__content strong {
   color: var(--white);
-  font-weight: 700;
+  font-weight: 750;
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   margin-bottom: 2px;
 }
 
@@ -1821,33 +1821,33 @@ body {
   background: rgba(105, 111, 199, 0.08);
   border: 1px dashed rgba(167, 170, 225, 0.25);
   border-radius: 14px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   box-sizing: border-box;
 }
 .modal-tray-help-banner__header {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 800;
   color: #fbbf24;
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 .modal-tray-help-banner__header svg {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   flex-shrink: 0;
 }
 .modal-tray-help-banner__body {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--ink-muted);
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 /* ── Step 2 Table-Based Print Details Listing ─────────────── */
@@ -1878,9 +1878,9 @@ body {
 }
 .modal-details-label {
   width: 36%;
-  padding: 11px 16px;
-  font-size: 13px;
-  font-weight: 700;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 750;
   color: var(--lavender);
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -1892,15 +1892,15 @@ body {
   gap: 8px;
 }
 .modal-details-label__inner svg {
-  width: 16px;
-  height: 16px;
-  opacity: 0.8;
+  width: 17px;
+  height: 17px;
+  opacity: 0.85;
   flex-shrink: 0;
 }
 .modal-details-value {
-  padding: 11px 16px;
-  font-size: 15.5px;
-  font-weight: 700;
+  padding: 10px 16px;
+  font-size: 17.5px;
+  font-weight: 750;
   color: var(--white);
   vertical-align: middle;
 }
@@ -1908,13 +1908,14 @@ body {
   color: var(--peach);
 }
 .modal-details-subvalue {
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 500;
   color: var(--ink-muted);
-  margin-left: 4px;
+  margin-left: 5px;
 }
 .modal-details-subvalue strong {
   color: var(--white);
+  font-weight: 800;
 }
 .modal-details-file-cell {
   display: flex;
@@ -1924,8 +1925,8 @@ body {
   width: 100%;
 }
 .modal-filename-text {
-  font-size: 14.5px;
-  font-weight: 700;
+  font-size: 16.5px;
+  font-weight: 750;
   color: var(--white);
   white-space: nowrap;
   overflow: hidden;
@@ -1935,9 +1936,9 @@ body {
   vertical-align: middle;
 }
 .modal-details-badge {
-  padding: 3px 9px;
+  padding: 3px 10px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   background: rgba(105, 111, 199, 0.25);
   color: var(--lavender);
@@ -1953,7 +1954,7 @@ body {
   background: rgba(167, 170, 225, 0.06);
   border: 1px solid rgba(167, 170, 225, 0.15);
   border-radius: 16px;
-  padding: 12px 20px;
+  padding: 10px 20px;
   box-sizing: border-box;
 }
 .modal-finance-bar__col {
@@ -1965,19 +1966,19 @@ body {
 }
 .modal-finance-bar__divider {
   width: 1px;
-  height: 36px;
+  height: 38px;
   background: rgba(167, 170, 225, 0.15);
 }
 .modal-finance-bar__label {
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--ink-muted);
 }
 .modal-finance-bar__value {
-  font-size: 25px;
-  font-weight: 800;
+  font-size: 29px;
+  font-weight: 850;
   line-height: 1.1;
   color: var(--white);
 }
@@ -1991,39 +1992,39 @@ body {
   color: #6ac47a;
 }
 .modal-charge-note {
-  margin: -2px 2px 0;
+  margin: -1px 2px 0;
   color: var(--ink-muted);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
   text-align: center;
 }
 
 /* ── Modal actions ────────────────────────────────────────── */
 .modal-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 0;
+  gap: 12px;
+  margin-top: 2px;
 }
 .modal-btn {
   flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 10px 18px;
+  gap: 8px;
+  padding: 11px 20px;
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 14.5px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 750;
   cursor: pointer;
   transition:
     background 150ms,
     transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 150ms;
   -webkit-tap-highlight-color: transparent;
-  min-height: 48px;
+  min-height: 52px;
 }
 .modal-btn:active {
   transform: scale(0.97);
@@ -2047,8 +2048,8 @@ body {
   box-shadow: 0 6px 20px rgba(58, 158, 82, 0.45);
 }
 .modal-btn svg {
-  width: 17px;
-  height: 17px;
+  width: 19px;
+  height: 19px;
 }
 .modal-btn--alert {
   background: #f26e6b;
@@ -2176,10 +2177,10 @@ body {
   color: #86db93;
 }
 .printing-stage {
-  min-height: 22px;
-  margin: 4px 0 0;
+  min-height: 24px;
+  margin: 6px 0 0;
   color: #c4c7f7;
-  font-size: 16px;
+  font-size: 17.5px;
   font-weight: 750;
   text-align: center;
 }
@@ -2546,11 +2547,11 @@ body {
 /* Print progress indicator — shown for print jobs as soon as the total is
  * known, then advanced by worker lifecycle telemetry. */
 .printing-progress-text {
-  margin: 16px 0 0;
-  font-size: 16.5px;
+  margin: 14px 0 0;
+  font-size: 17.5px;
   line-height: 1.4;
   color: var(--lavender);
-  opacity: 0.92;
+  opacity: 0.95;
   font-variant-numeric: tabular-nums;
 }
 
