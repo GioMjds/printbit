@@ -16,6 +16,7 @@ export function registerAdminModule(
   deps: AdminModuleDeps,
 ): void {
   const adminService = new AdminService();
+  adminService.setSocketIo(deps.io);
   const consumablesService = new ConsumablesService();
   const adminController = new AdminController(
     adminService,

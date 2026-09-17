@@ -19,8 +19,6 @@ import {
 } from '@/middleware';
 import { kioskAccessService } from '@/middleware/kiosk-access';
 import {
-  canControlCoinSlot,
-  canJoinSessionRoom,
   installSocketAccessMiddleware,
   type SocketPrincipal,
 } from '@/middleware/socket-access';
@@ -40,7 +38,7 @@ import {
 } from '@/services/hardware-state-projection';
 import { PaymentAcceptorGate } from '@/services/payment-acceptor-gate';
 import { BLOCKED_STATUSES } from '@/utils';
-import { db } from '@/services/db';
+import { db, type LogMeta } from '@/services/db';
 import { registerControlSocketHandlers } from '@/services/control-socket';
 import { isHotspotRunning, startHotspot } from '@/services/hotspot';
 import { SessionStore, resolvePublicBaseUrl } from '@/services/session';
@@ -67,6 +65,7 @@ import { buildAnomalyFingerprint } from '@/services/anomaly';
 import {
   startWorkerReturnPipeServer,
   mapWorkerEventToSocket,
+  type WorkerPrintEvent,
 } from '@/infrastructure/worker';
 import { handleWorkerReturnPrintEvent } from '@/services/worker-print-lifecycle';
 import { translateHardwarePrinterError } from '@/services/printer-error-translation';
@@ -250,6 +249,84 @@ async function startHttpServer(): Promise<void> {
   });
 }
 
+function logWorkerEventToAdmin(evt: WorkerPrintEvent): void {
+  const meta: LogMeta = {
+    source: 'Worker',
+    transactionId: evt.transactionId ?? null,
+    spoolerJobId: evt.spoolerJobId ?? null,
+    spoolerCorrelationKey: evt.spoolerCorrelationKey ?? null,
+    printerName: evt.printerName ?? null,
+    failureStage: evt.failureStage ?? null,
+    errorCode: evt.errorCode ?? null,
+  };
+
+  switch (evt.type) {
+    case 'PrinterOffline':
+      void adminService.appendAdminLog(
+        'printer_offline',
+        evt.message ?? `Printer "${evt.printerName ?? 'Default'}" went offline.`,
+        meta,
+      );
+      break;
+    case 'PrinterOnline':
+      void adminService.appendAdminLog(
+        'printer_online',
+        evt.message ?? `Printer "${evt.printerName ?? 'Default'}" is online.`,
+        meta,
+      );
+      break;
+    case 'PrinterError':
+      void adminService.appendAdminLog(
+        'printer_error',
+        evt.errorMessage ?? evt.message ?? 'Printer hardware error detected.',
+        meta,
+      );
+      break;
+    case 'PrintStarted':
+      void adminService.appendAdminLog(
+        'worker_print_started',
+        evt.message ?? `Print job started for file "${evt.fileName ?? 'unknown'}".`,
+        meta,
+      );
+      break;
+    case 'PrintSucceeded':
+      void adminService.appendAdminLog(
+        'worker_print_succeeded',
+        evt.message ?? `Print job completed successfully (${evt.pagesPrinted ?? evt.totalPages ?? 0} pages).`,
+        meta,
+      );
+      break;
+    case 'PrintFailed':
+      void adminService.appendAdminLog(
+        'worker_print_failed',
+        evt.errorMessage ?? evt.message ?? `Print job failed at stage ${evt.failureStage ?? 'unknown'}.`,
+        meta,
+      );
+      break;
+    case 'JobPaused':
+      void adminService.appendAdminLog(
+        'worker_job_paused',
+        evt.message ?? 'Print job was paused in spooler.',
+        meta,
+      );
+      break;
+    case 'JobResumed':
+      void adminService.appendAdminLog(
+        'worker_job_resumed',
+        evt.message ?? 'Print job was resumed in spooler.',
+        meta,
+      );
+      break;
+    case 'HardwareStatus':
+      void adminService.appendAdminLog(
+        'hardware_status',
+        evt.message ?? 'Worker hardware status update.',
+        meta,
+      );
+      break;
+  }
+}
+
 async function initializePrintBit(): Promise<void> {
   try {
     await initDB();
@@ -261,6 +338,7 @@ async function initializePrintBit(): Promise<void> {
       pipeName: WORKER_RETURN_PIPE_NAME,
       maxBytes: WORKER_RETURN_MAX_BYTES,
       onEvent: (evt) => {
+        logWorkerEventToAdmin(evt);
         if (
           evt.type === 'PowerStatusChanged' ||
           evt.type === 'PowerStatusSnapshot'
@@ -522,6 +600,7 @@ async function initializePrintBit(): Promise<void> {
       isHotspotRunning,
     });
     anomalyService.setSocketIo(io);
+    adminService.setSocketIo(io);
     let trustedTimeBlocked = startupBlocked;
     startTrustedTimeMonitor(async (status) => {
       const blocked =

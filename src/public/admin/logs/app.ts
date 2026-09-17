@@ -7,6 +7,15 @@ import {
   updateSidebarBadges,
 } from '../shared';
 
+// Socket.io client is loaded via <script src="/socket.io/socket.io.js">
+declare const io: (opts?: {
+  auth?: Record<string, string>;
+  reconnectionDelay?: number;
+}) => {
+  on(event: string, cb: (...args: unknown[]) => void): void;
+  disconnect(): void;
+};
+
 const logsBody = document.getElementById('logsBody') as HTMLElement;
 const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 const exportLogsBtn = document.getElementById(
@@ -20,8 +29,11 @@ const pageInfo = document.getElementById('pageInfo') as HTMLElement;
 const PAGE_SIZE = 20;
 let refreshTimer: number | null = null;
 let currentPage = 1;
-let totalLogs = 0;
 let allLogs: LogsResponse['logs'] = [];
+let socket: ReturnType<typeof io> | null = null;
+
+type LogFilter = 'all' | 'node' | 'worker' | 'error';
+let activeFilter: LogFilter = 'all';
 
 export function inferLogBadge(type: string, message: string): { label: string; className: string } {
   const normType = (type || '').toLowerCase();
@@ -46,9 +58,48 @@ export function inferLogBadge(type: string, message: string): { label: string; c
   return { label, className: 'log-badge--system' };
 }
 
+export function inferLogSource(log: LogsResponse['logs'][number]): { label: string; className: string } {
+  const src = (log.meta?.source as string | undefined)?.toLowerCase();
+  const normType = (log.type || '').toLowerCase();
+
+  if (
+    src === 'worker' ||
+    src === 'spooler' ||
+    src === 'worker-return-pipe' ||
+    normType.startsWith('worker_') ||
+    normType.startsWith('printer_')
+  ) {
+    return { label: 'WORKER', className: 'log-badge--worker' };
+  }
+
+  return { label: 'NODE', className: 'log-badge--node' };
+}
+
+function matchesFilter(log: LogsResponse['logs'][number]): boolean {
+  if (activeFilter === 'all') return true;
+  const isWorker =
+    log.meta?.source === 'Worker' ||
+    log.meta?.source === 'spooler' ||
+    log.meta?.source === 'worker-return-pipe' ||
+    log.type.startsWith('worker_') ||
+    log.type.startsWith('printer_');
+
+  if (activeFilter === 'worker') return isWorker;
+  if (activeFilter === 'node') return !isWorker;
+  if (activeFilter === 'error') {
+    const badge = inferLogBadge(log.type, log.message);
+    return badge.label === 'ERROR' || badge.label === 'WARN';
+  }
+  return true;
+}
+
+function getFilteredLogs(): LogsResponse['logs'] {
+  return allLogs.filter(matchesFilter);
+}
 
 function totalPages(): number {
-  return Math.max(1, Math.ceil(totalLogs / PAGE_SIZE));
+  const filtered = getFilteredLogs();
+  return Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 }
 
 function updatePaginationControls(): void {
@@ -59,8 +110,11 @@ function updatePaginationControls(): void {
 }
 
 function renderPage(): void {
+  const filtered = getFilteredLogs();
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if (currentPage > pages) currentPage = pages;
   const start = (currentPage - 1) * PAGE_SIZE;
-  const slice = allLogs.slice(start, start + PAGE_SIZE);
+  const slice = filtered.slice(start, start + PAGE_SIZE);
   applyLogs(slice);
   updatePaginationControls();
 }
@@ -71,19 +125,21 @@ function applyLogs(logs: LogsResponse['logs']): void {
   if (logs.length === 0) {
     const tr = document.createElement('tr');
     tr.className = 'logs-empty';
-    tr.innerHTML = `<td colspan="2" style="text-align:center;color:var(--ink-muted);padding:24px">No system log entries.</td>`;
+    tr.innerHTML = `<td colspan="2" style="text-align:center;color:var(--ink-muted);padding:24px">No log entries matching filter.</td>`;
     logsBody.appendChild(tr);
     return;
   }
 
   for (const log of logs) {
     const badge = inferLogBadge(log.type, log.message);
+    const source = inferLogSource(log);
     const tr = document.createElement('tr');
     tr.dataset.logId = log.id;
     tr.innerHTML = `
       <td class="logs-td logs-td--ts" data-label="Timestamp">${new Date(log.timestamp).toLocaleString()}</td>
       <td class="logs-td logs-td--msg" data-label="Message">
         <div class="logs-msg-wrap">
+          <span class="log-badge ${source.className}">${escapeHtml(source.label)}</span>
           <span class="log-badge ${badge.className}">${escapeHtml(badge.label)}</span>
           <span class="logs-msg-text">${escapeHtml(log.message)}</span>
         </div>
@@ -101,6 +157,30 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function connectSocket(): void {
+  if (typeof io !== 'function' || socket) return;
+  const pin = sessionStorage.getItem('adminPin') ?? '';
+  try {
+    socket = io({ auth: { pin }, reconnectionDelay: 2000 });
+    socket.on('admin:new_log', (entry: unknown) => {
+      if (!entry || typeof entry !== 'object') return;
+      const logEntry = entry as LogsResponse['logs'][number];
+      // Prevent duplicates
+      if (allLogs.some((l) => l.id === logEntry.id)) return;
+      allLogs.unshift(logEntry);
+      if (allLogs.length > 3000) allLogs.pop();
+      // Render immediately if on page 1
+      if (currentPage === 1) {
+        renderPage();
+      } else {
+        updatePaginationControls();
+      }
+    });
+  } catch (err) {
+    console.warn('[LOGS] Failed to establish Socket.IO connection:', err);
+  }
+}
+
 async function loadData(): Promise<void> {
   const params = new URLSearchParams({ limit: '1000' });
   const res = await apiFetch(`/api/admin/logs/system?${params.toString()}`);
@@ -110,8 +190,6 @@ async function loadData(): Promise<void> {
   }
   const data = (await res.json()) as LogsResponse;
   allLogs = data.logs;
-  totalLogs = allLogs.length;
-  if (currentPage > totalPages()) currentPage = totalPages();
   renderPage();
   await loadSummary();
 }
@@ -132,11 +210,21 @@ async function clearAllLogs(): Promise<void> {
     return;
   }
   allLogs = [];
-  totalLogs = 0;
   currentPage = 1;
   renderPage();
   setMessage('All system logs cleared.');
 }
+
+// Filter chips
+document.querySelectorAll<HTMLButtonElement>('.logs-filter-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.logs-filter-chip').forEach((c) => c.classList.remove('is-active'));
+    chip.classList.add('is-active');
+    activeFilter = (chip.dataset.filter as LogFilter) || 'all';
+    currentPage = 1;
+    renderPage();
+  });
+});
 
 refreshBtn.addEventListener('click', () => {
   setMessage('Refreshing...');
@@ -195,6 +283,7 @@ function showRefreshError(error: unknown): void {
 }
 
 initAuth(async (signal) => {
+  connectSocket();
   await loadData();
   if (signal.aborted) return;
   if (refreshTimer !== null) window.clearInterval(refreshTimer);

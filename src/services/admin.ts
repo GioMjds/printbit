@@ -13,8 +13,17 @@ import {
 import { getTrustedTimestamp } from './time-source';
 import { adminLogStore } from '@/core/database/sqlite-storage';
 
+interface SocketEmitter {
+  emit: (event: string, ...args: unknown[]) => void;
+}
+
 class AdminService {
   private readonly MAX_LOGS = 3000;
+  private io: SocketEmitter | null = null;
+
+  setSocketIo(io: SocketEmitter | null): void {
+    this.io = io;
+  }
 
   getPricingSettings(): PricingSettings {
     return db.data!.settings.pricing;
@@ -91,6 +100,11 @@ class AdminService {
     };
 
     adminLogStore.append(entry, this.MAX_LOGS);
+    try {
+      this.io?.emit('admin:new_log', entry);
+    } catch {
+      // Ignore broadcast failures
+    }
     return entry;
   }
 

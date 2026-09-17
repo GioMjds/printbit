@@ -110,8 +110,17 @@ export interface DispatchLatencyMetricsResult {
   speculation: DispatchLatencySpeculation;
 }
 
+interface SocketEmitter {
+  emit: (event: string, ...args: unknown[]) => void;
+}
+
 export class AdminService {
   private readonly MAX_LOGS = 3000;
+  private io: SocketEmitter | null = null;
+
+  setSocketIo(io: SocketEmitter | null): void {
+    this.io = io;
+  }
 
   private readonly dateShortFormatter = new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -214,6 +223,11 @@ export class AdminService {
     };
 
     adminLogStore.append(entry, this.MAX_LOGS);
+    try {
+      this.io?.emit('admin:new_log', entry);
+    } catch {
+      // Ignore broadcast failures
+    }
     return entry;
   }
 

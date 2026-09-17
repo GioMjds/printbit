@@ -166,6 +166,51 @@
   background: rgba(167, 170, 225, 0.12);
   color: var(--lavender);
 }
+.log-badge--worker {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+.log-badge--node {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+/* Filter chip bar */
+.logs-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.logs-filter-chip {
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-2);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.logs-filter-chip:hover {
+  background: var(--surface-2);
+  color: var(--white);
+  border-color: rgba(167, 170, 225, 0.35);
+}
+
+.logs-filter-chip.is-active {
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+  border-color: rgba(129, 140, 248, 0.55);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+}
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 640px) {

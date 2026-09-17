@@ -402,6 +402,13 @@
               </p>
             </section>
 
+            <div class="logs-filter-bar" role="group" aria-label="Filter logs by source and severity">
+              <button type="button" class="logs-filter-chip is-active" data-filter="all">All Logs</button>
+              <button type="button" class="logs-filter-chip" data-filter="node">Node.js</button>
+              <button type="button" class="logs-filter-chip" data-filter="worker">Worker & Spooler</button>
+              <button type="button" class="logs-filter-chip" data-filter="error">Errors & Warnings</button>
+            </div>
+
             <div class="logs-panel">
               <div class="logs-scroll">
                 <table class="logs-table">
@@ -431,6 +438,7 @@
       </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/admin/logs/app.js"></script>
   </body>
 </html>
