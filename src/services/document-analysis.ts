@@ -91,6 +91,9 @@ interface PdfOperatorList {
 }
 
 interface PdfOps {
+  save?: number;
+  restore?: number;
+  transform?: number;
   setFillRGBColor?: number;
   setStrokeRGBColor?: number;
   setFillCMYKColor?: number;
@@ -364,19 +367,29 @@ async function analyzePdfFile(
       let isColor = false;
       let classification: 'blank' | 'bw' | 'partial' | 'full_color' | 'image' = 'bw';
       let isBlank = true;
+      let isImagePage = false;
+      let imageCoverage = 0;
 
       try {
+        const viewport = page.getViewport({ scale: 1 });
         const opList = (await page.getOperatorList()) as PdfOperatorList;
         const analysis = analyzePageOperatorList(
           opList,
           ops,
           textRenderOps,
           textStructuralOps,
+          {
+            pageWidth: viewport.width,
+            pageHeight: viewport.height,
+            isOriginalImage: options?.isOriginalImage,
+          },
         );
         coverage = analysis.coverage;
         isColor = analysis.hasColor;
         isBlank = analysis.isBlank;
         classification = analysis.classification;
+        isImagePage = Boolean(analysis.isImagePage);
+        imageCoverage = analysis.imageCoverage ?? 0;
       } catch (error) {
         console.warn(
           `[document-analysis] Page ${pageNum} operator scan failed; defaulting to colored.`,
@@ -395,20 +408,10 @@ async function analyzePdfFile(
         isColor,
         coverage,
         contentCoverage: coverage,
-        classification: options?.isOriginalImage
-          ? isBlank
-            ? 'blank'
-            : isColor
-              ? 'image'
-              : 'bw'
-          : classification,
+        classification,
         isBlank,
-        ...(options?.isOriginalImage
-          ? {
-              isImagePage: !isBlank,
-              imageCoverage: isBlank ? 0 : 1.0,
-            }
-          : {}),
+        isImagePage,
+        imageCoverage,
         fallbackReasonFlags:
           fallbackPageCount > 0
             ? ['operator_scan_failed_default_color']
@@ -480,14 +483,26 @@ interface PageAnalysisMetrics {
   hasColor: boolean;
   coverage: number;
   isBlank: boolean;
-  classification: 'blank' | 'bw' | 'partial' | 'full_color';
+  classification: 'blank' | 'bw' | 'partial' | 'full_color' | 'image';
+  isImagePage?: boolean;
+  imageCoverage?: number;
 }
+
+interface PageOperatorScanOptions {
+  pageWidth?: number;
+  pageHeight?: number;
+  isOriginalImage?: boolean;
+  imageCoverageThreshold?: number;
+}
+
+type Matrix6 = [number, number, number, number, number, number];
 
 function analyzePageOperatorList(
   opList: PdfOperatorList,
   ops: PdfOps,
   textRenderOps: Set<number> = new Set(),
   textStructuralOps: Set<number> = new Set(),
+  options?: PageOperatorScanOptions,
 ): PageAnalysisMetrics {
   const imagePaintOps = new Set(
     [
@@ -527,11 +542,41 @@ function analyzePageOperatorList(
   let contentOpsCount = 0;
   let totalNonStructuralOps = 0;
 
+  let currentCtm: Matrix6 = [1, 0, 0, 1, 0, 0];
+  const ctmStack: Matrix6[] = [];
+  let totalImageArea = 0;
+
   for (let i = 0; i < opList.fnArray.length; i += 1) {
     const op = opList.fnArray[i];
     if (textStructuralOps.has(op)) continue;
 
     totalNonStructuralOps += 1;
+
+    // ── CTM matrix tracking ────────────────────────────────────────────────
+    if (op === ops.save) {
+      ctmStack.push([...currentCtm]);
+      continue;
+    }
+    if (op === ops.restore) {
+      currentCtm = ctmStack.pop() ?? [1, 0, 0, 1, 0, 0];
+      continue;
+    }
+    if (op === ops.transform) {
+      const args = opList.argsArray[i];
+      if (Array.isArray(args) && args.length >= 6) {
+        const [a1, b1, c1, d1, e1, f1] = currentCtm;
+        const [a2, b2, c2, d2, e2, f2] = args as number[];
+        currentCtm = [
+          a1 * a2 + b1 * c2,
+          a1 * b2 + b1 * d2,
+          c1 * a2 + d1 * c2,
+          c1 * b2 + d1 * d2,
+          e1 * a2 + f1 * c2 + e2,
+          e1 * b2 + f1 * d2 + f2,
+        ];
+      }
+      continue;
+    }
 
     // ── Color-state ops: record color, but do NOT mark page as having content ──
     if (op === ops.setFillRGBColor || op === ops.setStrokeRGBColor) {
@@ -566,6 +611,15 @@ function analyzePageOperatorList(
       // have their own colour data / are intentional even if "invisible").
       const isImageOp = imagePaintOps.has(op) || op === ops.paintFormXObject;
       const isTextOp = textRenderOps.has(op);
+
+      if (isImageOp) {
+        const det = Math.abs(
+          currentCtm[0] * currentCtm[3] - currentCtm[1] * currentCtm[2],
+        );
+        if (Number.isFinite(det) && det > 0) {
+          totalImageArea += det;
+        }
+      }
 
       const isWhitePaint =
         !isImageOp &&
@@ -620,11 +674,34 @@ function analyzePageOperatorList(
     !isBlank && totalNonStructuralOps > 0
       ? Math.min(1.0, contentOpsCount / totalNonStructuralOps)
       : 0;
-  let classification: 'blank' | 'bw' | 'partial' | 'full_color';
+
+  const pageWidth = options?.pageWidth ?? 0;
+  const pageHeight = options?.pageHeight ?? 0;
+  const pageArea =
+    pageWidth > 0 && pageHeight > 0 ? pageWidth * pageHeight : 0;
+  const rawImageCoverage =
+    pageArea > 0
+      ? Math.min(1.0, totalImageArea / pageArea)
+      : hasImages
+        ? 0.5
+        : 0;
+  const imageCoverage = options?.isOriginalImage
+    ? isBlank
+      ? 0
+      : 1.0
+    : rawImageCoverage;
+  const threshold = options?.imageCoverageThreshold ?? 0.50;
+  const isImagePage = options?.isOriginalImage
+    ? !isBlank
+    : imageCoverage >= threshold;
+
+  let classification: 'blank' | 'bw' | 'partial' | 'full_color' | 'image';
   if (isBlank) {
     classification = 'blank';
   } else if (!hasColor) {
     classification = 'bw';
+  } else if (isImagePage) {
+    classification = 'image';
   } else if (estimatedCoverage > 0.8 || hasImages) {
     classification = 'full_color';
   } else {
@@ -636,6 +713,8 @@ function analyzePageOperatorList(
     coverage: estimatedCoverage,
     isBlank,
     classification,
+    isImagePage,
+    imageCoverage,
   };
 }
 
