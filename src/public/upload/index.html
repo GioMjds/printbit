@@ -24,7 +24,7 @@
           <div class="brand-mark" aria-hidden="true"></div>
           <div>
             <h1 id="uploadTitle" class="card-title">Send to PrintBit</h1>
-            <p class="card-sub">
+            <p class="card-sub" id="uploadSubTitle">
               PDF, DOCX, JPG, and PNG files only · up to 25 MB each
             </p>
           </div>
@@ -105,7 +105,7 @@
                 or drag files here</span
               >
             </p>
-            <p class="drop-zone__hint">
+            <p class="drop-zone__hint" id="dropZoneHint">
               PDF recommended for fastest processing · Word documents &amp;
               images supported
             </p>
@@ -159,6 +159,7 @@
 
     <script>
       window.uploadToken = '{{token}}';
+      window.documentConversionEnabled = {{documentConversionEnabled}};
     </script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js"></script>

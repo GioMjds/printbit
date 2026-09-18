@@ -59,6 +59,17 @@ export class UploadPortalService {
     // Inject token into the placeholder used by app.ts
     template = template.replace('{{token}}', token.replace(/"/g, '&quot;'));
 
+    // Inject documentConversionEnabled flag
+    const pipelineSettings = adminService.getPipelineSettings();
+    const documentConversionEnabled =
+      typeof pipelineSettings?.documentConversionEnabled === 'boolean'
+        ? pipelineSettings.documentConversionEnabled
+        : true;
+    template = template.replace(
+      '{{documentConversionEnabled}}',
+      JSON.stringify(documentConversionEnabled),
+    );
+
     return template;
   }
 

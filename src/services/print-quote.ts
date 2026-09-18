@@ -36,6 +36,7 @@ export interface PrintQuoteResult {
     | 'high-confidence-page-detection'
     | 'fallback-assumptions';
   analysisFallbackReasonFlags: string[];
+  colorDetectionEnabled: boolean;
 }
 
 export type PrintQuoteComputation =
@@ -319,6 +320,7 @@ export function buildPrintQuote(input: {
       analysisConfidence: input.analysis.confidence,
       billingPageDetection,
       analysisFallbackReasonFlags,
+      colorDetectionEnabled: adminService.getPipelineSettings().colorDetectionEnabled,
     },
   };
 }

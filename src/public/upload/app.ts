@@ -10,6 +10,7 @@ void initKioskLocalization();
 declare global {
   interface Window {
     uploadToken?: string;
+    documentConversionEnabled?: boolean;
     io?: (
       namespace: string,
       options: {
@@ -39,6 +40,7 @@ interface SessionResponse {
   remainingSeconds?: number;
   warningThresholdSeconds?: number;
   ttlSeconds?: number;
+  documentConversionEnabled?: boolean;
 }
 
 interface UploadErrorResponse {
@@ -68,6 +70,12 @@ const retrySessionButton = document.getElementById(
   'retrySessionButton',
 ) as HTMLButtonElement;
 const uploadForm = document.getElementById('uploadForm') as HTMLFormElement;
+const uploadSubTitle = document.getElementById(
+  'uploadSubTitle',
+) as HTMLParagraphElement | null;
+const dropZoneHint = document.getElementById(
+  'dropZoneHint',
+) as HTMLParagraphElement | null;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -87,6 +95,10 @@ let countdownSyncedAtMs: number | null = null;
 let countdownHandle: number | null = null;
 let isSessionUnavailable = false;
 let largePrintWarningShown = false;
+let documentConversionEnabled =
+  typeof window.documentConversionEnabled === 'boolean'
+    ? window.documentConversionEnabled
+    : true;
 
 function getOrCreateUploadClientId(): string {
   const generated =
@@ -155,6 +167,58 @@ function extOf(name: string): string {
   return name.split('.').pop()?.toLowerCase() ?? 'file';
 }
 
+function isWordDocument(fileName: string, mimeType?: string): boolean {
+  const ext = extOf(fileName);
+  if (ext === 'doc' || ext === 'docx') return true;
+  const normalized = mimeType?.trim().toLowerCase();
+  return (
+    normalized === 'application/msword' ||
+    normalized ===
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  );
+}
+
+function setDocumentConversionEnabled(enabled: boolean): void {
+  documentConversionEnabled = enabled;
+
+  if (fileInput) {
+    fileInput.accept = enabled
+      ? '.pdf,.doc,.docx,.jpeg,.jpg,.png'
+      : '.pdf,.jpeg,.jpg,.png';
+  }
+
+  if (uploadSubTitle) {
+    uploadSubTitle.textContent = enabled
+      ? 'PDF, DOCX, JPG, and PNG files only · up to 25 MB each'
+      : 'PDF, JPG, and PNG files only · up to 25 MB each';
+  }
+
+  if (dropZoneHint) {
+    dropZoneHint.textContent = enabled
+      ? 'PDF recommended for fastest processing · Word documents & images supported'
+      : 'PDF recommended for fastest processing · Images supported (Word documents disabled)';
+  }
+
+  if (!enabled && queue.length > 0) {
+    let removedCount = 0;
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const qf = queue[i];
+      if (qf.status === 'pending' && isWordDocument(qf.file.name, qf.file.type)) {
+        queue.splice(i, 1);
+        qf.el.remove();
+        removedCount++;
+      }
+    }
+    if (removedCount > 0) {
+      refreshUploadBtn();
+      setStatus(
+        'Word document conversion is disabled on this kiosk. Removed Word document(s) from upload list.',
+        'info',
+      );
+    }
+  }
+}
+
 function normalizeMimeByExtension(
   fileName: string,
   mimeType: string,
@@ -177,21 +241,41 @@ function normalizeMimeByExtension(
   return extensionMimeMap[ext] ?? null;
 }
 
-function collectUnsupportedFiles(files: File[]): string[] {
+interface UnsupportedFilesResult {
+  unsupported: string[];
+  rejectedWordCount: number;
+}
+
+function collectUnsupportedFiles(files: File[]): UnsupportedFilesResult {
   const allowedMimeTypes = new Set<string>([
     'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'image/jpeg',
     'image/png',
   ]);
+  if (documentConversionEnabled) {
+    allowedMimeTypes.add('application/msword');
+    allowedMimeTypes.add(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+  }
 
-  return files
-    .filter((file) => {
-      const normalized = normalizeMimeByExtension(file.name, file.type);
-      return !normalized || !allowedMimeTypes.has(normalized);
-    })
-    .map((file) => file.name);
+  const unsupported: string[] = [];
+  let rejectedWordCount = 0;
+
+  for (const file of files) {
+    const isWord = isWordDocument(file.name, file.type);
+    if (!documentConversionEnabled && isWord) {
+      rejectedWordCount++;
+      unsupported.push(file.name);
+      continue;
+    }
+    const normalized = normalizeMimeByExtension(file.name, file.type);
+    if (!normalized || !allowedMimeTypes.has(normalized)) {
+      unsupported.push(file.name);
+    }
+  }
+
+  return { unsupported, rejectedWordCount };
 }
 
 async function sha256File(file: File): Promise<string | undefined> {
@@ -209,9 +293,9 @@ function mapError(r: UploadErrorResponse): string {
     case 'INVALID_TOKEN':
       return 'Invalid token. Scan a fresh kiosk QR or reopen the upload link from the kiosk.';
     case 'UNSUPPORTED_TYPE':
-      return 'Unsupported file type.';
+      return r.error ?? 'Unsupported file type.';
     case 'UNSUPPORTED_FILE_TYPE':
-      return 'Unsupported file type.';
+      return r.error ?? 'Unsupported file type.';
     case 'FILE_TOO_LARGE':
       return r.error ?? 'File exceeds the 25 MB limit.';
     case 'SESSION_NOT_FOUND':
@@ -373,6 +457,9 @@ async function refreshSessionLease(): Promise<void> {
     if (typeof session.remainingSeconds === 'number') {
       applySessionCountdown(session.remainingSeconds);
     }
+    if (typeof session.documentConversionEnabled === 'boolean') {
+      setDocumentConversionEnabled(session.documentConversionEnabled);
+    }
   } catch {
     // Keep current UI state on transient network errors.
   }
@@ -473,16 +560,27 @@ function escHtml(s: string): string {
 
 async function addFilesToQueue(files: FileList | File[]): Promise<void> {
   const arr = Array.from(files);
-  const unsupportedFiles = collectUnsupportedFiles(arr);
-  if (unsupportedFiles.length > 0) {
-    setStatus(
-      `Unsupported file type: ${unsupportedFiles[0]}${unsupportedFiles.length > 1 ? ` (+${unsupportedFiles.length - 1} more)` : ''}.`,
-      'error',
-    );
+  const { unsupported, rejectedWordCount } = collectUnsupportedFiles(arr);
+  if (unsupported.length > 0) {
+    if (rejectedWordCount > 0) {
+      setStatus(
+        'Word document conversion is disabled on this kiosk. Please upload PDF or image files.',
+        'error',
+      );
+    } else {
+      setStatus(
+        `Unsupported file type: ${unsupported[0]}${unsupported.length > 1 ? ` (+${unsupported.length - 1} more)` : ''}.`,
+        'error',
+      );
+    }
   }
 
   const duplicateFiles: string[] = [];
   for (const file of arr) {
+    if (!documentConversionEnabled && isWordDocument(file.name, file.type)) {
+      continue;
+    }
+
     const normalizedMime = normalizeMimeByExtension(file.name, file.type);
     if (!normalizedMime) continue;
 
@@ -516,7 +614,7 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
       `${duplicateFiles[0]} is already in the upload list${duplicateFiles.length > 1 ? ` (+${duplicateFiles.length - 1} more)` : ''}.`,
       'info',
     );
-  } else if (unsupportedFiles.length === 0) {
+  } else if (unsupported.length === 0) {
     clearStatus();
   }
 }
@@ -578,6 +676,10 @@ async function initSession(): Promise<void> {
     sessionId = session.sessionId;
     sessionWarningThresholdSeconds =
       session.warningThresholdSeconds ?? DEFAULT_WARNING_SECONDS;
+
+    if (typeof session.documentConversionEnabled === 'boolean') {
+      setDocumentConversionEnabled(session.documentConversionEnabled);
+    }
 
     attachSocket(sessionId);
     setAppState('session-ready');
@@ -681,6 +783,15 @@ async function uploadPendingFiles(): Promise<void> {
 
   for (const qf of pending) {
     if (isSessionUnavailable) break;
+    if (!documentConversionEnabled && isWordDocument(qf.file.name, qf.file.type)) {
+      updateItemStatus(
+        qf,
+        'error',
+        'Word document conversion is disabled.',
+      );
+      errorCount++;
+      continue;
+    }
     updateItemStatus(qf, 'uploading');
     setItemProgress(qf, 20);
 
@@ -821,24 +932,9 @@ document.addEventListener('visibilitychange', handleVisibilityResume);
 window.addEventListener('focus', () => {
   void refreshSessionLease();
 });
-
-retrySessionButton.addEventListener('click', () => {
-  clearQueueForRetry();
-  void initSession();
-});
-
-uploadForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  if (appState !== 'session-ready') return;
-  void uploadPendingFiles();
-});
-
-document.addEventListener('visibilitychange', handleVisibilityResume);
-window.addEventListener('focus', () => {
-  void refreshSessionLease();
-});
 window.addEventListener('pageshow', () => {
   void refreshSessionLease();
 });
 
+setDocumentConversionEnabled(documentConversionEnabled);
 void initSession();

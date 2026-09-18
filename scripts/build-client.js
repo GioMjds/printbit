@@ -40,9 +40,13 @@ function copyDotLottieWasm() {
     'dotlottie',
     'dotlottie-player.wasm',
   );
-  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  fs.copyFileSync(sourcePath, targetPath);
-  console.log(`Copied: ${sourcePath} -> ${targetPath}`);
+  try {
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath);
+    console.log(`Copied: ${sourcePath} -> ${targetPath}`);
+  } catch (err) {
+    console.warn(`Could not copy dotlottie wasm (ignoring): ${err.message}`);
+  }
 }
 
 const entryPoints = [
