@@ -1856,8 +1856,28 @@ function updateSummary(): void {
   if (currentPrintQuote) {
     footerSummary.classList.add('ready');
     if (footerBreakdown) {
+      const parts: string[] = [];
+      if (
+        currentPrintQuote.billableImagePages &&
+        currentPrintQuote.billableImagePages > 0
+      ) {
+        parts.push(
+          `${currentPrintQuote.billableImagePages} ${currentPrintQuote.billableImagePages === 1 ? 'photo' : 'photos'}`,
+        );
+      }
+      if (currentPrintQuote.billableColorPages > 0) {
+        parts.push(`${currentPrintQuote.billableColorPages} color`);
+      }
+      if (currentPrintQuote.billableBwPages > 0) {
+        parts.push(`${currentPrintQuote.billableBwPages} B&W`);
+      }
+      const pageDesc =
+        parts.length > 0
+          ? parts.join(' · ')
+          : `${currentPrintQuote.selectedPages} ${currentPrintQuote.selectedPages === 1 ? 'page' : 'pages'}`;
+
       footerBreakdown.textContent =
-        `${currentPrintQuote.selectedPages} ${currentPrintQuote.selectedPages === 1 ? 'page' : 'pages'} × ` +
+        `${pageDesc} × ` +
         `${n} ${n === 1 ? 'copy' : 'copies'} · ` +
         `${currentPrintQuote.effectiveColorMode === 'colored' ? 'Color' : 'Grayscale'} · ` +
         `${cfg.paperSize} · ${currentPrintQuote.quality === 'high' ? 'High quality' : 'Standard quality'}`;

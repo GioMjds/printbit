@@ -23,6 +23,7 @@ export interface PrintQuoteResult {
   selectedBwPages: number;
   billableColorPages: number;
   billableBwPages: number;
+  billableImagePages: number;
   requestedColorMode: ColorMode;
   effectiveColorMode: ColorMode;
   quality: PrintQuality;
@@ -206,9 +207,13 @@ export function buildPrintQuote(input: {
     ? input.analysis.pages
     : [];
   const byPage = new Map<number, boolean>();
+  const pageDetailsMap = new Map<number, (typeof pageAnalyses)[number]>();
   for (const page of pageAnalyses) {
     const index = Math.floor(page.index);
-    if (index >= 1) byPage.set(index, Boolean(page.isColor));
+    if (index >= 1) {
+      byPage.set(index, Boolean(page.isColor));
+      pageDetailsMap.set(index, page);
+    }
   }
 
   let selectedColorPages = 0;
@@ -276,19 +281,50 @@ export function buildPrintQuote(input: {
     };
   }
 
-  // The selected print mode is the customer's billing choice. Content analysis
-  // remains useful to describe the document, but it must not silently replace
-  // a selected Color job with the B&W price profile.
+  // The selected print mode is the customer's billing choice.
+  // In Color mode: per-page grading bills photos/images at baseImagePrice,
+  // colored pages at baseColorPrice, and B&W/blank at baseBwPrice.
+  // In B&W mode: driver prints pure grayscale, all pages bill at baseBwPrice.
   const effectiveColorMode: ColorMode = input.colorMode;
-  const billableColorPages =
-    effectiveColorMode === 'colored' ? selectedCount : 0;
-  const billableBwPages = selectedCount - billableColorPages;
+  let billableColorPages = 0;
+  let billableBwPages = 0;
+  let billableImagePages = 0;
+
+  if (effectiveColorMode === 'colored') {
+    if (!usedFallbackAssumptions && input.analysis.confidence !== 'low') {
+      for (const pageNum of selectedPages.selected) {
+        const page = pageDetailsMap.get(pageNum);
+        const isImage =
+          page?.classification === 'image' ||
+          Boolean(page?.isImagePage && page?.isColor);
+        if (isImage) {
+          billableImagePages += 1;
+        } else if (page?.isColor) {
+          billableColorPages += 1;
+        } else {
+          billableBwPages += 1;
+        }
+      }
+    } else {
+      // Fallback without reliable page detection: bill binary color/BW
+      billableColorPages = selectedColorPages;
+      billableBwPages = selectedBwPages;
+      billableImagePages = 0;
+    }
+  } else {
+    // B&W Mode: forces all pages to baseBwPrice (zero color ink)
+    billableBwPages = selectedCount;
+    billableColorPages = 0;
+    billableImagePages = 0;
+  }
+
   const quality: PrintQuality = input.quality ?? 'standard';
   const requiredAmount = adminService.calculateDocumentAmount(
     'print',
     {
       colorPages: billableColorPages,
       bwPages: billableBwPages,
+      imagePages: billableImagePages,
     },
     safeCopies,
     input.paperSize ?? 'A4',
@@ -309,6 +345,7 @@ export function buildPrintQuote(input: {
       selectedBwPages,
       billableColorPages,
       billableBwPages,
+      billableImagePages,
       requestedColorMode: input.colorMode,
       effectiveColorMode,
       quality,
