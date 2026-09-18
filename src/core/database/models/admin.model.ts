@@ -20,6 +20,7 @@ export type PricingEngineRoundingMode = 'whole_peso_total_only';
 export interface PricingEnginePaperProfile {
   baseBwPrice: number;
   baseColorPrice: number;
+  baseImagePrice: number;
 }
 
 export interface PricingEngineBulkDiscountTier {

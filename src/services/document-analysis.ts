@@ -44,7 +44,9 @@ export interface PageAnalysis {
    * to decide whether a B/W page is genuinely near-blank.
    */
   contentCoverage?: number;
-  classification?: 'blank' | 'bw' | 'partial' | 'full_color';
+  classification?: 'blank' | 'bw' | 'partial' | 'full_color' | 'image';
+  /** True when the source file is a raster image (uploaded image file). Used for photo/image pricing tier. */
+  isImagePage?: boolean;
   isBlank?: boolean;
   fallbackReasonFlags?: string[];
 }
@@ -71,6 +73,7 @@ interface AnalyzeDocumentInput {
   contentType?: string;
   filename?: string;
   convertToPdfPreview?: (sourcePath: string) => Promise<string>;
+  colorDetectionEnabled?: boolean;
 }
 
 interface RgbaFrame {
@@ -206,7 +209,32 @@ function computeFrameMetrics(frame: RgbaFrame): CoverageMetrics {
   };
 }
 
-async function analyzeImage(filePath: string): Promise<DocumentAnalysisResult> {
+async function analyzeImage(
+  filePath: string,
+  colorDetectionEnabled: boolean = true,
+): Promise<DocumentAnalysisResult> {
+  if (!colorDetectionEnabled) {
+    const page: PageAnalysis = {
+      index: 1,
+      isColor: false,
+      coverage: 0,
+      contentCoverage: 0,
+      classification: 'bw',
+      isBlank: false,
+    };
+
+    return {
+      fileType: 'image',
+      pageCount: 1,
+      pages: [page],
+      colorPages: 0,
+      bwPages: 1,
+      totalPages: 1,
+      confidence: 'high',
+      analysisVersion: ANALYSIS_ALGORITHM_VERSION,
+    };
+  }
+
   const { data, info } = await sharp(filePath)
     .ensureAlpha()
     .raw()
@@ -227,10 +255,9 @@ async function analyzeImage(filePath: string): Promise<DocumentAnalysisResult> {
     classification: isBlank
       ? 'blank'
       : isColor
-        ? metrics.colorCoverage > 0.95
-          ? 'full_color'
-          : 'partial'
+        ? 'image' // Source-file images always get photo/image pricing tier
         : 'bw',
+    isImagePage: !isBlank, // Mark as image page for photo pricing (blank images are excluded)
     isBlank,
   };
 
@@ -249,11 +276,40 @@ async function analyzeImage(filePath: string): Promise<DocumentAnalysisResult> {
 async function analyzePdfFile(
   pdfPath: string,
   fileType: AnalyzedFileType,
+  colorDetectionEnabled: boolean = true,
 ): Promise<DocumentAnalysisResult> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const ops = (pdfjs.OPS ?? {}) as PdfOps;
   const data = new Uint8Array(await fs.promises.readFile(pdfPath));
+  const loadingTask = pdfjs.getDocument({ data, verbosity: 0 });
+  const doc = await loadingTask.promise;
+  const totalPages = doc.numPages;
 
+  if (!colorDetectionEnabled) {
+    await loadingTask.destroy();
+    const pages: PageAnalysis[] = [];
+    for (let pageNum = 1; pageNum <= totalPages; pageNum += 1) {
+      pages.push({
+        index: pageNum,
+        isColor: false,
+        coverage: 0,
+        contentCoverage: 0,
+        classification: 'bw',
+        isBlank: false,
+      });
+    }
+    return {
+      fileType,
+      pageCount: totalPages,
+      pages,
+      colorPages: 0,
+      bwPages: totalPages,
+      totalPages,
+      confidence: 'high',
+      analysisVersion: ANALYSIS_ALGORITHM_VERSION,
+    };
+  }
+
+  const ops = (pdfjs.OPS ?? {}) as PdfOps;
   const pdfjsAllOps = (pdfjs.OPS ?? {}) as Record<string, number>;
   const textRenderOps = new Set<number>(
     [
@@ -276,14 +332,12 @@ async function analyzePdfFile(
       .map((k) => pdfjsAllOps[k])
       .filter((v): v is number => typeof v === 'number'),
   );
-  const loadingTask = pdfjs.getDocument({ data, verbosity: 0 });
-  const doc = await loadingTask.promise;
 
   const pages: PageAnalysis[] = [];
   let fallbackPageCount = 0;
 
   try {
-    for (let pageNum = 1; pageNum <= doc.numPages; pageNum += 1) {
+    for (let pageNum = 1; pageNum <= totalPages; pageNum += 1) {
       const page = await doc.getPage(pageNum);
       let coverage = 0;
       let isColor = false;
@@ -333,7 +387,7 @@ async function analyzePdfFile(
   }
 
   const colorPages = pages.filter((page) => page.isColor).length;
-  const totalPages = pages.length;
+
   const confidence: AnalysisConfidence =
     fallbackPageCount === 0
       ? 'high'
@@ -561,9 +615,10 @@ async function analyzeDocumentDirect(
   const contentType = (input.contentType ?? '').toLowerCase();
   const filename = input.filename ?? path.basename(input.filePath);
   const fileType = resolveFileType(contentType, filename);
+  const colorDetectionEnabled = input.colorDetectionEnabled !== false;
 
-  if (fileType === 'image') return analyzeImage(input.filePath);
-  if (fileType === 'pdf') return analyzePdfFile(input.filePath, fileType);
+  if (fileType === 'image') return analyzeImage(input.filePath, colorDetectionEnabled);
+  if (fileType === 'pdf') return analyzePdfFile(input.filePath, fileType, colorDetectionEnabled);
 
   if (
     fileType === 'docx' ||
@@ -580,7 +635,7 @@ async function analyzeDocumentDirect(
     }
 
     const pdfPath = await input.convertToPdfPreview(input.filePath);
-    return analyzePdfFile(pdfPath, fileType);
+    return analyzePdfFile(pdfPath, fileType, colorDetectionEnabled);
   }
 
   throw new Error('Unsupported file type for analysis.');
@@ -600,7 +655,10 @@ const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 export function clearDocumentAnalysisCache(filePath?: string): void {
   if (filePath) {
-    analysisCache.delete(path.resolve(filePath));
+    const resolved = path.resolve(filePath);
+    analysisCache.delete(`${resolved}:color`);
+    analysisCache.delete(`${resolved}:bw`);
+    analysisCache.delete(resolved);
   } else {
     analysisCache.clear();
   }
@@ -616,6 +674,8 @@ export async function analyzeDocument(
   if (!isMainThread) return analyzeDocumentDirect(input);
 
   const resolvedPath = path.resolve(input.filePath);
+  const isColorEnabled = input.colorDetectionEnabled !== false;
+  const cacheKey = `${resolvedPath}:${isColorEnabled ? 'color' : 'bw'}`;
 
   let stat: fs.Stats | null = null;
   try {
@@ -624,7 +684,7 @@ export async function analyzeDocument(
     return analyzeDocumentDirect(input);
   }
 
-  const cached = analysisCache.get(resolvedPath);
+  const cached = analysisCache.get(cacheKey);
   if (
     cached &&
     cached.mtimeMs === stat.mtimeMs &&
@@ -634,7 +694,7 @@ export async function analyzeDocument(
     return cached.result;
   }
 
-  const inFlight = inFlightAnalysis.get(resolvedPath);
+  const inFlight = inFlightAnalysis.get(cacheKey);
   if (inFlight) {
     return inFlight;
   }
@@ -647,7 +707,7 @@ export async function analyzeDocument(
           const firstKey = analysisCache.keys().next().value;
           if (firstKey) analysisCache.delete(firstKey);
         }
-        analysisCache.set(resolvedPath, {
+        analysisCache.set(cacheKey, {
           mtimeMs: stat.mtimeMs,
           size: stat.size,
           result,
@@ -656,11 +716,11 @@ export async function analyzeDocument(
       }
       return result;
     } finally {
-      inFlightAnalysis.delete(resolvedPath);
+      inFlightAnalysis.delete(cacheKey);
     }
   })();
 
-  inFlightAnalysis.set(resolvedPath, analysisPromise);
+  inFlightAnalysis.set(cacheKey, analysisPromise);
   return analysisPromise;
 }
 

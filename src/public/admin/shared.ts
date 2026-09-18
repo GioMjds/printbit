@@ -196,9 +196,9 @@ export type SettingsResponse = {
   };
   pricingEngine: {
     paperProfiles: {
-      a4: { baseBwPrice: number; baseColorPrice: number };
-      shortBond: { baseBwPrice: number; baseColorPrice: number };
-      longBond: { baseBwPrice: number; baseColorPrice: number };
+      a4: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number };
+      shortBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number };
+      longBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number };
     };
     bulkDiscountTiers: Array<{
       minPages: number;

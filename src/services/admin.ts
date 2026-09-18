@@ -61,25 +61,34 @@ class AdminService {
     const profile = engineCfg?.paperProfiles?.[profileKey] ?? {
       baseBwPrice: profileKey === 'longBond' ? 4 : 3,
       baseColorPrice: profileKey === 'longBond' ? 20 : 18,
+      baseImagePrice: profileKey === 'longBond' ? 30 : 25,
     };
+    const baseImagePrice =
+      profile.baseImagePrice ?? (profileKey === 'longBond' ? 30 : 25);
 
-    const { colorPages, bwPages } =
+    const counts =
       typeof colorOrPageCounts === 'string'
         ? {
             colorPages: colorOrPageCounts === 'colored' ? 1 : 0,
             bwPages: colorOrPageCounts === 'colored' ? 0 : 1,
+            imagePages: 0,
           }
         : colorOrPageCounts;
-    const safeColorPages = Math.max(0, Math.floor(colorPages));
-    const safeBwPages = Math.max(0, Math.floor(bwPages));
+    const safeColorPages = Math.max(0, Math.floor(counts.colorPages ?? 0));
+    const safeBwPages = Math.max(0, Math.floor(counts.bwPages ?? 0));
+    const safeImagePages = Math.max(
+      0,
+      Math.floor('imagePages' in counts && counts.imagePages ? counts.imagePages : 0),
+    );
     const surchargePerPg =
       quality === 'high'
         ? (engineCfg?.highQualitySurcharge ?? pricing?.highQualitySurcharge ?? 2)
         : 0;
-    const totalPages = safeColorPages + safeBwPages;
+    const totalPages = safeColorPages + safeBwPages + safeImagePages;
     const subtotalExact =
       (safeColorPages * profile.baseColorPrice +
         safeBwPages * profile.baseBwPrice +
+        safeImagePages * baseImagePrice +
         totalPages * surchargePerPg) *
       safeCopies;
     return Math.ceil(subtotalExact);
@@ -87,7 +96,7 @@ class AdminService {
 
   calculateDocumentAmount(
     mode: Exclude<PrintMode, 'scan'>,
-    pageCounts: { colorPages: number; bwPages: number },
+    pageCounts: { colorPages: number; bwPages: number; imagePages?: number },
     copies: number,
     paperSize: 'A4' | 'Letter' | 'Legal' = 'A4',
     quality: PrintQuality = 'standard',

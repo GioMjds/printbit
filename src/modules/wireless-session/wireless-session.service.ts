@@ -390,7 +390,16 @@ export class WirelessSessionService {
       return;
     }
 
-    res.json(session);
+    const pipelineSettings = adminService.getPipelineSettings();
+    const documentConversionEnabled =
+      typeof pipelineSettings?.documentConversionEnabled === 'boolean'
+        ? pipelineSettings.documentConversionEnabled
+        : true;
+
+    res.json({
+      ...session,
+      documentConversionEnabled,
+    });
   };
 
   getSessionPreview: RequestHandler<{ sessionId: string }> = async (
@@ -1234,12 +1243,18 @@ export class WirelessSessionService {
         | 'bw'
         | 'partial'
         | 'full_color'
+        | 'image'
         | undefined =
         classificationRaw === 'blank' ||
         classificationRaw === 'bw' ||
         classificationRaw === 'partial' ||
-        classificationRaw === 'full_color'
+        classificationRaw === 'full_color' ||
+        classificationRaw === 'image'
           ? classificationRaw
+          : undefined;
+      const isImagePage =
+        typeof pageValue.isImagePage === 'boolean'
+          ? pageValue.isImagePage
           : undefined;
       const isBlank =
         typeof pageValue.isBlank === 'boolean' ? pageValue.isBlank : undefined;
@@ -1254,6 +1269,7 @@ export class WirelessSessionService {
         isColor: pageValue.isColor,
         ...(coverage !== undefined ? { coverage } : {}),
         ...(classification ? { classification } : {}),
+        ...(isImagePage !== undefined ? { isImagePage } : {}),
         ...(isBlank !== undefined ? { isBlank } : {}),
         ...(fallbackReasonFlags && fallbackReasonFlags.length > 0
           ? { fallbackReasonFlags }

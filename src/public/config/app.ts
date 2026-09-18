@@ -111,6 +111,8 @@ interface PrintQuote {
   selectedBwPages: number;
   billableColorPages: number;
   billableBwPages: number;
+  /** Number of photo/image pages billed at baseImagePrice (Phase 2+). */
+  billableImagePages?: number;
   requestedColorMode: ColorMode;
   effectiveColorMode: ColorMode;
   quality: PrintQuality;
@@ -248,6 +250,9 @@ function logQuoteBreakdown(quote: PrintQuote): void {
   settingsLog('selectedBwPages', quote.selectedBwPages);
   settingsLog('billableColorPages', quote.billableColorPages);
   settingsLog('billableBwPages', quote.billableBwPages);
+  if (quote.billableImagePages !== undefined) {
+    settingsLog('billableImagePages', quote.billableImagePages);
+  }
   settingsLog('analysisConfidence', quote.analysisConfidence);
   settingsLog('billingPageDetection', quote.billingPageDetection);
   settingsLog('analysisFallbackReasonFlags', quote.analysisFallbackReasonFlags);

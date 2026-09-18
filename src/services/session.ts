@@ -24,7 +24,8 @@ export interface DocumentPageAnalysis {
   isColor: boolean;
   coverage?: number;
   contentCoverage?: number;
-  classification?: 'blank' | 'bw' | 'partial' | 'full_color';
+  classification?: 'blank' | 'bw' | 'partial' | 'full_color' | 'image';
+  isImagePage?: boolean;
   isBlank?: boolean;
   fallbackReasonFlags?: string[];
 }
@@ -933,16 +934,22 @@ export class SessionStore {
         | 'bw'
         | 'partial'
         | 'full_color'
+        | 'image'
         | undefined =
         pageCandidate.classification === 'blank' ||
         pageCandidate.classification === 'bw' ||
         pageCandidate.classification === 'partial' ||
-        pageCandidate.classification === 'full_color'
+        pageCandidate.classification === 'full_color' ||
+        pageCandidate.classification === 'image'
           ? pageCandidate.classification
           : undefined;
       const isBlank =
         typeof pageCandidate.isBlank === 'boolean'
           ? pageCandidate.isBlank
+          : undefined;
+      const isImagePage =
+        typeof pageCandidate.isImagePage === 'boolean'
+          ? pageCandidate.isImagePage
           : undefined;
       return {
         index: Math.floor(pageCandidate.index),
@@ -950,6 +957,7 @@ export class SessionStore {
         ...(coverage !== undefined ? { coverage } : {}),
         ...(contentCoverage !== undefined ? { contentCoverage } : {}),
         ...(classification ? { classification } : {}),
+        ...(isImagePage !== undefined ? { isImagePage } : {}),
         ...(isBlank !== undefined ? { isBlank } : {}),
         ...(fallbackReasonFlags
           ? { fallbackReasonFlags: fallbackReasonFlags as string[] }

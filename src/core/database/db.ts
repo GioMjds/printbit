@@ -267,14 +267,17 @@ const DEFAULT_DATA: Schema = {
         a4: {
           baseBwPrice: 3,
           baseColorPrice: 18,
+          baseImagePrice: 25,
         },
         shortBond: {
           baseBwPrice: 3,
           baseColorPrice: 18,
+          baseImagePrice: 25,
         },
         longBond: {
           baseBwPrice: 4,
           baseColorPrice: 20,
+          baseImagePrice: 30,
         },
       },
       bulkDiscountTiers: [],
@@ -1111,6 +1114,13 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
                   defaultPricingEngine.paperProfiles.a4.baseColorPrice,
                 ),
               ),
+              baseImagePrice: Math.max(
+                0,
+                finiteOr(
+                  a4?.baseImagePrice,
+                  defaultPricingEngine.paperProfiles.a4.baseImagePrice,
+                ),
+              ),
             },
             shortBond: {
               baseBwPrice: Math.max(
@@ -1127,6 +1137,13 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
                   defaultPricingEngine.paperProfiles.shortBond.baseColorPrice,
                 ),
               ),
+              baseImagePrice: Math.max(
+                0,
+                finiteOr(
+                  shortBond?.baseImagePrice,
+                  defaultPricingEngine.paperProfiles.shortBond.baseImagePrice,
+                ),
+              ),
             },
             longBond: {
               baseBwPrice: Math.max(
@@ -1141,6 +1158,13 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
                 finiteOr(
                   longBond?.baseColorPrice,
                   defaultPricingEngine.paperProfiles.longBond.baseColorPrice,
+                ),
+              ),
+              baseImagePrice: Math.max(
+                0,
+                finiteOr(
+                  longBond?.baseImagePrice,
+                  defaultPricingEngine.paperProfiles.longBond.baseImagePrice,
                 ),
               ),
             },
