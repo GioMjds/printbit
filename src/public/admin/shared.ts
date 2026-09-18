@@ -260,16 +260,21 @@ export type SettingsResponse = {
     customPatternEnabled: boolean;
     customPattern: string;
   };
+  pipelineSettings?: {
+    malwareScanningEnabled: boolean;
+    documentConversionEnabled: boolean;
+    colorDetectionEnabled: boolean;
+  };
 };
 
 export type LogsResponse = {
-  logs: Array<{
+  logs: {
     id: string;
     timestamp: string;
     type: string;
     message: string;
     meta?: Record<string, string | number | boolean | null>;
-  }>;
+  }[];
 };
 
 export type EarningsAnalyticsView = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -290,13 +295,13 @@ export type EarningsAnalyticsResponse = {
     allTime: number;
     period: number;
   };
-  buckets: Array<{
+  buckets: {
     key: string;
     label: string;
     start: string;
     end: string;
     amount: number;
-  }>;
+  }[];
   methods: {
     print: number;
     copy: number;

@@ -79,6 +79,7 @@ import {
   AlertDedupeSettings,
   AlertSettings,
   AdminLogEntry,
+  PipelineSettings,
 } from './models/admin.model';
 
 import {
@@ -110,6 +111,7 @@ export {
   AlertDedupeSettings,
   AlertSettings,
   AdminLogEntry,
+  PipelineSettings,
 };
 
 export {
@@ -346,6 +348,11 @@ const DEFAULT_DATA: Schema = {
       customPatternEnabled: false,
       customPattern: '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}',
     },
+    pipelineSettings: {
+      malwareScanningEnabled: true,
+      documentConversionEnabled: true,
+      colorDetectionEnabled: true,
+    },
   },
   coinStats: {
     one: 0,
@@ -486,6 +493,7 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const consumablesForecasting = data?.settings?.consumablesForecasting;
   const consumableEstimation = data?.settings?.consumableEstimation;
   const scanFilenameFormat = data?.settings?.scanFilenameFormat;
+  const pipelineSettings = data?.settings?.pipelineSettings;
   const normalizedPaperTrayCapacitySheets = Math.max(
     1,
     Math.floor(
@@ -1435,6 +1443,20 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
           typeof scanFilenameFormat?.customPattern === 'string' && scanFilenameFormat.customPattern.trim()
             ? scanFilenameFormat.customPattern.trim()
             : DEFAULT_DATA.settings.scanFilenameFormat.customPattern,
+      },
+      pipelineSettings: {
+        malwareScanningEnabled:
+          typeof pipelineSettings?.malwareScanningEnabled === 'boolean'
+            ? pipelineSettings.malwareScanningEnabled
+            : DEFAULT_DATA.settings.pipelineSettings.malwareScanningEnabled,
+        documentConversionEnabled:
+          typeof pipelineSettings?.documentConversionEnabled === 'boolean'
+            ? pipelineSettings.documentConversionEnabled
+            : DEFAULT_DATA.settings.pipelineSettings.documentConversionEnabled,
+        colorDetectionEnabled:
+          typeof pipelineSettings?.colorDetectionEnabled === 'boolean'
+            ? pipelineSettings.colorDetectionEnabled
+            : DEFAULT_DATA.settings.pipelineSettings.colorDetectionEnabled,
       },
     },
     coinStats: {

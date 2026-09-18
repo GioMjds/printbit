@@ -597,6 +597,79 @@
                 </div>
               </div>
 
+              <!-- Document Processing & Upload Pipeline -->
+              <div class="sg">
+                <div class="sg__head">
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M4 2a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H4zm0 1a1 1 0 00-1 1v8a1 1 0 001 1h8a1 1 0 001-1V4a1 1 0 00-1-1H4zm3 2a.5.5 0 01.5.5v2.793l1.146-1.147a.5.5 0 01.708.708l-2 2a.5.5 0 01-.708 0l-2-2a.5.5 0 11.708-.708L6.5 8.293V5.5A.5.5 0 017 5z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <h3 class="sg__title">Document Processing &amp; Upload Pipeline</h3>
+                </div>
+                <div class="fields">
+                  <!-- Malware Scanning -->
+                  <div class="field field--stretch">
+                    <label class="field__lbl" for="settingMalwareScanning">File Malware Detection</label>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingMalwareScanning">
+                        <input
+                          type="checkbox"
+                          id="settingMalwareScanning"
+                          class="checkbox-input"
+                        />
+                        <span>Enable Microsoft Defender CLI scan on uploaded files</span>
+                      </label>
+                    </div>
+                    <p class="field__hint">
+                      When enabled, runs synchronous Defender scan before accepting files. Disabling speeds up upload latency by 1.5–5s per file.
+                    </p>
+                  </div>
+
+                  <!-- Word Document Conversion -->
+                  <div class="field field--stretch">
+                    <label class="field__lbl" for="settingDocumentConversion">Word Document Conversion</label>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingDocumentConversion">
+                        <input
+                          type="checkbox"
+                          id="settingDocumentConversion"
+                          class="checkbox-input"
+                        />
+                        <span>Allow Word documents (.doc, .docx) and auto-convert to PDF</span>
+                      </label>
+                    </div>
+                    <p class="field__hint">
+                      When disabled, restricts uploads strictly to native PDF and image files, avoiding background LibreOffice conversion overhead.
+                    </p>
+                  </div>
+
+                  <!-- Color Detection -->
+                  <div class="field field--stretch">
+                    <label class="field__lbl" for="settingColorDetection">Document Color Detection</label>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingColorDetection">
+                        <input
+                          type="checkbox"
+                          id="settingColorDetection"
+                          class="checkbox-input"
+                        />
+                        <span>Automatically detect color vs. grayscale pages in uploaded PDFs</span>
+                      </label>
+                    </div>
+                    <p class="field__hint">
+                      When disabled, skips page-by-page operator scanning (preventing timeouts on 30+ pages) and defaults print jobs to Black &amp; White, allowing customers to manually choose Color if desired.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Ink Monitoring -->
               <!-- <div class="sg">
                 <div class="sg__head">

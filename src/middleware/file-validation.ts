@@ -294,6 +294,38 @@ function validateIncomingFileType(
     return;
   }
 
+  const pipeline = adminService.getPipelineSettings();
+  if (
+    !pipeline.documentConversionEnabled &&
+    (ext === '.doc' || ext === '.docx')
+  ) {
+    const meta = {
+      ...requestContext,
+      originalFilename: file.originalname,
+      declaredMimeType: incomingMime,
+      detectedMimeType: null,
+      detectedExecutableExtension: null,
+      validationReason: 'UNSUPPORTED_TYPE',
+      uploadSurface: policy.surface,
+    };
+    appendSecurityLog(
+      'upload_security_violation',
+      'Rejected upload because document conversion is disabled and file is a Word document.',
+      meta,
+    );
+    cb(
+      Object.assign(
+        new Error(
+          'Document conversion is disabled. Only PDF and image files are allowed.',
+        ),
+        {
+          code: 'UNSUPPORTED_TYPE',
+        },
+      ),
+    );
+    return;
+  }
+
   const expectedMime = policy.extensionMimeMap[ext];
   const normalizedMime =
     incomingMime === 'application/octet-stream' ? expectedMime : incomingMime;
@@ -616,6 +648,12 @@ async function scanStagedUploadWithSurface(
 ): Promise<void> {
   const file = req.file;
   if (!file || !file.path) {
+    next();
+    return;
+  }
+
+  const pipeline = adminService.getPipelineSettings();
+  if (!pipeline.malwareScanningEnabled) {
     next();
     return;
   }

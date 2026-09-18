@@ -4,12 +4,6 @@ export const ALLOWED_MIME_TYPES = new Set([
   // Word
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  // Excel
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  // PowerPoint
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   // Images
   'image/jpeg',
   'image/png',
@@ -20,10 +14,6 @@ export const ALLOWED_EXTENSIONS = new Set([
   '.pdf',
   '.doc',
   '.docx',
-  '.xls',
-  '.xlsx',
-  '.ppt',
-  '.pptx',
   '.jpg',
   '.jpeg',
   '.png',
@@ -51,12 +41,12 @@ export interface MagicSignature {
   offset?: number;
 }
 
-// OLE Compound File header (used by legacy Office formats: DOC, XLS, PPT)
+// OLE Compound File header (used by legacy Office formats: DOC)
 const OLE_MAGIC: MagicSignature = {
   bytes: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
 };
 
-// OOXML (ZIP-based) header (used by DOCX, XLSX, PPTX)
+// OOXML (ZIP-based) header (used by DOCX)
 const OOXML_MAGIC: MagicSignature = { bytes: [0x50, 0x4b, 0x03, 0x04] };
 
 export const MAGIC_SIGNATURES: Record<string, MagicSignature[]> = {
@@ -65,16 +55,6 @@ export const MAGIC_SIGNATURES: Record<string, MagicSignature[]> = {
   // Word
   'application/msword': [OLE_MAGIC],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [
-    OOXML_MAGIC,
-  ],
-  // Excel
-  'application/vnd.ms-excel': [OLE_MAGIC],
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [
-    OOXML_MAGIC,
-  ],
-  // PowerPoint
-  'application/vnd.ms-powerpoint': [OLE_MAGIC],
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation': [
     OOXML_MAGIC,
   ],
   // Images
@@ -99,11 +79,6 @@ export const EXTENSION_MIME_MAP: Record<string, string> = {
   '.doc': 'application/msword',
   '.docx':
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.xls': 'application/vnd.ms-excel',
-  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  '.ppt': 'application/vnd.ms-powerpoint',
-  '.pptx':
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
@@ -120,7 +95,4 @@ export const REPORT_ATTACHMENT_EXTENSION_MIME_MAP: Record<string, string> = {
 export const OOXML_DIRECTORY_MARKERS: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
     'word/',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xl/',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation':
-    'ppt/',
 };

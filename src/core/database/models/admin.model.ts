@@ -120,6 +120,12 @@ export interface AlertSettings {
   dedupe: AlertDedupeSettings;
 }
 
+export interface PipelineSettings {
+  malwareScanningEnabled: boolean;
+  documentConversionEnabled: boolean;
+  colorDetectionEnabled: boolean;
+}
+
 export interface AdminSettings {
   pricing: PricingSettings;
   pricingEngine: PricingEngineSettings;
@@ -133,6 +139,7 @@ export interface AdminSettings {
   consumablesForecasting: ConsumablesForecastingSettings;
   consumableEstimation: ConsumableEstimationSettings;
   scanFilenameFormat: ScanFilenameFormatSettings;
+  pipelineSettings: PipelineSettings;
 }
 
 export interface AdminLogEntry {

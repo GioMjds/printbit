@@ -31,6 +31,17 @@ const settingPaperCurrentSheets = document.getElementById(
   'settingPaperCurrentSheets',
 ) as HTMLInputElement | null;
 
+// ── Document Processing & Upload Pipeline ────
+const settingMalwareScanning = document.getElementById(
+  'settingMalwareScanning',
+) as HTMLInputElement | null;
+const settingDocumentConversion = document.getElementById(
+  'settingDocumentConversion',
+) as HTMLInputElement | null;
+const settingColorDetection = document.getElementById(
+  'settingColorDetection',
+) as HTMLInputElement | null;
+
 // ── Pricing Engine settings ──────────────────
 const settingA4BwPrice = document.getElementById(
   'settingA4BwPrice',
@@ -304,6 +315,20 @@ function applySettings(settings: SettingsResponse): void {
   }
   if (settingIdleScreenTimeout) {
     settingIdleScreenTimeout.value = String(settings.idleScreenTimeoutSeconds);
+  }
+
+  // Document Processing & Upload Pipeline
+  if (settingMalwareScanning) {
+    settingMalwareScanning.checked =
+      settings.pipelineSettings?.malwareScanningEnabled ?? true;
+  }
+  if (settingDocumentConversion) {
+    settingDocumentConversion.checked =
+      settings.pipelineSettings?.documentConversionEnabled ?? true;
+  }
+  if (settingColorDetection) {
+    settingColorDetection.checked =
+      settings.pipelineSettings?.colorDetectionEnabled ?? true;
   }
 
   // Ink Monitoring (optional)
@@ -656,6 +681,11 @@ settingsForm.addEventListener('submit', (e) => {
       ? settingAdminLocalOnly.checked
       : loadedAdminLocalOnly,
     ...(newPin ? { adminPin: newPin } : {}),
+    pipelineSettings: {
+      malwareScanningEnabled: settingMalwareScanning?.checked ?? true,
+      documentConversionEnabled: settingDocumentConversion?.checked ?? true,
+      colorDetectionEnabled: settingColorDetection?.checked ?? true,
+    },
   };
 
   if (settingScanFilenamePrefix) {

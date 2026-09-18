@@ -860,6 +860,11 @@ export class ScannerService {
   }
 
   async analyzeColor(filename: string): Promise<ColorAnalysisResult> {
+    const pipeline = adminService.getPipelineSettings();
+    if (!pipeline.colorDetectionEnabled) {
+      return { hasColor: false, isGrayscale: true, sampledPages: 0 };
+    }
+
     const absPath = path.resolve('uploads', 'scans', filename);
 
     if (!fs.existsSync(absPath)) {

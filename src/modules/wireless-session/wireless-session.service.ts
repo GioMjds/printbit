@@ -520,6 +520,16 @@ export class WirelessSessionService {
       return;
     }
 
+    const pipeline = adminService.getPipelineSettings();
+    if (!pipeline.colorDetectionEnabled) {
+      res.json({
+        hasColor: false,
+        isGrayscale: true,
+        sampledPages: 0,
+      });
+      return;
+    }
+
     try {
       const pdfPath = await this.resolveCanonicalPdfPath(sessionId, target);
 

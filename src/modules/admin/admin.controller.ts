@@ -63,7 +63,13 @@ import {
   validateScanFilenameFormatSettings,
 } from '@/services/scan-filename';
 import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
-import type { AlertSettings } from './admin.schema';
+import type { AlertSettings, PipelineSettings } from './admin.schema';
+
+export const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
+  malwareScanningEnabled: true,
+  documentConversionEnabled: true,
+  colorDetectionEnabled: true,
+};
 import type { AdminQueueView } from '@/modules/anomaly/anomaly.schema';
 import { ConsumablesService } from './consumables.service';
 import { ReceiptService, type ReceiptPayload } from '@/modules/receipt';
@@ -1110,7 +1116,7 @@ export class AdminController {
         ? req.body.printerName.trim()
         : undefined;
 
-    let workerResult: {
+    interface RestartPrintSpoolerResponse {
       requestId?: string;
       type?: string;
       outcome?: string;
@@ -1121,10 +1127,12 @@ export class AdminController {
       message?: string | null;
       startedAt?: string;
       completedAt?: string;
-    } | null = null;
+    }
+
+    let workerResult: RestartPrintSpoolerResponse | null = null;
 
     try {
-      workerResult = await sendWorkerRequest<typeof workerResult>(
+      workerResult = await sendWorkerRequest<RestartPrintSpoolerResponse>(
         {
           type: 'RestartPrintSpooler',
           requestId,
@@ -1325,7 +1333,11 @@ export class AdminController {
   // ── Settings handlers ──────────────────────────────────────────────────────
 
   private handleGetSettings = (_req: Request, res: Response) => {
-    res.json(db.data!.settings);
+    const settings = db.data!.settings;
+    if (!settings.pipelineSettings) {
+      settings.pipelineSettings = { ...DEFAULT_PIPELINE_SETTINGS };
+    }
+    res.json(settings);
   };
 
   private handleUpdateSettings = async (req: Request, res: Response) => {
@@ -1341,6 +1353,11 @@ export class AdminController {
       idleScreenTimeoutSeconds?: number;
       adminPin?: string;
       adminLocalOnly?: boolean;
+      pipelineSettings?: {
+        malwareScanningEnabled?: boolean;
+        documentConversionEnabled?: boolean;
+        colorDetectionEnabled?: boolean;
+      };
       inkMonitoring?: {
         enabled?: boolean;
         targetPrinterName?: string | null;
@@ -1512,6 +1529,10 @@ export class AdminController {
           ...originalSettings.consumableEstimation.printerOverrides,
         },
       },
+      pipelineSettings: {
+        ...DEFAULT_PIPELINE_SETTINGS,
+        ...(originalSettings.pipelineSettings || {}),
+      },
     };
 
     if (body.pricing) {
@@ -1526,6 +1547,24 @@ export class AdminController {
       if (highQualitySurcharge !== undefined) {
         nextSettings.pricing.highQualitySurcharge = highQualitySurcharge;
         nextSettings.pricingEngine.highQualitySurcharge = highQualitySurcharge;
+      }
+    }
+
+    if (body.pipelineSettings) {
+      if (body.pipelineSettings.malwareScanningEnabled !== undefined) {
+        nextSettings.pipelineSettings.malwareScanningEnabled = Boolean(
+          body.pipelineSettings.malwareScanningEnabled,
+        );
+      }
+      if (body.pipelineSettings.documentConversionEnabled !== undefined) {
+        nextSettings.pipelineSettings.documentConversionEnabled = Boolean(
+          body.pipelineSettings.documentConversionEnabled,
+        );
+      }
+      if (body.pipelineSettings.colorDetectionEnabled !== undefined) {
+        nextSettings.pipelineSettings.colorDetectionEnabled = Boolean(
+          body.pipelineSettings.colorDetectionEnabled,
+        );
       }
     }
 

@@ -9,9 +9,16 @@ import {
   type PrintMode,
   type PricingSettings,
   type PrintQuality,
+  type PipelineSettings,
 } from './db';
 import { getTrustedTimestamp } from './time-source';
 import { adminLogStore } from '@/core/database/sqlite-storage';
+
+const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
+  malwareScanningEnabled: true,
+  documentConversionEnabled: true,
+  colorDetectionEnabled: true,
+};
 
 interface SocketEmitter {
   emit: (event: string, ...args: unknown[]) => void;
@@ -27,6 +34,10 @@ class AdminService {
 
   getPricingSettings(): PricingSettings {
     return db.data!.settings.pricing;
+  }
+
+  getPipelineSettings(): PipelineSettings {
+    return db.data?.settings?.pipelineSettings ?? DEFAULT_PIPELINE_SETTINGS;
   }
 
   calculateJobAmount(
