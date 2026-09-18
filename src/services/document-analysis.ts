@@ -20,8 +20,9 @@ import {
  *   1 — initial operator-list analysis
  *   2 — colour-op / content-op separation; white-paint guard (blank page fix)
  *   3 — persist content coverage separately from color coverage
+ *   4 — forward original file type to preserve image classification across PDF conversion
  */
-export const ANALYSIS_ALGORITHM_VERSION = 3;
+export const ANALYSIS_ALGORITHM_VERSION = 4;
 
 export type AnalyzedFileType =
   | 'pdf'
@@ -47,6 +48,7 @@ export interface PageAnalysis {
   classification?: 'blank' | 'bw' | 'partial' | 'full_color' | 'image';
   /** True when the source file is a raster image (uploaded image file). Used for photo/image pricing tier. */
   isImagePage?: boolean;
+  imageCoverage?: number;
   isBlank?: boolean;
   fallbackReasonFlags?: string[];
 }
@@ -74,6 +76,7 @@ interface AnalyzeDocumentInput {
   filename?: string;
   convertToPdfPreview?: (sourcePath: string) => Promise<string>;
   colorDetectionEnabled?: boolean;
+  originalFileType?: AnalyzedFileType;
 }
 
 interface RgbaFrame {
@@ -109,7 +112,7 @@ interface PdfOps {
   shadingFill?: number;
 }
 
-function resolveFileType(
+export function resolveFileType(
   contentType: string,
   filename: string,
 ): AnalyzedFileType {
@@ -220,6 +223,8 @@ async function analyzeImage(
       coverage: 0,
       contentCoverage: 0,
       classification: 'bw',
+      isImagePage: true,
+      imageCoverage: 1.0,
       isBlank: false,
     };
 
@@ -258,6 +263,7 @@ async function analyzeImage(
         ? 'image' // Source-file images always get photo/image pricing tier
         : 'bw',
     isImagePage: !isBlank, // Mark as image page for photo pricing (blank images are excluded)
+    imageCoverage: isBlank ? 0 : 1.0,
     isBlank,
   };
 
@@ -277,6 +283,7 @@ async function analyzePdfFile(
   pdfPath: string,
   fileType: AnalyzedFileType,
   colorDetectionEnabled: boolean = true,
+  options?: { isOriginalImage?: boolean },
 ): Promise<DocumentAnalysisResult> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const data = new Uint8Array(await fs.promises.readFile(pdfPath));
@@ -288,13 +295,27 @@ async function analyzePdfFile(
     await loadingTask.destroy();
     const pages: PageAnalysis[] = [];
     for (let pageNum = 1; pageNum <= totalPages; pageNum += 1) {
+      const isBlank = false;
+      const isColor = false;
       pages.push({
         index: pageNum,
         isColor: false,
         coverage: 0,
         contentCoverage: 0,
-        classification: 'bw',
+        classification: options?.isOriginalImage
+          ? isBlank
+            ? 'blank'
+            : isColor
+              ? 'image'
+              : 'bw'
+          : 'bw',
         isBlank: false,
+        ...(options?.isOriginalImage
+          ? {
+              isImagePage: !isBlank,
+              imageCoverage: isBlank ? 0 : 1.0,
+            }
+          : {}),
       });
     }
     return {
@@ -341,7 +362,7 @@ async function analyzePdfFile(
       const page = await doc.getPage(pageNum);
       let coverage = 0;
       let isColor = false;
-      let classification: 'blank' | 'bw' | 'partial' | 'full_color' = 'bw';
+      let classification: 'blank' | 'bw' | 'partial' | 'full_color' | 'image' = 'bw';
       let isBlank = true;
 
       try {
@@ -374,8 +395,20 @@ async function analyzePdfFile(
         isColor,
         coverage,
         contentCoverage: coverage,
-        classification,
+        classification: options?.isOriginalImage
+          ? isBlank
+            ? 'blank'
+            : isColor
+              ? 'image'
+              : 'bw'
+          : classification,
         isBlank,
+        ...(options?.isOriginalImage
+          ? {
+              isImagePage: !isBlank,
+              imageCoverage: isBlank ? 0 : 1.0,
+            }
+          : {}),
         fallbackReasonFlags:
           fallbackPageCount > 0
             ? ['operator_scan_failed_default_color']
@@ -614,11 +647,20 @@ async function analyzeDocumentDirect(
 ): Promise<DocumentAnalysisResult> {
   const contentType = (input.contentType ?? '').toLowerCase();
   const filename = input.filename ?? path.basename(input.filePath);
-  const fileType = resolveFileType(contentType, filename);
+  const fileType = input.originalFileType ?? resolveFileType(contentType, filename);
   const colorDetectionEnabled = input.colorDetectionEnabled !== false;
 
-  if (fileType === 'image') return analyzeImage(input.filePath, colorDetectionEnabled);
-  if (fileType === 'pdf') return analyzePdfFile(input.filePath, fileType, colorDetectionEnabled);
+  if (fileType === 'image' && path.extname(input.filePath).toLowerCase() !== '.pdf') {
+    return analyzeImage(input.filePath, colorDetectionEnabled);
+  }
+  if (
+    fileType === 'pdf' ||
+    (fileType === 'image' && path.extname(input.filePath).toLowerCase() === '.pdf')
+  ) {
+    return analyzePdfFile(input.filePath, fileType, colorDetectionEnabled, {
+      isOriginalImage: fileType === 'image',
+    });
+  }
 
   if (
     fileType === 'docx' ||

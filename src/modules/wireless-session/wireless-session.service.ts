@@ -12,8 +12,11 @@ import type {
   UploadedDocument,
 } from '@/services/session';
 import { detectPdfColorContent } from '@/services/color-detection';
-import { ANALYSIS_ALGORITHM_VERSION } from '@/services/document-analysis';
-import { analyzeDocument } from '@/services/document-analysis';
+import {
+  ANALYSIS_ALGORITHM_VERSION,
+  analyzeDocument,
+  resolveFileType,
+} from '@/services/document-analysis';
 import {
   enqueuePricingAnalysisJob,
   getPricingAnalysisJobStatus,
@@ -1374,10 +1377,20 @@ export class WirelessSessionService {
       }
     }
 
+    const isOriginalImage =
+      target.contentType.startsWith('image/') ||
+      ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif'].includes(
+        path.extname(target.filename).toLowerCase(),
+      );
+    const originalFileType = isOriginalImage
+      ? 'image'
+      : resolveFileType(target.contentType, target.filename);
+
     const analysis = await analyzeDocument({
       filePath: analysisFilePath,
       contentType: 'application/pdf',
       filename: `${path.basename(target.filename, path.extname(target.filename))}.pdf`,
+      originalFileType,
     });
 
     const analysisForStore = this.normalizeAnalysisPayload({
