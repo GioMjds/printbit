@@ -1379,7 +1379,7 @@ export class WirelessSessionService {
 
     const isOriginalImage =
       target.contentType.startsWith('image/') ||
-      ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif'].includes(
+      ['.jpg', '.jpeg', '.png'].includes(
         path.extname(target.filename).toLowerCase(),
       );
     const originalFileType = isOriginalImage
