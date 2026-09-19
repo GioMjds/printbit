@@ -881,6 +881,220 @@
                 </div>
               </div>
 
+              <!-- Print Limits Configuration -->
+              <div class="sg">
+                <div class="sg__head">
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M4 2a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H4zm1 2h6v2H5V4zm6 4H5v1h6V8zm-6 2h4v1H5v-1z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <h3 class="sg__title">Print Limits Configuration</h3>
+                </div>
+                <div class="fields">
+                  <div class="field">
+                    <label class="field__lbl" for="settingMaxPagesPerSession"
+                      >Max Pages per Session</label
+                    >
+                    <div class="field__wrap field__wrap--post">
+                      <input
+                        id="settingMaxPagesPerSession"
+                        type="number"
+                        min="1"
+                        max="500"
+                        step="1"
+                        class="field__input"
+                        placeholder="30"
+                        required
+                      />
+                      <span class="field__affix">pages</span>
+                    </div>
+                    <p class="field__hint">
+                      Maximum printable pages allowed per session across kiosk print flows.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Kiosk Availability & UI Blocking -->
+              <div class="sg">
+                <div class="sg__head">
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 1.5a1.5 1.5 0 00-3 0v1.07A5.002 5.002 0 003 7.5v3.293l-.854.853A.5.5 0 002.5 12.5h11a.5.5 0 00.354-.854L13 10.793V7.5a5.002 5.002 0 00-4-4.93V1.5zM8 15a2 2 0 002-2H6a2 2 0 002 2z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <h3 class="sg__title">Kiosk Availability &amp; UI Blocking</h3>
+                </div>
+                <div class="fields">
+                  <div class="field field--stretch">
+                    <label class="field__lbl" for="settingUiBlockingEnabled"
+                      >Kiosk Lockout Overlay</label
+                    >
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingUiBlockingEnabled">
+                        <input
+                          type="checkbox"
+                          id="settingUiBlockingEnabled"
+                          class="checkbox-input"
+                        />
+                        <span>Enable customer UI blocking overlay</span>
+                      </label>
+                    </div>
+                    <p class="field__hint">
+                      Locks kiosk customer screens with a modal notice. Staff can dismiss on-screen via PIN.
+                    </p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingUiBlockingMode"
+                      >Lockout Mode</label
+                    >
+                    <select id="settingUiBlockingMode" class="field__input">
+                      <option value="maintenance">Maintenance Mode</option>
+                      <option value="needs_admin">Attendant Assistance Required</option>
+                      <option value="out_of_service">Temporarily Out of Service</option>
+                    </select>
+                    <p class="field__hint">
+                      Select reason banner displayed to customers
+                    </p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingUiBlockingMessage"
+                      >Custom Message</label
+                    >
+                    <input
+                      id="settingUiBlockingMessage"
+                      type="text"
+                      maxlength="250"
+                      class="field__input"
+                      placeholder="Optional custom note displayed to customers (e.g. Technician on site)"
+                    />
+                    <p class="field__hint">
+                      Optional custom note displayed to customers (max 250 characters)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Scanner & ADF Resolution Settings -->
+              <div class="sg">
+                <div class="sg__head">
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M3 3a2 2 0 012-2h6a2 2 0 012 2v2h1a2 2 0 012 2v4a2 2 0 01-2 2h-1v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2H2a2 2 0 01-2-2V7a2 2 0 012-2h1V3zm2 0v2h6V3H5zm0 8h6v3H5v-3z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <h3 class="sg__title">Scanner &amp; ADF Resolution Settings</h3>
+                </div>
+                <div class="fields">
+                  <div class="field">
+                    <label class="field__lbl" for="settingCopyGlassDpi"
+                      >Copy — Glass Scanner (Flatbed)</label
+                    >
+                    <select id="settingCopyGlassDpi" class="field__input">
+                      <option value="150">150 DPI · Draft / Fast</option>
+                      <option value="300">300 DPI · Standard (Recommended)</option>
+                      <option value="600">600 DPI · High Quality</option>
+                    </select>
+                    <p class="field__hint">Resolution for photocopies made on the flatbed glass</p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingCopyAdfDpi"
+                      >Copy — Document Feeder (ADF)</label
+                    >
+                    <select id="settingCopyAdfDpi" class="field__input">
+                      <option value="150">150 DPI · Draft / Fast</option>
+                      <option value="300">300 DPI · Standard (Recommended)</option>
+                      <option value="600">600 DPI · High Quality</option>
+                    </select>
+                    <p class="field__hint">Resolution for multi-page ADF photocopy jobs</p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingScanGlassDpi"
+                      >Scan — Glass Scanner (Flatbed)</label
+                    >
+                    <select id="settingScanGlassDpi" class="field__input">
+                      <option value="150">150 DPI · Draft / Fast</option>
+                      <option value="300">300 DPI · Standard (Recommended)</option>
+                      <option value="600">600 DPI · High Quality</option>
+                    </select>
+                    <p class="field__hint">Resolution for flatbed digital scans to phone/USB</p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingScanAdfDpi"
+                      >Scan — Document Feeder (ADF)</label
+                    >
+                    <select id="settingScanAdfDpi" class="field__input">
+                      <option value="150">150 DPI · Draft / Fast</option>
+                      <option value="300">300 DPI · Standard (Recommended)</option>
+                      <option value="600">600 DPI · High Quality</option>
+                    </select>
+                    <p class="field__hint">Resolution for document feeder scans</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Developer Testing Mode -->
+              <div class="sg">
+                <div class="sg__head">
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10.478 1.647a.5.5 0 10-.956-.294l-4 13a.5.5 0 00.956.294l4-13zM4.854 4.146a.5.5 0 010 .708L1.707 8l3.147 3.146a.5.5 0 01-.708.708l-3.5-3.5a.5.5 0 010-.708l3.5-3.5a.5.5 0 01.708 0zm6.292 0a.5.5 0 000 .708L14.293 8l-3.147 3.146a.5.5 0 00.708.708l3.5-3.5a.5.5 0 000-.708l-3.5-3.5a.5.5 0 00-.708 0z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <h3 class="sg__title">Developer Testing Mode</h3>
+                </div>
+                <div class="fields">
+                  <div class="field field--stretch">
+                    <label class="field__lbl" for="settingDeveloperModeEnabled"
+                      >Developer Mode</label
+                    >
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingDeveloperModeEnabled">
+                        <input
+                          type="checkbox"
+                          id="settingDeveloperModeEnabled"
+                          class="checkbox-input"
+                        />
+                        <span>Enable Developer Testing Mode</span>
+                      </label>
+                    </div>
+                    <p class="field__hint">
+                      When active, test print/copy/scan transactions are tagged with environment='test' and will NOT add false earnings to production revenue, graphs, or financial summaries.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Security -->
               <div class="sg">
                 <div class="sg__head">

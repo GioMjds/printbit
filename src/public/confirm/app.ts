@@ -27,6 +27,7 @@ import {
   attachPowerSafetyOverlay,
   type PowerSafetyOverlayController,
 } from '../shared/power-safety-overlay';
+import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 import {
   resolveWifiTroubleshootingDetails,
   type HotspotConfig,
@@ -2631,7 +2632,9 @@ printAnotherBtn?.addEventListener('click', () => {
 });
 
 const ioFactory = (window as unknown as { io?: SocketIoFactory }).io;
-if (typeof ioFactory === 'function') {
+if (typeof ioFactory !== 'function') {
+  attachUiBlockingOverlay();
+} else {
   const connectedSocket = ioFactory() as SocketLike;
   socket = connectedSocket;
 
@@ -2643,6 +2646,7 @@ if (typeof ioFactory === 'function') {
     socket: connectedSocket,
     isPrintInFlight: () => hasActiveJob(),
   });
+  attachUiBlockingOverlay({ socket: connectedSocket });
 
   connectedSocket.on('balance', (amount: unknown) => {
     if (typeof amount === 'number') updateBalanceUI(amount);

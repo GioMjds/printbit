@@ -13,6 +13,7 @@ import {
 } from './db';
 import { getTrustedTimestamp } from './time-source';
 import { adminLogStore } from '@/core/database/sqlite-storage';
+import { adminService as moduleAdminService } from '@/modules/admin/admin.service';
 
 const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
   malwareScanningEnabled: true,
@@ -207,11 +208,29 @@ class AdminService {
 
     // Use date-bounded query to avoid transferring all payment logs
     const weekTimestamp = startOfWeek.toISOString();
+    const seenTxIds = new Set<string>();
+    const failedTxIds = new Set<string>();
+
     for (const log of adminLogStore.listByTypesSince(
-      ['payment_confirmed'],
+      ['payment_confirmed', 'copy_job_enqueued', 'copy_job_completed', 'copy_job_failed'],
       weekTimestamp,
     )) {
-      const amountRaw = log.meta?.amount;
+      const txId =
+        (typeof log.meta?.transactionId === 'string' &&
+          log.meta.transactionId) ||
+        (typeof log.meta?.jobId === 'string' && log.meta.jobId) ||
+        null;
+      if (txId) {
+        if (log.type === 'copy_job_failed') {
+          failedTxIds.add(txId);
+          continue;
+        }
+        if (failedTxIds.has(txId)) continue;
+        if (seenTxIds.has(txId)) continue;
+        seenTxIds.add(txId);
+      }
+
+      const amountRaw = log.meta?.amount ?? log.meta?.chargedAmount;
       const amount =
         typeof amountRaw === 'number' ? amountRaw : Number(amountRaw);
       if (!Number.isFinite(amount) || amount <= 0) continue;
@@ -228,6 +247,10 @@ class AdminService {
       week: Number(week.toFixed(2)),
       allTime: Number(allTime.toFixed(2)),
     };
+  }
+
+  async reconcileMissingCopyTransactions(): Promise<number> {
+    return moduleAdminService.reconcileMissingCopyTransactions();
   }
 
   getStorageUsage(uploadDir: string): { fileCount: number; bytes: number } {

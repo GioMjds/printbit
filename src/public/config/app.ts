@@ -29,10 +29,12 @@ import {
   detectOrientationFromDimensions,
   detectPaperSizeFromDimensions,
 } from './geometry-detection';
+import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 
 export {};
 
 void initKioskLocalization();
+attachUiBlockingOverlay();
 
 void initializePageIdleTimeout({
   showWarningModal: true,
@@ -1292,6 +1294,7 @@ function syncCustomRangeInputs(
       customRangeDisplay.textContent = `Selected: ${normalizedRange}`;
     }
   }
+  clampCopiesInput();
 }
 
 function updateCustomRangeWithDelta(
@@ -1495,10 +1498,99 @@ function hasMultiplePages(): boolean {
   return mode === 'print' && getPageRangeMaxPages() > 1;
 }
 
+let dynamicMaxPages =
+  Number(sessionStorage.getItem('printbit.maxPagesPerSession')) || 30;
+
+void fetch('/api/settings/idle-timeout')
+  .then((res) => (res.ok ? res.json() : null))
+  .then((data) => {
+    if (
+      data &&
+      typeof data.maxPagesPerSession === 'number' &&
+      Number.isFinite(data.maxPagesPerSession)
+    ) {
+      dynamicMaxPages = data.maxPagesPerSession;
+      sessionStorage.setItem(
+        'printbit.maxPagesPerSession',
+        String(dynamicMaxPages),
+      );
+      syncPageRangeAvailability();
+      clampCopiesInput();
+      updateSummary();
+      schedulePrintQuoteRefresh();
+    }
+  })
+  .catch(() => {
+    // Keep fallback
+  });
+
+function getMaxAllowedPages(): number {
+  return (
+    Number(sessionStorage.getItem('printbit.maxPagesPerSession')) ||
+    dynamicMaxPages ||
+    30
+  );
+}
+
+function getSelectedPagesCount(): number {
+  if (mode !== 'print' || !hasMultiplePages()) {
+    return 1;
+  }
+  if (pageModeSingle?.checked) {
+    return 1;
+  }
+  if (pageModeCustom?.checked) {
+    const raw = (pageRangeInput?.value ?? '').trim();
+    if (!raw) return 1;
+    const max = getPageRangeMaxPages();
+    const chunks = raw.split(',');
+    const pages = new Set<number>();
+    for (const chunk of chunks) {
+      const trimmed = chunk.trim();
+      if (trimmed.includes('-')) {
+        const [startStr, endStr] = trimmed.split('-');
+        const start = parseInt(startStr, 10);
+        const end = parseInt(endStr, 10);
+        if (!isNaN(start) && !isNaN(end) && start >= 1 && end >= start) {
+          for (let p = start; p <= Math.min(max, end); p++) {
+            pages.add(p);
+          }
+        }
+      } else {
+        const p = parseInt(trimmed, 10);
+        if (!isNaN(p) && p >= 1 && p <= max) {
+          pages.add(p);
+        }
+      }
+    }
+    return pages.size > 0 ? pages.size : 1;
+  }
+  return Math.max(1, getPageRangeMaxPages());
+}
+
+function getMaxCopiesAllowed(): number {
+  const maxAllowed = getMaxAllowedPages();
+  const selectedPages = getSelectedPagesCount();
+  return Math.max(1, Math.floor(maxAllowed / Math.max(1, selectedPages)));
+}
+
+function clampCopiesInput(): void {
+  if (!copiesInput) return;
+  const maxCopies = getMaxCopiesAllowed();
+  copiesInput.max = String(maxCopies);
+  const current = parseInt(copiesInput.value || '1', 10) || 1;
+  if (current > maxCopies) {
+    copiesInput.value = String(maxCopies);
+  }
+}
+
 function syncPageRangeAvailability(): void {
   const visible = hasMultiplePages();
   const maxPages = getPageRangeMaxPages();
-  const maxAllowed: number = 30; // Maximum pages allowed for custom range selection
+  const maxAllowed =
+    Number(sessionStorage.getItem('printbit.maxPagesPerSession')) ||
+    dynamicMaxPages ||
+    30;
 
   pageRangeGroup?.classList.toggle('hidden', !visible);
 
@@ -1524,13 +1616,14 @@ function syncPageRangeAvailability(): void {
     allPagesLabel.style.display = maxPages > maxAllowed ? 'none' : '';
     allPagesLabel.setAttribute(
       'title',
-      maxPages > maxAllowed ? 'Max 30 pages allowed' : '',
+      maxPages > maxAllowed ? `Max ${maxAllowed} pages allowed` : '',
     );
   }
 
   syncPageRangeUI();
   syncCustomRangeInputs();
   syncCustomRangeValidity();
+  clampCopiesInput();
 }
 
 function getRadio(name: string): string {
@@ -1549,9 +1642,10 @@ function getSelectedQuality(): PrintQuality {
 }
 
 function getCopies(): number {
+  const maxCopies = getMaxCopiesAllowed();
   return Math.max(
     1,
-    Math.min(30, parseInt(copiesInput?.value ?? '1', 10) || 1),
+    Math.min(maxCopies, parseInt(copiesInput?.value ?? '1', 10) || 1),
   );
 }
 
@@ -1599,8 +1693,12 @@ function setPrintContinueState(): void {
     hasMultiplePages() &&
     Boolean(pageModeCustom?.checked) &&
     Boolean(pageRangeInput?.validationMessage);
+  const hasCopiesError = Boolean(copiesInput?.validationMessage);
   const canContinue =
-    Boolean(currentPrintQuote) && !quoteLoading && !hasCustomRangeError;
+    Boolean(currentPrintQuote) &&
+    !quoteLoading &&
+    !hasCustomRangeError &&
+    !hasCopiesError;
   setContinueEnabled(canContinue);
 }
 
@@ -1817,11 +1915,12 @@ function schedulePrintQuoteRefresh(): void {
 function updateSummary(): void {
   renderColorDetectionEvidence();
   if (largePrintDisclaimer) {
+    const maxAllowed = getMaxAllowedPages();
     const shouldShow =
-      mode === 'print' && isLargePrintDocument(preview.pageCount);
+      mode === 'print' && isLargePrintDocument(preview.pageCount, maxAllowed);
     largePrintDisclaimer.hidden = !shouldShow;
     largePrintDisclaimer.textContent = shouldShow
-      ? formatLargePrintDisclaimer(preview.pageCount)
+      ? formatLargePrintDisclaimer(preview.pageCount, maxAllowed)
       : '';
     if (shouldShow) {
       sessionStorage.setItem('printbit.largePrintNoticeShown', 'true');
@@ -2007,18 +2106,35 @@ copiesDec?.addEventListener('click', () => {
   }
 });
 copiesInc?.addEventListener('click', () => {
+  const maxCopies = getMaxCopiesAllowed();
   const v = getCopies();
-  if (v < 30 && copiesInput) {
+  if (v < maxCopies && copiesInput) {
     copiesInput.value = String(v + 1);
     updateSummary();
     schedulePrintQuoteRefresh();
   }
 });
+copiesInput?.addEventListener('input', () => {
+  if (!copiesInput) return;
+  const maxAllowed = getMaxAllowedPages();
+  const selectedPages = getSelectedPagesCount();
+  const val = parseInt(copiesInput.value, 10);
+  if (!isNaN(val) && val * selectedPages > maxAllowed) {
+    copiesInput.setCustomValidity(
+      `Total pages cannot exceed ${maxAllowed} (selected ${selectedPages} pages × ${val} copies = ${selectedPages * val} pages).`,
+    );
+  } else {
+    copiesInput.setCustomValidity('');
+  }
+  setPrintContinueState();
+});
 copiesInput?.addEventListener('change', () => {
   if (copiesInput) {
     copiesInput.value = String(getCopies());
+    copiesInput.setCustomValidity('');
     updateSummary();
     schedulePrintQuoteRefresh();
+    setPrintContinueState();
   }
 });
 

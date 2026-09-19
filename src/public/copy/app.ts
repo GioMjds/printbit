@@ -13,10 +13,12 @@ import {
   getCopyTroubleshootingGuide,
   isAdfPaperJam,
 } from './troubleshooting';
+import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 
 export {};
 
 void initKioskLocalization();
+attachUiBlockingOverlay();
 
 // ── Idle Timeout with Warning Modal (Copy Page) ───────────────────────────────────────────────
 

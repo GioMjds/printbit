@@ -4,6 +4,7 @@ import {
   type FinancialEventType,
   type FinancialLedgerEntry,
   type LogMeta,
+  type TrustedTimestampMeta,
 } from './db';
 import {
   assertTrustedTimeForFinancialOperation,
@@ -15,6 +16,8 @@ interface AppendLedgerInput {
   amount: number;
   referenceId?: string | null;
   meta?: LogMeta;
+  timestamp?: string | null;
+  timestampMeta?: TrustedTimestampMeta | null;
 }
 
 function serializeForHash(entry: {
@@ -54,7 +57,7 @@ class FinancialLedgerService {
     await previousQueue;
 
     try {
-      if (input.eventType !== 'coin_inserted') {
+      if (input.eventType !== 'coin_inserted' && !input.timestamp) {
         assertTrustedTimeForFinancialOperation(
           `ledger_append:${input.eventType}`,
         );
@@ -67,10 +70,21 @@ class FinancialLedgerService {
         ? Number(input.amount.toFixed(2))
         : 0;
       const meta = input.meta ?? {};
+      const entryTimestamp = input.timestamp || trusted.timestamp;
+      const timestampMeta =
+        input.timestampMeta ??
+        (input.timestamp
+          ? {
+              source: 'system' as const,
+              synced: false,
+              offsetMs: null,
+              detail: 'Historical reconciliation from admin log',
+            }
+          : trusted.meta);
 
       const hashPayload = serializeForHash({
         id,
-        timestamp: trusted.timestamp,
+        timestamp: entryTimestamp,
         eventType: input.eventType,
         amount,
         referenceId: input.referenceId ?? null,
@@ -80,8 +94,8 @@ class FinancialLedgerService {
 
       const entry: FinancialLedgerEntry = {
         id,
-        timestamp: trusted.timestamp,
-        timestampMeta: trusted.meta,
+        timestamp: entryTimestamp,
+        timestampMeta,
         eventType: input.eventType,
         amount,
         referenceId: input.referenceId ?? null,

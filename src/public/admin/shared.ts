@@ -186,7 +186,33 @@ export type SummaryResponse = {
   };
 };
 
-export type SettingsResponse = {
+export interface PrintLimitsSettings {
+  maxPagesPerSession: number;
+}
+
+export type UiBlockingMode = 'maintenance' | 'needs_admin' | 'out_of_service';
+
+export interface UiBlockingSettings {
+  enabled: boolean;
+  mode: UiBlockingMode;
+  customMessage: string;
+}
+
+export type SupportedDpi = 150 | 300 | 600;
+
+export interface ScannerDpiSettings {
+  copyGlass: SupportedDpi;
+  copyAdf: SupportedDpi;
+  scanGlass: SupportedDpi;
+  scanAdf: SupportedDpi;
+}
+
+export interface DeveloperModeSettings {
+  enabled: boolean;
+  environmentTag: 'test';
+}
+
+export interface AdminSettings {
   pricing: {
     printPerPage: number;
     copyPerPage: number;
@@ -265,7 +291,13 @@ export type SettingsResponse = {
     documentConversionEnabled: boolean;
     colorDetectionEnabled: boolean;
   };
-};
+  printLimits?: PrintLimitsSettings;
+  uiBlocking?: UiBlockingSettings;
+  scannerDpi?: ScannerDpiSettings;
+  developerMode?: DeveloperModeSettings;
+}
+
+export type SettingsResponse = AdminSettings;
 
 export type LogsResponse = {
   logs: {

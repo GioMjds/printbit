@@ -22,6 +22,7 @@ import { jobStore, type ScanJobSettings } from '@/services/job-store';
 import { ReceiptService } from '@/modules/receipt/receipt.service';
 import { adminService } from '@/services/admin';
 import { db } from '@/services/db';
+import type { SupportedDpi } from '@/core/database/models/admin.model';
 import { settlementService } from '@/services/settlement';
 import { financialLedgerService } from '@/services/financial-ledger';
 import {
@@ -80,7 +81,7 @@ export interface ScannerStatusResponse {
 export interface InteractiveScanInput {
   source: ScannerPageSource;
   color: ScannerPageColor;
-  dpi: string | number;
+  dpi?: string | number;
   paperSize: ScannerPaperSize;
   format?: 'pdf' | 'jpg' | 'png';
 }
@@ -126,7 +127,7 @@ export interface UsbExportResult {
 
 export interface ScanJobInput {
   source: string;
-  dpi: number;
+  dpi?: number;
   colorMode: string;
   duplex: boolean;
   format: string;
@@ -170,6 +171,18 @@ export class ScannerService {
     return (
       FORMAT_CONTENT_TYPES[ext.toLowerCase()] ?? 'application/octet-stream'
     );
+  }
+
+  public resolveConfiguredDpi(
+    service: 'copy' | 'scan',
+    source: 'flatbed' | 'adf' | 'glass' | 'feeder',
+  ): SupportedDpi {
+    const isAdf = source === 'adf' || source === 'feeder';
+    const cfg = db.data?.settings?.scannerDpi;
+    if (service === 'copy') {
+      return isAdf ? (cfg?.copyAdf ?? 300) : (cfg?.copyGlass ?? 300);
+    }
+    return isAdf ? (cfg?.scanAdf ?? 300) : (cfg?.scanGlass ?? 300);
   }
 
   private toScanSource(source: ScannerPageSource): 'flatbed' | 'adf' {
@@ -331,14 +344,25 @@ export class ScannerService {
       throw new Error('Invalid color. Accepted: "color", "grayscale"');
     }
 
-    const safeDpi =
-      typeof dpi === 'number'
-        ? dpi
-        : typeof dpi === 'string'
-          ? Number(dpi)
-          : NaN;
-    if (!VALID_DPI.has(safeDpi)) {
-      throw new Error('Invalid dpi. Accepted: 150, 300, 600');
+    let safeDpi: SupportedDpi;
+    if (
+      dpi === undefined ||
+      dpi === null ||
+      dpi === '' ||
+      (typeof dpi === 'string' && dpi.trim().toLowerCase() === 'default')
+    ) {
+      safeDpi = this.resolveConfiguredDpi('scan', source);
+    } else {
+      const parsedDpi =
+        typeof dpi === 'number'
+          ? dpi
+          : typeof dpi === 'string'
+            ? Number(dpi)
+            : NaN;
+      if (!VALID_DPI.has(parsedDpi)) {
+        throw new Error('Invalid dpi. Accepted: 150, 300, 600');
+      }
+      safeDpi = parsedDpi as SupportedDpi;
     }
     if (!VALID_PAPER_SIZES.has(paperSize)) {
       throw new Error('Invalid paperSize. Accepted: "A4", "Letter", "Legal"');
@@ -686,14 +710,34 @@ export class ScannerService {
   }
 
   validateScanJobInput(input: ScanJobInput): ScanJobSettings {
-    const { source, dpi, colorMode, duplex, format, paperSize } = input;
+    const { source, colorMode, duplex, format, paperSize } = input;
 
     if (!source || !VALID_SOURCES.has(source)) {
       throw new Error('Invalid source. Accepted: "adf", "flatbed"');
     }
-    if (typeof dpi !== 'number' || !VALID_DPI.has(dpi)) {
-      throw new Error('Invalid dpi. Accepted: 150, 300, 600');
+
+    let dpi: SupportedDpi;
+    if (
+      input.dpi === undefined ||
+      input.dpi === null ||
+      (input.dpi as any) === '' ||
+      (typeof input.dpi === 'string' &&
+        (input.dpi as string).trim().toLowerCase() === 'default')
+    ) {
+      dpi = this.resolveConfiguredDpi('scan', source as 'flatbed' | 'adf');
+    } else {
+      const parsedDpi =
+        typeof input.dpi === 'number'
+          ? input.dpi
+          : typeof input.dpi === 'string'
+            ? Number(input.dpi)
+            : NaN;
+      if (!VALID_DPI.has(parsedDpi)) {
+        throw new Error('Invalid dpi. Accepted: 150, 300, 600');
+      }
+      dpi = parsedDpi as SupportedDpi;
     }
+
     if (!colorMode || !VALID_COLOR_MODES.has(colorMode)) {
       throw new Error('Invalid colorMode. Accepted: "colored", "grayscale"');
     }
@@ -718,22 +762,32 @@ export class ScannerService {
   }
 
   async createScanJob(settings: ScanJobSettings) {
-    const job = jobStore.createScanJob(settings);
+    const effectiveDpi =
+      settings.dpi && VALID_DPI.has(settings.dpi)
+        ? (settings.dpi as SupportedDpi)
+        : this.resolveConfiguredDpi('scan', settings.source);
+
+    const resolvedSettings: ScanJobSettings = {
+      ...settings,
+      dpi: effectiveDpi,
+    };
+
+    const job = jobStore.createScanJob(resolvedSettings);
 
     void adminService.appendAdminLog('scan_job_created', 'Scan job created.', {
       jobId: job.id,
-      source: settings.source,
-      dpi: settings.dpi,
-      colorMode: settings.colorMode,
-      format: settings.format,
-      paperSize: settings.paperSize,
+      source: resolvedSettings.source,
+      dpi: resolvedSettings.dpi,
+      colorMode: resolvedSettings.colorMode,
+      format: resolvedSettings.format,
+      paperSize: resolvedSettings.paperSize,
     });
 
     // Start scan asynchronously
     void (async () => {
       jobStore.updateJobState(job.id, 'running');
       try {
-        const result = await getAdapter().scan(settings, 'uploads/scans');
+        const result = await getAdapter().scan(resolvedSettings, 'uploads/scans');
         jobStore.updateJobState(job.id, 'succeeded', {
           resultPath: result.outputPath,
         });
@@ -780,11 +834,14 @@ export class ScannerService {
       throw new Error('Invalid paperSize. Accepted: "A4", "Letter", "Legal"');
     }
 
-    console.log('[SCAN-PREVIEW] Starting copy pre-scan (300 DPI color)…');
+    const source = toCopyPreviewSource(paperSize);
+    const dpi = this.resolveConfiguredDpi('copy', source);
+
+    console.log(`[SCAN-PREVIEW] Starting copy pre-scan (${dpi} DPI color)…`);
 
     const previewSettings = {
-      source: toCopyPreviewSource(paperSize),
-      dpi: 300,
+      source,
+      dpi,
       colorMode: 'colored' as const,
       duplex: false,
       format: 'pdf' as const,

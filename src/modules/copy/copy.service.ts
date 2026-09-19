@@ -470,6 +470,30 @@ export class CopyService {
       };
     }
 
+    try {
+      await financialLedgerService.append({
+        eventType: 'job_started',
+        amount: requiredAmount,
+        referenceId: job.id,
+        meta: {
+          mode: 'copy',
+          copies: quote.copies,
+          colorMode: quote.effectiveColorMode,
+          requestedColorMode: normalized.colorMode,
+          rotationDeg: normalized.rotationDeg,
+          previewFilename,
+          selectedPages: quote.selectedPages,
+          billableColorPages: quote.billableColorPages,
+          billableBwPages: quote.billableBwPages,
+        },
+      });
+    } catch (ledgerError) {
+      console.error(
+        '[COPY] Failed to record job_started in financial ledger:',
+        ledgerError,
+      );
+    }
+
     const settlement = await settlementService.settle({
       requiredAmount,
       io: this.deps.io,
@@ -492,6 +516,31 @@ export class CopyService {
         },
         cacheIdempotencyResponse: false,
       };
+    }
+
+    try {
+      await financialLedgerService.append({
+        eventType: 'job_completed',
+        amount: settlement.chargedAmount,
+        referenceId: job.id,
+        meta: {
+          mode: 'copy',
+          changeState: settlement.change.state,
+          changeRequested: settlement.change.requested,
+          changeDispensed: settlement.change.dispensed,
+          remainingBalance: settlement.remainingBalance,
+        },
+      });
+    } catch (ledgerError) {
+      const message =
+        ledgerError instanceof Error
+          ? ledgerError.message
+          : 'Unknown ledger error.';
+      void adminService.appendAdminLog(
+        'financial_ledger_write_failed',
+        'Failed to record immutable job_completed event.',
+        { transactionId: job.id, jobId: job.id, mode: 'copy', error: message },
+      );
     }
 
     const settledAt = getTrustedTimestamp().timestamp;
@@ -620,9 +669,29 @@ export class CopyService {
         'Copy job settled and enqueued.',
         {
           jobId: job.id,
+          transactionId: job.id,
+          amount: settlement.chargedAmount,
           chargedAmount: settlement.chargedAmount,
           copies: quote.copies,
           colorMode: quote.effectiveColorMode,
+          billableColorPages: quote.billableColorPages * quote.copies,
+          billableBwPages: quote.billableBwPages * quote.copies,
+        },
+      );
+
+      void adminService.appendAdminLog(
+        'payment_confirmed',
+        'Payment confirmed.',
+        {
+          transactionId: job.id,
+          jobId: job.id,
+          mode: 'copy',
+          amount: settlement.chargedAmount,
+          copies: quote.copies,
+          colorMode: quote.effectiveColorMode,
+          rotationDeg: normalized.rotationDeg,
+          duplex: quote.duplex,
+          selectedPages: quote.selectedPages,
           billableColorPages: quote.billableColorPages * quote.copies,
           billableBwPages: quote.billableBwPages * quote.copies,
         },

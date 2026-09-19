@@ -86,6 +86,28 @@ const SESSION_MONITOR_INTERVAL_MS = 5000;
 const SESSION_COUNTDOWN_TICK_MS = 1000;
 const DEFAULT_WARNING_SECONDS = 60;
 
+let maxPagesPerSession = 30;
+
+async function resolveMaxPagesPerSession(): Promise<number> {
+  try {
+    const res = await fetch('/api/settings/idle-timeout');
+    if (res.ok) {
+      const data = await res.json();
+      if (
+        typeof data.maxPagesPerSession === 'number' &&
+        Number.isFinite(data.maxPagesPerSession)
+      ) {
+        maxPagesPerSession = data.maxPagesPerSession;
+        return maxPagesPerSession;
+      }
+    }
+  } catch {
+    // fallback to default
+  }
+  return maxPagesPerSession;
+}
+void resolveMaxPagesPerSession();
+
 let sessionId: string | null = null;
 let appState: UploadState = 'session-loading';
 let sessionWarningThresholdSeconds = DEFAULT_WARNING_SECONDS;
@@ -746,9 +768,15 @@ function attachSocket(sid: string): void {
             .analysis
         : undefined;
     const pageCount = analysis?.totalPages ?? analysis?.pageCount;
-    if (!largePrintWarningShown && isLargePrintDocument(pageCount)) {
+    if (
+      !largePrintWarningShown &&
+      isLargePrintDocument(pageCount, maxPagesPerSession)
+    ) {
       largePrintWarningShown = true;
-      setStatus(formatLargePrintDisclaimer(pageCount), 'info');
+      setStatus(
+        formatLargePrintDisclaimer(pageCount, maxPagesPerSession),
+        'info',
+      );
       return;
     }
     setStatus(`✓ Your document file is ready for printing at kiosk.`, 'ok');

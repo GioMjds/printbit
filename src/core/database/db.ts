@@ -80,6 +80,12 @@ import {
   AlertSettings,
   AdminLogEntry,
   PipelineSettings,
+  PrintLimitsSettings,
+  UiBlockingMode,
+  UiBlockingSettings,
+  SupportedDpi,
+  ScannerDpiSettings,
+  DeveloperModeSettings,
 } from './models/admin.model';
 
 import {
@@ -112,6 +118,12 @@ export {
   AlertSettings,
   AdminLogEntry,
   PipelineSettings,
+  PrintLimitsSettings,
+  UiBlockingMode,
+  UiBlockingSettings,
+  SupportedDpi,
+  ScannerDpiSettings,
+  DeveloperModeSettings,
 };
 
 export {
@@ -356,6 +368,24 @@ const DEFAULT_DATA: Schema = {
       documentConversionEnabled: true,
       colorDetectionEnabled: true,
     },
+    printLimits: {
+      maxPagesPerSession: 30,
+    },
+    uiBlocking: {
+      enabled: false,
+      mode: 'maintenance',
+      customMessage: '',
+    },
+    scannerDpi: {
+      copyGlass: 300,
+      copyAdf: 300,
+      scanGlass: 300,
+      scanAdf: 300,
+    },
+    developerMode: {
+      enabled: false,
+      environmentTag: 'test',
+    },
   },
   coinStats: {
     one: 0,
@@ -488,7 +518,7 @@ function normalizePricingEngineBulkDiscountTiers(
   return normalized;
 }
 
-function normalizeSchema(data: Partial<Schema> | undefined): Schema {
+export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const pricing = data?.settings?.pricing;
   const pricingEngine = data?.settings?.pricingEngine;
   const alertSettings = data?.settings?.alerts;
@@ -497,6 +527,10 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const consumableEstimation = data?.settings?.consumableEstimation;
   const scanFilenameFormat = data?.settings?.scanFilenameFormat;
   const pipelineSettings = data?.settings?.pipelineSettings;
+  const printLimits = data?.settings?.printLimits;
+  const uiBlocking = data?.settings?.uiBlocking;
+  const scannerDpi = data?.settings?.scannerDpi;
+  const developerMode = data?.settings?.developerMode;
   const normalizedPaperTrayCapacitySheets = Math.max(
     1,
     Math.floor(
@@ -1482,6 +1516,69 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
             ? pipelineSettings.colorDetectionEnabled
             : DEFAULT_DATA.settings.pipelineSettings.colorDetectionEnabled,
       },
+      printLimits: {
+        maxPagesPerSession: Math.max(
+          1,
+          Math.min(
+            500,
+            Math.floor(
+              finiteOr(
+                printLimits?.maxPagesPerSession,
+                DEFAULT_DATA.settings.printLimits.maxPagesPerSession,
+              ),
+            ),
+          ),
+        ),
+      },
+      uiBlocking: {
+        enabled:
+          typeof uiBlocking?.enabled === 'boolean'
+            ? uiBlocking.enabled
+            : DEFAULT_DATA.settings.uiBlocking.enabled,
+        mode:
+          uiBlocking?.mode === 'maintenance' ||
+          uiBlocking?.mode === 'needs_admin' ||
+          uiBlocking?.mode === 'out_of_service'
+            ? uiBlocking.mode
+            : DEFAULT_DATA.settings.uiBlocking.mode,
+        customMessage:
+          typeof uiBlocking?.customMessage === 'string'
+            ? uiBlocking.customMessage.slice(0, 250)
+            : DEFAULT_DATA.settings.uiBlocking.customMessage,
+      },
+      scannerDpi: {
+        copyGlass:
+          scannerDpi?.copyGlass === 150 ||
+          scannerDpi?.copyGlass === 300 ||
+          scannerDpi?.copyGlass === 600
+            ? scannerDpi.copyGlass
+            : DEFAULT_DATA.settings.scannerDpi.copyGlass,
+        copyAdf:
+          scannerDpi?.copyAdf === 150 ||
+          scannerDpi?.copyAdf === 300 ||
+          scannerDpi?.copyAdf === 600
+            ? scannerDpi.copyAdf
+            : DEFAULT_DATA.settings.scannerDpi.copyAdf,
+        scanGlass:
+          scannerDpi?.scanGlass === 150 ||
+          scannerDpi?.scanGlass === 300 ||
+          scannerDpi?.scanGlass === 600
+            ? scannerDpi.scanGlass
+            : DEFAULT_DATA.settings.scannerDpi.scanGlass,
+        scanAdf:
+          scannerDpi?.scanAdf === 150 ||
+          scannerDpi?.scanAdf === 300 ||
+          scannerDpi?.scanAdf === 600
+            ? scannerDpi.scanAdf
+            : DEFAULT_DATA.settings.scannerDpi.scanAdf,
+      },
+      developerMode: {
+        enabled:
+          typeof developerMode?.enabled === 'boolean'
+            ? developerMode.enabled
+            : DEFAULT_DATA.settings.developerMode.enabled,
+        environmentTag: 'test',
+      },
     },
     coinStats: {
       one: finiteOr(data?.coinStats?.one, DEFAULT_DATA.coinStats.one),
@@ -1604,6 +1701,8 @@ function normalizeSchema(data: Partial<Schema> | undefined): Schema {
     },
   };
 }
+
+export const normalizeDbData = normalizeSchema;
 
 function cloneDefaultData(): Schema {
   return structuredClone(DEFAULT_DATA);

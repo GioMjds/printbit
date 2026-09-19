@@ -8,10 +8,11 @@ import {
   type PrintMode,
   type PricingSettings,
 } from '@/modules/admin/admin.schema';
-import { type PrintQuality } from '@/core/database/shared.schema';
+import { type PrintQuality, type TrustedTimestampMeta } from '@/core/database/shared.schema';
 import { db } from '@/services/db';
 import { getTrustedTimestamp } from '@/services/time-source';
 import { adminLogStore } from '@/core/database/sqlite-storage';
+import { financialLedgerService } from '@/services/financial-ledger';
 
 export type EarningsAnalyticsView = 'daily' | 'weekly' | 'monthly' | 'yearly';
 type EarningsMode = 'print' | 'copy' | 'scan';
@@ -22,6 +23,15 @@ export type TransactionLogStatus =
   | 'completed'
   | 'failed'
   | 'refund';
+
+export interface UnreconciledCopyTransaction {
+  txId: string;
+  timestamp: string;
+  timestampMeta?: TrustedTimestampMeta;
+  amount: number;
+  copies?: number;
+  colorMode?: ColorMode;
+}
 
 export interface TransactionLogFilters {
   transactionId?: string;
@@ -311,7 +321,10 @@ export class AdminService {
   }
 
   private getTransactionId(entry: AdminLogEntry): string | null {
-    const txId = entry.meta?.transactionId ?? entry.meta?.transaction_id;
+    const txId =
+      entry.meta?.transactionId ??
+      entry.meta?.transaction_id ??
+      (entry.meta?.jobId ? String(entry.meta.jobId) : null);
     if (typeof txId === 'string' && txId.trim().length > 0) {
       return txId.trim();
     }
@@ -551,11 +564,29 @@ export class AdminService {
 
     // Use date-bounded query to avoid transferring all payment logs
     const weekTimestamp = startOfWeek.toISOString();
+    const seenTxIds = new Set<string>();
+    const failedTxIds = new Set<string>();
+
     for (const log of adminLogStore.listByTypesSince(
-      ['payment_confirmed'],
+      ['payment_confirmed', 'copy_job_enqueued', 'copy_job_completed', 'copy_job_failed'],
       weekTimestamp,
     )) {
-      const amountRaw = log.meta?.amount;
+      const txId =
+        (typeof log.meta?.transactionId === 'string' &&
+          log.meta.transactionId) ||
+        (typeof log.meta?.jobId === 'string' && log.meta.jobId) ||
+        null;
+      if (txId) {
+        if (log.type === 'copy_job_failed') {
+          failedTxIds.add(txId);
+          continue;
+        }
+        if (failedTxIds.has(txId)) continue;
+        if (seenTxIds.has(txId)) continue;
+        seenTxIds.add(txId);
+      }
+
+      const amountRaw = log.meta?.amount ?? log.meta?.chargedAmount;
       const amount =
         typeof amountRaw === 'number' ? amountRaw : Number(amountRaw);
       if (!Number.isFinite(amount) || amount <= 0) continue;
@@ -572,6 +603,162 @@ export class AdminService {
       week: Number(week.toFixed(2)),
       allTime: Number(allTime.toFixed(2)),
     };
+  }
+
+  findUnreconciledCopyTransactions(
+    completedReferenceIds: ReadonlySet<string>,
+  ): UnreconciledCopyTransaction[] {
+    const allLogs = adminLogStore.listAll();
+    const failedJobIds = new Set<string>();
+    const candidates = new Map<
+      string,
+      {
+        timestamp: string;
+        timestampMeta?: TrustedTimestampMeta;
+        amount: number;
+        hasCompletedLog: boolean;
+        copies?: number;
+        colorMode?: ColorMode;
+      }
+    >();
+
+    for (const log of allLogs) {
+      const type = log.type.toLowerCase();
+      const txId = this.getTransactionId(log);
+      if (!txId) continue;
+
+      if (
+        type.includes('failed') ||
+        type.includes('error') ||
+        type.includes('printer_malfunction')
+      ) {
+        if (type.startsWith('copy_') || log.meta?.mode === 'copy') {
+          failedJobIds.add(txId);
+        }
+      }
+
+      const isCopy =
+        type === 'copy_job_completed' ||
+        type === 'copy_job_enqueued' ||
+        (type === 'payment_confirmed' &&
+          (log.meta?.mode === 'copy' ||
+            log.message.toLowerCase().includes('copy')));
+
+      if (!isCopy) continue;
+
+      const rawAmount = log.meta?.amount ?? log.meta?.chargedAmount;
+      const amount =
+        typeof rawAmount === 'number' ? rawAmount : Number(rawAmount);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+
+      const copiesRaw = log.meta?.copies;
+      const copies =
+        typeof copiesRaw === 'number' && Number.isFinite(copiesRaw)
+          ? copiesRaw
+          : undefined;
+      const colorMode =
+        log.meta?.colorMode === 'colored' || log.meta?.colorMode === 'grayscale'
+          ? (log.meta.colorMode as ColorMode)
+          : undefined;
+
+      const existing = candidates.get(txId);
+      if (!existing) {
+        candidates.set(txId, {
+          timestamp: log.timestamp,
+          timestampMeta: log.timestampMeta,
+          amount,
+          hasCompletedLog: type === 'copy_job_completed',
+          copies,
+          colorMode,
+        });
+      } else {
+        if (type === 'copy_job_completed') {
+          existing.hasCompletedLog = true;
+          existing.amount = amount;
+          existing.timestamp = log.timestamp;
+          if (log.timestampMeta) existing.timestampMeta = log.timestampMeta;
+        } else if (!existing.hasCompletedLog) {
+          existing.amount = amount;
+        }
+        if (copies !== undefined && existing.copies === undefined) {
+          existing.copies = copies;
+        }
+        if (colorMode !== undefined && existing.colorMode === undefined) {
+          existing.colorMode = colorMode;
+        }
+      }
+    }
+
+    const unreconciled: UnreconciledCopyTransaction[] = [];
+    for (const [txId, candidate] of candidates.entries()) {
+      if (completedReferenceIds.has(txId)) continue;
+      if (failedJobIds.has(txId) && !candidate.hasCompletedLog) continue;
+
+      unreconciled.push({
+        txId,
+        timestamp: candidate.timestamp,
+        timestampMeta: candidate.timestampMeta,
+        amount: candidate.amount,
+        copies: candidate.copies,
+        colorMode: candidate.colorMode,
+      });
+    }
+
+    return unreconciled.sort(
+      (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp),
+    );
+  }
+
+  async reconcileMissingCopyTransactions(): Promise<number> {
+    if (!db.data?.financialLedger) return 0;
+
+    const completedReferenceIds = new Set<string>();
+    for (const entry of db.data.financialLedger) {
+      if (entry.eventType === 'job_completed') {
+        if (
+          typeof entry.referenceId === 'string' &&
+          entry.referenceId.trim().length > 0
+        ) {
+          completedReferenceIds.add(entry.referenceId.trim());
+        }
+        const metaId =
+          (typeof entry.meta?.transactionId === 'string' &&
+            entry.meta.transactionId.trim()) ||
+          (typeof entry.meta?.transaction_id === 'string' &&
+            entry.meta.transaction_id.trim()) ||
+          (typeof entry.meta?.jobId === 'string' && entry.meta.jobId.trim()) ||
+          null;
+        if (metaId) {
+          completedReferenceIds.add(metaId);
+        }
+      }
+    }
+
+    const unreconciled = this.findUnreconciledCopyTransactions(
+      completedReferenceIds,
+    );
+    if (unreconciled.length === 0) return 0;
+
+    let count = 0;
+    for (const item of unreconciled) {
+      await financialLedgerService.append({
+        eventType: 'job_completed',
+        amount: item.amount,
+        referenceId: item.txId,
+        meta: {
+          mode: 'copy',
+          reconciled: true,
+          source: 'historical_copy_reconciliation',
+          ...(item.copies ? { copies: item.copies } : {}),
+          ...(item.colorMode ? { colorMode: item.colorMode } : {}),
+        },
+        timestamp: item.timestamp,
+        timestampMeta: item.timestampMeta,
+      });
+      count += 1;
+    }
+
+    return count;
   }
 
   private normalizeMoney(value: number): number {
@@ -762,7 +949,28 @@ export class AdminService {
       scan: 0,
     };
 
+    const completedReferenceIds = new Set<string>();
+
     for (const entry of db.data!.financialLedger) {
+      if (entry.eventType === 'job_completed') {
+        if (
+          typeof entry.referenceId === 'string' &&
+          entry.referenceId.trim().length > 0
+        ) {
+          completedReferenceIds.add(entry.referenceId.trim());
+        }
+        const metaId =
+          (typeof entry.meta?.transactionId === 'string' &&
+            entry.meta.transactionId.trim()) ||
+          (typeof entry.meta?.transaction_id === 'string' &&
+            entry.meta.transaction_id.trim()) ||
+          (typeof entry.meta?.jobId === 'string' && entry.meta.jobId.trim()) ||
+          null;
+        if (metaId) {
+          completedReferenceIds.add(metaId);
+        }
+      }
+
       if (
         entry.eventType !== 'job_completed' &&
         entry.eventType !== 'refund_issued'
@@ -804,6 +1012,40 @@ export class AdminService {
           methodTotals[mode] += signedAmount;
         }
       }
+    }
+
+    // In-memory reconciliation fallback: include any historical copy jobs recorded in
+    // adminLogStore that haven't been persisted to financialLedger yet
+    const unreconciledCopy = this.findUnreconciledCopyTransactions(
+      completedReferenceIds,
+    );
+    if (unreconciledCopy.length > 0) {
+      for (const item of unreconciledCopy) {
+        const timestamp = new Date(item.timestamp);
+        if (Number.isNaN(timestamp.getTime())) continue;
+        const amount = item.amount;
+
+        if (timestamp >= startOfToday) today += amount;
+        if (timestamp >= startOfWeek) week += amount;
+        if (timestamp >= startOfMonth) month += amount;
+        if (timestamp >= startOfYear) year += amount;
+
+        if (timestamp >= period.start && timestamp < period.end) {
+          const bucketKey = this.resolveBucketKey(input.view, timestamp);
+          const previous = bucketTotals.get(bucketKey);
+          if (previous !== undefined) {
+            bucketTotals.set(bucketKey, previous + amount);
+          }
+          methodTotals.copy += amount;
+        }
+      }
+
+      void this.reconcileMissingCopyTransactions().catch((reconcileError) => {
+        console.error(
+          '[ADMIN] Background copy transaction reconciliation failed:',
+          reconcileError,
+        );
+      });
     }
 
     const buckets = period.buckets.map((bucket) => ({

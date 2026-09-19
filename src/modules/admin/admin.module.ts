@@ -24,5 +24,11 @@ export function registerAdminModule(
     deps,
   );
   app.use('/api/admin', adminController.router);
+  void adminService.reconcileMissingCopyTransactions().catch((err) => {
+    console.error(
+      '[ADMIN] Failed to reconcile missing copy transactions on registerAdminModule:',
+      err,
+    );
+  });
 }
 

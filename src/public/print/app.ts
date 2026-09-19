@@ -6,9 +6,11 @@ import {
 import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import { attachPowerSafetyOverlay } from '../shared/power-safety-overlay';
+import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 import { resolveWifiTroubleshootingDetails } from '../shared/wifi-troubleshooting';
 
 attachPowerSafetyOverlay();
+attachUiBlockingOverlay();
 
 type UploadedFile = {
   documentId?: string;
@@ -17,6 +19,11 @@ type UploadedFile = {
   sizeBytes?: number;
   analysisStatus?: 'pending' | 'completed' | 'failed';
   analysisError?: string | null;
+  pageCount?: number;
+  analysis?: {
+    pageCount?: number;
+    totalPages?: number;
+  };
 };
 
 const bootKioskLocalization = (): void => {
@@ -120,7 +127,31 @@ const conversionCancelBtn = document.getElementById(
   'conversionCancel',
 ) as HTMLButtonElement | null;
 
-// ── State ─────────────────────────────────────────────────────────────────────
+let maxPagesPerSession =
+  Number(sessionStorage.getItem('printbit.maxPagesPerSession')) || 30;
+sessionStorage.setItem('printbit.maxPagesPerSession', String(maxPagesPerSession));
+
+async function fetchKioskSettings(): Promise<void> {
+  try {
+    const res = await fetch('/api/settings/idle-timeout');
+    if (res.ok) {
+      const data = await res.json();
+      if (
+        typeof data.maxPagesPerSession === 'number' &&
+        Number.isFinite(data.maxPagesPerSession)
+      ) {
+        maxPagesPerSession = data.maxPagesPerSession;
+        sessionStorage.setItem(
+          'printbit.maxPagesPerSession',
+          String(maxPagesPerSession),
+        );
+      }
+    }
+  } catch (err) {
+    console.warn('[print] Failed to fetch settings:', err);
+  }
+}
+void fetchKioskSettings();
 
 let activeSessionId = '';
 let activeSessionToken = '';
@@ -359,7 +390,15 @@ function formatBytes(bytes: number): string {
 
 function fileKey(file: UploadedFile): string {
   const bytes = file.size ?? file.sizeBytes ?? -1;
-  return `${file.documentId || file.filename}::${file.filename}::${bytes}`;
+  const pageCount =
+    typeof file.pageCount === 'number'
+      ? file.pageCount
+      : typeof file.analysis?.pageCount === 'number'
+        ? file.analysis.pageCount
+        : typeof file.analysis?.totalPages === 'number'
+          ? file.analysis.totalPages
+          : -1;
+  return `${file.documentId || file.filename}::${file.filename}::${bytes}::${pageCount}::${file.analysisStatus ?? ''}`;
 }
 
 function filesSignature(files: UploadedFile[]): string {
@@ -416,6 +455,20 @@ function selectFile(file: UploadedFile): void {
   }
 
   if (footerHint) {
+    const pageCount =
+      typeof file.pageCount === 'number'
+        ? file.pageCount
+        : typeof file.analysis?.pageCount === 'number'
+          ? file.analysis.pageCount
+          : typeof file.analysis?.totalPages === 'number'
+            ? file.analysis.totalPages
+            : undefined;
+
+    if (typeof pageCount === 'number' && pageCount > maxPagesPerSession) {
+      footerHint.textContent = `Document has ${pageCount} pages. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
+    } else {
+      footerHint.textContent = `Selected "${file.filename}". You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
+    }
     footerHint.classList.add('ready');
   }
 }
@@ -490,6 +543,21 @@ function addFileToList(file: UploadedFile): void {
   const ext = file.filename.split('.').pop()?.toUpperCase() ?? 'FILE';
   const icon = iconIdForFile(file.filename);
 
+  const pageCount =
+    typeof file.pageCount === 'number'
+      ? file.pageCount
+      : typeof file.analysis?.pageCount === 'number'
+        ? file.analysis.pageCount
+        : typeof file.analysis?.totalPages === 'number'
+          ? file.analysis.totalPages
+          : undefined;
+
+  const isExceeded =
+    typeof pageCount === 'number' && pageCount > maxPagesPerSession;
+  const pageLimitBadge = isExceeded
+    ? `<span class="file-item__limit-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(234,179,8,0.15);color:#eab308;font-size:11px;font-weight:600;margin-left:6px;">Document has ${pageCount} pages (Max ${maxPagesPerSession} pages per print)</span>`
+    : '';
+
   const li = document.createElement('li');
   li.className = 'file-item';
   li.role = 'option';
@@ -507,6 +575,7 @@ function addFileToList(file: UploadedFile): void {
         <span class="file-item__ext">${escapeHtml(ext)}</span>
         ${file.size !== undefined ? `<span>${formatBytes(file.size)}</span>` : ''}
         <span class="file-analysis-status" style="display:none"></span>
+        ${pageLimitBadge}
       </div>
     </div>
     <div class="file-item__actions">
@@ -791,14 +860,29 @@ async function checkUploadStatus(): Promise<void> {
         ? [session.document]
         : [];
 
-  const files: UploadedFile[] = rawFiles.map((file) => ({
-    documentId: file.documentId || file.filename,
-    filename: file.filename,
-    size: file.size ?? file.sizeBytes,
-    sizeBytes: file.sizeBytes,
-    analysisStatus: file.analysisStatus,
-    analysisError: file.analysisError,
-  }));
+  const files: UploadedFile[] = rawFiles.map((file) => {
+    const rawAnalysis = (
+      file as { analysis?: { pageCount?: number; totalPages?: number } }
+    ).analysis;
+    const pageCount =
+      typeof (file as { pageCount?: number }).pageCount === 'number'
+        ? (file as { pageCount?: number }).pageCount
+        : typeof rawAnalysis?.pageCount === 'number'
+          ? rawAnalysis.pageCount
+          : typeof rawAnalysis?.totalPages === 'number'
+            ? rawAnalysis.totalPages
+            : undefined;
+    return {
+      documentId: file.documentId || file.filename,
+      filename: file.filename,
+      size: file.size ?? file.sizeBytes,
+      sizeBytes: file.sizeBytes,
+      analysisStatus: file.analysisStatus,
+      analysisError: file.analysisError,
+      pageCount,
+      analysis: rawAnalysis,
+    };
+  });
 
   const nextSignature = filesSignature(files);
   if (nextSignature === lastRenderedFileSignature) {
@@ -1140,6 +1224,10 @@ continueBtn?.addEventListener('click', async () => {
     conversionWaitInFlight
   ) {
     return;
+  }
+  if (footerHint) {
+    footerHint.textContent = `Proceeding to print configuration. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
+    footerHint.classList.add('ready');
   }
   if (!isPdfFilename(selectedFilename)) {
     conversionWaitInFlight = true;

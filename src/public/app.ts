@@ -9,6 +9,7 @@ import { mountLoadingAnimation } from './shared/loading-animation';
 import { initIdleScreen } from './shared/idle-screen';
 import { isMobileViewport } from './shared/device-mode';
 import { attachPowerSafetyOverlay } from './shared/power-safety-overlay';
+import { attachUiBlockingOverlay } from './shared/ui-blocking-overlay';
 import { fetchPublicPricing, formatPricingGuide } from './shared/pricing-guide';
 
 type SocketLike = {
@@ -86,6 +87,7 @@ const ioFactory = (
 
 const homeSocket = typeof ioFactory === 'function' ? ioFactory() : null;
 attachPowerSafetyOverlay({ socket: homeSocket });
+attachUiBlockingOverlay({ socket: homeSocket });
 
 if (homeSocket) {
   homeSocket.on('balance', (amount: unknown) => {

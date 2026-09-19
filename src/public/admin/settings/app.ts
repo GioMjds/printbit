@@ -1,4 +1,5 @@
 import {
+  AdminSettings,
   SettingsResponse,
   SummaryResponse,
   apiFetch,
@@ -103,6 +104,40 @@ const scanFilenamePreviewText = document.getElementById(
   'scanFilenamePreviewText',
 ) as HTMLElement | null;
 
+// ── Print Limits Configuration ─────────────────────────────────
+const settingMaxPagesPerSession = document.getElementById(
+  'settingMaxPagesPerSession',
+) as HTMLInputElement | null;
+
+// ── Kiosk Availability & UI Blocking ───────────────────────────
+const settingUiBlockingEnabled = document.getElementById(
+  'settingUiBlockingEnabled',
+) as HTMLInputElement | null;
+const settingUiBlockingMode = document.getElementById(
+  'settingUiBlockingMode',
+) as HTMLSelectElement | null;
+const settingUiBlockingMessage = document.getElementById(
+  'settingUiBlockingMessage',
+) as HTMLInputElement | null;
+
+// ── Scanner & ADF Resolution Settings ──────────────────────────
+const settingCopyGlassDpi = document.getElementById(
+  'settingCopyGlassDpi',
+) as HTMLSelectElement | null;
+const settingCopyAdfDpi = document.getElementById(
+  'settingCopyAdfDpi',
+) as HTMLSelectElement | null;
+const settingScanGlassDpi = document.getElementById(
+  'settingScanGlassDpi',
+) as HTMLSelectElement | null;
+const settingScanAdfDpi = document.getElementById(
+  'settingScanAdfDpi',
+) as HTMLSelectElement | null;
+
+// ── Developer Testing Mode ─────────────────────────────────────
+const settingDeveloperModeEnabled = document.getElementById(
+  'settingDeveloperModeEnabled',
+) as HTMLInputElement | null;
 
 // ── Optional sections (may be commented out in HTML) ─────────────────────────
 const settingIdleTimeout = document.getElementById(
@@ -166,6 +201,7 @@ const testEmailAlertBtn = document.getElementById(
 const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 let refreshTimer: number | null = null;
 let loadedAdminLocalOnly: boolean = false;
+let currentDeveloperModeEnabled: boolean = false;
 let settingsDirty: boolean = false;
 
 function renderScanFilenamePreview(): void {
@@ -481,6 +517,49 @@ function applySettings(settings: SettingsResponse): void {
   }
   syncScanFilenameUI();
 
+  // Print Limits
+  if (settingMaxPagesPerSession) {
+    settingMaxPagesPerSession.value = String(
+      settings.printLimits?.maxPagesPerSession ?? 30,
+    );
+  }
+
+  // Kiosk Availability & UI Blocking
+  if (settingUiBlockingEnabled) {
+    settingUiBlockingEnabled.checked = Boolean(settings.uiBlocking?.enabled);
+  }
+  if (settingUiBlockingMode) {
+    settingUiBlockingMode.value = settings.uiBlocking?.mode ?? 'maintenance';
+  }
+  if (settingUiBlockingMessage) {
+    settingUiBlockingMessage.value = settings.uiBlocking?.customMessage ?? '';
+  }
+
+  // Scanner & ADF Resolution Settings
+  if (settingCopyGlassDpi) {
+    settingCopyGlassDpi.value = String(settings.scannerDpi?.copyGlass ?? 300);
+  }
+  if (settingCopyAdfDpi) {
+    settingCopyAdfDpi.value = String(settings.scannerDpi?.copyAdf ?? 300);
+  }
+  if (settingScanGlassDpi) {
+    settingScanGlassDpi.value = String(settings.scannerDpi?.scanGlass ?? 300);
+  }
+  if (settingScanAdfDpi) {
+    settingScanAdfDpi.value = String(settings.scannerDpi?.scanAdf ?? 300);
+  }
+
+  // Developer Testing Mode
+  if (settingDeveloperModeEnabled) {
+    settingDeveloperModeEnabled.checked = Boolean(
+      settings.developerMode?.enabled,
+    );
+  }
+  currentDeveloperModeEnabled = Boolean(settings.developerMode?.enabled);
+}
+
+export function populateForm(settings: SettingsResponse): void {
+  applySettings(settings);
 }
 
 function buildAlertPayload(): {
@@ -824,13 +903,99 @@ settingsForm.addEventListener('submit', (e) => {
     };
   }
 
+  // Print Limits
+  if (settingMaxPagesPerSession) {
+    const maxPages = Number(settingMaxPagesPerSession.value);
+    if (
+      !Number.isInteger(maxPages) ||
+      maxPages < 1 ||
+      maxPages > 500
+    ) {
+      setMessage('Max pages per session must be a whole number between 1 and 500.');
+      return;
+    }
+    payload.printLimits = {
+      maxPagesPerSession: maxPages,
+    };
+  }
+
+  // Kiosk Availability & UI Blocking
+  if (settingUiBlockingEnabled && settingUiBlockingMode) {
+    const modeVal = settingUiBlockingMode.value;
+    if (
+      modeVal !== 'maintenance' &&
+      modeVal !== 'needs_admin' &&
+      modeVal !== 'out_of_service'
+    ) {
+      setMessage(
+        'UI blocking mode must be "maintenance", "needs_admin", or "out_of_service".',
+      );
+      return;
+    }
+    const customMessageVal = settingUiBlockingMessage?.value.trim() ?? '';
+    if (customMessageVal.length > 250) {
+      setMessage('UI blocking custom message cannot exceed 250 characters.');
+      return;
+    }
+    payload.uiBlocking = {
+      enabled: settingUiBlockingEnabled.checked,
+      mode: modeVal as 'maintenance' | 'needs_admin' | 'out_of_service',
+      customMessage: customMessageVal,
+    };
+  }
+
+  // Scanner & ADF Resolution Settings
+  if (
+    settingCopyGlassDpi &&
+    settingCopyAdfDpi &&
+    settingScanGlassDpi &&
+    settingScanAdfDpi
+  ) {
+    const copyGlass = Number(settingCopyGlassDpi.value);
+    const copyAdf = Number(settingCopyAdfDpi.value);
+    const scanGlass = Number(settingScanGlassDpi.value);
+    const scanAdf = Number(settingScanAdfDpi.value);
+    const validDpis = [150, 300, 600];
+    if (
+      !validDpis.includes(copyGlass) ||
+      !validDpis.includes(copyAdf) ||
+      !validDpis.includes(scanGlass) ||
+      !validDpis.includes(scanAdf)
+    ) {
+      setMessage('Scanner DPI resolutions must be 150, 300, or 600.');
+      return;
+    }
+    payload.scannerDpi = {
+      copyGlass: copyGlass as 150 | 300 | 600,
+      copyAdf: copyAdf as 150 | 300 | 600,
+      scanGlass: scanGlass as 150 | 300 | 600,
+      scanAdf: scanAdf as 150 | 300 | 600,
+    };
+  }
+
+  // Developer Testing Mode
+  if (settingDeveloperModeEnabled) {
+    const devModeEnabled = settingDeveloperModeEnabled.checked;
+    if (devModeEnabled && !currentDeveloperModeEnabled) {
+      const confirmed = window.confirm(
+        'Enabling Developer Testing Mode will tag transactions as test environment and isolate them from production earnings. Proceed?',
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    payload.developerMode = {
+      enabled: devModeEnabled,
+    };
+  }
+
   const alertPayload =
     alertSeverityThreshold !== null ? buildAlertPayload() : null;
 
   setMessage('Saving settings...');
 
   const settingsFetch = apiFetch('/api/admin/settings', {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
   const alertsFetch = alertPayload

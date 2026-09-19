@@ -63,7 +63,14 @@ import {
   validateScanFilenameFormatSettings,
 } from '@/services/scan-filename';
 import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
-import type { AlertSettings, PipelineSettings } from './admin.schema';
+import type {
+  AlertSettings,
+  PipelineSettings,
+  PrintLimitsSettings,
+  UiBlockingSettings,
+  ScannerDpiSettings,
+  DeveloperModeSettings,
+} from './admin.schema';
 
 export const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
   malwareScanningEnabled: true,
@@ -406,6 +413,10 @@ export class AdminController {
   private readonly receiptService: ReceiptService;
   private readonly deps: AdminControllerDeps;
 
+  public get io(): SocketIOServer | undefined {
+    return this.deps?.io;
+  }
+
   constructor(
     adminService: AdminService,
     consumablesService: ConsumablesService,
@@ -426,6 +437,11 @@ export class AdminController {
       requireAdminLocalAccess,
       adminAuthRateLimit,
       this.handleAuth,
+    );
+    this.router.post(
+      '/verify-pin',
+      requireAdminLocalAccess,
+      this.handleVerifyPin,
     );
     this.router.post(
       '/logout',
@@ -515,6 +531,12 @@ export class AdminController {
       this.handleGetSettings,
     );
     this.router.put(
+      '/settings',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleUpdateSettings,
+    );
+    this.router.patch(
       '/settings',
       requireAdminLocalAccess,
       requireAdminPin,
@@ -781,6 +803,63 @@ export class AdminController {
     });
 
     return res.json({ ok: true });
+  };
+
+  private handleVerifyPin = async (req: Request, res: Response) => {
+    const pin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
+
+    if (!pin) {
+      return res.status(401).json({ valid: false, error: 'Invalid PIN' });
+    }
+
+    const storedPin = db.data?.settings?.adminPin;
+    if (!storedPin) {
+      return res
+        .status(500)
+        .json({ valid: false, error: 'Settings not initialized' });
+    }
+
+    let valid = false;
+    try {
+      valid = await verifyPassword(storedPin, pin);
+    } catch {
+      valid = storedPin === pin;
+    }
+    if (!valid && storedPin === pin) {
+      valid = true;
+    }
+
+    if (!valid) {
+      return res.status(401).json({ valid: false, error: 'Invalid PIN' });
+    }
+
+    const sessionToken = createAdminSession();
+    res.cookie('adminToken', sessionToken, {
+      httpOnly: true,
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    if (req.body?.action === 'disable_ui_blocking') {
+      if (!db.data!.settings.uiBlocking) {
+        db.data!.settings.uiBlocking = {
+          enabled: false,
+          mode: 'maintenance',
+          customMessage: '',
+        };
+      } else {
+        db.data!.settings.uiBlocking.enabled = false;
+      }
+      await db.write();
+      this.io?.emit('uiBlockingChanged', db.data!.settings.uiBlocking);
+      await this.adminService.appendAdminLog(
+        'ui_blocking_disabled',
+        'UI blocking mode disabled via staff unlock.',
+      );
+      return res.json({ valid: true, disabled: true, token: sessionToken });
+    }
+
+    return res.json({ valid: true, token: sessionToken });
   };
 
   private handleLogout = async (_req: Request, res: Response) => {
@@ -1337,6 +1416,30 @@ export class AdminController {
     if (!settings.pipelineSettings) {
       settings.pipelineSettings = { ...DEFAULT_PIPELINE_SETTINGS };
     }
+    if (!settings.printLimits) {
+      settings.printLimits = { maxPagesPerSession: 30 };
+    }
+    if (!settings.uiBlocking) {
+      settings.uiBlocking = {
+        enabled: false,
+        mode: 'maintenance',
+        customMessage: '',
+      };
+    }
+    if (!settings.scannerDpi) {
+      settings.scannerDpi = {
+        copyGlass: 300,
+        copyAdf: 300,
+        scanGlass: 300,
+        scanAdf: 300,
+      };
+    }
+    if (!settings.developerMode) {
+      settings.developerMode = {
+        enabled: false,
+        environmentTag: 'test',
+      };
+    }
     res.json(settings);
   };
 
@@ -1394,7 +1497,7 @@ export class AdminController {
         >;
       };
       scanFilenameFormat?: unknown;
-    pricingEngine?: {
+      pricingEngine?: {
         paperProfiles?: {
           a4?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number };
           shortBond?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number };
@@ -1407,6 +1510,23 @@ export class AdminController {
         }[];
         rounding?: 'whole_peso_total_only';
         highQualitySurcharge?: number;
+      };
+      printLimits?: {
+        maxPagesPerSession?: number;
+      };
+      uiBlocking?: {
+        enabled?: boolean;
+        mode?: 'maintenance' | 'needs_admin' | 'out_of_service';
+        customMessage?: string;
+      };
+      scannerDpi?: {
+        copyGlass?: number;
+        copyAdf?: number;
+        scanGlass?: number;
+        scanAdf?: number;
+      };
+      developerMode?: {
+        enabled?: boolean;
       };
     };
 
@@ -1532,6 +1652,28 @@ export class AdminController {
       pipelineSettings: {
         ...DEFAULT_PIPELINE_SETTINGS,
         ...(originalSettings.pipelineSettings || {}),
+      },
+      printLimits: {
+        maxPagesPerSession: 30,
+        ...(originalSettings.printLimits || {}),
+      },
+      uiBlocking: {
+        enabled: false,
+        mode: 'maintenance' as const,
+        customMessage: '',
+        ...(originalSettings.uiBlocking || {}),
+      },
+      scannerDpi: {
+        copyGlass: 300 as const,
+        copyAdf: 300 as const,
+        scanGlass: 300 as const,
+        scanAdf: 300 as const,
+        ...(originalSettings.scannerDpi || {}),
+      },
+      developerMode: {
+        enabled: false,
+        environmentTag: 'test' as const,
+        ...(originalSettings.developerMode || {}),
       },
     };
 
@@ -2199,8 +2341,149 @@ export class AdminController {
       nextSettings.scanFilenameFormat = parsedFormat.value;
     }
 
+    if (body.printLimits !== undefined) {
+      if (
+        typeof body.printLimits !== 'object' ||
+        body.printLimits === null ||
+        Array.isArray(body.printLimits)
+      ) {
+        return res.status(400).json({
+          error: 'printLimits must be an object.',
+        });
+      }
+      if (body.printLimits.maxPagesPerSession !== undefined) {
+        const maxPages = body.printLimits.maxPagesPerSession;
+        if (
+          !isFiniteNumber(maxPages) ||
+          !Number.isInteger(maxPages) ||
+          maxPages < 1 ||
+          maxPages > 500
+        ) {
+          return res.status(400).json({
+            error:
+              'printLimits.maxPagesPerSession must be a whole number between 1 and 500.',
+          });
+        }
+        nextSettings.printLimits.maxPagesPerSession = maxPages;
+      }
+    }
+
+    let uiBlockingModified = false;
+    if (body.uiBlocking !== undefined) {
+      if (
+        typeof body.uiBlocking !== 'object' ||
+        body.uiBlocking === null ||
+        Array.isArray(body.uiBlocking)
+      ) {
+        return res.status(400).json({
+          error: 'uiBlocking must be an object.',
+        });
+      }
+      const incoming = body.uiBlocking;
+      if (incoming.enabled !== undefined) {
+        if (typeof incoming.enabled !== 'boolean') {
+          return res.status(400).json({
+            error: 'uiBlocking.enabled must be boolean.',
+          });
+        }
+        nextSettings.uiBlocking.enabled = incoming.enabled;
+      }
+      if (incoming.mode !== undefined) {
+        if (
+          incoming.mode !== 'maintenance' &&
+          incoming.mode !== 'needs_admin' &&
+          incoming.mode !== 'out_of_service'
+        ) {
+          return res.status(400).json({
+            error:
+              'uiBlocking.mode must be "maintenance", "needs_admin", or "out_of_service".',
+          });
+        }
+        nextSettings.uiBlocking.mode = incoming.mode;
+      }
+      if (incoming.customMessage !== undefined) {
+        if (
+          typeof incoming.customMessage !== 'string' ||
+          incoming.customMessage.length > 250
+        ) {
+          return res.status(400).json({
+            error:
+              'uiBlocking.customMessage must be a string up to 250 characters.',
+          });
+        }
+        nextSettings.uiBlocking.customMessage = incoming.customMessage;
+      }
+      uiBlockingModified = true;
+    }
+
+    if (body.scannerDpi !== undefined) {
+      if (
+        typeof body.scannerDpi !== 'object' ||
+        body.scannerDpi === null ||
+        Array.isArray(body.scannerDpi)
+      ) {
+        return res.status(400).json({
+          error: 'scannerDpi must be an object.',
+        });
+      }
+      const dpiFields: Array<keyof ScannerDpiSettings> = [
+        'copyGlass',
+        'copyAdf',
+        'scanGlass',
+        'scanAdf',
+      ];
+      for (const field of dpiFields) {
+        const val = body.scannerDpi[field];
+        if (val !== undefined) {
+          if (val !== 150 && val !== 300 && val !== 600) {
+            return res.status(400).json({
+              error: `scannerDpi.${field} must be 150, 300, or 600.`,
+            });
+          }
+          nextSettings.scannerDpi[field] = val;
+        }
+      }
+    }
+
+    if (body.developerMode !== undefined) {
+      if (
+        typeof body.developerMode !== 'object' ||
+        body.developerMode === null ||
+        Array.isArray(body.developerMode)
+      ) {
+        return res.status(400).json({
+          error: 'developerMode must be an object.',
+        });
+      }
+      if (body.developerMode.enabled !== undefined) {
+        if (typeof body.developerMode.enabled !== 'boolean') {
+          return res.status(400).json({
+            error: 'developerMode.enabled must be boolean.',
+          });
+        }
+        nextSettings.developerMode.enabled = body.developerMode.enabled;
+      }
+      nextSettings.developerMode.environmentTag = 'test';
+    }
+
+    const isUiBlockingModified =
+      uiBlockingModified ||
+      nextSettings.uiBlocking.enabled !== originalSettings.uiBlocking?.enabled ||
+      nextSettings.uiBlocking.mode !== originalSettings.uiBlocking?.mode ||
+      nextSettings.uiBlocking.customMessage !==
+        originalSettings.uiBlocking?.customMessage;
+
     db.data!.settings = nextSettings;
     await db.write();
+
+    if (isUiBlockingModified) {
+      this.io?.emit('uiBlockingChanged', nextSettings.uiBlocking);
+    }
+    this.io?.emit('systemSettingsChanged', {
+      printLimits: nextSettings.printLimits,
+      scannerDpi: nextSettings.scannerDpi,
+      developerMode: nextSettings.developerMode,
+    });
     if (refreshConsumablesAlerts) {
       await this.consumablesService.evaluateAndPublishForecastAlerts();
     }

@@ -94,9 +94,9 @@ export class PageController {
     );
     this.router.get('/kiosk/bootstrap', this.handleBootstrap.bind(this));
 
-    // Public endpoint to get idle timeout configuration (for client-side idle detection)
+    // Public endpoint to get idle timeout and kiosk settings configuration (for client-side idle detection and scanner config)
     this.router.get(
-      '/api/settings/idle-timeout',
+      ['/api/settings/idle-timeout', '/api/page/settings'],
       this.handleIdleTimeout.bind(this),
     );
 
@@ -211,7 +211,27 @@ export class PageController {
   private handleIdleTimeout(_req: Request, res: Response): void {
     const { idleTimeoutSeconds, idleScreenTimeoutSeconds } =
       db.data!.settings;
-    res.json({ idleTimeoutSeconds, idleScreenTimeoutSeconds });
+    res.json({
+      idleTimeoutSeconds,
+      idleScreenTimeoutSeconds,
+      maxPagesPerSession:
+        db.data?.settings?.printLimits?.maxPagesPerSession ?? 30,
+      uiBlocking:
+        db.data?.settings?.uiBlocking ?? {
+          enabled: false,
+          mode: 'maintenance',
+          customMessage: '',
+        },
+      developerMode: {
+        enabled: Boolean(db.data?.settings?.developerMode?.enabled),
+      },
+      scannerDpi: db.data?.settings?.scannerDpi ?? {
+        copyGlass: 300,
+        copyAdf: 300,
+        scanGlass: 300,
+        scanAdf: 300,
+      },
+    });
   }
 
   private handleAdminRedirect(_req: Request, res: Response): void {

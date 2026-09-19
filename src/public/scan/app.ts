@@ -7,10 +7,12 @@ import {
   type PdfLoadingTask,
 } from '../shared/pdfjs-loading-task-cleanup';
 import { getScanTroubleshootingGuide } from './troubleshooting';
+import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 
 export {};
 
 void initKioskLocalization();
+attachUiBlockingOverlay();
 
 // ── Idle Timeout with Warning Modal (Scan Page) ───────────────────────────────────────────────
 
@@ -184,9 +186,70 @@ let scanFilename: string | null = null;
 let scanReleaseToken: string | null = null;
 let scanDocumentPrice = 5;
 
+interface ScannerDpiSettings {
+  copyGlass: 150 | 300 | 600;
+  copyAdf: 150 | 300 | 600;
+  scanGlass: 150 | 300 | 600;
+  scanAdf: 150 | 300 | 600;
+}
+
+let configuredScannerDpi: ScannerDpiSettings | null = null;
+
 const SCAN_SOURCE: ScanSource = 'feeder';
 const SCAN_COLOR: ScanColor = 'color';
-const SCAN_DPI: ScanDpi = '300';
+let SCAN_DPI: ScanDpi = '300';
+
+function getSelectedScanSource(): ScanSource {
+  const checked = document.querySelector<HTMLInputElement>(
+    'input[name="scanSource"]:checked, input[name="source"]:checked, input[name="scanSourceType"]:checked',
+  );
+  if (checked?.value === 'glass' || checked?.value === 'flatbed') {
+    return 'glass';
+  }
+  if (checked?.value === 'feeder' || checked?.value === 'adf') {
+    return 'feeder';
+  }
+  return SCAN_SOURCE;
+}
+
+function resolveScanDpi(source: ScanSource = getSelectedScanSource()): ScanDpi {
+  const isAdf = source === 'feeder';
+  const dpi = isAdf
+    ? (configuredScannerDpi?.scanAdf ?? 300)
+    : (configuredScannerDpi?.scanGlass ?? 300);
+  const dpiStr = String(dpi);
+  if (dpiStr === '150' || dpiStr === '300' || dpiStr === '600') {
+    return dpiStr;
+  }
+  return '300';
+}
+
+async function loadScannerSettings(): Promise<void> {
+  try {
+    const res = await fetch('/api/settings/idle-timeout');
+    if (res.ok) {
+      const data = (await res.json()) as {
+        scannerDpi?: ScannerDpiSettings;
+      };
+      if (data?.scannerDpi) {
+        configuredScannerDpi = data.scannerDpi;
+        SCAN_DPI = resolveScanDpi();
+      }
+    }
+  } catch (err) {
+    console.warn('[SCAN] Could not fetch scanner settings:', err);
+  }
+}
+
+void loadScannerSettings();
+
+document.querySelectorAll<HTMLInputElement>(
+  'input[name="scanSource"], input[name="source"], input[name="scanSourceType"]',
+).forEach((radio) => {
+  radio.addEventListener('change', () => {
+    SCAN_DPI = resolveScanDpi();
+  });
+});
 
 const scanSourcePaperSizeRadios = document.querySelectorAll<HTMLInputElement>(
   'input[name="scanSourcePaperSize"]',
@@ -648,11 +711,13 @@ async function startScan(): Promise<void> {
   }, 1200);
 
   try {
+    const selectedSource = getSelectedScanSource();
+    SCAN_DPI = resolveScanDpi(selectedSource);
     const res = await fetch('/api/scanner/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        source: SCAN_SOURCE,
+        source: selectedSource,
         color: SCAN_COLOR,
         dpi: SCAN_DPI,
         paperSize,
@@ -822,7 +887,7 @@ proceedBtn.addEventListener('click', () => {
 });
 
 async function initializeScanPage(): Promise<void> {
-  await loadPricing();
+  await Promise.all([loadPricing(), loadScannerSettings()]);
   const restored = await restoreScanPreviewFromSession();
   if (restored) return;
 

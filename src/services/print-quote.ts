@@ -1,5 +1,5 @@
 import { adminService } from './admin';
-import type { ColorMode, PrintQuality } from './db';
+import { db, type ColorMode, type PrintQuality } from './db';
 import type { DocumentAnalysis } from './session';
 
 type PageRangeSelectionPayload =
@@ -42,7 +42,7 @@ export interface PrintQuoteResult {
 
 export type PrintQuoteComputation =
   | { ok: true; quote: PrintQuoteResult }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: string };
 
 function normalizeRangeString(raw: string): string | null {
   const compact = raw.replace(/\s+/g, '');
@@ -187,7 +187,8 @@ export function buildPrintQuote(input: {
   duplex?: boolean;
   quality?: PrintQuality;
 }): PrintQuoteComputation {
-  const safeCopies = Math.min(30, Math.max(1, Math.floor(input.copies)));
+  const maxPages = db.data?.settings?.printLimits?.maxPagesPerSession ?? 30;
+  const safeCopies = Math.min(maxPages, Math.max(1, Math.floor(input.copies)));
   const parsedRange = parsePageRange(input.pageRange);
   if (parsedRange.error) {
     return { ok: false, error: parsedRange.error };
@@ -267,17 +268,20 @@ export function buildPrintQuote(input: {
     };
   }
 
-  if (selectedCount > 30) {
+  if (selectedCount > maxPages) {
     return {
       ok: false,
-      error: 'Maximum 30 printed pages allowed per job.',
+      code: 'PAGE_LIMIT_EXCEEDED',
+      error: `Maximum ${maxPages} printed pages allowed per job.`,
     };
   }
 
-  if (selectedCount * safeCopies > 30) {
+  const totalBillablePages = selectedCount * safeCopies;
+  if (totalBillablePages > maxPages) {
     return {
       ok: false,
-      error: `Job exceeds maximum length of 30 pages (requested ${selectedCount * safeCopies} pages).`,
+      code: 'PAGE_LIMIT_EXCEEDED',
+      error: `Job exceeds maximum length of ${maxPages} pages (requested ${totalBillablePages} pages).`,
     };
   }
 

@@ -1,0 +1,86 @@
+PrintBit Terms and Conditions
+Effective Date: September 19, 2026
+
+Welcome to PrintBit, a coin-operated self-service document printing kiosk. By proceeding with a transaction, you agree to these Terms and Conditions and the PrintBit Privacy Notice.
+
+1. Service Description
+PrintBit is a self-service kiosk that lets you upload a document and print it on-site. Services include:
+
+Document upload and printing
+Automatic page count and cost calculation, including color/black-and-white classification
+Coin-based payment, including change dispensing where applicable
+Transaction receipts (reference format: PB-YYYYMMDD-XXXX)
+Error reporting and dispute submission via QR code for failed or interrupted print jobs
+Available services depend on the current configuration and condition of the kiosk unit.
+
+2. Customer Responsibilities
+Before confirming a transaction, you are responsible for:
+
+Uploading the correct file
+Verifying page range, number of copies, and print settings (color/grayscale, paper size)
+Reviewing the calculated cost shown on the confirmation screen before inserting payment
+Ensuring you have the right to reproduce, copy, or print the submitted material
+Collecting your printed documents and any personal belongings from the kiosk
+PrintBit cannot verify ownership or usage rights of any uploaded file. Responsibility for lawful use of submitted content rests with the customer.
+
+3. Accepted Files
+PrintBit accepts file formats supported by the current system version. All uploaded files are automatically scanned for malware and validated before processing.
+
+Files that are corrupted, unsupported, password-protected, unreadable, or flagged during security scanning will be rejected and are not eligible for printing.
+File size and page limits may apply and will be indicated on the kiosk interface.
+Rejected files are not stored beyond what is needed to complete the rejection and are handled per the PrintBit Privacy Notice.
+
+4. Prohibited Use
+You must not use PrintBit to:
+
+Print, reproduce, or distribute material you are not authorized to use
+Print material that violates applicable law or, where PrintBit is deployed on institutional premises, that institution's applicable policies
+Attempt to access, copy, or interfere with another customer's files, transaction data, or receipts
+Tamper with, bypass, or interfere with the kiosk's coin mechanism, hardware, network, or software
+Violations may result in transaction cancellation and, where applicable, reporting to the kiosk administrator or relevant authority.
+
+5. Pricing and Payment
+The cost of your print job is calculated automatically (based on page count and color/black-and-white classification) and displayed before you insert payment.
+PrintBit accepts coins via its coin acceptor. Accepted denominations are indicated on the kiosk.
+Once the required payment threshold is met, the coin slot locks and the transaction proceeds automatically.
+If a payment is inserted and the coin mechanism jams, fails to register, or the kiosk cannot dispense correct change, the transaction will be flagged for review. Do not attempt to retrieve inserted coins yourself — report the issue via the on-screen dispute flow or to kiosk support.
+Overpayment, where change dispensing is supported, will be returned via the coin hopper. If the hopper cannot dispense exact change, the transaction will be held for administrator resolution rather than completed with incorrect change.
+
+6. Printing Failures and Disputes
+PrintBit distinguishes between errors caused by customer input and errors caused by the system:
+
+Customer-selected errors (wrong file, wrong page range, wrong number of copies, wrong print settings) are not eligible for refund once the transaction is confirmed and printing has started.
+
+System or equipment errors — including but not limited to paper jams, paper-out conditions, printer hardware faults, or an interrupted job — will be surfaced on the confirmation screen with a dispute QR code. Scanning this code lets you report the failed transaction for review.
+
+Refunds, reprints, or other remedies for verified system errors will be handled according to PrintBit's active refund policy at the deployment site and are subject to administrator assessment.
+
+7. Equipment and Service Availability
+PrintBit depends on the availability of its printer, coin mechanism, network connection, and kiosk software. Service may be interrupted or unavailable due to:
+
+Printer hardware issues or consumable depletion (paper, ink)
+Coin acceptor or hopper faults
+Network or WiFi connectivity issues
+Scheduled maintenance or system updates
+Power interruption
+PrintBit does not guarantee uninterrupted availability.
+
+8. Privacy and Data Handling
+Use of PrintBit involves processing information necessary to complete your transaction — including uploaded files, transaction and receipt records, and, where applicable, device or session information. This is handled under the separate PrintBit Privacy Notice, consistent with the Philippine Data Privacy Act (RA 10173), covering purpose of processing, retention periods, and your rights as a data subject.
+
+Uploaded files are retained only as long as necessary to complete printing and are not shared beyond what is required to operate the service.
+
+9. Unauthorized Access
+Users must not attempt to access, copy, modify, or disclose another customer's uploaded files, transaction records, or receipts. Attempts to interfere with kiosk security may result in transaction termination and reporting to the kiosk administrator.
+
+10. Limitation of Responsibility
+PrintBit is provided on an "as-available" basis. While reasonable efforts are made to ensure correct and reliable operation, PrintBit is not responsible for:
+
+Errors resulting from customer-selected file, settings, or print options
+Files the customer was not authorized to print
+Delays or failures caused by hardware, network, or power conditions outside PrintBit's control
+Documents left uncollected at the kiosk
+Nothing in these Terms limits rights or remedies that cannot be excluded under applicable Philippine law.
+
+11. Changes to These Terms
+These Terms may be updated to reflect changes in PrintBit's services or operating policies. The current version is available on the kiosk at time of transaction.
