@@ -44,6 +44,7 @@ function syncFabVisibility(): void {
   const isFeedbackOpen = Boolean(document.getElementById('feedbackOverlay')?.classList.contains('is-visible'));
   const isWifiOpen = Boolean(document.getElementById('wifiOverlay')?.classList.contains('is-visible'));
   const isAdminOpen = Boolean(document.getElementById('adminOverlay')?.classList.contains('is-visible'));
+  const isReceiptPromptOpen = Boolean(document.getElementById('receiptPromptOverlay')?.classList.contains('is-visible'));
   const isIdleAttractorOpen = Boolean(
     document.getElementById('idleOverlay')?.classList.contains('is-visible') ||
     document.documentElement.classList.contains('kiosk-boot-idle')
@@ -62,6 +63,7 @@ function syncFabVisibility(): void {
     isFeedbackOpen ||
     isWifiOpen ||
     isAdminOpen ||
+    isReceiptPromptOpen ||
     isIdleAttractorOpen ||
     isIdleWarningOpen;
 
@@ -193,11 +195,100 @@ window.addEventListener('pagehide', (event) => {
   }
 });
 
-openPrint?.addEventListener('click', () => {
-  navigateTo('/print');
+// ── Optional Transaction Receipt Prompt ──────────────────────────────────────
+
+const receiptPromptOverlay = document.getElementById('receiptPromptOverlay');
+const receiptPromptYesBtn = document.getElementById('receiptPromptYesBtn');
+const receiptPromptNoBtn = document.getElementById('receiptPromptNoBtn');
+const receiptPromptCancelBtn = document.getElementById('receiptPromptCancelBtn');
+const receiptPromptProgress = document.getElementById('receiptPromptProgress');
+
+let pendingPrintMethodDestination: string | null = null;
+let receiptPromptTimeout: ReturnType<typeof setTimeout> | null = null;
+const RECEIPT_PROMPT_TIMEOUT_MS = 15000;
+
+function closeReceiptPrompt(): void {
+  if (receiptPromptTimeout) {
+    clearTimeout(receiptPromptTimeout);
+    receiptPromptTimeout = null;
+  }
+  pendingPrintMethodDestination = null;
+  if (receiptPromptOverlay) {
+    receiptPromptOverlay.classList.remove('is-visible');
+    receiptPromptOverlay.setAttribute('aria-hidden', 'true');
+  }
+  if (receiptPromptProgress) {
+    receiptPromptProgress.style.transition = 'none';
+    receiptPromptProgress.style.width = '100%';
+  }
+  syncFabVisibility();
+}
+
+function selectReceiptPreferenceAndNavigate(preference: 'yes' | 'no'): void {
+  const destination = pendingPrintMethodDestination;
+  closeReceiptPrompt();
+  if (!destination) return;
+  try {
+    sessionStorage.setItem('printbit.receiptPreference', preference);
+  } catch {
+    // Best-effort storage
+  }
+  navigateTo(destination);
+}
+
+function promptReceiptChoice(destination: string): void {
+  pendingPrintMethodDestination = destination;
+  if (!receiptPromptOverlay) {
+    try {
+      sessionStorage.setItem('printbit.receiptPreference', 'yes');
+    } catch {}
+    navigateTo(destination);
+    return;
+  }
+
+  receiptPromptOverlay.classList.add('is-visible');
+  receiptPromptOverlay.setAttribute('aria-hidden', 'false');
+  syncFabVisibility();
+
+  if (receiptPromptProgress) {
+    receiptPromptProgress.style.transition = 'none';
+    receiptPromptProgress.style.width = '100%';
+    void receiptPromptProgress.offsetHeight;
+    receiptPromptProgress.style.transition = `width ${RECEIPT_PROMPT_TIMEOUT_MS}ms linear`;
+    receiptPromptProgress.style.width = '0%';
+  }
+
+  if (receiptPromptTimeout) clearTimeout(receiptPromptTimeout);
+  receiptPromptTimeout = setTimeout(() => {
+    closeReceiptPrompt();
+  }, RECEIPT_PROMPT_TIMEOUT_MS);
+}
+
+receiptPromptYesBtn?.addEventListener('click', () => {
+  selectReceiptPreferenceAndNavigate('yes');
 });
-openCopy?.addEventListener('click', () => navigateTo('/copy'));
-openScan?.addEventListener('click', () => navigateTo('/scan'));
+receiptPromptNoBtn?.addEventListener('click', () => {
+  selectReceiptPreferenceAndNavigate('no');
+});
+receiptPromptCancelBtn?.addEventListener('click', () => {
+  closeReceiptPrompt();
+});
+receiptPromptOverlay?.addEventListener('click', (event) => {
+  if (event.target === receiptPromptOverlay) {
+    closeReceiptPrompt();
+  }
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && receiptPromptOverlay?.classList.contains('is-visible')) {
+    closeReceiptPrompt();
+  }
+});
+
+openPrint?.addEventListener('click', () => {
+  promptReceiptChoice('/print');
+});
+openCopy?.addEventListener('click', () => promptReceiptChoice('/copy'));
+openScan?.addEventListener('click', () => promptReceiptChoice('/scan'));
 
 // ── Hotspot Wi-Fi connection modal (Public ESP32 Hotspot) ─────────────────────
 

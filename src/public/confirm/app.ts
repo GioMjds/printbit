@@ -71,6 +71,7 @@ void initializePageIdleTimeout({
     sessionStorage.removeItem('printbit.copyPreviewReleaseToken');
     sessionStorage.removeItem('printbit.sessionId');
     sessionStorage.removeItem('printbit.sessionToken');
+    sessionStorage.removeItem('printbit.receiptPreference');
     navigateWithKioskMotion('/', 'replace');
   },
 });
@@ -1868,9 +1869,25 @@ async function pollCopyJobReceipt(jobId: string): Promise<void> {
   }
 }
 
+function isReceiptRequested(): boolean {
+  try {
+    const pref = sessionStorage.getItem('printbit.receiptPreference');
+    return pref !== 'no';
+  } catch {
+    return true;
+  }
+}
+
 function renderReceiptCta(): void {
+  if (!isReceiptRequested()) {
+    receiptCtaContainer?.setAttribute('hidden', '');
+    return;
+  }
   const receipt = confirmationOutcome.receipt;
-  if (!receiptCtaContainer || !receiptQrCanvas || !receipt) return;
+  if (!receiptCtaContainer || !receiptQrCanvas || !receipt) {
+    receiptCtaContainer?.setAttribute('hidden', '');
+    return;
+  }
   receiptCtaContainer.removeAttribute('hidden');
   if (receiptQrExpiry) {
     if (receipt.expiresAt) {
@@ -2092,10 +2109,15 @@ function finalizePrintSuccess(
     }
   }
 
+  const receiptWanted = isReceiptRequested();
   if (config.mode === 'scan') {
     collectionCallout?.setAttribute('hidden', '');
     if (thankYouModalSheet) {
-      thankYouModalSheet.classList.add('modal-sheet--dual-qr');
+      if (receiptWanted) {
+        thankYouModalSheet.classList.add('modal-sheet--dual-qr');
+      } else {
+        thankYouModalSheet.classList.remove('modal-sheet--dual-qr');
+      }
     }
     renderScanDownloadCta();
     renderReceiptCta();
@@ -2108,6 +2130,10 @@ function finalizePrintSuccess(
       scanDownloadCtaContainer.setAttribute('hidden', '');
     }
     renderReceiptCta();
+  }
+
+  if (!receiptWanted && config.mode !== 'scan') {
+    confirmWifiHelpBtn?.setAttribute('hidden', '');
   }
 
   showOverlay(thankYouOverlay);
@@ -2356,6 +2382,7 @@ function clearConfirmSessionStorage(): void {
   sessionStorage.removeItem('printbit.uploadedDocumentId');
   sessionStorage.removeItem('printbit.sessionId');
   sessionStorage.removeItem('printbit.sessionToken');
+  sessionStorage.removeItem('printbit.receiptPreference');
 }
 
 async function checkRemainingFilesAndPrompt(): Promise<void> {
