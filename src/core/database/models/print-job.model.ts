@@ -75,7 +75,7 @@ export class PrintJobSqliteStore {
            SET state = ?, attempts_json = ?, updated_at = ?
            WHERE job_id = ?`,
         )
-         .run(state, attemptsJson, updatedAt, jobId);
+        .run(state, attemptsJson, updatedAt, jobId);
     } else {
       getSqliteDb()
         .prepare(
@@ -83,7 +83,7 @@ export class PrintJobSqliteStore {
            SET state = ?, updated_at = ?
            WHERE job_id = ?`,
         )
-         .run(state, updatedAt, jobId);
+        .run(state, updatedAt, jobId);
     }
   }
 
@@ -108,6 +108,73 @@ export class PrintJobSqliteStore {
 
   deleteJob(jobId: string): void {
     getSqliteDb().prepare('DELETE FROM print_jobs WHERE job_id = ?').run(jobId);
+  }
+
+  getJobByTransactionId(transactionId: string): PrintJobEntry | null {
+    const row = getSqliteDb()
+      .prepare(
+        `SELECT
+          job_id,
+          transaction_id,
+          state,
+          payload_json,
+          attempts_json,
+          created_at,
+          updated_at
+         FROM print_jobs
+         WHERE transaction_id = ?
+         ORDER BY created_at DESC
+         LIMIT 1`,
+      )
+      .get(transactionId) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return this.toEntry(row);
+  }
+
+  listAllJobs(limit = 1000): PrintJobEntry[] {
+    const rows = getSqliteDb()
+      .prepare(
+        `SELECT
+          job_id,
+          transaction_id,
+          state,
+          payload_json,
+          attempts_json,
+          created_at,
+          updated_at
+         FROM print_jobs
+         ORDER BY created_at DESC
+         LIMIT ?`,
+      )
+      .all(limit) as Array<Record<string, unknown>>;
+    return rows.map((row) => this.toEntry(row));
+  }
+
+  getJobStats(): { total: number; print: number; copy: number; scan: number } {
+    const rows = getSqliteDb()
+      .prepare(`SELECT payload_json FROM print_jobs WHERE state = 'printed'`)
+      .all() as Array<{ payload_json: string }>;
+    let print = 0;
+    let copy = 0;
+    let scan = 0;
+    for (const r of rows) {
+      try {
+        const p = JSON.parse(r.payload_json);
+        const mode = p.request?.mode || p.mode;
+        if (mode === 'print') print += 1;
+        else if (mode === 'copy') copy += 1;
+        else if (mode === 'scan') scan += 1;
+        else print += 1;
+      } catch {
+        print += 1;
+      }
+    }
+    return {
+      total: print + copy + scan,
+      print,
+      copy,
+      scan,
+    };
   }
 
   private toEntry(row: Record<string, unknown>): PrintJobEntry {

@@ -11,7 +11,11 @@ import type {
   ReportIssueSessionEntry,
 } from './db';
 
-const SQLITE_FILE_PATH = path.resolve('printbit.sqlite');
+const SQLITE_FILE_PATH =
+  process.env.PRINTBIT_SQLITE_PATH ??
+  (process.env.NODE_ENV === 'test'
+    ? path.resolve('printbit-test.sqlite')
+    : path.resolve('printbit.sqlite'));
 const LOWDB_IMPORT_META_KEY = 'lowdb_import_v1';
 const SCHEMA_SNAPSHOT_META_KEY = 'schema_snapshot_v1';
 const RUNTIME_STATE_ROW_ID = 1;
@@ -391,6 +395,24 @@ function ensureSchema(db: DatabaseSync): void {
       source_timestamp_utc TEXT,
       received_timestamp_utc TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS transaction_reconciliation (
+      transaction_id TEXT PRIMARY KEY,
+      job_id TEXT,
+      created_at TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'print',
+      required_amount REAL NOT NULL DEFAULT 0,
+      verified_amount REAL NOT NULL DEFAULT 0,
+      reconciliation_status TEXT NOT NULL DEFAULT 'JOB_ONLY',
+      payment_evidence TEXT NOT NULL DEFAULT 'none',
+      change_dispensed REAL NOT NULL DEFAULT 0,
+      receipt_id TEXT,
+      details_json TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_txn_rec_status
+      ON transaction_reconciliation(reconciliation_status);
+    CREATE INDEX IF NOT EXISTS idx_txn_rec_created_at
+      ON transaction_reconciliation(created_at DESC);
   `);
 
   const wirelessDocumentColumnRows = db
@@ -678,6 +700,36 @@ export function getSqliteDb(): DatabaseSync {
   }
   return sqliteDb;
 }
+
+export function getAuthoritativeCoinStats(): {
+  one: number;
+  five: number;
+  ten: number;
+  twenty: number;
+} {
+  const db = getSqliteDb();
+  const rows = db
+    .prepare(
+      'SELECT coin_value, COUNT(*) AS c FROM coin_bridge_events GROUP BY coin_value',
+    )
+    .all() as Array<{ coin_value: number; c: number }>;
+  const stats = { one: 0, five: 0, ten: 0, twenty: 0 };
+  for (const r of rows) {
+    if (r.coin_value === 1) stats.one = r.c;
+    else if (r.coin_value === 5) stats.five = r.c;
+    else if (r.coin_value === 10) stats.ten = r.c;
+    else if (r.coin_value === 20) stats.twenty = r.c;
+  }
+  return stats;
+}
+
+export {
+  TransactionReconciliationSqliteStore,
+  transactionReconciliationStore,
+  type TransactionReconciliationEntry,
+  type TransactionReconciliationStatus,
+  type ReconciliationSummary,
+} from './models/transaction-reconciliation.model';
 
 export {
   type WirelessSessionStorageEntry,

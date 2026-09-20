@@ -528,9 +528,9 @@ export class FinancialService {
     const config = db.data?.settings?.pricingEngine;
     res.json({
       paperProfiles: config?.paperProfiles ?? {
-        a4: { baseBwPrice: 3, baseColorPrice: 18 },
-        shortBond: { baseBwPrice: 3, baseColorPrice: 18 },
-        longBond: { baseBwPrice: 4, baseColorPrice: 20 },
+        a4: { baseBwPrice: 3, baseColorPrice: 18, baseImagePrice: 25 },
+        shortBond: { baseBwPrice: 3, baseColorPrice: 18, baseImagePrice: 25 },
+        longBond: { baseBwPrice: 4, baseColorPrice: 20, baseImagePrice: 30 },
       },
       highQualitySurcharge:
         config?.highQualitySurcharge ??

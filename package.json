@@ -37,7 +37,8 @@
     "driver:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-printer-driver-version.ps1",
     "upload-storage:secure": "powershell -ExecutionPolicy Bypass -File .\\scripts\\configure-upload-storage-acl.ps1",
     "defender:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-defender-upload-gate.ps1",
-    "worker-pipe:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-worker-command-pipe.ps1"
+    "worker-pipe:verify": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-worker-command-pipe.ps1",
+    "reconcile:transactions": "node scripts/reconcile-transactions.cjs"
   },
   "keywords": [],
   "author": "GioMjds",
