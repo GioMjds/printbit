@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import * as XLSX from 'xlsx';
 import { PREVIEW_CACHE_DIR } from '@/config/http.config';
 import { convertDocumentViaWorker } from '@/services/document-conversion-pipe';
 
@@ -148,6 +147,7 @@ export class PreviewService {
     const ext = path.extname(sourcePath).toLowerCase();
 
     if (ext === '.xlsx' || ext === '.xls') {
+      const XLSX = await import('xlsx');
       const workbook = XLSX.readFile(sourcePath);
       if (workbook.SheetNames.length === 0) {
         return this.wrapPreviewHtml(

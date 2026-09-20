@@ -42,6 +42,7 @@ import { db, type LogMeta } from '@/services/db';
 import { registerControlSocketHandlers } from '@/services/control-socket';
 import { isHotspotRunning, startHotspot } from '@/services/hotspot';
 import { SessionStore, resolvePublicBaseUrl } from '@/services/session';
+import { scannerService } from '@/services/scanner';
 import { runHopperSelfTest } from '@/services/hopper';
 import { anomalyService } from '@/services/anomaly';
 import { adminService } from '@/services/admin';
@@ -81,7 +82,26 @@ const server = http.createServer(app);
 const io = new Server(server);
 const sessionIo = io.of('/session');
 
+export const STARTUP_T0 = performance.now();
+
+export function markStartup(label: string): void {
+  const elapsed = Math.round(performance.now() - STARTUP_T0);
+  console.log(`[STARTUP +${elapsed}ms] ${label}`);
+}
+
+markStartup('Express application and socket servers initialized');
+
 type StartupPhase = 'booting' | 'ready' | 'failed';
+
+export interface SubsystemStatuses {
+  webServer: 'ready';
+  database: 'ready' | 'initializing' | 'failed';
+  worker: 'ready' | 'connecting' | 'failed';
+  printer: 'ready' | 'initializing' | 'offline';
+  scanner: 'ready' | 'initializing' | 'unavailable';
+  esp32: 'ready' | 'connecting' | 'failed';
+  trustedTime: 'synced' | 'unsynced' | 'verifying';
+}
 
 interface StartupReadinessState {
   phase: StartupPhase;
@@ -89,6 +109,7 @@ interface StartupReadinessState {
   readyAt: string | null;
   failedAt: string | null;
   message: string | null;
+  subsystems: SubsystemStatuses;
 }
 
 const STARTUP_POLL_INTERVAL_MS = 1_500;
@@ -99,6 +120,15 @@ const startupReadinessState: StartupReadinessState = {
   readyAt: null,
   failedAt: null,
   message: 'Starting PrintBit services…',
+  subsystems: {
+    webServer: 'ready',
+    database: 'initializing',
+    worker: 'connecting',
+    printer: 'initializing',
+    scanner: 'initializing',
+    esp32: 'connecting',
+    trustedTime: 'verifying',
+  },
 };
 
 function markStartupReady(): void {
@@ -122,6 +152,7 @@ function getStartupReadinessSnapshot() {
     readyAt: startupReadinessState.readyAt,
     failedAt: startupReadinessState.failedAt,
     message: startupReadinessState.message,
+    subsystems: { ...startupReadinessState.subsystems },
     retryAfterMs:
       startupReadinessState.phase === 'failed'
         ? Math.max(STARTUP_POLL_INTERVAL_MS, 5_000)
@@ -327,13 +358,254 @@ function logWorkerEventToAdmin(evt: WorkerPrintEvent): void {
   }
 }
 
-async function initializePrintBit(): Promise<void> {
-  try {
-    await initDB();
+async function connectWorkerPaymentLockWithRetry(
+  maxAttempts = 15,
+  delayMs = 1_000,
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const acknowledged =
+        await hardwareStateProjection.initializeCustomerPaymentLock();
+      if (acknowledged) {
+        startupReadinessState.subsystems.worker = 'ready';
+        markStartup(`Worker payment lock acknowledged (attempt ${attempt})`);
+        return true;
+      }
+    } catch {
+      // Worker IPC not ready yet; retry
+    }
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  startupReadinessState.subsystems.worker = 'failed';
+  markStartup(
+    'Worker payment lock not acknowledged within startup window; continuing in background',
+  );
+  return false;
+}
 
-    // Capture the handle so we can await readiness before continuing startup.
-    // This guarantees the named pipe is open and accepting connections from
-    // the C# worker before any downstream service tries to use it.
+async function initializeBackgroundSubsystems(): Promise<void> {
+  markStartup('Starting background subsystem initialization');
+
+  // 1. Worker connection and payment lock (non-blocking retry)
+  void connectWorkerPaymentLockWithRetry();
+
+  // 2. Hardware probes and network concurrently
+  void Promise.allSettled([
+    (async () => {
+      markStartup('Probing default printer');
+      await detectDefaultPrinter();
+      const telemetry = getPrinterTelemetry();
+      startupReadinessState.subsystems.printer = telemetry.connected
+        ? 'ready'
+        : 'offline';
+      markStartup(`Printer probe complete (connected: ${telemetry.connected})`);
+    })(),
+    (async () => {
+      markStartup('Probing scanner via C# worker');
+      await detectScanner();
+      const status = scannerService.getStatus();
+      startupReadinessState.subsystems.scanner = status.connected
+        ? 'ready'
+        : 'unavailable';
+      await cleanupTransientFilesOnStartup(UPLOAD_DIR).catch((error) => {
+        console.error(
+          '[STARTUP] Failed to clean up transient files on startup.',
+          {
+            uploadDir: UPLOAD_DIR,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
+      });
+      startScanStorageCleanup();
+      markStartup(`Scanner probe complete (connected: ${status.connected})`);
+    })(),
+    (async () => {
+      markStartup('Initializing serial and running hopper self-test');
+      await initSerial(io);
+      await runHopperSelfTest();
+      markStartup('Serial and hopper self-test complete');
+    })(),
+    (async () => {
+      markStartup('Starting ESP32 hotspot service');
+      await startHotspot();
+      startupReadinessState.subsystems.esp32 = isHotspotRunning()
+        ? 'ready'
+        : 'failed';
+      markStartup(`ESP32 hotspot service started (running: ${isHotspotRunning()})`);
+    })(),
+  ]).then(() => {
+    markStartup('All background hardware and network probes completed');
+  });
+
+  // 3. Watchdog monitor setup
+  startWatchdogHealthMonitor({
+    getSerialStatus,
+    getPrinterTelemetry,
+    isHotspotRunning,
+  });
+  anomalyService.setSocketIo(io);
+  adminService.setSocketIo(io);
+
+  // 4. Trusted time check and monitor (non-blocking background sync)
+  void (async () => {
+    try {
+      markStartup('Verifying trusted clock sync in background');
+      const startupTrustedTime = await verifyTrustedClockSync();
+      startupReadinessState.subsystems.trustedTime = startupTrustedTime.synced
+        ? 'synced'
+        : 'unsynced';
+      const startupBlocked =
+        startupTrustedTime.enforceForFinancial &&
+        (!startupTrustedTime.synced ||
+          startupTrustedTime.offsetMs === null ||
+          startupTrustedTime.driftExceeded);
+      void adminService
+        .appendAdminLog(
+          startupBlocked ? 'trusted_time_unsynced' : 'trusted_time_synced',
+          startupBlocked
+            ? 'Trusted time unavailable at startup. Financial operations are blocked until synchronization recovers.'
+            : 'Trusted time verified at startup.',
+          {
+            synced: startupTrustedTime.synced,
+            offsetMs: startupTrustedTime.offsetMs,
+            driftExceeded: startupTrustedTime.driftExceeded,
+            maxDriftMs: startupTrustedTime.maxDriftMs,
+            source: startupTrustedTime.source,
+            enforceForFinancial: startupTrustedTime.enforceForFinancial,
+            detail: startupTrustedTime.detail,
+            ntpSource: startupTrustedTime.ntpSource,
+          },
+        )
+        .catch(() => {});
+
+      if (startupBlocked) {
+        void anomalyService
+          .report({
+            type: 'trusted_time_unsynced',
+            source: 'time-sync',
+            category: 'network',
+            severity: 'critical',
+            message:
+              'Trusted time verification failed. Financial operations are blocked until synchronization recovers.',
+            fingerprint: buildAnomalyFingerprint([
+              'time-sync',
+              'trusted-time-unsynced',
+            ]),
+            context: {
+              offsetMs: startupTrustedTime.offsetMs,
+              driftExceeded: startupTrustedTime.driftExceeded,
+              maxDriftMs: startupTrustedTime.maxDriftMs,
+              detail: startupTrustedTime.detail,
+            },
+          })
+          .catch(() => {});
+      }
+
+      markStartup(
+        `Trusted time check complete (synced: ${startupTrustedTime.synced}, offset: ${startupTrustedTime.offsetMs}ms)`,
+      );
+
+      let trustedTimeBlocked = startupBlocked;
+      startTrustedTimeMonitor(async (status) => {
+        const blocked =
+          status.enforceForFinancial &&
+          (!status.synced || status.offsetMs === null || status.driftExceeded);
+        if (blocked === trustedTimeBlocked) return;
+        try {
+          if (blocked) {
+            await adminService.appendAdminLog(
+              'trusted_time_unsynced',
+              'Trusted time lost during runtime. Financial operations are now blocked.',
+              {
+                synced: status.synced,
+                offsetMs: status.offsetMs,
+                driftExceeded: status.driftExceeded,
+                maxDriftMs: status.maxDriftMs,
+                source: status.source,
+                detail: status.detail,
+                ntpSource: status.ntpSource,
+              },
+            );
+            await anomalyService.report({
+              type: 'trusted_time_unsynced',
+              source: 'time-sync',
+              category: 'network',
+              severity: 'critical',
+              message:
+                'Trusted time synchronization is unavailable. Financial operations are blocked.',
+              fingerprint: buildAnomalyFingerprint([
+                'time-sync',
+                'trusted-time-unsynced',
+              ]),
+              context: {
+                offsetMs: status.offsetMs,
+                driftExceeded: status.driftExceeded,
+                maxDriftMs: status.maxDriftMs,
+                detail: status.detail,
+              },
+            });
+            trustedTimeBlocked = blocked;
+            return;
+          }
+
+          await adminService.appendAdminLog(
+            'trusted_time_restored',
+            'Trusted time synchronization restored. Financial operations are unblocked.',
+            {
+              synced: status.synced,
+              offsetMs: status.offsetMs,
+              driftExceeded: status.driftExceeded,
+              maxDriftMs: status.maxDriftMs,
+              source: status.source,
+              detail: status.detail,
+              ntpSource: status.ntpSource,
+            },
+          );
+          await anomalyService.report({
+            type: 'trusted_time_restored',
+            source: 'time-sync',
+            category: 'network',
+            severity: 'warning',
+            message:
+              'Trusted time synchronization has been restored. Financial operations are available again.',
+            fingerprint: buildAnomalyFingerprint([
+              'time-sync',
+              'trusted-time-restored',
+            ]),
+            context: {
+              offsetMs: status.offsetMs,
+              driftExceeded: status.driftExceeded,
+              maxDriftMs: status.maxDriftMs,
+              detail: status.detail,
+            },
+          });
+          trustedTimeBlocked = blocked;
+        } catch (error) {
+          console.error('[TIME] Failed to publish trusted-time transition.', {
+            targetState: blocked ? 'blocked' : 'restored',
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      });
+    } catch (error) {
+      console.error('[TIME] Background trusted-time verification error.', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  })();
+}
+
+async function initializePrintBit(): Promise<void> {
+  markStartup('Beginning PrintBit core initialization');
+  try {
+    markStartup('Initializing SQLite database');
+    await initDB();
+    startupReadinessState.subsystems.database = 'ready';
+    markStartup('SQLite database initialized');
+
+    markStartup('Starting worker return pipe server');
     const workerReturnPipe = startWorkerReturnPipeServer({
       pipeName: WORKER_RETURN_PIPE_NAME,
       maxBytes: WORKER_RETURN_MAX_BYTES,
@@ -358,6 +630,7 @@ async function initializePrintBit(): Promise<void> {
 
         if (evt.type === 'PrinterOffline') {
           void paymentAcceptorGate.disarmForSafety('printer_unavailable');
+          startupReadinessState.subsystems.printer = 'offline';
           io.emit('printerMalfunction', {
             printError: {
               code: 'PRINTER_OFFLINE',
@@ -372,23 +645,13 @@ async function initializePrintBit(): Promise<void> {
         }
 
         if (evt.type === 'PrinterOnline') {
+          startupReadinessState.subsystems.printer = 'ready';
           io.emit('printerStatusRestored', {
             printerName: evt.printerName ?? null,
             timestamp: evt.timestampUtc,
           });
         }
 
-        // Hardware errors are distinct from offline/online transitions: the
-        // printer is reachable but WMI reports a non-zero DetectedErrorState
-        // (paper jam, ink empty, door open, etc.).  Emit a dedicated
-        // printerMalfunction so the UI can surface the right message.
-        //
-        // We translate the worker's generic `PrinterError` message into a
-        // more specific code/severity so the confirm page can offer
-        // Pause/Resume for paper-related conditions (the kiosk's primary
-        // recovery action) instead of always showing a fatal-staff-help
-        // modal. The worker formats the message as:
-        //   "Printer hardware error detected (<Description>, code <N>). ..."
         if (evt.type === 'PrinterError') {
           void paymentAcceptorGate.disarmForSafety('printer_unavailable');
           const translated = translateHardwarePrinterError({
@@ -427,17 +690,11 @@ async function initializePrintBit(): Promise<void> {
       },
     });
 
-    // Block until the named pipe is listening.  If the bind fails (e.g. the
-    // pipe is already held by a stale process) this throws and startup is
-    // marked failed — preventing the kiosk from running without a working IPC
-    // channel to the C# hardware service.
     await workerReturnPipe.ready;
-    if (!await hardwareStateProjection.initializeCustomerPaymentLock()) {
-      throw new Error('Customer payment lock was not acknowledged by the worker.');
-    }
+    markStartup('Worker return pipe listening');
 
+    markStartup('Reconciling startup recovery state');
     const startupMarker = await markRecoveryStartup('server_start');
-    const startupTrustedTime = await verifyTrustedClockSync();
     const recoverySummary = await reconcileRecoverySessionsOnStartup();
     const recoveryStatus = getRecoveryStatusSnapshot();
     if (
@@ -506,186 +763,19 @@ async function initializePrintBit(): Promise<void> {
           );
         });
     }
-    const startupBlocked =
-      startupTrustedTime.enforceForFinancial &&
-      (!startupTrustedTime.synced ||
-        startupTrustedTime.offsetMs === null ||
-        startupTrustedTime.driftExceeded);
-    void adminService
-      .appendAdminLog(
-        startupBlocked ? 'trusted_time_unsynced' : 'trusted_time_synced',
-        startupBlocked
-          ? 'Trusted time unavailable at startup. Financial operations are blocked until synchronization recovers.'
-          : 'Trusted time verified at startup.',
-        {
-          synced: startupTrustedTime.synced,
-          offsetMs: startupTrustedTime.offsetMs,
-          driftExceeded: startupTrustedTime.driftExceeded,
-          maxDriftMs: startupTrustedTime.maxDriftMs,
-          source: startupTrustedTime.source,
-          enforceForFinancial: startupTrustedTime.enforceForFinancial,
-          detail: startupTrustedTime.detail,
-          ntpSource: startupTrustedTime.ntpSource,
-        },
-      )
-      .catch((error) => {
-        console.error(
-          '[TIME] Failed to append startup trusted-time admin log.',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-        );
-      });
-    if (startupBlocked) {
-      void anomalyService
-        .report({
-          type: 'trusted_time_unsynced',
-          source: 'time-sync',
-          category: 'network',
-          severity: 'critical',
-          message:
-            'Trusted time verification failed. Financial operations are blocked until synchronization recovers.',
-          fingerprint: buildAnomalyFingerprint([
-            'time-sync',
-            'trusted-time-unsynced',
-          ]),
-          context: {
-            offsetMs: startupTrustedTime.offsetMs,
-            driftExceeded: startupTrustedTime.driftExceeded,
-            maxDriftMs: startupTrustedTime.maxDriftMs,
-            detail: startupTrustedTime.detail,
-          },
-        })
-        .catch((error) => {
-          console.error(
-            '[TIME] Failed to report startup trusted-time anomaly.',
-            {
-              error: error instanceof Error ? error.message : String(error),
-            },
-          );
-        });
-    }
+
+    markStartup('Initializing job processor');
     const jobProcessor = getJobProcessor();
     jobProcessor.setIo(io);
     await jobProcessor.init();
+    markStartup('Job processor ready');
 
-    // Run independent hardware and network subsystem probes concurrently to minimize startup latency
-    await Promise.allSettled([
-      (async () => {
-        await detectDefaultPrinter();
-      })(),
-      (async () => {
-        await detectScanner();
-        await cleanupTransientFilesOnStartup(UPLOAD_DIR).catch((error) => {
-          console.error(
-            '[STARTUP] Failed to clean up transient files on startup.',
-            {
-              uploadDir: UPLOAD_DIR,
-              error: error instanceof Error ? error.message : String(error),
-            },
-          );
-        });
-        startScanStorageCleanup();
-      })(),
-      (async () => {
-        await initSerial(io);
-        await runHopperSelfTest();
-      })(),
-      startHotspot(),
-    ]);
-
-    startWatchdogHealthMonitor({
-      getSerialStatus,
-      getPrinterTelemetry,
-      isHotspotRunning,
-    });
-    anomalyService.setSocketIo(io);
-    adminService.setSocketIo(io);
-    let trustedTimeBlocked = startupBlocked;
-    startTrustedTimeMonitor(async (status) => {
-      const blocked =
-        status.enforceForFinancial &&
-        (!status.synced || status.offsetMs === null || status.driftExceeded);
-      if (blocked === trustedTimeBlocked) return;
-      try {
-        if (blocked) {
-          await adminService.appendAdminLog(
-            'trusted_time_unsynced',
-            'Trusted time lost during runtime. Financial operations are now blocked.',
-            {
-              synced: status.synced,
-              offsetMs: status.offsetMs,
-              driftExceeded: status.driftExceeded,
-              maxDriftMs: status.maxDriftMs,
-              source: status.source,
-              detail: status.detail,
-              ntpSource: status.ntpSource,
-            },
-          );
-          await anomalyService.report({
-            type: 'trusted_time_unsynced',
-            source: 'time-sync',
-            category: 'network',
-            severity: 'critical',
-            message:
-              'Trusted time synchronization is unavailable. Financial operations are blocked.',
-            fingerprint: buildAnomalyFingerprint([
-              'time-sync',
-              'trusted-time-unsynced',
-            ]),
-            context: {
-              offsetMs: status.offsetMs,
-              driftExceeded: status.driftExceeded,
-              maxDriftMs: status.maxDriftMs,
-              detail: status.detail,
-            },
-          });
-          trustedTimeBlocked = blocked;
-          return;
-        }
-
-        await adminService.appendAdminLog(
-          'trusted_time_restored',
-          'Trusted time synchronization restored. Financial operations are unblocked.',
-          {
-            synced: status.synced,
-            offsetMs: status.offsetMs,
-            driftExceeded: status.driftExceeded,
-            maxDriftMs: status.maxDriftMs,
-            source: status.source,
-            detail: status.detail,
-            ntpSource: status.ntpSource,
-          },
-        );
-        await anomalyService.report({
-          type: 'trusted_time_restored',
-          source: 'time-sync',
-          category: 'network',
-          severity: 'warning',
-          message:
-            'Trusted time synchronization has been restored. Financial operations are available again.',
-          fingerprint: buildAnomalyFingerprint([
-            'time-sync',
-            'trusted-time-restored',
-          ]),
-          context: {
-            offsetMs: status.offsetMs,
-            driftExceeded: status.driftExceeded,
-            maxDriftMs: status.maxDriftMs,
-            detail: status.detail,
-          },
-        });
-        trustedTimeBlocked = blocked;
-      } catch (error) {
-        console.error('[TIME] Failed to publish trusted-time transition.', {
-          targetState: blocked ? 'blocked' : 'restored',
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    });
-
-    await startHotspot();
+    // Mark kiosk ready now: HTTP, DB, IPC pipe, and job queue are operational.
     markStartupReady();
+    markStartup('Core kiosk server is READY (UI accessible)');
+
+    // Launch non-blocking background initialization for worker, hardware, and network subsystems
+    void initializeBackgroundSubsystems();
   } catch (error) {
     const startupErrorMessage =
       error instanceof Error ? error.message : String(error);
@@ -695,11 +785,18 @@ async function initializePrintBit(): Promise<void> {
     markStartupFailed(
       'Startup initialization failed. Waiting for automatic recovery.',
     );
+    // Automatic retry after 5s instead of hanging permanently
+    setTimeout(() => {
+      console.log('[SERVER] Retrying startup initialization...');
+      void initializePrintBit();
+    }, 5_000);
   }
 }
 
 async function start(): Promise<void> {
+  markStartup('Starting HTTP listener');
   await startHttpServer();
+  markStartup(`HTTP listener online on port ${PORT}`);
   console.log(
     '[BOOT] Express HTTP server listening; /loading and /api/startup/ready are available.',
   );
