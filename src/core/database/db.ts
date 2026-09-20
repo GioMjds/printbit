@@ -86,6 +86,7 @@ import {
   SupportedDpi,
   ScannerDpiSettings,
   DeveloperModeSettings,
+  TransactionIdFormatSettings,
 } from './models/admin.model';
 
 import {
@@ -124,6 +125,7 @@ export {
   SupportedDpi,
   ScannerDpiSettings,
   DeveloperModeSettings,
+  TransactionIdFormatSettings,
 };
 
 export {
@@ -385,6 +387,14 @@ const DEFAULT_DATA: Schema = {
     developerMode: {
       enabled: false,
       environmentTag: 'test',
+    },
+    transactionIdFormat: {
+      prefix: 'TXN',
+      dateFormat: 'YYYYMMDD',
+      includeTime: false,
+      randomSuffixLength: 4,
+      customPatternEnabled: false,
+      customPattern: '{PREFIX}-{DATE}-{RANDOM}',
     },
   },
   coinStats: {
@@ -1579,6 +1589,41 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
             : DEFAULT_DATA.settings.developerMode.enabled,
         environmentTag: 'test',
       },
+      transactionIdFormat: (() => {
+        const txnFmt = (data?.settings as { transactionIdFormat?: Partial<TransactionIdFormatSettings> })?.transactionIdFormat;
+        const def = DEFAULT_DATA.settings.transactionIdFormat!;
+        return {
+          prefix:
+            typeof txnFmt?.prefix === 'string' && txnFmt.prefix.trim()
+              ? txnFmt.prefix.trim().slice(0, 20)
+              : def.prefix,
+          dateFormat:
+            txnFmt?.dateFormat === 'YYYYMMDD' ||
+            txnFmt?.dateFormat === 'YYYY-MM-DD' ||
+            txnFmt?.dateFormat === 'none'
+              ? txnFmt.dateFormat
+              : def.dateFormat,
+          includeTime:
+            typeof txnFmt?.includeTime === 'boolean'
+              ? txnFmt.includeTime
+              : def.includeTime,
+          randomSuffixLength: Math.max(
+            2,
+            Math.min(
+              12,
+              Math.floor(finiteOr(txnFmt?.randomSuffixLength, def.randomSuffixLength)),
+            ),
+          ),
+          customPatternEnabled:
+            typeof txnFmt?.customPatternEnabled === 'boolean'
+              ? txnFmt.customPatternEnabled
+              : def.customPatternEnabled,
+          customPattern:
+            typeof txnFmt?.customPattern === 'string' && txnFmt.customPattern.trim()
+              ? txnFmt.customPattern.trim().slice(0, 120)
+              : def.customPattern,
+        };
+      })(),
     },
     coinStats: {
       one: finiteOr(data?.coinStats?.one, DEFAULT_DATA.coinStats.one),

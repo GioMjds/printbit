@@ -27,6 +27,7 @@ export interface FinancialLedgerEntry {
   meta: LogMeta;
   previousHash: string | null;
   hash: string;
+  environment?: 'production' | 'test';
 }
 
 export interface PendingRefundEntry {

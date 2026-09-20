@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { formatTransactionId } from './transaction-id';
 
 // Types
 export type JobState =
@@ -84,7 +84,7 @@ class JobStore {
   ): CopyJob {
     const now = new Date().toISOString();
     const job: CopyJob = {
-      id: randomUUID(),
+      id: formatTransactionId('copy'),
       type: 'copy',
       state: 'queued',
       progress: null,
@@ -101,7 +101,7 @@ class JobStore {
   createScanJob(settings: ScanJobSettings): ScanJob {
     const now = new Date().toISOString();
     const job: ScanJob = {
-      id: randomUUID(),
+      id: formatTransactionId('scan'),
       type: 'scan',
       state: 'queued',
       progress: null,

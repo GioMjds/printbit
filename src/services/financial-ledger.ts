@@ -70,6 +70,8 @@ class FinancialLedgerService {
         ? Number(input.amount.toFixed(2))
         : 0;
       const meta = input.meta ?? {};
+      const isTest = Boolean(db.data?.settings?.developerMode?.enabled);
+      const environment: 'production' | 'test' = isTest ? 'test' : 'production';
       const entryTimestamp = input.timestamp || trusted.timestamp;
       const timestampMeta =
         input.timestampMeta ??
@@ -102,6 +104,7 @@ class FinancialLedgerService {
         meta,
         previousHash,
         hash: computeHash(hashPayload),
+        environment,
       };
 
       db.data!.financialLedger.unshift(entry);
