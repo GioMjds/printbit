@@ -53,7 +53,7 @@ if "%PORT%"=="" set "PORT=3000"
 
 if /I "%PRINTBIT_NETWORK_PROVIDER%"=="esp32" (
     if exist "%PROJECT_DIR%\scripts\ensure-esp32-network.ps1" (
-        echo [PrintBit] Ensuring ESP32 Wi-Fi static IP profile in background...
+        echo [PrintBit] Ensuring ESP32 Wi-Fi connection in background...
         start "" /b powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\ensure-esp32-network.ps1" -Quiet
     ) else (
         echo [PrintBit] WARNING: Missing network helper script at "%PROJECT_DIR%\scripts\ensure-esp32-network.ps1"
@@ -81,8 +81,12 @@ if defined EXISTING_SERVER_PID (
 set "NETWORK_PROVIDER=%PRINTBIT_NETWORK_PROVIDER%"
 
 if /I "%NETWORK_PROVIDER%"=="esp32" (
-    set "LOCAL_IP=%PRINTBIT_ESP32_KIOSK_IP%"
-    if "%LOCAL_IP%"=="" set "LOCAL_IP=192.168.4.2"
+    if not "%PRINTBIT_ESP32_KIOSK_IP%"=="" (
+        set "LOCAL_IP=%PRINTBIT_ESP32_KIOSK_IP%"
+    ) else (
+        call :detect_ip
+        if "%LOCAL_IP%"=="" set "LOCAL_IP=192.168.4.2"
+    )
     echo [PrintBit] ESP32 mode detected. Using kiosk IP: %LOCAL_IP%
 ) else (
     call :detect_ip

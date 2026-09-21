@@ -205,6 +205,16 @@ $ManageEdge = Should-ManageEdge
 
 function Get-KioskLocalIp {
     if ((Get-NetworkProvider) -eq "esp32") {
+        $configured = [Environment]::GetEnvironmentVariable("PRINTBIT_ESP32_KIOSK_IP")
+        if (-not [string]::IsNullOrWhiteSpace($configured)) {
+            return $configured.Trim()
+        }
+        $ipCandidates = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPAddress -notmatch '^127\.' -and $_.PrefixOrigin -ne 'WellKnown' }
+        $preferred = $ipCandidates |
+            Where-Object { $_.IPAddress -like "192.168.4.*" } |
+            Select-Object -First 1
+        if ($preferred) { return [string]$preferred.IPAddress }
         return (Get-Esp32KioskIp)
     }
 
@@ -436,9 +446,15 @@ function Ensure-EdgeRunning {
     param(
         [pscustomobject]$State
     )
-    $currentKioskUrl = "http://$(Get-KioskLocalIp):$Port/loading"
+    $kioskHost = [Environment]::GetEnvironmentVariable("PRINTBIT_KIOSK_HOST")
+    if ([string]::IsNullOrWhiteSpace($kioskHost)) {
+        $kioskHost = "127.0.0.1"
+    }
+    $currentKioskUrl = "http://${kioskHost}:$Port/loading"
+    $altKioskUrl = "http://$(Get-KioskLocalIp):$Port/loading"
     try {
         $escapedUrl = [Regex]::Escape($currentKioskUrl)
+        $escapedAltUrl = [Regex]::Escape($altKioskUrl)
         $kioskEdges = @(
             Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" |
                 Where-Object {
@@ -447,7 +463,7 @@ function Ensure-EdgeRunning {
                 }
         )
         foreach ($kioskEdge in $kioskEdges) {
-            if ([string]$kioskEdge.CommandLine -match $escapedUrl) {
+            if ([string]$kioskEdge.CommandLine -match $escapedUrl -or [string]$kioskEdge.CommandLine -match $escapedAltUrl) {
                 return $false
             }
         }

@@ -373,7 +373,7 @@ Defaults shown in `[]`. `PRINTBIT_` prefix is the canonical form; a few keys als
 | `PRINTBIT_ESP32_KIOSK_NETMASK`       | `255.255.255.0`              | Netmask for startup static-IP enforcement                        |
 | `PRINTBIT_ESP32_GATEWAY_IP`          | (derived)                    | Gateway override for startup static-IP enforcement               |
 | `PRINTBIT_ESP32_WIFI_INTERFACE`      | (auto)                       | Windows Wi-Fi interface alias for startup static-IP enforcement  |
-| `PRINTBIT_ESP32_STATIC_IP_ENFORCE`   | `true` (esp32)               | Reapplies static IP on startup                                   |
+| `PRINTBIT_ESP32_STATIC_IP_ENFORCE`   | `false`                      | Reapplies static IP on startup (opt-in)                          |
 | `PRINTBIT_ESP32_COIN_SOURCE`         | `esp32`                      | Required `x-coin-source` header value                            |
 | `PRINTBIT_ESP32_COIN_API_KEY`        | **(required in esp32 mode)** | Shared secret with ESP32 firmware; rejected at boot if missing   |
 | `PRINTBIT_ESP32_COIN_BRIDGE_RELAXED` | `false`                      | **Simulation only** — accepts legacy `/coin?value=` without auth |

@@ -84,15 +84,15 @@ Write-StartupLog "Environment PRINTBIT_KIOSK_LOCKDOWN=$($env:PRINTBIT_KIOSK_LOCK
 
 if ((Get-NetworkProvider) -eq "esp32") {
     if (Test-Path $EnsureEsp32NetworkScript) {
-        Write-StartupLog "ESP32 provider detected. Launching Wi-Fi static IP profile task in background."
+        Write-StartupLog "ESP32 provider detected. Launching Wi-Fi connection task in background."
         try {
             Start-Process -FilePath "powershell.exe" `
                 -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$EnsureEsp32NetworkScript`"", "-Quiet") `
                 -WorkingDirectory $ProjectDir `
                 -WindowStyle Hidden
-            Write-StartupLog "Background network profile enforcement initiated."
+            Write-StartupLog "Background network connection task initiated."
         } catch {
-            Write-StartupLog "WARNING: Could not launch ESP32 static IP profile task: $($_.Exception.Message)"
+            Write-StartupLog "WARNING: Could not launch ESP32 network connection task: $($_.Exception.Message)"
         }
     } else {
         Write-StartupLog "WARNING: Missing network helper script at $EnsureEsp32NetworkScript"
