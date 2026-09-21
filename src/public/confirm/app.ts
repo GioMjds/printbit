@@ -2171,6 +2171,14 @@ function finalizePrintSuccess(
 function enterWorkerPendingState(transactionId: string | null): void {
   setTransactionReference(transactionId);
   activeSpoolerCorrelationKey = paymentSpoolerCorrelationKey;
+
+  // If print completed before the confirm-payment response resolved, do not revert to pending
+  if (confirmationOutcome.outcome === 'success') {
+    hideOverlay(printingOverlay);
+    showOverlay(thankYouOverlay);
+    return;
+  }
+
   restoreConfirmationPending({
     transactionId,
     spoolerCorrelationKey: activeSpoolerCorrelationKey,
@@ -2844,6 +2852,18 @@ if (typeof ioFactory !== 'function') {
       }
       if (!isHardwareError) {
         clearPrinterError();
+      }
+      if (
+        lifecycle.state === 'printed' &&
+        matchesPendingWorkerEvent({
+          transactionId: lifecycle.transactionId ?? null,
+          spoolerCorrelationKey: lifecycle.spoolerCorrelationKey ?? null,
+        })
+      ) {
+        finalizePrintSuccess(
+          lifecycle.transactionId ?? null,
+          lifecycle.spoolerCorrelationKey ?? null,
+        );
       }
     }
   });

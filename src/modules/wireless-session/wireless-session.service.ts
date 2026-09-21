@@ -448,7 +448,10 @@ export class WirelessSessionService {
     const startedAt = Date.now();
 
     try {
-      const absolutePath = await this.resolveCanonicalPdfPath(sessionId, target);
+      const absolutePath = await this.resolveCanonicalPdfPath(
+        sessionId,
+        target,
+      );
       const extension = path.extname(absolutePath).toLowerCase();
       console.log('[preview] request', {
         sessionId,
@@ -1472,7 +1475,9 @@ export class WirelessSessionService {
       artifactPath,
     );
     if (path.resolve(convertedPdfPath) !== artifactPath) {
-      throw new Error('Document conversion returned an unexpected artifact path.');
+      throw new Error(
+        'Document conversion returned an unexpected artifact path.',
+      );
     }
     if (
       !this.deps.sessionStore.setDocumentConvertedPdfPath(
