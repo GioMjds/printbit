@@ -11,10 +11,7 @@ import {
 import { type PrintQuality, type TrustedTimestampMeta } from '@/core/database/shared.schema';
 import { db } from '@/services/db';
 import { getTrustedTimestamp } from '@/services/time-source';
-import {
-  adminLogStore,
-  transactionReconciliationStore,
-} from '@/core/database/sqlite-storage';
+import { adminLogStore } from '@/core/database/sqlite-storage';
 import { financialLedgerService } from '@/services/financial-ledger';
 
 export type EarningsAnalyticsView = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -446,46 +443,10 @@ export class AdminService {
   }
 
   listAllTransactionLogs(filters: TransactionLogFilters): AdminLogEntry[] {
-    const rawLogs = this.listAllLogs().filter((entry) => this.isTransactionLog(entry));
-    const seenTxIds = new Set<string>();
-    for (const log of rawLogs) {
-      const id = this.getTransactionId(log);
-      if (id) seenTxIds.add(id);
-    }
-
-    const reconciled = transactionReconciliationStore.listAll(1000);
-    const syntheticLogs: AdminLogEntry[] = [];
-    for (const rec of reconciled) {
-      if (!seenTxIds.has(rec.transactionId)) {
-        seenTxIds.add(rec.transactionId);
-        syntheticLogs.push({
-          id: `reconciled-${rec.transactionId}`,
-          timestamp: rec.createdAt,
-          type:
-            rec.reconciliationStatus === 'RECONCILED_COMPLETED'
-              ? `${rec.mode}_job_completed`
-              : rec.reconciliationStatus === 'FAILED_NO_CHARGE'
-                ? `${rec.mode}_job_failed`
-                : `${rec.mode}_job_completed`,
-          message:
-            rec.reconciliationStatus === 'RECONCILED_COMPLETED'
-              ? `Reconciled ${rec.mode} transaction completed (₱${rec.verifiedAmount})`
-              : rec.reconciliationStatus === 'FAILED_NO_CHARGE'
-                ? 'Print job failed with no charge'
-                : `Historical ${rec.mode} job (unverified revenue gap, ₱${rec.requiredAmount})`,
-          meta: {
-            transactionId: rec.transactionId,
-            mode: rec.mode,
-            chargedAmount: rec.verifiedAmount,
-            requiredAmount: rec.requiredAmount,
-            reconciliationStatus: rec.reconciliationStatus,
-            reconciled: rec.reconciliationStatus === 'RECONCILED_COMPLETED',
-          },
-        });
-      }
-    }
-
-    const logs = this.filterTransactionLogs([...rawLogs, ...syntheticLogs], filters);
+    const logs = this.filterTransactionLogs(
+      this.listAllLogs().filter((entry) => this.isTransactionLog(entry)),
+      filters,
+    );
     return this.groupLogsByTransaction(logs);
   }
 
@@ -593,15 +554,55 @@ export class AdminService {
   }
 
   computeEarningsBuckets(now = new Date()) {
-    const analytics = this.computeDetailedEarningsAnalytics({
-      view: 'daily',
-      anchor: now,
-      now,
-    });
+    const allTime = db.data!.earnings;
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - 6);
+
+    let today = 0;
+    let week = 0;
+
+    // Use date-bounded query to avoid transferring all payment logs
+    const weekTimestamp = startOfWeek.toISOString();
+    const seenTxIds = new Set<string>();
+    const failedTxIds = new Set<string>();
+
+    for (const log of adminLogStore.listByTypesSince(
+      ['payment_confirmed', 'copy_job_enqueued', 'copy_job_completed', 'copy_job_failed'],
+      weekTimestamp,
+    )) {
+      const txId =
+        (typeof log.meta?.transactionId === 'string' &&
+          log.meta.transactionId) ||
+        (typeof log.meta?.jobId === 'string' && log.meta.jobId) ||
+        null;
+      if (txId) {
+        if (log.type === 'copy_job_failed') {
+          failedTxIds.add(txId);
+          continue;
+        }
+        if (failedTxIds.has(txId)) continue;
+        if (seenTxIds.has(txId)) continue;
+        seenTxIds.add(txId);
+      }
+
+      const amountRaw = log.meta?.amount ?? log.meta?.chargedAmount;
+      const amount =
+        typeof amountRaw === 'number' ? amountRaw : Number(amountRaw);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+
+      const ts = new Date(log.timestamp);
+      if (Number.isNaN(ts.getTime())) continue;
+
+      if (ts >= startOfToday) today += amount;
+      if (ts >= startOfWeek) week += amount;
+    }
+
     return {
-      today: analytics.totals.today,
-      week: analytics.totals.week,
-      allTime: analytics.totals.allTime,
+      today: Number(today.toFixed(2)),
+      week: Number(week.toFixed(2)),
+      allTime: Number(allTime.toFixed(2)),
     };
   }
 
@@ -965,8 +966,7 @@ export class AdminService {
     const completedReferenceIds = new Set<string>();
 
     const productionEntries = db.data!.financialLedger.filter(
-      (e) =>
-        e.environment !== 'test' && e.meta?.reconciliationStatus !== 'duplicate',
+      (e) => e.environment !== 'test',
     );
 
     for (const entry of productionEntries) {

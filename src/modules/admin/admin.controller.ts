@@ -29,9 +29,6 @@ import {
   processPendingRefund,
 } from '@/services/pending-refund';
 import { anomalyService } from '@/modules/anomaly/anomaly.service';
-import { transactionReconciliationService } from '@/services/transaction-reconciliation';
-import { transactionReconciliationStore } from '@/core/database/models/transaction-reconciliation.model';
-import { printJobStore } from '@/core/database/models/print-job.model';
 import { generateTestPagePdf } from '@/services/test-page';
 import {
   listInstalledPrinters,
@@ -494,18 +491,6 @@ export class AdminController {
       requireAdminLocalAccess,
       requireAdminPin,
       this.handleGetEarningsAnalytics,
-    );
-    this.router.get(
-      '/reconciliation',
-      requireAdminLocalAccess,
-      requireAdminPin,
-      this.handleGetReconciliation,
-    );
-    this.router.post(
-      '/reconciliation/run',
-      requireAdminLocalAccess,
-      requireAdminPin,
-      this.handleRunReconciliation,
     );
     this.router.get(
       '/print-dispatch/latency',
@@ -976,9 +961,7 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ? AND timestamp >= ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE, startIso) as
-        | Record<string, unknown>
-        | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE, startIso) as Record<string, unknown> | undefined;
       const totalRow = sqlite
         .prepare(
           `SELECT
@@ -987,9 +970,7 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as
-        | Record<string, unknown>
-        | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as Record<string, unknown> | undefined;
 
       const baseline = db.data!.inkRefillBaseline;
       const todayAdminTestPages = consumablesStore.sumUsagePagesBySource(
@@ -1001,8 +982,7 @@ export class AdminController {
       );
       const totalColor =
         Number(totalRow?.colorSum ?? 0) + totalAdminTestPages.colorPages;
-      const totalBw =
-        Number(totalRow?.bwSum ?? 0) + totalAdminTestPages.bwPages;
+      const totalBw = Number(totalRow?.bwSum ?? 0) + totalAdminTestPages.bwPages;
 
       const pageCounts = {
         todayColorPages:
@@ -1055,7 +1035,6 @@ export class AdminController {
         earnings: this.adminService.computeEarningsBuckets(),
         coinStats: db.data!.coinStats,
         jobStats: db.data!.jobStats,
-        reconciliation: transactionReconciliationService.getSummary(),
         hopperStats: db.data!.hopperStats,
         owedChangeOpenCount: db.data!.owedChanges.filter(
           (entry) => entry.status === 'open',
@@ -1238,8 +1217,7 @@ export class AdminController {
   private handleRestartSpooler = async (req: Request, res: Response) => {
     const requestId = randomUUID();
     const printerName =
-      typeof req.body?.printerName === 'string' &&
-      req.body.printerName.trim().length > 0
+      typeof req.body?.printerName === 'string' && req.body.printerName.trim().length > 0
         ? req.body.printerName.trim()
         : undefined;
 
@@ -1248,11 +1226,7 @@ export class AdminController {
       type?: string;
       outcome?: string;
       action?: string | null;
-      spoolerState?: {
-        isRunning: boolean;
-        status: string;
-        errorMessage?: string | null;
-      } | null;
+      spoolerState?: { isRunning: boolean; status: string; errorMessage?: string | null } | null;
       printerState?: string | null;
       issueKind?: string | null;
       message?: string | null;
@@ -1284,8 +1258,7 @@ export class AdminController {
       );
       return res.status(503).json({
         ok: false,
-        error:
-          'Worker did not respond. The C# hardware service may be offline.',
+        error: 'Worker did not respond. The C# hardware service may be offline.',
       });
     }
 
@@ -1293,9 +1266,7 @@ export class AdminController {
     const succeeded = outcome === 'recovered' || outcome === 'healthy';
 
     void this.adminService.appendAdminLog(
-      succeeded
-        ? 'admin_printer_spooler_restart_ok'
-        : 'admin_printer_spooler_restart_failed',
+      succeeded ? 'admin_printer_spooler_restart_ok' : 'admin_printer_spooler_restart_failed',
       `Printer spooler restart: outcome=${outcome}. ${workerResult.message ?? ''}`.trim(),
       {
         requestId,
@@ -1311,9 +1282,7 @@ export class AdminController {
       return res.status(409).json({
         ok: false,
         outcome,
-        error:
-          workerResult.message ??
-          'Worker is busy with an active print job. Try again shortly.',
+        error: workerResult.message ?? 'Worker is busy with an active print job. Try again shortly.',
       });
     }
 
@@ -1321,9 +1290,7 @@ export class AdminController {
       return res.status(422).json({
         ok: false,
         outcome,
-        message:
-          workerResult.message ??
-          'Physical printer fault detected. Manual intervention required.',
+        message: workerResult.message ?? 'Physical printer fault detected. Manual intervention required.',
         printerState: workerResult.printerState,
         issueKind: workerResult.issueKind,
       });
@@ -1345,24 +1312,6 @@ export class AdminController {
       spoolerState: workerResult.spoolerState,
       printerState: workerResult.printerState,
     });
-  };
-
-  private handleGetReconciliation = (_req: Request, res: Response) => {
-    const summary = transactionReconciliationService.getSummary();
-    const recent =
-      transactionReconciliationService.listReconciledTransactions(100);
-    res.json({ summary, recent });
-  };
-
-  private handleRunReconciliation = async (_req: Request, res: Response) => {
-    try {
-      const summary = await transactionReconciliationService.reconcileAll();
-      res.json({ ok: true, summary });
-    } catch (error) {
-      res.status(500).json({
-        error: error instanceof Error ? error.message : 'Reconciliation failed',
-      });
-    }
   };
 
   private handleGetEarningsAnalytics = (req: Request, res: Response) => {
@@ -1586,21 +1535,9 @@ export class AdminController {
       scanFilenameFormat?: unknown;
       pricingEngine?: {
         paperProfiles?: {
-          a4?: {
-            baseBwPrice?: number;
-            baseColorPrice?: number;
-            baseImagePrice?: number;
-          };
-          shortBond?: {
-            baseBwPrice?: number;
-            baseColorPrice?: number;
-            baseImagePrice?: number;
-          };
-          longBond?: {
-            baseBwPrice?: number;
-            baseColorPrice?: number;
-            baseImagePrice?: number;
-          };
+          a4?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number };
+          shortBond?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number };
+          longBond?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number };
         };
         bulkDiscountTiers?: {
           minPages?: number;
@@ -1725,8 +1662,7 @@ export class AdminController {
       inkMonitoring: { ...originalSettings.inkMonitoring },
       consumablesForecasting: { ...originalSettings.consumablesForecasting },
       scanFilenameFormat: {
-        ...(originalSettings.scanFilenameFormat ||
-          DEFAULT_SCAN_FILENAME_FORMAT),
+        ...(originalSettings.scanFilenameFormat || DEFAULT_SCAN_FILENAME_FORMAT),
       },
       pricingEngine: {
         paperProfiles: {
@@ -2217,7 +2153,8 @@ export class AdminController {
         }
       }
       if (
-        next.paperProfiles.a4.baseColorPrice < next.paperProfiles.a4.baseBwPrice
+        next.paperProfiles.a4.baseColorPrice <
+        next.paperProfiles.a4.baseBwPrice
       ) {
         return res.status(400).json({
           error:
@@ -2227,7 +2164,7 @@ export class AdminController {
       if (
         next.paperProfiles.a4.baseImagePrice !== undefined &&
         next.paperProfiles.a4.baseImagePrice <
-          next.paperProfiles.a4.baseColorPrice
+        next.paperProfiles.a4.baseColorPrice
       ) {
         return res.status(400).json({
           error:
@@ -2285,7 +2222,7 @@ export class AdminController {
       if (
         next.paperProfiles.shortBond.baseImagePrice !== undefined &&
         next.paperProfiles.shortBond.baseImagePrice <
-          next.paperProfiles.shortBond.baseColorPrice
+        next.paperProfiles.shortBond.baseColorPrice
       ) {
         return res.status(400).json({
           error:
@@ -2343,7 +2280,7 @@ export class AdminController {
       if (
         next.paperProfiles.longBond.baseImagePrice !== undefined &&
         next.paperProfiles.longBond.baseImagePrice <
-          next.paperProfiles.longBond.baseColorPrice
+        next.paperProfiles.longBond.baseColorPrice
       ) {
         return res.status(400).json({
           error:
@@ -2590,8 +2527,7 @@ export class AdminController {
       if (inc.prefix !== undefined) {
         if (typeof inc.prefix !== 'string' || inc.prefix.trim().length > 20) {
           return res.status(400).json({
-            error:
-              'transactionIdFormat.prefix must be a string up to 20 characters.',
+            error: 'transactionIdFormat.prefix must be a string up to 20 characters.',
           });
         }
         next.prefix = inc.prefix.trim() || 'TXN';
@@ -2603,8 +2539,7 @@ export class AdminController {
           inc.dateFormat !== 'none'
         ) {
           return res.status(400).json({
-            error:
-              'transactionIdFormat.dateFormat must be "YYYYMMDD", "YYYY-MM-DD", or "none".',
+            error: 'transactionIdFormat.dateFormat must be "YYYYMMDD", "YYYY-MM-DD", or "none".',
           });
         }
         next.dateFormat = inc.dateFormat;
@@ -2625,8 +2560,7 @@ export class AdminController {
           inc.randomSuffixLength > 12
         ) {
           return res.status(400).json({
-            error:
-              'transactionIdFormat.randomSuffixLength must be a whole number between 2 and 12.',
+            error: 'transactionIdFormat.randomSuffixLength must be a whole number between 2 and 12.',
           });
         }
         next.randomSuffixLength = inc.randomSuffixLength;
@@ -2640,17 +2574,12 @@ export class AdminController {
         next.customPatternEnabled = inc.customPatternEnabled;
       }
       if (inc.customPattern !== undefined) {
-        if (
-          typeof inc.customPattern !== 'string' ||
-          inc.customPattern.length > 120
-        ) {
+        if (typeof inc.customPattern !== 'string' || inc.customPattern.length > 120) {
           return res.status(400).json({
-            error:
-              'transactionIdFormat.customPattern must be a string up to 120 characters.',
+            error: 'transactionIdFormat.customPattern must be a string up to 120 characters.',
           });
         }
-        next.customPattern =
-          inc.customPattern.trim() || '{PREFIX}-{DATE}-{RANDOM}';
+        next.customPattern = inc.customPattern.trim() || '{PREFIX}-{DATE}-{RANDOM}';
       }
 
       nextSettings.transactionIdFormat = next;
@@ -2658,8 +2587,7 @@ export class AdminController {
 
     const isUiBlockingModified =
       uiBlockingModified ||
-      nextSettings.uiBlocking.enabled !==
-        originalSettings.uiBlocking?.enabled ||
+      nextSettings.uiBlocking.enabled !== originalSettings.uiBlocking?.enabled ||
       nextSettings.uiBlocking.mode !== originalSettings.uiBlocking?.mode ||
       nextSettings.uiBlocking.customMessage !==
         originalSettings.uiBlocking?.customMessage;
@@ -3212,10 +3140,6 @@ export class AdminController {
       receiptResolution.status === 'ok' ? receiptResolution.payload : null;
     const receiptExpired = receiptResolution.status === 'expired';
 
-    const reconcileEntry =
-      transactionReconciliationStore.getByTransactionId(transactionId);
-    const printJob = printJobStore.getJobByTransactionId(transactionId);
-
     const found =
       logs.length > 0 ||
       ledgerEntries.length > 0 ||
@@ -3223,23 +3147,18 @@ export class AdminController {
       lifecycleRecord !== null ||
       pendingRefunds.length > 0 ||
       receiptResolution.status === 'ok' ||
-      receiptResolution.status === 'expired' ||
-      reconcileEntry !== null ||
-      printJob !== null;
+      receiptResolution.status === 'expired';
     if (!found) return null;
 
     const chargedAmount =
       receiptPayload?.chargedAmount ??
       ledgerEntries.find((entry) => entry.eventType === 'job_completed')
         ?.amount ??
-      reconcileEntry?.verifiedAmount ??
-      reconcileEntry?.requiredAmount ??
       recoverySession?.chargedAmount ??
       pendingRefunds[0]?.chargedAmount ??
       null;
     const mode =
       receiptPayload?.mode ??
-      reconcileEntry?.mode ??
       lifecycleRecord?.mode ??
       recoverySession?.mode ??
       (typeof logs[0]?.meta?.mode === 'string' ? logs[0].meta.mode : null) ??
@@ -3496,9 +3415,7 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as
-        | Record<string, unknown>
-        | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as Record<string, unknown> | undefined;
 
       const adminTestPages = consumablesStore.sumUsagePagesBySource(
         ADMIN_TEST_PAGE_USAGE_SOURCE,

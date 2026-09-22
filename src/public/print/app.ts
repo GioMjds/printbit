@@ -131,101 +131,6 @@ let maxPagesPerSession =
   Number(sessionStorage.getItem('printbit.maxPagesPerSession')) || 30;
 sessionStorage.setItem('printbit.maxPagesPerSession', String(maxPagesPerSession));
 
-let currentUploadedFiles: UploadedFile[] = [];
-let currentSelectedFile: UploadedFile | null = null;
-
-function updatePrintLimitTip(limit: number): void {
-  const tipDesc = document.getElementById('printLimitTipDesc');
-  if (tipDesc) {
-    tipDesc.textContent = `A maximum of ${limit} pages can be printed in this session. Your selected page range multiplied by copies must stay within ${limit} pages.`;
-  } else {
-    const tipText = document.querySelector(
-      '.upload-tip--print-limit .upload-tip__text',
-    );
-    if (tipText) {
-      tipText.innerHTML = `<strong class="upload-tip__badge">Print limit:</strong> A maximum of ${limit} pages can be printed in this session. Your selected page range multiplied by copies must stay within ${limit} pages.`;
-    }
-  }
-}
-updatePrintLimitTip(maxPagesPerSession);
-
-function updateSelectionFooterHint(file: UploadedFile): void {
-  if (!footerHint) return;
-  const pageCount =
-    typeof file.pageCount === 'number'
-      ? file.pageCount
-      : typeof file.analysis?.pageCount === 'number'
-        ? file.analysis.pageCount
-        : typeof file.analysis?.totalPages === 'number'
-          ? file.analysis.totalPages
-          : undefined;
-
-  if (typeof pageCount === 'number' && pageCount > maxPagesPerSession) {
-    footerHint.textContent = `Document has ${pageCount} pages. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
-  } else {
-    footerHint.textContent = `Selected "${file.filename}". You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
-  }
-  footerHint.classList.add('ready');
-}
-
-function applyMaxPagesPerSession(limit: number): void {
-  if (typeof limit !== 'number' || !Number.isFinite(limit) || limit <= 0) {
-    return;
-  }
-  const changed = maxPagesPerSession !== limit;
-  maxPagesPerSession = limit;
-  sessionStorage.setItem(
-    'printbit.maxPagesPerSession',
-    String(maxPagesPerSession),
-  );
-  updatePrintLimitTip(maxPagesPerSession);
-
-  if (changed) {
-    if (currentSelectedFile) {
-      updateSelectionFooterHint(currentSelectedFile);
-    }
-    if (currentUploadedFiles.length > 0) {
-      lastRenderedFileSignature = '';
-      renderFiles(currentUploadedFiles);
-    }
-  }
-}
-
-function handleSystemSettingsChanged(payload: unknown): void {
-  if (
-    payload &&
-    typeof payload === 'object' &&
-    'printLimits' in payload &&
-    payload.printLimits &&
-    typeof (payload.printLimits as { maxPagesPerSession?: unknown })
-      .maxPagesPerSession === 'number'
-  ) {
-    const nextLimit = (
-      payload.printLimits as { maxPagesPerSession: number }
-    ).maxPagesPerSession;
-    applyMaxPagesPerSession(nextLimit);
-  }
-}
-
-type PrintSocketLike = {
-  on: (e: string, cb: (...a: unknown[]) => void) => void;
-  emit: (e: string, ...a: unknown[]) => void;
-};
-
-let globalSocketBound = false;
-function initGlobalSocket(): void {
-  if (globalSocketBound) return;
-  const ioFactory = (window as unknown as { io?: () => PrintSocketLike }).io;
-  if (typeof ioFactory !== 'function') return;
-  globalSocketBound = true;
-  try {
-    const socket = ioFactory();
-    socket.on('systemSettingsChanged', handleSystemSettingsChanged);
-  } catch (err) {
-    console.warn('[print] Failed to bind global socket for settings:', err);
-  }
-}
-
 async function fetchKioskSettings(): Promise<void> {
   try {
     const res = await fetch('/api/settings/idle-timeout');
@@ -235,7 +140,11 @@ async function fetchKioskSettings(): Promise<void> {
         typeof data.maxPagesPerSession === 'number' &&
         Number.isFinite(data.maxPagesPerSession)
       ) {
-        applyMaxPagesPerSession(data.maxPagesPerSession);
+        maxPagesPerSession = data.maxPagesPerSession;
+        sessionStorage.setItem(
+          'printbit.maxPagesPerSession',
+          String(maxPagesPerSession),
+        );
       }
     }
   } catch (err) {
@@ -243,7 +152,6 @@ async function fetchKioskSettings(): Promise<void> {
   }
 }
 void fetchKioskSettings();
-initGlobalSocket();
 
 let activeSessionId = '';
 let activeSessionToken = '';
@@ -494,7 +402,7 @@ function fileKey(file: UploadedFile): string {
 }
 
 function filesSignature(files: UploadedFile[]): string {
-  return `${files.map((file) => fileKey(file)).join('|')}::limit=${maxPagesPerSession}`;
+  return files.map((file) => fileKey(file)).join('|');
 }
 
 // ── File list rendering ───────────────────────────────────────────────────────
@@ -502,14 +410,12 @@ function filesSignature(files: UploadedFile[]): string {
 function clearSelectedFileState(): void {
   selectedFilename = '';
   selectedDocumentId = '';
-  currentSelectedFile = null;
   sessionStorage.removeItem('printbit.uploadedFile');
   sessionStorage.removeItem('printbit.uploadedDocumentId');
 }
 
 function setWaitingForFilesState(): void {
   clearSelectedFileState();
-  currentUploadedFiles = [];
   knownFiles = new Set<string>();
   lastRenderedFileSignature = '';
   sessionStorage.removeItem('printbit.uploadedFiles');
@@ -527,7 +433,6 @@ function setWaitingForFilesState(): void {
 }
 
 function selectFile(file: UploadedFile): void {
-  currentSelectedFile = file;
   const resolvedDocumentId = file.documentId || file.filename;
   selectedFilename = file.filename;
   selectedDocumentId = resolvedDocumentId;
@@ -549,7 +454,23 @@ function selectFile(file: UploadedFile): void {
     continueBtn.setAttribute('aria-disabled', 'false');
   }
 
-  updateSelectionFooterHint(file);
+  if (footerHint) {
+    const pageCount =
+      typeof file.pageCount === 'number'
+        ? file.pageCount
+        : typeof file.analysis?.pageCount === 'number'
+          ? file.analysis.pageCount
+          : typeof file.analysis?.totalPages === 'number'
+            ? file.analysis.totalPages
+            : undefined;
+
+    if (typeof pageCount === 'number' && pageCount > maxPagesPerSession) {
+      footerHint.textContent = `Document has ${pageCount} pages. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
+    } else {
+      footerHint.textContent = `Selected "${file.filename}". You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
+    }
+    footerHint.classList.add('ready');
+  }
 }
 
 async function deleteSessionFile(file: UploadedFile): Promise<void> {
@@ -698,7 +619,6 @@ function escapeHtml(str: string): string {
 }
 
 function renderFiles(files: UploadedFile[]): void {
-  currentUploadedFiles = files;
   const prevSelected = selectedDocumentId;
   lastRenderedFileSignature = filesSignature(files);
   knownFiles = new Set<string>();
@@ -1072,7 +992,6 @@ function attachSocket(sid: string): void {
   if (attachedSessionId === sid) return;
 
   const socket = ioFactory();
-  initGlobalSocket();
   attachedSessionId = sid;
   socket.emit('joinSession', sid);
   socket.on('UploadCompleted', () => void checkUploadStatus());
