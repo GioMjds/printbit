@@ -6,7 +6,6 @@ import {
 import path from 'node:path';
 import fs from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { formatTransactionId } from '@/services/transaction-id';
 import type { DatabaseSync } from 'node:sqlite';
 import type { Server } from 'socket.io';
 import {
@@ -1211,9 +1210,7 @@ export class FinancialService {
       idempotencyClaimed = true;
     }
 
-    const transactionId = formatTransactionId(
-      (req.body as ConfirmPaymentBody)?.mode,
-    );
+    const transactionId = randomUUID();
 
     const sendResponse = (status: number, body: unknown): void => {
       if (idempotencyClaimed) {

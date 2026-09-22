@@ -548,38 +548,6 @@ function cancelActiveCustomerSessions(state: UiBlockingSettings): void {
   } catch {}
 }
 
-const DEV_MODE_BANNER_ID = 'devModeBanner';
-
-export function attachDevModeBanner(): void {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(DEV_MODE_BANNER_ID)) return;
-  const banner = document.createElement('div');
-  banner.id = DEV_MODE_BANNER_ID;
-  banner.style.cssText = [
-    'position:fixed',
-    'top:0',
-    'left:0',
-    'right:0',
-    'z-index:99998',
-    'background:#b45309',
-    'color:#fff',
-    'font-size:13px',
-    'font-weight:600',
-    'text-align:center',
-    'padding:6px 12px',
-    'letter-spacing:0.02em',
-    'pointer-events:none',
-  ].join(';');
-  banner.textContent = '\uD83D\uDEE0 DEVELOPER TESTING MODE \u2014 Transactions tagged as TEST. No real earnings recorded.';
-  document.body.prepend(banner);
-}
-
-export function removeDevModeBanner(): void {
-  if (typeof document === 'undefined') return;
-  const banner = document.getElementById(DEV_MODE_BANNER_ID);
-  banner?.remove();
-}
-
 export function attachUiBlockingOverlay(
   options: UiBlockingOverlayOptions = {},
 ): UiBlockingOverlayController {
@@ -1011,17 +979,6 @@ export function attachUiBlockingOverlay(
       return;
     attachedSocket = sock;
     sock.on('uiBlockingChanged', handleUiBlockingEvent);
-    sock.on(
-      'systemSettingsChanged',
-      (payload: { developerMode?: { enabled?: boolean } }) => {
-        if (destroyed) return;
-        if (payload?.developerMode?.enabled) {
-          attachDevModeBanner();
-        } else {
-          removeDevModeBanner();
-        }
-      },
-    );
   };
 
   if (options.socket) {
@@ -1048,17 +1005,11 @@ export function attachUiBlockingOverlay(
     void fetch('/api/settings/idle-timeout')
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<{
-          uiBlocking?: UiBlockingSettings;
-          developerMode?: { enabled?: boolean };
-        }>;
+        return res.json() as Promise<{ uiBlocking?: UiBlockingSettings }>;
       })
       .then((data) => {
         if (!destroyed && data?.uiBlocking) {
           handleUiBlockingEvent(data.uiBlocking);
-        }
-        if (!destroyed && data?.developerMode?.enabled) {
-          attachDevModeBanner();
         }
       })
       .catch((err) => {
@@ -1095,7 +1046,6 @@ export function attachUiBlockingOverlay(
       destroyed = true;
       if (attachedSocket && typeof attachedSocket.off === 'function') {
         attachedSocket.off('uiBlockingChanged', handleUiBlockingEvent);
-        attachedSocket.off('systemSettingsChanged');
       }
       overlayEl?.remove();
       modalEl?.remove();

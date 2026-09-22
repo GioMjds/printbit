@@ -212,15 +212,6 @@ export interface DeveloperModeSettings {
   environmentTag: 'test';
 }
 
-export interface TransactionIdFormatSettings {
-  prefix: string;
-  dateFormat: 'YYYYMMDD' | 'YYYY-MM-DD' | 'none';
-  includeTime: boolean;
-  randomSuffixLength: number;
-  customPatternEnabled: boolean;
-  customPattern: string;
-}
-
 export interface AdminSettings {
   pricing: {
     printPerPage: number;
@@ -304,7 +295,6 @@ export interface AdminSettings {
   uiBlocking?: UiBlockingSettings;
   scannerDpi?: ScannerDpiSettings;
   developerMode?: DeveloperModeSettings;
-  transactionIdFormat?: TransactionIdFormatSettings;
 }
 
 export type SettingsResponse = AdminSettings;

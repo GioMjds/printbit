@@ -69,10 +69,14 @@ import type {
   PrintLimitsSettings,
   UiBlockingSettings,
   ScannerDpiSettings,
-  SupportedDpi,
   DeveloperModeSettings,
-  TransactionIdFormatSettings,
 } from './admin.schema';
+
+export const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
+  malwareScanningEnabled: true,
+  documentConversionEnabled: true,
+  colorDetectionEnabled: true,
+};
 import type { AdminQueueView } from '@/modules/anomaly/anomaly.schema';
 import { ConsumablesService } from './consumables.service';
 import { ReceiptService, type ReceiptPayload } from '@/modules/receipt';
@@ -84,12 +88,6 @@ import {
 } from '@/core/database/sqlite-storage';
 import { requestWindowsShutdown } from '@/services/windows-power';
 import { sendWorkerRequest } from '@/services/worker-command-pipe';
-
-export const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
-  malwareScanningEnabled: true,
-  documentConversionEnabled: true,
-  colorDetectionEnabled: true,
-};
 
 export interface AdminControllerDeps {
   io: SocketIOServer;
@@ -443,7 +441,6 @@ export class AdminController {
     this.router.post(
       '/verify-pin',
       requireAdminLocalAccess,
-      adminAuthRateLimit,
       this.handleVerifyPin,
     );
     this.router.post(
@@ -811,18 +808,6 @@ export class AdminController {
   private handleVerifyPin = async (req: Request, res: Response) => {
     const pin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
 
-    const lockStatus = checkLockout();
-    if (lockStatus.locked) {
-      await this.adminService.appendAdminLog(
-        'admin_auth_blocked',
-        'Admin PIN verification blocked - account is locked.',
-      );
-      return res.status(423).json({
-        valid: false,
-        error: `Too many failed attempts. Try again in ${formatRemainingTime(lockStatus.remainingMs!)}.`,
-      });
-    }
-
     if (!pin) {
       return res.status(401).json({ valid: false, error: 'Invalid PIN' });
     }
@@ -845,20 +830,9 @@ export class AdminController {
     }
 
     if (!valid) {
-      const attempts = await recordFailedAttempt();
-      const attemptsLeft = Math.max(0, MAX_ATTEMPTS - attempts);
-      await this.adminService.appendAdminLog(
-        'admin_auth_failed',
-        `Staff PIN unlock failed (attempt ${attempts}/${MAX_ATTEMPTS}).`,
-      );
-      const message =
-        attemptsLeft > 0
-          ? `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`
-          : 'Too many failed attempts. Kiosk locked for 10 minutes.';
-      return res.status(401).json({ valid: false, error: message });
+      return res.status(401).json({ valid: false, error: 'Invalid PIN' });
     }
 
-    await clearLockout();
     const sessionToken = createAdminSession();
     res.cookie('adminToken', sessionToken, {
       httpOnly: true,
@@ -1454,26 +1428,16 @@ export class AdminController {
     }
     if (!settings.scannerDpi) {
       settings.scannerDpi = {
-        copyGlass: 300 as const,
-        copyAdf: 300 as const,
-        scanGlass: 300 as const,
-        scanAdf: 300 as const,
+        copyGlass: 300,
+        copyAdf: 300,
+        scanGlass: 300,
+        scanAdf: 300,
       };
     }
     if (!settings.developerMode) {
       settings.developerMode = {
         enabled: false,
-        environmentTag: 'test' as const,
-      };
-    }
-    if (!settings.transactionIdFormat) {
-      settings.transactionIdFormat = {
-        prefix: 'TXN',
-        dateFormat: 'YYYYMMDD' as const,
-        includeTime: false,
-        randomSuffixLength: 4,
-        customPatternEnabled: false,
-        customPattern: '{PREFIX}-{DATE}-{RANDOM}',
+        environmentTag: 'test',
       };
     }
     res.json(settings);
@@ -1563,14 +1527,6 @@ export class AdminController {
       };
       developerMode?: {
         enabled?: boolean;
-      };
-      transactionIdFormat?: {
-        prefix?: string;
-        dateFormat?: 'YYYYMMDD' | 'YYYY-MM-DD' | 'none';
-        includeTime?: boolean;
-        randomSuffixLength?: number;
-        customPatternEnabled?: boolean;
-        customPattern?: string;
       };
     };
 
@@ -1698,25 +1654,26 @@ export class AdminController {
         ...(originalSettings.pipelineSettings || {}),
       },
       printLimits: {
+        maxPagesPerSession: 30,
         ...(originalSettings.printLimits || {}),
       },
       uiBlocking: {
+        enabled: false,
+        mode: 'maintenance' as const,
+        customMessage: '',
         ...(originalSettings.uiBlocking || {}),
       },
       scannerDpi: {
+        copyGlass: 300 as const,
+        copyAdf: 300 as const,
+        scanGlass: 300 as const,
+        scanAdf: 300 as const,
         ...(originalSettings.scannerDpi || {}),
       },
       developerMode: {
+        enabled: false,
+        environmentTag: 'test' as const,
         ...(originalSettings.developerMode || {}),
-      },
-      transactionIdFormat: {
-        prefix: 'TXN',
-        dateFormat: 'YYYYMMDD' as const,
-        includeTime: false,
-        randomSuffixLength: 4,
-        customPatternEnabled: false,
-        customPattern: '{PREFIX}-{DATE}-{RANDOM}',
-        ...(originalSettings.transactionIdFormat || {}),
       },
     };
 
@@ -2483,7 +2440,7 @@ export class AdminController {
               error: `scannerDpi.${field} must be 150, 300, or 600.`,
             });
           }
-          nextSettings.scannerDpi[field] = val as SupportedDpi;
+          nextSettings.scannerDpi[field] = val;
         }
       }
     }
@@ -2509,82 +2466,6 @@ export class AdminController {
       nextSettings.developerMode.environmentTag = 'test';
     }
 
-    if (body.transactionIdFormat !== undefined) {
-      if (
-        typeof body.transactionIdFormat !== 'object' ||
-        body.transactionIdFormat === null ||
-        Array.isArray(body.transactionIdFormat)
-      ) {
-        return res.status(400).json({
-          error: 'transactionIdFormat must be an object.',
-        });
-      }
-      const inc = body.transactionIdFormat;
-      const next: TransactionIdFormatSettings = {
-        ...(nextSettings.transactionIdFormat || {}),
-      };
-
-      if (inc.prefix !== undefined) {
-        if (typeof inc.prefix !== 'string' || inc.prefix.trim().length > 20) {
-          return res.status(400).json({
-            error: 'transactionIdFormat.prefix must be a string up to 20 characters.',
-          });
-        }
-        next.prefix = inc.prefix.trim() || 'TXN';
-      }
-      if (inc.dateFormat !== undefined) {
-        if (
-          inc.dateFormat !== 'YYYYMMDD' &&
-          inc.dateFormat !== 'YYYY-MM-DD' &&
-          inc.dateFormat !== 'none'
-        ) {
-          return res.status(400).json({
-            error: 'transactionIdFormat.dateFormat must be "YYYYMMDD", "YYYY-MM-DD", or "none".',
-          });
-        }
-        next.dateFormat = inc.dateFormat;
-      }
-      if (inc.includeTime !== undefined) {
-        if (typeof inc.includeTime !== 'boolean') {
-          return res.status(400).json({
-            error: 'transactionIdFormat.includeTime must be boolean.',
-          });
-        }
-        next.includeTime = inc.includeTime;
-      }
-      if (inc.randomSuffixLength !== undefined) {
-        if (
-          !isFiniteNumber(inc.randomSuffixLength) ||
-          !Number.isInteger(inc.randomSuffixLength) ||
-          inc.randomSuffixLength < 2 ||
-          inc.randomSuffixLength > 12
-        ) {
-          return res.status(400).json({
-            error: 'transactionIdFormat.randomSuffixLength must be a whole number between 2 and 12.',
-          });
-        }
-        next.randomSuffixLength = inc.randomSuffixLength;
-      }
-      if (inc.customPatternEnabled !== undefined) {
-        if (typeof inc.customPatternEnabled !== 'boolean') {
-          return res.status(400).json({
-            error: 'transactionIdFormat.customPatternEnabled must be boolean.',
-          });
-        }
-        next.customPatternEnabled = inc.customPatternEnabled;
-      }
-      if (inc.customPattern !== undefined) {
-        if (typeof inc.customPattern !== 'string' || inc.customPattern.length > 120) {
-          return res.status(400).json({
-            error: 'transactionIdFormat.customPattern must be a string up to 120 characters.',
-          });
-        }
-        next.customPattern = inc.customPattern.trim() || '{PREFIX}-{DATE}-{RANDOM}';
-      }
-
-      nextSettings.transactionIdFormat = next;
-    }
-
     const isUiBlockingModified =
       uiBlockingModified ||
       nextSettings.uiBlocking.enabled !== originalSettings.uiBlocking?.enabled ||
@@ -2602,7 +2483,6 @@ export class AdminController {
       printLimits: nextSettings.printLimits,
       scannerDpi: nextSettings.scannerDpi,
       developerMode: nextSettings.developerMode,
-      transactionIdFormat: nextSettings.transactionIdFormat,
     });
     if (refreshConsumablesAlerts) {
       await this.consumablesService.evaluateAndPublishForecastAlerts();

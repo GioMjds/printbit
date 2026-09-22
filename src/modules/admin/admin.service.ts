@@ -127,7 +127,6 @@ interface SocketEmitter {
 export class AdminService {
   private readonly MAX_LOGS = 3000;
   private io: SocketEmitter | null = null;
-  private copyReconciliationPromise: Promise<number> | null = null;
 
   setSocketIo(io: SocketEmitter | null): void {
     this.io = io;
@@ -711,68 +710,55 @@ export class AdminService {
   }
 
   async reconcileMissingCopyTransactions(): Promise<number> {
-    if (this.copyReconciliationPromise) {
-      return this.copyReconciliationPromise;
-    }
-
     if (!db.data?.financialLedger) return 0;
 
-    this.copyReconciliationPromise = (async () => {
-      const completedReferenceIds = new Set<string>();
-      for (const entry of db.data!.financialLedger) {
-        if (entry.eventType === 'job_completed') {
-          if (
-            typeof entry.referenceId === 'string' &&
-            entry.referenceId.trim().length > 0
-          ) {
-            completedReferenceIds.add(entry.referenceId.trim());
-          }
-          const metaId =
-            (typeof entry.meta?.transactionId === 'string' &&
-              entry.meta.transactionId.trim()) ||
-            (typeof entry.meta?.transaction_id === 'string' &&
-              entry.meta.transaction_id.trim()) ||
-            (typeof entry.meta?.jobId === 'string' && entry.meta.jobId.trim()) ||
-            null;
-          if (metaId) {
-            completedReferenceIds.add(metaId);
-          }
+    const completedReferenceIds = new Set<string>();
+    for (const entry of db.data.financialLedger) {
+      if (entry.eventType === 'job_completed') {
+        if (
+          typeof entry.referenceId === 'string' &&
+          entry.referenceId.trim().length > 0
+        ) {
+          completedReferenceIds.add(entry.referenceId.trim());
+        }
+        const metaId =
+          (typeof entry.meta?.transactionId === 'string' &&
+            entry.meta.transactionId.trim()) ||
+          (typeof entry.meta?.transaction_id === 'string' &&
+            entry.meta.transaction_id.trim()) ||
+          (typeof entry.meta?.jobId === 'string' && entry.meta.jobId.trim()) ||
+          null;
+        if (metaId) {
+          completedReferenceIds.add(metaId);
         }
       }
+    }
 
-      const unreconciled = this.findUnreconciledCopyTransactions(
-        completedReferenceIds,
-      );
-      if (unreconciled.length === 0) return 0;
+    const unreconciled = this.findUnreconciledCopyTransactions(
+      completedReferenceIds,
+    );
+    if (unreconciled.length === 0) return 0;
 
-      let count = 0;
-      for (const item of unreconciled) {
-        if (completedReferenceIds.has(item.txId)) continue;
-        completedReferenceIds.add(item.txId);
+    let count = 0;
+    for (const item of unreconciled) {
+      await financialLedgerService.append({
+        eventType: 'job_completed',
+        amount: item.amount,
+        referenceId: item.txId,
+        meta: {
+          mode: 'copy',
+          reconciled: true,
+          source: 'historical_copy_reconciliation',
+          ...(item.copies ? { copies: item.copies } : {}),
+          ...(item.colorMode ? { colorMode: item.colorMode } : {}),
+        },
+        timestamp: item.timestamp,
+        timestampMeta: item.timestampMeta,
+      });
+      count += 1;
+    }
 
-        await financialLedgerService.append({
-          eventType: 'job_completed',
-          amount: item.amount,
-          referenceId: item.txId,
-          meta: {
-            mode: 'copy',
-            reconciled: true,
-            source: 'historical_copy_reconciliation',
-            ...(item.copies ? { copies: item.copies } : {}),
-            ...(item.colorMode ? { colorMode: item.colorMode } : {}),
-          },
-          timestamp: item.timestamp,
-          timestampMeta: item.timestampMeta,
-        });
-        count += 1;
-      }
-
-      return count;
-    })().finally(() => {
-      this.copyReconciliationPromise = null;
-    });
-
-    return this.copyReconciliationPromise;
+    return count;
   }
 
   private normalizeMoney(value: number): number {
@@ -965,11 +951,7 @@ export class AdminService {
 
     const completedReferenceIds = new Set<string>();
 
-    const productionEntries = db.data!.financialLedger.filter(
-      (e) => e.environment !== 'test',
-    );
-
-    for (const entry of productionEntries) {
+    for (const entry of db.data!.financialLedger) {
       if (entry.eventType === 'job_completed') {
         if (
           typeof entry.referenceId === 'string' &&
