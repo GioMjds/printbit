@@ -958,6 +958,9 @@ const selectedFile =
 const selectedDocumentId =
   params.get('documentId') ??
   sessionStorage.getItem('printbit.uploadedDocumentId');
+let hasLowContent =
+  params.get('hasLowContent') === 'true' ||
+  sessionStorage.getItem('printbit.hasLowContent') === 'true';
 const copyPreviewPath = sessionStorage.getItem('printbit.copyPreviewPath');
 const copyPreviewReleaseToken = sessionStorage.getItem(
   'printbit.copyPreviewReleaseToken',
@@ -1009,6 +1012,9 @@ const footerTotal = document.getElementById(
 ) as HTMLElement | null;
 const largePrintDisclaimer = document.getElementById(
   'largePrintDisclaimer',
+) as HTMLElement | null;
+let lowContentDisclaimer = document.getElementById(
+  'lowContentDisclaimer',
 ) as HTMLElement | null;
 const openPricingBtn = document.getElementById('openPricingBtn');
 const closePricingBtn = document.getElementById('closePricingBtn');
@@ -1928,6 +1934,20 @@ function updateSummary(): void {
       sessionStorage.setItem('printbit.largePrintNoticeShown', 'true');
     }
   }
+  if (!lowContentDisclaimer && footerTotal?.parentElement) {
+    lowContentDisclaimer = document.createElement('div');
+    lowContentDisclaimer.id = 'lowContentDisclaimer';
+    lowContentDisclaimer.className = 'pricing-disclaimer-callout';
+    lowContentDisclaimer.hidden = true;
+    footerTotal.parentElement.appendChild(lowContentDisclaimer);
+  }
+  if (lowContentDisclaimer) {
+    const shouldShow = mode === 'print' && hasLowContent === true;
+    lowContentDisclaimer.hidden = !shouldShow;
+    lowContentDisclaimer.textContent = shouldShow
+      ? 'ℹ Pricing Disclaimer: Kiosk pricing is determined by kiosk configuration per page and does not adjust for low content density or ink coverage.'
+      : '';
+  }
   if (!footerSummary) return;
   if (mode === 'scan') {
     const cfg = currentPreviewConfig();
@@ -2324,6 +2344,7 @@ async function loadPreview(): Promise<void> {
       updateSummary();
     });
     void applyColorAnalysis(sessionId, selectedFile);
+    if (sessionId) void fetchDocumentAnalysis(sessionId, selectedDocumentId);
     syncPageRangeAvailability();
     clampSinglePage();
     updateSummary();
@@ -2333,7 +2354,10 @@ async function loadPreview(): Promise<void> {
 
   await previewPromise;
   await applyDocumentAutoDetection();
-  if (sessionId) await applyColorAnalysis(sessionId, selectedFile);
+  if (sessionId) {
+    await applyColorAnalysis(sessionId, selectedFile);
+    await fetchDocumentAnalysis(sessionId, selectedDocumentId);
+  }
   syncPageRangeAvailability();
   clampSinglePage();
   updateSummary();
@@ -2428,6 +2452,31 @@ async function applyColorAnalysis(
     }
   } catch {
     detectedColorMode = null;
+  }
+}
+
+async function fetchDocumentAnalysis(
+  sessionId: string,
+  documentId?: string | null,
+): Promise<void> {
+  if (!sessionId || !documentId) return;
+  try {
+    const analysisParams = new URLSearchParams();
+    if (sessionToken) analysisParams.set('token', sessionToken);
+    const query = analysisParams.toString();
+    const endpoint = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/analysis/${encodeURIComponent(documentId)}`;
+    const url = query ? `${endpoint}?${query}` : endpoint;
+    const resp = await fetchWithTimeout(url, 10_000);
+    if (!resp.ok) return;
+
+    const data = (await resp.json()) as { hasLowContent?: boolean };
+    if (typeof data.hasLowContent === 'boolean') {
+      hasLowContent = data.hasLowContent;
+      sessionStorage.setItem('printbit.hasLowContent', String(hasLowContent));
+      updateSummary();
+    }
+  } catch {
+    // Keep initial hasLowContent state
   }
 }
 

@@ -150,6 +150,7 @@ type QueuedFile = {
 
 const queue: QueuedFile[] = [];
 let nextId = 0;
+const rejectedBlankFileHashes = new Set<string>();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -598,6 +599,7 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
   }
 
   const duplicateFiles: string[] = [];
+  let hasRejectedBlank = false;
   for (const file of arr) {
     if (!documentConversionEnabled && isWordDocument(file.name, file.type)) {
       continue;
@@ -611,6 +613,15 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
       contentHash = await sha256File(file);
     } catch {
       // The server still performs the authoritative duplicate validation.
+    }
+
+    if (contentHash && rejectedBlankFileHashes.has(contentHash)) {
+      setStatus(
+        `Reminder: "${file.name}" contains only blank pages and must not be sent. Please upload a document with printable content.`,
+        'error',
+      );
+      hasRejectedBlank = true;
+      continue;
     }
 
     if (contentHash && queue.some((q) => q.contentHash === contentHash)) {
@@ -636,7 +647,7 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
       `${duplicateFiles[0]} is already in the upload list${duplicateFiles.length > 1 ? ` (+${duplicateFiles.length - 1} more)` : ''}.`,
       'info',
     );
-  } else if (unsupported.length === 0) {
+  } else if (unsupported.length === 0 && !hasRejectedBlank) {
     clearStatus();
   }
 }
@@ -750,6 +761,27 @@ function attachSocket(sid: string): void {
     setStatus('Kiosk reported an upload error. Please retry.', 'error');
   });
 
+  socket.on('DocumentRejected', (info: unknown) => {
+    const data = info as {
+      documentId?: string;
+      filename?: string;
+      reason?: string;
+      message?: string;
+    };
+    const filename = data?.filename ?? 'file';
+    const targetItem = queue.find((q) => q.file.name === filename);
+    if (targetItem) {
+      updateItemStatus(targetItem, 'error', 'Rejected: Blank File');
+      if (targetItem.contentHash) {
+        rejectedBlankFileHashes.add(targetItem.contentHash);
+      }
+    }
+    setStatus(
+      `⛔ "${filename}" was rejected: All pages are blank. Blank documents cannot be sent to the kiosk.`,
+      'error',
+    );
+  });
+
   socket.on('AnalysisStarted', (info: unknown) => {
     const name =
       typeof info === 'object' &&
@@ -762,13 +794,50 @@ function attachSocket(sid: string): void {
   });
 
   socket.on('AnalysisCompleted', (info: unknown) => {
-    const analysis =
-      typeof info === 'object' && info !== null && 'analysis' in info
-        ? (info as { analysis?: { pageCount?: unknown; totalPages?: unknown } })
-            .analysis
-        : undefined;
+    const data = info as {
+      filename?: string;
+      documentId?: string;
+      analysis?: {
+        pageCount?: unknown;
+        totalPages?: unknown;
+        blankPages?: number[];
+        blankPageCount?: number;
+        isEntirelyBlank?: boolean;
+        lowContentPages?: number[];
+        lowContentPageCount?: number;
+        hasLowContent?: boolean;
+      };
+    };
+    const filename =
+      typeof info === 'object' &&
+      info !== null &&
+      'filename' in info &&
+      typeof (info as { filename: unknown }).filename === 'string'
+        ? (info as { filename: string }).filename
+        : 'file';
+    const analysis = data?.analysis;
+    const targetItem = queue.find((q) => q.file.name === filename);
+    if (targetItem && analysis?.blankPages && analysis.blankPages.length > 0) {
+      const badge = targetItem.el.querySelector('.queue-item__status') as HTMLElement;
+      if (badge) {
+        badge.textContent = `⚠ Blank: p. ${analysis.blankPages.join(', ')}`;
+      }
+    }
+
     const pageCount = analysis?.totalPages ?? analysis?.pageCount;
-    if (
+    if (analysis?.blankPageCount && analysis.blankPageCount > 0) {
+      const blankPages = analysis.blankPages ?? [];
+      setStatus(
+        `⚠ "${filename}" contains ${analysis.blankPageCount} blank page(s) (Page ${blankPages.join(', ')}). Blank pages will still be billed if printed.`,
+        'info',
+      );
+    } else if (analysis?.hasLowContent) {
+      const lowPages = analysis.lowContentPages ?? [];
+      setStatus(
+        `ℹ Notice: "${filename}" has low content on Page ${lowPages.join(', ')}. Pricing is based on kiosk configurations per page, not content density or ink coverage.`,
+        'info',
+      );
+    } else if (
       !largePrintWarningShown &&
       isLargePrintDocument(pageCount, maxPagesPerSession)
     ) {
@@ -778,8 +847,9 @@ function attachSocket(sid: string): void {
         'info',
       );
       return;
+    } else {
+      setStatus(`✓ Your document file is ready for printing at kiosk.`, 'ok');
     }
-    setStatus(`✓ Your document file is ready for printing at kiosk.`, 'ok');
   });
 
   socket.on('AnalysisFailed', (info: unknown) => {

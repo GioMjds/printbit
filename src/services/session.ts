@@ -49,6 +49,12 @@ export interface DocumentAnalysis {
   totalPages: number;
   confidence: 'high' | 'medium' | 'low';
   analyzedAt: Date;
+  blankPages?: number[];
+  blankPageCount?: number;
+  isEntirelyBlank?: boolean;
+  lowContentPages?: number[];
+  lowContentPageCount?: number;
+  hasLowContent?: boolean;
 }
 
 export interface UploadedDocument {
@@ -979,6 +985,42 @@ export class SessionStore {
         ? Math.max(0, Math.floor(candidate.analysisVersion))
         : 0;
 
+    const blankPages = Array.isArray(candidate.blankPages)
+      ? candidate.blankPages
+          .filter(
+            (page): page is number =>
+              typeof page === 'number' && Number.isFinite(page),
+          )
+          .map((page) => Math.floor(page))
+      : undefined;
+    const blankPageCount =
+      typeof candidate.blankPageCount === 'number' &&
+      Number.isFinite(candidate.blankPageCount)
+        ? Math.max(0, Math.floor(candidate.blankPageCount))
+        : (blankPages ? blankPages.length : undefined);
+    const isEntirelyBlank =
+      typeof candidate.isEntirelyBlank === 'boolean'
+        ? candidate.isEntirelyBlank
+        : undefined;
+
+    const lowContentPages = Array.isArray(candidate.lowContentPages)
+      ? candidate.lowContentPages
+          .filter(
+            (page): page is number =>
+              typeof page === 'number' && Number.isFinite(page),
+          )
+          .map((page) => Math.floor(page))
+      : undefined;
+    const lowContentPageCount =
+      typeof candidate.lowContentPageCount === 'number' &&
+      Number.isFinite(candidate.lowContentPageCount)
+        ? Math.max(0, Math.floor(candidate.lowContentPageCount))
+        : (lowContentPages ? lowContentPages.length : undefined);
+    const hasLowContent =
+      typeof candidate.hasLowContent === 'boolean'
+        ? candidate.hasLowContent
+        : undefined;
+
     return {
       fileType: candidate.fileType as DocumentAnalysis['fileType'],
       pageCount: Math.floor(candidate.pageCount),
@@ -989,6 +1031,12 @@ export class SessionStore {
       confidence,
       analyzedAt,
       analysisVersion,
+      ...(blankPages !== undefined ? { blankPages } : {}),
+      ...(blankPageCount !== undefined ? { blankPageCount } : {}),
+      ...(isEntirelyBlank !== undefined ? { isEntirelyBlank } : {}),
+      ...(lowContentPages !== undefined ? { lowContentPages } : {}),
+      ...(lowContentPageCount !== undefined ? { lowContentPageCount } : {}),
+      ...(hasLowContent !== undefined ? { hasLowContent } : {}),
     };
   }
 
