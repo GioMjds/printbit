@@ -1286,6 +1286,17 @@ body {
   line-height: 1.45;
 }
 
+.pricing-disclaimer-callout {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.12);
+  border-radius: 8px;
+  color: var(--white);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 /* ════════════════════════════════════════════════════════════
    Responsive
    ════════════════════════════════════════════════════════════ */

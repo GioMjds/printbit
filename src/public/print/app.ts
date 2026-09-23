@@ -23,6 +23,12 @@ type UploadedFile = {
   analysis?: {
     pageCount?: number;
     totalPages?: number;
+    blankPages?: number[];
+    blankPageCount?: number;
+    isEntirelyBlank?: boolean;
+    lowContentPages?: number[];
+    lowContentPageCount?: number;
+    hasLowContent?: boolean;
   };
 };
 
@@ -158,6 +164,8 @@ let activeSessionToken = '';
 let pollHandle: number | null = null;
 let selectedFilename = '';
 let selectedDocumentId = '';
+let currentSelectedFile: UploadedFile | null = null;
+let currentUploadedFiles: UploadedFile[] = [];
 let knownFiles = new Set<string>();
 let deletingDocumentIds = new Set<string>();
 let lastRenderedFileSignature = '';
@@ -398,7 +406,9 @@ function fileKey(file: UploadedFile): string {
         : typeof file.analysis?.totalPages === 'number'
           ? file.analysis.totalPages
           : -1;
-  return `${file.documentId || file.filename}::${file.filename}::${bytes}::${pageCount}::${file.analysisStatus ?? ''}`;
+  const blankCount = file.analysis?.blankPageCount ?? 0;
+  const lowContent = file.analysis?.hasLowContent ? 1 : 0;
+  return `${file.documentId || file.filename}::${file.filename}::${bytes}::${pageCount}::${file.analysisStatus ?? ''}::${blankCount}::${lowContent}`;
 }
 
 function filesSignature(files: UploadedFile[]): string {
@@ -408,13 +418,16 @@ function filesSignature(files: UploadedFile[]): string {
 // ── File list rendering ───────────────────────────────────────────────────────
 
 function clearSelectedFileState(): void {
+  currentSelectedFile = null;
   selectedFilename = '';
   selectedDocumentId = '';
   sessionStorage.removeItem('printbit.uploadedFile');
   sessionStorage.removeItem('printbit.uploadedDocumentId');
+  sessionStorage.removeItem('printbit.hasLowContent');
 }
 
 function setWaitingForFilesState(): void {
+  currentUploadedFiles = [];
   clearSelectedFileState();
   knownFiles = new Set<string>();
   lastRenderedFileSignature = '';
@@ -432,12 +445,53 @@ function setWaitingForFilesState(): void {
   }
 }
 
+function updateSelectionFooterHint(file: UploadedFile): void {
+  if (!footerHint) return;
+
+  const pageCount =
+    typeof file.pageCount === 'number'
+      ? file.pageCount
+      : typeof file.analysis?.pageCount === 'number'
+        ? file.analysis.pageCount
+        : typeof file.analysis?.totalPages === 'number'
+          ? file.analysis.totalPages
+          : undefined;
+
+  let hint = '';
+  if (typeof pageCount === 'number' && pageCount > maxPagesPerSession) {
+    hint = `Document has ${pageCount} pages. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
+  } else {
+    hint = `Selected "${file.filename}". You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
+  }
+
+  const blankCount = file.analysis?.blankPageCount ?? 0;
+  if (blankCount > 0) {
+    const blankPages = file.analysis?.blankPages ?? [];
+    const pagesList =
+      blankPages.length > 0 ? ` (p. ${blankPages.join(', ')})` : '';
+    hint += ` Contains ${blankCount} blank page(s)${pagesList}. You can customize your page range on the next step.`;
+  }
+
+  if (file.analysis?.hasLowContent) {
+    hint += ` Notice: Pricing is based on kiosk price configurations and not page content density.`;
+  }
+
+  footerHint.textContent = hint;
+  footerHint.classList.add('ready');
+}
+
 function selectFile(file: UploadedFile): void {
+  currentSelectedFile = file;
   const resolvedDocumentId = file.documentId || file.filename;
   selectedFilename = file.filename;
   selectedDocumentId = resolvedDocumentId;
   sessionStorage.setItem('printbit.uploadedFile', file.filename);
   sessionStorage.setItem('printbit.uploadedDocumentId', resolvedDocumentId);
+  if (file.analysis?.hasLowContent) {
+    sessionStorage.setItem('printbit.hasLowContent', 'true');
+  } else {
+    sessionStorage.removeItem('printbit.hasLowContent');
+  }
 
   // Update aria-selected on all items
   fileList?.querySelectorAll('.file-item').forEach((el) => {
@@ -454,23 +508,7 @@ function selectFile(file: UploadedFile): void {
     continueBtn.setAttribute('aria-disabled', 'false');
   }
 
-  if (footerHint) {
-    const pageCount =
-      typeof file.pageCount === 'number'
-        ? file.pageCount
-        : typeof file.analysis?.pageCount === 'number'
-          ? file.analysis.pageCount
-          : typeof file.analysis?.totalPages === 'number'
-            ? file.analysis.totalPages
-            : undefined;
-
-    if (typeof pageCount === 'number' && pageCount > maxPagesPerSession) {
-      footerHint.textContent = `Document has ${pageCount} pages. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
-    } else {
-      footerHint.textContent = `Selected "${file.filename}". You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
-    }
-    footerHint.classList.add('ready');
-  }
+  updateSelectionFooterHint(file);
 }
 
 async function deleteSessionFile(file: UploadedFile): Promise<void> {
@@ -534,12 +572,7 @@ async function deleteSessionFile(file: UploadedFile): Promise<void> {
   }
 }
 
-function addFileToList(file: UploadedFile): void {
-  if (!fileList) return;
-  const key = fileKey(file);
-  if (knownFiles.has(key)) return;
-  knownFiles.add(key);
-
+function createFileItem(file: UploadedFile): HTMLElement {
   const ext = file.filename.split('.').pop()?.toUpperCase() ?? 'FILE';
   const icon = iconIdForFile(file.filename);
 
@@ -556,6 +589,15 @@ function addFileToList(file: UploadedFile): void {
     typeof pageCount === 'number' && pageCount > maxPagesPerSession;
   const pageLimitBadge = isExceeded
     ? `<span class="file-item__limit-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(234,179,8,0.15);color:#eab308;font-size:11px;font-weight:600;margin-left:6px;">Document has ${pageCount} pages (Max ${maxPagesPerSession} pages per print)</span>`
+    : '';
+
+  const blankBadge =
+    file.analysis?.blankPageCount && file.analysis.blankPageCount > 0
+      ? `<span class="file-item__blank-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(234,179,8,0.15);color:#eab308;font-size:11px;font-weight:600;margin-left:6px;">⚠ ${file.analysis.blankPageCount} Blank Page${file.analysis.blankPageCount > 1 ? 's' : ''}</span>`
+      : '';
+
+  const lowContentBadge = file.analysis?.hasLowContent
+    ? `<span class="file-item__low-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(59,130,246,0.15);color:#3b82f6;font-size:11px;font-weight:600;margin-left:6px;">ℹ Low Content</span>`
     : '';
 
   const li = document.createElement('li');
@@ -576,6 +618,8 @@ function addFileToList(file: UploadedFile): void {
         ${file.size !== undefined ? `<span>${formatBytes(file.size)}</span>` : ''}
         <span class="file-analysis-status" style="display:none"></span>
         ${pageLimitBadge}
+        ${blankBadge}
+        ${lowContentBadge}
       </div>
     </div>
     <div class="file-item__actions">
@@ -607,6 +651,16 @@ function addFileToList(file: UploadedFile): void {
     void deleteSessionFile(file);
   });
 
+  return li;
+}
+
+function addFileToList(file: UploadedFile): void {
+  if (!fileList) return;
+  const key = fileKey(file);
+  if (knownFiles.has(key)) return;
+  knownFiles.add(key);
+
+  const li = createFileItem(file);
   fileList.appendChild(li);
 }
 
@@ -619,6 +673,7 @@ function escapeHtml(str: string): string {
 }
 
 function renderFiles(files: UploadedFile[]): void {
+  currentUploadedFiles = files;
   const prevSelected = selectedDocumentId;
   lastRenderedFileSignature = filesSignature(files);
   knownFiles = new Set<string>();
@@ -861,9 +916,7 @@ async function checkUploadStatus(): Promise<void> {
         : [];
 
   const files: UploadedFile[] = rawFiles.map((file) => {
-    const rawAnalysis = (
-      file as { analysis?: { pageCount?: number; totalPages?: number } }
-    ).analysis;
+    const rawAnalysis = (file as UploadedFile).analysis;
     const pageCount =
       typeof (file as { pageCount?: number }).pageCount === 'number'
         ? (file as { pageCount?: number }).pageCount
@@ -996,6 +1049,24 @@ function attachSocket(sid: string): void {
   socket.emit('joinSession', sid);
   socket.on('UploadCompleted', () => void checkUploadStatus());
   socket.on('UploadRemoved', () => void checkUploadStatus());
+
+  socket.on('DocumentRejected', (info: unknown) => {
+    const data = info as {
+      documentId?: string;
+      filename?: string;
+      reason?: string;
+      message?: string;
+    };
+    const documentId = data?.documentId;
+    const filename = data?.filename;
+    currentUploadedFiles = currentUploadedFiles.filter(
+      (f) =>
+        (!documentId || (f.documentId || f.filename) !== documentId) &&
+        (!filename || f.filename !== filename),
+    );
+    renderFiles(currentUploadedFiles);
+    void checkUploadStatus();
+  });
 
   // Analysis progress events
   socket.on('AnalysisStarted', (info: unknown) => {
@@ -1255,11 +1326,14 @@ continueBtn?.addEventListener('click', async () => {
         : 'PDF ready. Opening print settings…',
     );
   }
-  const destination =
+  let destination =
     `/config?mode=print&sessionId=${encodeURIComponent(activeSessionId)}` +
     `&file=${encodeURIComponent(selectedFilename)}` +
     `&documentId=${encodeURIComponent(selectedDocumentId)}` +
     `&token=${encodeURIComponent(activeSessionToken)}`;
+  if (currentSelectedFile?.analysis?.hasLowContent) {
+    destination += '&hasLowContent=true';
+  }
   navigateWithKioskMotion(destination);
 });
 
