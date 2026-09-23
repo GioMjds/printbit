@@ -48,7 +48,7 @@ export class WirelessSessionSqliteStore {
        FROM wireless_sessions
        ORDER BY created_at DESC`,
       )
-      .all() as Array<Record<string, unknown>>;
+      .all() as Record<string, unknown>[];
 
     if (sessionRows.length === 0) return [];
 
@@ -72,7 +72,7 @@ export class WirelessSessionSqliteStore {
        FROM wireless_session_documents
        ORDER BY uploaded_at ASC`,
       )
-      .all() as Array<Record<string, unknown>>;
+      .all() as Record<string, unknown>[];
 
     const documentsBySessionId = new Map<
       string,

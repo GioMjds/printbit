@@ -221,7 +221,7 @@ export class ReportIssueSqliteStore {
          FROM report_issue_attachments
          WHERE session_id = ? AND report_issue_id IS NULL`,
       )
-      .all(sessionId) as Array<Record<string, unknown>>;
+      .all(sessionId) as Record<string, unknown>[];
     return rows.map((row) => this.toAttachmentEntry(row));
   }
 
@@ -341,7 +341,7 @@ export class ReportIssueSqliteStore {
     const offset = Math.max(0, Math.floor(options.offset));
 
     const where: string[] = [];
-    const params: Array<string | number> = [];
+    const params = [] as (string | number)[];
     if (options.view === 'active') {
       where.push('status != ?');
       params.push('resolved');
@@ -381,7 +381,7 @@ export class ReportIssueSqliteStore {
          ORDER BY timestamp DESC
          LIMIT ? OFFSET ?`,
       )
-      .all(...params, limit, offset) as Array<Record<string, unknown>>;
+      .all(...params, limit, offset) as Record<string, unknown>[];
 
     return {
       total: Number(totalRow.total ?? 0),
@@ -432,7 +432,7 @@ export class ReportIssueSqliteStore {
          WHERE report_issue_id = ?
          ORDER BY timestamp DESC`,
       )
-      .all(reportIssueId) as Array<Record<string, unknown>>;
+      .all(reportIssueId) as Record<string, unknown>[];
     return rows.map((row) => this.toAttachmentEntry(row));
   }
 
@@ -485,7 +485,7 @@ export class ReportIssueSqliteStore {
     const retentionCutoff = nowMs - retentionMs;
     const sessionRows = getSqliteDb()
       .prepare('SELECT id, created_at, expires_at FROM report_issue_sessions')
-      .all() as Array<Record<string, unknown>>;
+      .all() as Record<string, unknown>[];
 
     const removedSessionIds: string[] = [];
     for (const row of sessionRows) {
@@ -528,7 +528,7 @@ export class ReportIssueSqliteStore {
          FROM report_issue_attachments
          WHERE session_id IN (${placeholders}) AND report_issue_id IS NULL`,
       )
-      .all(...removedSessionIds) as Array<Record<string, unknown>>;
+      .all(...removedSessionIds) as Record<string, unknown>[];
 
     withTransaction(() => {
       getSqliteDb()
@@ -587,11 +587,7 @@ export class ReportIssueSqliteStore {
       'network',
       'other',
     ]);
-    const validStatuses = new Set<string>([
-      'open',
-      'acknowledged',
-      'resolved',
-    ]);
+    const validStatuses = new Set<string>(['open', 'acknowledged', 'resolved']);
 
     const categoryRaw = typeof row.category === 'string' ? row.category : '';
     const categoryValue = validCategories.has(categoryRaw)

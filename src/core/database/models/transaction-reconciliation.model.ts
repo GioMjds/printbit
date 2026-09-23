@@ -90,7 +90,7 @@ export class TransactionReconciliationSqliteStore {
       .prepare(
         `SELECT * FROM transaction_reconciliation ORDER BY created_at DESC LIMIT ?`,
       )
-      .all(limit) as Array<Record<string, unknown>>;
+      .all(limit) as Record<string, unknown>[];
     return rows.map((r) => this.toEntry(r));
   }
 

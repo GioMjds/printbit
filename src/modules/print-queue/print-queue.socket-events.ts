@@ -149,34 +149,34 @@ export interface PrintQueueStatsEvent {
 export interface PrintQueueStatusSnapshot {
   generatedAt: string;
   queueStats: PrintQueueStatsEvent;
-  activeJobs: Array<{
+  activeJobs: {
     jobId: string | number;
     transactionId: string;
     attemptNumber: number;
     stage: string;
     startedAt: string;
-  }>;
-  recentFailures: Array<{
+  }[];
+  recentFailures: {
     jobId: string | number;
     transactionId: string;
     failureReason: string;
     failureClass: string;
     failedAt: string;
     isRetryable: boolean;
-  }>;
-  recentCompleted: Array<{
+  }[];
+  recentCompleted: {
     jobId: string | number;
     transactionId: string;
     durationMs: number;
     completedAt: string;
-  }>;
-  activeThresholdIncidents: Array<{
+  }[];
+  activeThresholdIncidents: {
     printerName: string;
     supplyName: string | null;
     currentLevel: number;
     thresholdLevel: number;
     triggeredAt: string;
-  }>;
+  }[];
 }
 
 /**

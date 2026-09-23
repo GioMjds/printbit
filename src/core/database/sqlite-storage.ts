@@ -417,7 +417,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const wirelessDocumentColumnRows = db
     .prepare('PRAGMA table_info(wireless_session_documents)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const wirelessDocumentColumns = new Set(
     wirelessDocumentColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -461,7 +461,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const receiptColumnRows = db
     .prepare('PRAGMA table_info(receipt_records)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const receiptColumns = new Set(
     receiptColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -507,7 +507,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const consumablesUsageColumnRows = db
     .prepare('PRAGMA table_info(consumable_usage_events)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const consumablesUsageColumns = new Set(
     consumablesUsageColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -526,7 +526,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const consumableUsageColumnRows = db
     .prepare('PRAGMA table_info(consumable_usage_events)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const consumableUsageColumns = new Set(
     consumableUsageColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -541,7 +541,7 @@ function ensureSchema(db: DatabaseSync): void {
   // Ensure consumable_ink_snapshots exists for DBs that missed schema creation
   const inkSnapshotColumnRows = db
     .prepare('PRAGMA table_info(consumable_ink_snapshots)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   if (inkSnapshotColumnRows.length === 0) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS consumable_ink_snapshots (
@@ -564,7 +564,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const pricingCacheColumnRows = db
     .prepare('PRAGMA table_info(pricing_analysis_cache)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const pricingCacheColumns = new Set(
     pricingCacheColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -712,7 +712,7 @@ export function getAuthoritativeCoinStats(): {
     .prepare(
       'SELECT coin_value, COUNT(*) AS c FROM coin_bridge_events GROUP BY coin_value',
     )
-    .all() as Array<{ coin_value: number; c: number }>;
+    .all() as { coin_value: number; c: number }[];
   const stats = { one: 0, five: 0, ten: 0, twenty: 0 };
   for (const r of rows) {
     if (r.coin_value === 1) stats.one = r.c;
@@ -1174,7 +1174,7 @@ export function clearStalePricingAnalysisCache(currentVersion: number): number {
   const db = getSqliteDb();
   const columns = db
     .prepare('PRAGMA table_info(pricing_analysis_cache)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const hasVersion = columns.some(
     (col) => typeof col.name === 'string' && col.name === 'algorithm_version',
   );

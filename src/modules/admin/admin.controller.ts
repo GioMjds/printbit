@@ -69,11 +69,8 @@ import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
 import type {
   AlertSettings,
   PipelineSettings,
-  PrintLimitsSettings,
-  UiBlockingSettings,
   ScannerDpiSettings,
   SupportedDpi,
-  DeveloperModeSettings,
   TransactionIdFormatSettings,
 } from './admin.schema';
 import type { AdminQueueView } from '@/modules/anomaly/anomaly.schema';
@@ -2052,13 +2049,13 @@ export class AdminController {
       };
 
       if (incoming.defaultCoefficients) {
-        const fields: Array<keyof typeof next.defaultCoefficients> = [
+        const fields = [
           'bwBlack',
           'colorCyan',
           'colorMagenta',
           'colorYellow',
           'colorBlack',
-        ];
+        ] satisfies (keyof typeof next.defaultCoefficients)[];
         for (const field of fields) {
           const parsed = validateCoefficient(
             incoming.defaultCoefficients[field],
@@ -2111,13 +2108,13 @@ export class AdminController {
             ...next.defaultCoefficients,
             ...(next.printerOverrides[normalizedKey] ?? {}),
           };
-          const fields: Array<keyof typeof next.defaultCoefficients> = [
+          const fields = [
             'bwBlack',
             'colorCyan',
             'colorMagenta',
             'colorYellow',
             'colorBlack',
-          ];
+          ] satisfies (keyof typeof next.defaultCoefficients)[];
           for (const field of fields) {
             const parsed = validateCoefficient(
               candidate[field],
@@ -2532,12 +2529,12 @@ export class AdminController {
           error: 'scannerDpi must be an object.',
         });
       }
-      const dpiFields: Array<keyof ScannerDpiSettings> = [
+      const dpiFields = [
         'copyGlass',
         'copyAdf',
         'scanGlass',
         'scanAdf',
-      ];
+      ] satisfies (keyof ScannerDpiSettings)[];
       for (const field of dpiFields) {
         const val = body.scannerDpi[field];
         if (val !== undefined) {
@@ -3169,26 +3166,26 @@ export class AdminController {
       failedAt: string | null;
       transitions: SpoolerLifecycleTransitionEntry[];
     } | null;
-    pendingRefunds: Array<{
+    pendingRefunds: {
       id: string;
       status: string;
       chargedAmount: number;
       reason: string;
       closedAt: string | null;
-    }>;
-    ledgerEntries: Array<{
+    }[];
+    ledgerEntries: {
       id: string;
       eventType: string;
       amount: number;
       timestamp: string;
-    }>;
-    relatedLogs: Array<{
+    }[];
+    relatedLogs: {
       id: string;
       type: string;
       message: string;
       timestamp: string;
       meta: LogMeta;
-    }>;
+    }[];
   } | null {
     const logs = this.adminService.listAllTransactionLogs({
       exactTransactionId: transactionId,

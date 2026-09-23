@@ -102,7 +102,7 @@ export class PrintJobSqliteStore {
          WHERE state = 'pending'
          ORDER BY created_at ASC`,
       )
-      .all() as Array<Record<string, unknown>>;
+      .all() as Record<string, unknown>[];
     return rows.map((row) => this.toEntry(row));
   }
 
@@ -146,14 +146,14 @@ export class PrintJobSqliteStore {
          ORDER BY created_at DESC
          LIMIT ?`,
       )
-      .all(limit) as Array<Record<string, unknown>>;
+      .all(limit) as Record<string, unknown>[];
     return rows.map((row) => this.toEntry(row));
   }
 
   getJobStats(): { total: number; print: number; copy: number; scan: number } {
     const rows = getSqliteDb()
       .prepare(`SELECT payload_json FROM print_jobs WHERE state = 'printed'`)
-      .all() as Array<{ payload_json: string }>;
+      .all() as { payload_json: string }[];
     let print = 0;
     let copy = 0;
     let scan = 0;

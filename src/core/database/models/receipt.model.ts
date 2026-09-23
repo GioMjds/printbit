@@ -235,7 +235,7 @@ export class ReceiptSqliteStore {
     const limit = Math.max(1, Math.floor(options.limit));
     const offset = Math.max(0, Math.floor(options.offset));
     const where: string[] = [];
-    const params: Array<string | number> = [];
+    const params: (string | number)[] = [];
     if (options.mode) {
       where.push('mode = ?');
       params.push(options.mode);
@@ -276,7 +276,7 @@ export class ReceiptSqliteStore {
          ORDER BY created_at DESC, rowid DESC
          LIMIT ? OFFSET ?`,
       )
-      .all(...params, limit, offset) as Array<Record<string, unknown>>;
+      .all(...params, limit, offset) as Record<string, unknown>[];
 
     return {
       total: Number(totalRow.total ?? 0),
@@ -339,7 +339,7 @@ export class ReceiptSqliteStore {
          WHERE receipt_id = ?
          ORDER BY created_at DESC, rowid DESC`,
       )
-      .all(receiptId) as Array<Record<string, unknown>>;
+      .all(receiptId) as Record<string, unknown>[];
     return rows.map((row) => this.toAccessTokenEntry(row));
   }
 
