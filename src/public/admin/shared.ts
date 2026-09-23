@@ -85,7 +85,7 @@ export type SummaryResponse = {
       projectedEmptyAt: string | null;
       usageEventsConsidered: number;
     };
-    inkSupplies: Array<{
+    inkSupplies: {
       printerName: string;
       name: string;
       status: 'ok' | 'insufficient_data' | 'telemetry_unavailable';
@@ -102,7 +102,7 @@ export type SummaryResponse = {
         | 'printer-property'
         | 'error-state'
         | 'none';
-    }>;
+    }[];
     alerts: {
       withinThreshold: boolean;
       reasons: string[];
@@ -165,11 +165,11 @@ export type SummaryResponse = {
       connectionType?: 'usb' | 'network' | 'wsd' | 'virtual' | 'unknown';
       status: string;
       statusFlags?: string[];
-      ink: Array<{
+      ink: {
         name: string;
         level: number | null;
         status: 'ok' | 'low' | 'empty' | 'unknown';
-      }>;
+      }[];
       inkDetectionMethod?:
         | 'snmp'
         | 'vendor-wmi'
@@ -226,11 +226,11 @@ export interface AdminSettings {
       shortBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number };
       longBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number };
     };
-    bulkDiscountTiers: Array<{
+    bulkDiscountTiers: {
       minPages: number;
       maxPages?: number;
       discountPerPage: number;
-    }>;
+    }[];
     rounding: 'whole_peso_total_only';
     highQualitySurcharge: number;
   };

@@ -666,10 +666,10 @@ export class SessionStore {
   }
 
   private restorePersistedSessions(): void {
-    let snapshots: Array<{
+    let snapshots: {
       session: WirelessSessionStorageEntry;
       documents: WirelessSessionDocumentStorageEntry[];
-    }>;
+    }[];
     try {
       snapshots = wirelessSessionStore.listSessionSnapshots();
     } catch (error) {
@@ -1318,10 +1318,10 @@ export class SessionStore {
     const deletionResults = await Promise.allSettled(
       filePaths.map((filePath) => fs.promises.unlink(filePath)),
     );
-    const failedDeletes: Array<{
+    const failedDeletes: {
       filePath: string | undefined;
       reason: unknown;
-    }> = [];
+    }[] = [];
     deletionResults.forEach((result, index) => {
       if (result.status === 'rejected') {
         if (isMissingFileError(result.reason)) {

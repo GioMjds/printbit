@@ -175,7 +175,7 @@ type TransactionContextPayload = {
     processingAt: string | null;
     printedAt: string | null;
     failedAt: string | null;
-    transitions: Array<{
+    transitions: {
       state: string;
       timestamp: string;
       reason: string | null;
@@ -186,28 +186,28 @@ type TransactionContextPayload = {
       pagesPrinted: number | null;
       totalPages: number | null;
       meta: Record<string, string | number | boolean | null>;
-    }>;
+    }[];
   } | null;
-  pendingRefunds: Array<{
+  pendingRefunds: {
     id: string;
     status: string;
     chargedAmount: number;
     reason: string;
     closedAt: string | null;
-  }>;
-  ledgerEntries: Array<{
+  }[];
+  ledgerEntries: {
     id: string;
     eventType: string;
     amount: number;
     timestamp: string;
-  }>;
-  relatedLogs: Array<{
+  }[];
+  relatedLogs: {
     id: string;
     type: string;
     message: string;
     timestamp: string;
     meta: Record<string, string | number | boolean | null>;
-  }>;
+  }[];
 };
 
 type FilterState = {
@@ -230,7 +230,7 @@ type ReportCategory =
   | 'network'
   | 'other';
 
-const filterState: FilterState = {
+const filterState = {
   transactionId: '',
   mode: '',
   status: '',
@@ -238,7 +238,7 @@ const filterState: FilterState = {
   dateFrom: '',
   dateTo: '',
   quickFilter: 'all',
-};
+} as FilterState;
 
 function showToast(msg: string): void {
   setMessage(msg);

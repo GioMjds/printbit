@@ -15,11 +15,6 @@ declare global {
   }
 }
 
-interface SessionResponse {
-  sessionId: string;
-  reportUrl: string;
-}
-
 interface AttachmentResponse {
   attachmentId: string;
   fileName: string;
@@ -34,7 +29,7 @@ const MAX_ATTACHMENTS = 5;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-const CATEGORIES: Array<{ value: string; label: string }> = [
+const CATEGORIES = [
   { value: 'hardware', label: 'Hardware' },
   { value: 'software', label: 'Software' },
   { value: 'print', label: 'Print' },
@@ -43,7 +38,7 @@ const CATEGORIES: Array<{ value: string; label: string }> = [
   { value: 'payment', label: 'Payment' },
   { value: 'network', label: 'Network' },
   { value: 'other', label: 'Other' },
-];
+] satisfies { value: string; label: string }[];
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
@@ -68,12 +63,12 @@ const formMsg = document.getElementById('formMsg') as HTMLElement;
 
 let selectedCategory: string = 'other';
 const attachmentIds: string[] = [];
-const attachedFiles: Array<{
+const attachedFiles: {
   name: string;
   id: string;
   status: 'uploading' | 'done' | 'error';
   previewUrl: string;
-}> = [];
+}[] = [];
 
 // ── State switching ───────────────────────────────────────────────────────────
 

@@ -303,7 +303,7 @@ export class AdminLogSqliteStore {
          ORDER BY timestamp DESC, rowid DESC
          LIMIT ?`,
       )
-      .all(Math.max(1, Math.floor(limit))) as Array<Record<string, unknown>>;
+      .all(Math.max(1, Math.floor(limit))) as Record<string, unknown>[];
 
     return rows.map((row) => this.toLogEntry(row));
   }
@@ -322,7 +322,7 @@ export class AdminLogSqliteStore {
          FROM admin_logs
          ORDER BY timestamp DESC, rowid DESC`,
       )
-      .all() as Array<Record<string, unknown>>;
+      .all() as Record<string, unknown>[];
 
     return rows.map((row) => this.toLogEntry(row));
   }
@@ -344,7 +344,7 @@ export class AdminLogSqliteStore {
          WHERE type IN (${placeholders})
          ORDER BY timestamp DESC, rowid DESC`,
       )
-      .all(...types) as Array<Record<string, unknown>>;
+      .all(...types) as Record<string, unknown>[];
 
     return rows.map((row) => this.toLogEntry(row));
   }
@@ -370,7 +370,7 @@ export class AdminLogSqliteStore {
            AND timestamp >= ?
          ORDER BY timestamp DESC, rowid DESC`,
       )
-      .all(...types, sinceTimestamp) as Array<Record<string, unknown>>;
+      .all(...types, sinceTimestamp) as Record<string, unknown>[];
 
     return rows.map((row) => this.toLogEntry(row));
   }

@@ -1,10 +1,10 @@
 import {
   SummaryResponse,
   apiFetch,
-  setMessage,
+  formatBytes,
   initAuth,
   peso,
-  formatBytes,
+  setMessage,
   updateSidebarBadges,
 } from '../shared';
 
@@ -19,9 +19,15 @@ const owedChangeOpen = document.getElementById(
   'owedChangeOpen',
 ) as HTMLElement | null;
 // ── Ink tank gauge elements ──────────────────────────────
-const inkAlertBanner = document.getElementById('inkAlertBanner') as HTMLElement | null;
-const inkAlertText = document.getElementById('inkAlertText') as HTMLElement | null;
-const inkAlertBadge = document.getElementById('inkAlertBadge') as HTMLElement | null;
+const inkAlertBanner = document.getElementById(
+  'inkAlertBanner',
+) as HTMLElement | null;
+const inkAlertText = document.getElementById(
+  'inkAlertText',
+) as HTMLElement | null;
+const inkAlertBadge = document.getElementById(
+  'inkAlertBadge',
+) as HTMLElement | null;
 const owedChangeHint = document.getElementById(
   'owedChangeHint',
 ) as HTMLElement | null;
@@ -48,9 +54,7 @@ const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 const resetBalanceBtn = document.getElementById(
   'resetBalanceBtn',
 ) as HTMLButtonElement;
-const resetInkBtn = document.getElementById(
-  'resetInkBtn',
-) as HTMLButtonElement;
+const resetInkBtn = document.getElementById('resetInkBtn') as HTMLButtonElement;
 const clearStorageBtn = document.getElementById(
   'clearStorageBtn',
 ) as HTMLButtonElement;
@@ -62,6 +66,12 @@ const openAlertBadgeMob = document.getElementById(
 ) as HTMLElement | null;
 
 let refreshTimer: number | null = null;
+
+type Tanks = {
+  key: 'grayscale' | 'color';
+  label: string;
+  id: string;
+};
 
 function formatNumber(n: number): string {
   return n.toLocaleString();
@@ -76,10 +86,10 @@ function applyInkEstimation(summary: SummaryResponse): void {
     return;
   }
 
-  const tanks: Array<{ key: 'grayscale' | 'color'; label: string; id: string }> = [
+  const tanks = [
     { key: 'grayscale', label: 'Grayscale ink', id: 'Grayscale' },
     { key: 'color', label: 'Color ink', id: 'Color' },
-  ];
+  ] satisfies Tanks[];
 
   let alertCount = 0;
   const lowNames: string[] = [];
@@ -92,7 +102,8 @@ function applyInkEstimation(summary: SummaryResponse): void {
     const tankEl = document.getElementById(`inkTank${id}`);
 
     if (fillEl) fillEl.style.height = `${tank.remainingPercent}%`;
-    if (percentEl) percentEl.textContent = `${tank.remainingPercent.toFixed(1)}%`;
+    if (percentEl)
+      percentEl.textContent = `${tank.remainingPercent.toFixed(1)}%`;
     if (pagesEl) {
       pagesEl.textContent = `${formatNumber(tank.pagesUsed)} / ${formatNumber(tank.maxPages)} pages`;
     }
@@ -147,7 +158,9 @@ function applyConsumablesForecast(summary: SummaryResponse): void {
   }
 
   if (forecastPaperDays) {
-    forecastPaperDays.textContent = formatDaysRemaining(forecast.paper.daysRemaining);
+    forecastPaperDays.textContent = formatDaysRemaining(
+      forecast.paper.daysRemaining,
+    );
   }
   if (forecastPaperStock) {
     forecastPaperStock.textContent = `${forecast.paper.currentSheets}/${forecast.paper.trayCapacitySheets} sheets`;
@@ -274,7 +287,7 @@ resetBalanceBtn.addEventListener('click', () => {
       setMessage(e instanceof Error ? e.message : 'Failed to reset balance.'),
     );
 });
- 
+
 resetInkBtn.addEventListener('click', () => {
   if (!window.confirm('Reset page counters for new ink refill?')) return;
   setMessage('Resetting ink counters...');
@@ -285,7 +298,9 @@ resetInkBtn.addEventListener('click', () => {
       setMessage('Ink counters reset.');
     })
     .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : 'Failed to reset ink counters.'),
+      setMessage(
+        e instanceof Error ? e.message : 'Failed to reset ink counters.',
+      ),
     );
 });
 
@@ -318,4 +333,3 @@ initAuth(async (signal) => {
     10_000,
   );
 });
-

@@ -395,7 +395,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const wirelessDocumentColumnRows = db
     .prepare('PRAGMA table_info(wireless_session_documents)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const wirelessDocumentColumns = new Set(
     wirelessDocumentColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -439,7 +439,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const receiptColumnRows = db
     .prepare('PRAGMA table_info(receipt_records)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const receiptColumns = new Set(
     receiptColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -485,7 +485,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const consumablesUsageColumnRows = db
     .prepare('PRAGMA table_info(consumable_usage_events)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const consumablesUsageColumns = new Set(
     consumablesUsageColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -504,7 +504,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const consumableUsageColumnRows = db
     .prepare('PRAGMA table_info(consumable_usage_events)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const consumableUsageColumns = new Set(
     consumableUsageColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -519,7 +519,7 @@ function ensureSchema(db: DatabaseSync): void {
   // Ensure consumable_ink_snapshots exists for DBs that missed schema creation
   const inkSnapshotColumnRows = db
     .prepare('PRAGMA table_info(consumable_ink_snapshots)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   if (inkSnapshotColumnRows.length === 0) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS consumable_ink_snapshots (
@@ -542,7 +542,7 @@ function ensureSchema(db: DatabaseSync): void {
 
   const pricingCacheColumnRows = db
     .prepare('PRAGMA table_info(pricing_analysis_cache)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const pricingCacheColumns = new Set(
     pricingCacheColumnRows
       .map((row) => (typeof row.name === 'string' ? row.name : ''))
@@ -679,6 +679,39 @@ export function getSqliteDb(): DatabaseSync {
   return sqliteDb;
 }
 
+<<<<<<< HEAD
+=======
+export function getAuthoritativeCoinStats(): {
+  one: number;
+  five: number;
+  ten: number;
+  twenty: number;
+} {
+  const db = getSqliteDb();
+  const rows = db
+    .prepare(
+      'SELECT coin_value, COUNT(*) AS c FROM coin_bridge_events GROUP BY coin_value',
+    )
+    .all() as { coin_value: number; c: number }[];
+  const stats = { one: 0, five: 0, ten: 0, twenty: 0 };
+  for (const r of rows) {
+    if (r.coin_value === 1) stats.one = r.c;
+    else if (r.coin_value === 5) stats.five = r.c;
+    else if (r.coin_value === 10) stats.ten = r.c;
+    else if (r.coin_value === 20) stats.twenty = r.c;
+  }
+  return stats;
+}
+
+export {
+  TransactionReconciliationSqliteStore,
+  transactionReconciliationStore,
+  type TransactionReconciliationEntry,
+  type TransactionReconciliationStatus,
+  type ReconciliationSummary,
+} from './models/transaction-reconciliation.model';
+
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 export {
   type WirelessSessionStorageEntry,
   type WirelessSessionDocumentStorageEntry,
@@ -1122,7 +1155,7 @@ export function clearStalePricingAnalysisCache(currentVersion: number): number {
   const db = getSqliteDb();
   const columns = db
     .prepare('PRAGMA table_info(pricing_analysis_cache)')
-    .all() as Array<Record<string, unknown>>;
+    .all() as Record<string, unknown>[];
   const hasVersion = columns.some(
     (col) => typeof col.name === 'string' && col.name === 'algorithm_version',
   );

@@ -17,4 +17,5 @@ bin/
 
 graphify-out/
 .impeccable
+.superpowers
 REPORT_LOGS.txt

@@ -1,5 +1,4 @@
 import {
-  AdminSettings,
   SettingsResponse,
   SummaryResponse,
   apiFetch,
@@ -217,8 +216,11 @@ function renderScanFilenamePreview(): void {
   const RANDOM = 'A1B2';
 
   const prefix = settingScanFilenamePrefix?.value.trim() || 'PrintBit-Scan';
-  const customEnabled = settingScanFilenameCustomPatternEnabled?.checked ?? false;
-  const customPattern = settingScanFilenameCustomPattern?.value.trim() || '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
+  const customEnabled =
+    settingScanFilenameCustomPatternEnabled?.checked ?? false;
+  const customPattern =
+    settingScanFilenameCustomPattern?.value.trim() ||
+    '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
   const dateFormat = settingScanFilenameDateFormat?.value ?? 'YYYYMMDD';
   const timeFormat = settingScanFilenameTimeFormat?.value ?? 'HHmmss';
   const includeRandom = settingScanFilenameIncludeRandom?.checked ?? false;
@@ -252,7 +254,8 @@ function renderScanFilenamePreview(): void {
   }
 
   // eslint-disable-next-line no-control-regex
-  const cleaned = baseName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+  const cleaned = baseName
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -271,11 +274,11 @@ function syncScanFilenameUI(): void {
     customPatternContainer.classList.toggle('hidden', !customEnabled);
   }
 
-  const presetElements: Array<HTMLSelectElement | HTMLInputElement | null> = [
+  const presetElements = [
     settingScanFilenameDateFormat,
     settingScanFilenameTimeFormat,
     settingScanFilenameIncludeRandom,
-  ];
+  ] satisfies (HTMLSelectElement | HTMLInputElement | null)[];
 
   presetElements.forEach((el) => {
     if (!el) return;
@@ -346,6 +349,89 @@ document.querySelectorAll('.token-tag').forEach((tag) => {
 
 syncScanFilenameUI();
 
+<<<<<<< HEAD
+=======
+// ── Transaction ID Format Preview ─────────────────────────────────
+
+function renderTxnFormatPreview(): void {
+  if (!txnFormatPreviewText) return;
+  const now = new Date();
+  const YYYY = String(now.getFullYear());
+  const MM = String(now.getMonth() + 1).padStart(2, '0');
+  const DD = String(now.getDate()).padStart(2, '0');
+  const HH = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const RANDOM = 'A1B2';
+
+  const prefix = settingTxnPrefix?.value.trim() || 'TXN';
+  const dateFormat = settingTxnDateFormat?.value ?? 'YYYYMMDD';
+  const includeTime = settingTxnIncludeTime?.checked ?? false;
+  const customEnabled = settingTxnCustomPatternEnabled?.checked ?? false;
+  const customPattern =
+    settingTxnCustomPattern?.value.trim() || '{PREFIX}-{DATE}-{RANDOM}';
+
+  let dateStr = '';
+  if (dateFormat === 'YYYYMMDD') dateStr = `${YYYY}${MM}${DD}`;
+  else if (dateFormat === 'YYYY-MM-DD') dateStr = `${YYYY}-${MM}-${DD}`;
+
+  const timeStr = includeTime ? `${HH}${mm}${ss}` : '';
+
+  let result: string;
+  if (customEnabled) {
+    result = customPattern
+      .replace(/\{PREFIX\}/gi, prefix)
+      .replace(/\{DATE\}/gi, dateStr || `${YYYY}${MM}${DD}`)
+      .replace(/\{YYYY\}/g, YYYY)
+      .replace(/\{MM\}/g, MM)
+      .replace(/\{DD\}/g, DD)
+      .replace(/\{HH\}/g, HH)
+      .replace(/\{mm\}/g, mm)
+      .replace(/\{ss\}/g, ss)
+      .replace(/\{RANDOM\}/gi, RANDOM);
+  } else {
+    const parts: string[] = [prefix];
+    if (dateStr) parts.push(dateStr);
+    if (timeStr) parts.push(timeStr);
+    parts.push(RANDOM);
+    result = parts.join('-');
+  }
+
+  txnFormatPreviewText.textContent = result || 'TXN-A1B2';
+}
+
+function syncTxnFormatUI(): void {
+  const customEnabled = settingTxnCustomPatternEnabled?.checked ?? false;
+  if (txnCustomPatternContainer) {
+    txnCustomPatternContainer.classList.toggle('hidden', !customEnabled);
+  }
+  renderTxnFormatPreview();
+}
+
+const txnFormatInputs = [
+  settingTxnPrefix,
+  settingTxnDateFormat,
+  settingTxnIncludeTime,
+  settingTxnRandomLength,
+  settingTxnCustomPatternEnabled,
+  settingTxnCustomPattern,
+];
+
+txnFormatInputs.forEach((el) => {
+  if (!el) return;
+  const update = () => {
+    if (el === settingTxnCustomPatternEnabled) {
+      syncTxnFormatUI();
+    } else {
+      renderTxnFormatPreview();
+    }
+  };
+  el.addEventListener('input', update);
+  el.addEventListener('change', update);
+});
+
+syncTxnFormatUI();
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 
 function applySettings(settings: SettingsResponse): void {
   settingAdminPin.value = '';
@@ -556,6 +642,36 @@ function applySettings(settings: SettingsResponse): void {
     );
   }
   currentDeveloperModeEnabled = Boolean(settings.developerMode?.enabled);
+<<<<<<< HEAD
+=======
+
+  // Transaction ID & Receipt Format
+  const txnFmt = settings.transactionIdFormat ?? {
+    prefix: 'TXN',
+    dateFormat: 'YYYYMMDD' as const,
+    includeTime: false,
+    randomSuffixLength: 4,
+    customPatternEnabled: false,
+    customPattern: '{PREFIX}-{DATE}-{RANDOM}',
+  };
+  if (settingTxnPrefix) settingTxnPrefix.value = txnFmt.prefix ?? 'TXN';
+  if (settingTxnDateFormat)
+    settingTxnDateFormat.value = txnFmt.dateFormat ?? 'YYYYMMDD';
+  if (settingTxnIncludeTime)
+    settingTxnIncludeTime.checked = Boolean(txnFmt.includeTime);
+  if (settingTxnRandomLength)
+    settingTxnRandomLength.value = String(txnFmt.randomSuffixLength ?? 4);
+  if (settingTxnCustomPatternEnabled) {
+    settingTxnCustomPatternEnabled.checked = Boolean(
+      txnFmt.customPatternEnabled,
+    );
+  }
+  if (settingTxnCustomPattern) {
+    settingTxnCustomPattern.value =
+      txnFmt.customPattern ?? '{PREFIX}-{DATE}-{RANDOM}';
+  }
+  syncTxnFormatUI();
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 }
 
 export function populateForm(settings: SettingsResponse): void {
@@ -712,28 +828,40 @@ settingsForm.addEventListener('submit', (e) => {
     return;
   }
   if (settingA4ImagePrice && !isWholePeso(a4ImagePrice)) {
-    setMessage('A4 Photo/Image price must be a whole peso value (no decimals).');
+    setMessage(
+      'A4 Photo/Image price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingA4BwPrice && settingA4ColorPrice && a4ColorPrice < a4BwPrice) {
     setMessage('A4 Color price cannot be less than B&W price.');
     return;
   }
-  if (settingA4ColorPrice && settingA4ImagePrice && a4ImagePrice < a4ColorPrice) {
+  if (
+    settingA4ColorPrice &&
+    settingA4ImagePrice &&
+    a4ImagePrice < a4ColorPrice
+  ) {
     setMessage('A4 Photo/Image price cannot be less than Color price.');
     return;
   }
 
   if (settingShortBondBwPrice && !isWholePeso(shortBondBwPrice)) {
-    setMessage('Short (Letter) B&W price must be a whole peso value (no decimals).');
+    setMessage(
+      'Short (Letter) B&W price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingShortBondColorPrice && !isWholePeso(shortBondColorPrice)) {
-    setMessage('Short (Letter) Color price must be a whole peso value (no decimals).');
+    setMessage(
+      'Short (Letter) Color price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingShortBondImagePrice && !isWholePeso(shortBondImagePrice)) {
-    setMessage('Short (Letter) Photo/Image price must be a whole peso value (no decimals).');
+    setMessage(
+      'Short (Letter) Photo/Image price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (
@@ -749,20 +877,28 @@ settingsForm.addEventListener('submit', (e) => {
     settingShortBondImagePrice &&
     shortBondImagePrice < shortBondColorPrice
   ) {
-    setMessage('Short (Letter) Photo/Image price cannot be less than Color price.');
+    setMessage(
+      'Short (Letter) Photo/Image price cannot be less than Color price.',
+    );
     return;
   }
 
   if (settingLongBondBwPrice && !isWholePeso(longBondBwPrice)) {
-    setMessage('Long (Legal) B&W price must be a whole peso value (no decimals).');
+    setMessage(
+      'Long (Legal) B&W price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingLongBondColorPrice && !isWholePeso(longBondColorPrice)) {
-    setMessage('Long (Legal) Color price must be a whole peso value (no decimals).');
+    setMessage(
+      'Long (Legal) Color price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingLongBondImagePrice && !isWholePeso(longBondImagePrice)) {
-    setMessage('Long (Legal) Photo/Image price must be a whole peso value (no decimals).');
+    setMessage(
+      'Long (Legal) Photo/Image price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (
@@ -778,7 +914,9 @@ settingsForm.addEventListener('submit', (e) => {
     settingLongBondImagePrice &&
     longBondImagePrice < longBondColorPrice
   ) {
-    setMessage('Long (Legal) Photo/Image price cannot be less than Color price.');
+    setMessage(
+      'Long (Legal) Photo/Image price cannot be less than Color price.',
+    );
     return;
   }
 
@@ -787,7 +925,9 @@ settingsForm.addEventListener('submit', (e) => {
     return;
   }
   if (settingHighQualitySurcharge && !isWholePeso(highQualitySurcharge)) {
-    setMessage('High quality surcharge must be a whole peso value (no decimals).');
+    setMessage(
+      'High quality surcharge must be a whole peso value (no decimals).',
+    );
     return;
   }
 
@@ -835,7 +975,8 @@ settingsForm.addEventListener('submit', (e) => {
       setMessage('Scan filename prefix cannot exceed 50 characters.');
       return;
     }
-    const customPatternVal = settingScanFilenameCustomPattern?.value.trim() ?? '';
+    const customPatternVal =
+      settingScanFilenameCustomPattern?.value.trim() ?? '';
     if (customPatternVal.length > 100) {
       setMessage('Scan filename custom pattern cannot exceed 100 characters.');
       return;
@@ -846,11 +987,11 @@ settingsForm.addEventListener('submit', (e) => {
       dateFormat: settingScanFilenameDateFormat?.value || 'YYYYMMDD',
       timeFormat: settingScanFilenameTimeFormat?.value || 'HHmmss',
       includeRandomSuffix: settingScanFilenameIncludeRandom?.checked ?? false,
-      customPatternEnabled: settingScanFilenameCustomPatternEnabled?.checked ?? false,
+      customPatternEnabled:
+        settingScanFilenameCustomPatternEnabled?.checked ?? false,
       customPattern: customPatternVal || '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}',
     };
   }
-
 
   if (settingIdleTimeout) {
     const idleTimeoutValue = Number(settingIdleTimeout.value);
@@ -859,7 +1000,9 @@ settingsForm.addEventListener('submit', (e) => {
       idleTimeoutValue < 60 ||
       idleTimeoutValue > 3600
     ) {
-      setMessage('Idle timeout must be a whole number between 60 and 3600 seconds.');
+      setMessage(
+        'Idle timeout must be a whole number between 60 and 3600 seconds.',
+      );
       return;
     }
     payload.idleTimeoutSeconds = idleTimeoutValue;
@@ -906,12 +1049,10 @@ settingsForm.addEventListener('submit', (e) => {
   // Print Limits
   if (settingMaxPagesPerSession) {
     const maxPages = Number(settingMaxPagesPerSession.value);
-    if (
-      !Number.isInteger(maxPages) ||
-      maxPages < 1 ||
-      maxPages > 500
-    ) {
-      setMessage('Max pages per session must be a whole number between 1 and 500.');
+    if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > 500) {
+      setMessage(
+        'Max pages per session must be a whole number between 1 and 500.',
+      );
       return;
     }
     payload.printLimits = {
@@ -989,6 +1130,52 @@ settingsForm.addEventListener('submit', (e) => {
     };
   }
 
+<<<<<<< HEAD
+=======
+  // Transaction ID & Receipt Format
+  if (settingTxnPrefix && settingTxnDateFormat && settingTxnRandomLength) {
+    const txnPrefix = settingTxnPrefix.value.trim();
+    if (txnPrefix.length > 20) {
+      setMessage('Transaction ID prefix cannot exceed 20 characters.');
+      return;
+    }
+    const dateFormatVal = settingTxnDateFormat.value;
+    if (
+      dateFormatVal !== 'YYYYMMDD' &&
+      dateFormatVal !== 'YYYY-MM-DD' &&
+      dateFormatVal !== 'none'
+    ) {
+      setMessage('Invalid transaction ID date format.');
+      return;
+    }
+    const randomLength = Number(settingTxnRandomLength.value);
+    if (
+      !Number.isInteger(randomLength) ||
+      randomLength < 2 ||
+      randomLength > 12
+    ) {
+      setMessage(
+        'Random suffix length must be a whole number between 2 and 12.',
+      );
+      return;
+    }
+    const customPatternVal = settingTxnCustomPattern?.value.trim() ?? '';
+    if (customPatternVal.length > 120) {
+      setMessage('Transaction ID custom pattern cannot exceed 120 characters.');
+      return;
+    }
+
+    payload.transactionIdFormat = {
+      prefix: txnPrefix || 'TXN',
+      dateFormat: dateFormatVal as 'YYYYMMDD' | 'YYYY-MM-DD' | 'none',
+      includeTime: settingTxnIncludeTime?.checked ?? false,
+      randomSuffixLength: randomLength,
+      customPatternEnabled: settingTxnCustomPatternEnabled?.checked ?? false,
+      customPattern: customPatternVal || '{PREFIX}-{DATE}-{RANDOM}',
+    };
+  }
+
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
   const alertPayload =
     alertSeverityThreshold !== null ? buildAlertPayload() : null;
 
@@ -1014,7 +1201,9 @@ settingsForm.addEventListener('submit', (e) => {
         let serverError: string | undefined;
         if (!settingsResponse.ok) {
           try {
-            const errBody = (await settingsResponse.json()) as { error?: string };
+            const errBody = (await settingsResponse.json()) as {
+              error?: string;
+            };
             serverError = errBody.error;
           } catch {
             // ignore

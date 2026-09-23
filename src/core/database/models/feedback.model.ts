@@ -199,7 +199,7 @@ export class FeedbackSqliteStore {
     const offset = Math.max(0, Math.floor(options.offset));
 
     const where: string[] = [];
-    const params: Array<string | number> = [];
+    const params: (string | number)[] = [];
 
     if (options.view === 'active') {
       where.push('status = ?');
@@ -234,7 +234,7 @@ export class FeedbackSqliteStore {
          ORDER BY timestamp DESC
          LIMIT ? OFFSET ?`,
       )
-      .all(...params, limit, offset) as Array<Record<string, unknown>>;
+      .all(...params, limit, offset) as Record<string, unknown>[];
 
     return {
       total: Number(totalRow.total ?? 0),
@@ -310,7 +310,7 @@ export class FeedbackSqliteStore {
          FROM feedback_entries
          ORDER BY timestamp DESC`,
       )
-      .all() as Array<Record<string, unknown>>;
+      .all() as Record<string, unknown>[];
     return rows.map((row) => this.toFeedbackEntry(row));
   }
 

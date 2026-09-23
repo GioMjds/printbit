@@ -176,7 +176,7 @@ export interface AdminTransactionSupervisionRecord {
   /**
    * Timeline of all events
    */
-  timeline: Array<{
+  timeline: {
     timestamp: string;
     event:
       | 'transaction_created'
@@ -188,7 +188,7 @@ export interface AdminTransactionSupervisionRecord {
       | 'receipt_printed'
       | 'change_dispensed';
     details: Record<string, unknown>;
-  }>;
+  }[];
 }
 
 /**
@@ -312,21 +312,21 @@ export interface AdminQueueDashboardData {
   /**
    * Recent failures (last 24h)
    */
-  recentFailures: Array<{
+  recentFailures: {
     transactionId: string;
     failureClass: string;
     attemptNumber: number;
     timestamp: string;
-  }>;
+  }[];
 
   /**
    * Top failure reasons (last 7 days)
    */
-  topFailureReasons: Array<{
+  topFailureReasons: {
     reason: string;
     count: number;
     failureClass: string;
-  }>;
+  }[];
 
   /**
    * Retry success rate (last 7 days)

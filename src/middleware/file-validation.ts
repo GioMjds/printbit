@@ -41,7 +41,7 @@ export interface ValidationPolicy {
   readonly extensionMimeMap: Record<string, string>;
   readonly magicSignatures: Record<
     string,
-    Array<{ bytes: number[]; offset?: number }>
+    { bytes: number[]; offset?: number }[]
   >;
   readonly surface: UploadSurface;
 }
@@ -82,29 +82,29 @@ const DANGEROUS_SCRIPT_OR_EXECUTABLE_EXTENSIONS = new Set([
   '.gadget',
 ]);
 
-const DOCUMENT_UPLOAD_POLICY: ValidationPolicy = {
+const DOCUMENT_UPLOAD_POLICY = {
   allowedExtensions: ALLOWED_EXTENSIONS,
   allowedMimeTypes: ALLOWED_MIME_TYPES,
   extensionMimeMap: EXTENSION_MIME_MAP,
   magicSignatures: MAGIC_SIGNATURES,
   surface: 'wireless-session-upload',
-};
+} as const satisfies ValidationPolicy;
 
-const LEGACY_UPLOAD_POLICY: ValidationPolicy = {
+const LEGACY_UPLOAD_POLICY = {
   allowedExtensions: ALLOWED_EXTENSIONS,
   allowedMimeTypes: ALLOWED_MIME_TYPES,
   extensionMimeMap: EXTENSION_MIME_MAP,
   magicSignatures: MAGIC_SIGNATURES,
   surface: 'legacy-upload',
-};
+} as const satisfies ValidationPolicy;
 
-const REPORT_ATTACHMENT_POLICY: ValidationPolicy = {
+const REPORT_ATTACHMENT_POLICY = {
   allowedExtensions: REPORT_ATTACHMENT_ALLOWED_EXTENSIONS,
   allowedMimeTypes: REPORT_ATTACHMENT_ALLOWED_MIME_TYPES,
   extensionMimeMap: REPORT_ATTACHMENT_EXTENSION_MIME_MAP,
   magicSignatures: REPORT_ATTACHMENT_MAGIC_SIGNATURES,
   surface: 'report-issue-attachment',
-};
+} as const satisfies ValidationPolicy;
 
 function classifyDetectedMime(
   buffer: Buffer,
@@ -187,7 +187,7 @@ async function reportUploadSecurityAnomaly(input: {
   source: UploadSurface;
   severity: 'warning' | 'critical';
   message: string;
-  fingerprintParts: Array<string | null>;
+  fingerprintParts: (string | null)[];
   context?: Record<string, string | number | boolean | null>;
 }): Promise<void> {
   try {
@@ -469,9 +469,7 @@ async function validateStagedOoxmlStructure(
   if (eocdRelativeOffset === -1) return false;
 
   const eocdAbsoluteOffset = tailOffset + eocdRelativeOffset;
-  const centralDirectorySize = tailBuffer.readUInt32LE(
-    eocdRelativeOffset + 12,
-  );
+  const centralDirectorySize = tailBuffer.readUInt32LE(eocdRelativeOffset + 12);
   const centralDirectoryOffset = tailBuffer.readUInt32LE(
     eocdRelativeOffset + 16,
   );
@@ -631,7 +629,10 @@ async function validateStagedMagicBytesWithPolicy(
 
     next();
   } catch (error) {
-    console.error('[file-validation] Unexpected error validating magic bytes:', error);
+    console.error(
+      '[file-validation] Unexpected error validating magic bytes:',
+      error,
+    );
     res.status(422).json({
       code: 'UNSUPPORTED_TYPE',
       error: 'File content could not be verified.',
@@ -725,7 +726,8 @@ async function scanStagedUploadWithSurface(
         type: 'upload_malware_detected',
         source: surface,
         severity: 'critical',
-        message: 'Upload quarantined because Microsoft Defender detected malware.',
+        message:
+          'Upload quarantined because Microsoft Defender detected malware.',
         fingerprintParts: [
           surface,
           'malware-detected',

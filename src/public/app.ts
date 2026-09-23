@@ -100,7 +100,7 @@ function navigateTo(path: string) {
   navigateWithKioskMotion(path);
 }
 
-const PRINT_ONBOARDING_TRIGGER_KEY = 'printbit.showPrintOnboardingModal';
+// const PRINT_ONBOARDING_TRIGGER_KEY = 'printbit.showPrintOnboardingModal';
 
 const openPrint = document.getElementById('openPrintBtn');
 const openCopy = document.getElementById('openCopyBtn');
@@ -193,6 +193,100 @@ window.addEventListener('pagehide', (event) => {
   }
 });
 
+<<<<<<< HEAD
+=======
+// ── Optional Transaction Receipt Prompt ──────────────────────────────────────
+
+const receiptPromptOverlay = document.getElementById('receiptPromptOverlay');
+const receiptPromptYesBtn = document.getElementById('receiptPromptYesBtn');
+const receiptPromptNoBtn = document.getElementById('receiptPromptNoBtn');
+const receiptPromptCancelBtn = document.getElementById('receiptPromptCancelBtn');
+const receiptPromptProgress = document.getElementById('receiptPromptProgress');
+
+let pendingPrintMethodDestination: string | null = null;
+let receiptPromptTimeout: ReturnType<typeof setTimeout> | null = null;
+const RECEIPT_PROMPT_TIMEOUT_MS = 15000;
+
+function closeReceiptPrompt(): void {
+  if (receiptPromptTimeout) {
+    clearTimeout(receiptPromptTimeout);
+    receiptPromptTimeout = null;
+  }
+  pendingPrintMethodDestination = null;
+  if (receiptPromptOverlay) {
+    receiptPromptOverlay.classList.remove('is-visible');
+    receiptPromptOverlay.setAttribute('aria-hidden', 'true');
+  }
+  if (receiptPromptProgress) {
+    receiptPromptProgress.style.transition = 'none';
+    receiptPromptProgress.style.width = '100%';
+  }
+  syncFabVisibility();
+}
+
+function selectReceiptPreferenceAndNavigate(preference: 'yes' | 'no'): void {
+  const destination = pendingPrintMethodDestination;
+  closeReceiptPrompt();
+  if (!destination) return;
+  try {
+    sessionStorage.setItem('printbit.receiptPreference', preference);
+  } catch {
+    // Best-effort storage
+  }
+  navigateTo(destination);
+}
+
+function promptReceiptChoice(destination: string): void {
+  pendingPrintMethodDestination = destination;
+  if (!receiptPromptOverlay) {
+    try {
+      sessionStorage.setItem('printbit.receiptPreference', 'yes');
+    } catch {
+      // Best-effort storage
+    }
+    navigateTo(destination);
+    return;
+  }
+
+  receiptPromptOverlay.classList.add('is-visible');
+  receiptPromptOverlay.setAttribute('aria-hidden', 'false');
+  syncFabVisibility();
+
+  if (receiptPromptProgress) {
+    receiptPromptProgress.style.transition = 'none';
+    receiptPromptProgress.style.width = '100%';
+    void receiptPromptProgress.offsetHeight;
+    receiptPromptProgress.style.transition = `width ${RECEIPT_PROMPT_TIMEOUT_MS}ms linear`;
+    receiptPromptProgress.style.width = '0%';
+  }
+
+  if (receiptPromptTimeout) clearTimeout(receiptPromptTimeout);
+  receiptPromptTimeout = setTimeout(() => {
+    closeReceiptPrompt();
+  }, RECEIPT_PROMPT_TIMEOUT_MS);
+}
+
+receiptPromptYesBtn?.addEventListener('click', () => {
+  selectReceiptPreferenceAndNavigate('yes');
+});
+receiptPromptNoBtn?.addEventListener('click', () => {
+  selectReceiptPreferenceAndNavigate('no');
+});
+receiptPromptCancelBtn?.addEventListener('click', () => {
+  closeReceiptPrompt();
+});
+receiptPromptOverlay?.addEventListener('click', (event) => {
+  if (event.target === receiptPromptOverlay) {
+    closeReceiptPrompt();
+  }
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && receiptPromptOverlay?.classList.contains('is-visible')) {
+    closeReceiptPrompt();
+  }
+});
+
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 openPrint?.addEventListener('click', () => {
   navigateTo('/print');
 });

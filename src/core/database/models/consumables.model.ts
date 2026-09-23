@@ -54,11 +54,11 @@ export interface InkHistoryEntry {
     | 'none';
   inkTelemetryAvailable: boolean;
   inkTelemetryReason: string | null;
-  supplies: Array<{
+  supplies: {
     name: string;
     level: number | null;
     status: 'ok' | 'low' | 'empty' | 'unknown';
-  }>;
+  }[];
 }
 
 export interface InkRefillBaseline {
@@ -162,7 +162,7 @@ export class ConsumablesSqliteStore {
          WHERE timestamp >= ?
          ORDER BY timestamp DESC, rowid DESC`,
       )
-      .all(sinceTimestamp) as Array<Record<string, unknown>>;
+      .all(sinceTimestamp) as Record<string, unknown>[];
 
     return rows.map((row) => this.toUsageEventEntry(row));
   }
@@ -229,8 +229,8 @@ export class ConsumablesSqliteStore {
          WHERE timestamp >= ?
          ORDER BY timestamp DESC, rowid DESC`,
       )
-      .all(sinceTimestamp) as Array<Record<string, unknown>>;
-
+      .all(sinceTimestamp) as Record<string, unknown>[];
+      
     return rows.map((row) => this.toInkSnapshotEntry(row));
   }
 

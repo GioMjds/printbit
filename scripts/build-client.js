@@ -2,29 +2,6 @@ const esbuild = require('esbuild');
 const fs = require('node:fs');
 const path = require('node:path');
 
-function copyFlatpickrCss() {
-  const sourcePath = path.resolve(
-    'node_modules',
-    'flatpickr',
-    'dist',
-    'flatpickr.min.css',
-  );
-  const targetPath = path.resolve(
-    'src',
-    'public',
-    'vendor',
-    'flatpickr',
-    'flatpickr.min.css',
-  );
-  try {
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.copyFileSync(sourcePath, targetPath);
-    console.log(`Copied: ${sourcePath} -> ${targetPath}`);
-  } catch (err) {
-    console.warn(`Could not copy flatpickr css (ignoring): ${err.message}`);
-  }
-}
-
 function copyDotLottieWasm() {
   const sourcePath = path.resolve(
     'node_modules',
@@ -86,7 +63,6 @@ function ensurePwaIcons() {
 }
 
 try {
-  copyFlatpickrCss();
   copyDotLottieWasm();
   ensurePwaIcons();
   for (const entry of entryPoints) {

@@ -194,13 +194,11 @@ export const GHOSTSCRIPT_PATH = readPathEnv(
   'GHOSTSCRIPT_PATH',
 );
 
-
 export const PRINT_DISPATCH_TIMEOUT_MS = readPositiveIntEnv(
   process.env.PRINTBIT_PRINT_DISPATCH_TIMEOUT_MS?.trim(),
   60_000,
   5_000,
 );
-
 
 export const PRINT_SPOOLER_MONITOR_WINDOW_MS = readPositiveIntEnv(
   process.env.PRINTBIT_PRINT_SPOOLER_MONITOR_WINDOW_MS?.trim(),
@@ -226,7 +224,7 @@ export const PRINT_SPOOLER_QUERY_TIMEOUT_MS = readPositiveIntEnv(
   5_000,
 );
 
-export const PUBLIC_PAGE_ROUTES: Array<{ route: string; filePath: string }> = [
+export const PUBLIC_PAGE_ROUTES = [
   { route: '/', filePath: path.join(PUBLIC_DIR, 'index.html') },
   { route: '/print', filePath: path.join(PUBLIC_DIR, 'print', 'index.html') },
   { route: '/copy', filePath: path.join(PUBLIC_DIR, 'copy', 'index.html') },
@@ -284,4 +282,4 @@ export const PUBLIC_PAGE_ROUTES: Array<{ route: string; filePath: string }> = [
     route: '/scc',
     filePath: path.join(PUBLIC_DIR, 'scc', 'index.html'),
   },
-];
+] satisfies { route: string; filePath: string }[];

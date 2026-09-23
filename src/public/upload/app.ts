@@ -140,7 +140,7 @@ function getOrCreateUploadClientId(): string {
 const uploadClientId = getOrCreateUploadClientId();
 
 /** Files staged for upload — keyed by a local id */
-interface QueuedFile {
+type QueuedFile = {
   id: string;
   file: File;
   contentHash?: string;
@@ -618,13 +618,13 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
       continue;
     }
 
-    const qf: QueuedFile = {
+    const qf = {
       id: String(nextId++),
       file,
       contentHash,
       status: 'pending',
       el: null as unknown as HTMLElement,
-    };
+    } satisfies QueuedFile;
     const el = createQueueItem(qf);
     qf.el = el;
     queue.push(qf);

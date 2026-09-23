@@ -60,7 +60,6 @@
     "edge-js": "^26.0.0",
     "express": "^5.2.1",
     "file-type": "^21.3.2",
-    "flatpickr": "^4.6.13",
     "i18next": "^25.9.0",
     "i18next-fs-backend": "^2.6.6",
     "i18next-http-middleware": "^3.9.7",
