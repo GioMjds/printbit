@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -25,7 +24,6 @@ import {
 import { recordSpoolerLifecycleTransition } from '@/services/recovery';
 import { BLOCKED_STATUSES } from '@/utils';
 import {
-  WORKER_COMMAND_PIPE_NAME,
   WORKER_QUEUE_DIR,
   WORKER_FAILED_DIR,
 } from '@/config/http.config';
@@ -472,7 +470,7 @@ export class PrinterService {
     try {
       await execFileAsync('taskkill', ['/F', '/IM', 'e_yarnyre.exe'], { timeout: 2000 });
       console.log(`[PRINTER] Successfully dismissed Epson Status Monitor popup (e_yarnyre.exe)`);
-    } catch (e) {
+    } catch {
       // Ignore errors (process not found, etc.)
     }
 
@@ -685,7 +683,8 @@ export class PrinterService {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[PRINTER] Failed to resubmit job: ${msg}`);
       throw new Error(
-        `Failed to resume or resubmit job. (Original resume error: ${result.error}. Handoff retry error: ${msg})`,
+        `Failed to resume or resubmit job. (Original resume error: ${result.error}. Handoff retry error: ${msg})`, 
+        { cause: err }
       );
     }
   }
@@ -962,7 +961,7 @@ export class PrinterService {
             if (isSafe) {
               try {
                 await fs.unlink(filePath);
-              } catch (e) {
+              } catch {
                 // ignore missing
               }
             }

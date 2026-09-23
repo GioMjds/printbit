@@ -572,7 +572,7 @@ if ('${username}' -and '${password}') {
   }
 }
 
-export function buildAnomalyFingerprint(parts: Array<string | null>): string {
+export function buildAnomalyFingerprint(parts: (string | null)[]): string {
   return parts
     .map((part) => (part ?? '').trim().toLowerCase())
     .filter((part) => part.length > 0)

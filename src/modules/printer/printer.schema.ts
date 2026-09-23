@@ -15,11 +15,11 @@ export interface InkHistoryEntry {
     | 'none';
   inkTelemetryAvailable: boolean;
   inkTelemetryReason: string | null;
-  supplies: Array<{
+  supplies: {
     name: string;
     level: number | null;
     status: 'ok' | 'low' | 'empty' | 'unknown';
-  }>;
+  }[];
 }
 
 export type Orientation = 'portrait' | 'landscape';

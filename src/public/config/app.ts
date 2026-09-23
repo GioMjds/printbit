@@ -1313,16 +1313,18 @@ function updateCustomRangeWithDelta(
   schedulePrintQuoteRefresh();
 }
 
-const customRangeStepperControls: Array<{
+type CustomRangeStepperControl = {
   el: HTMLButtonElement | null;
   target: 'start' | 'end';
   delta: number;
-}> = [
+}
+
+const customRangeStepperControls = [
   { el: customRangeStartDec, target: 'start', delta: -1 },
   { el: customRangeStartInc, target: 'start', delta: 1 },
   { el: customRangeEndDec, target: 'end', delta: -1 },
   { el: customRangeEndInc, target: 'end', delta: 1 },
-];
+] satisfies CustomRangeStepperControl[];
 
 customRangeStepperControls.forEach(({ el, target, delta }) => {
   el?.addEventListener('click', () => {

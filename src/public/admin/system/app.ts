@@ -87,12 +87,6 @@ const spoolerAlertMsg = document.getElementById(
 const spoolerAlertDismiss = document.getElementById(
   'spoolerAlertDismiss',
 ) as HTMLButtonElement | null;
-const openAlertBadge = document.getElementById(
-  'openAlertBadge',
-) as HTMLElement | null;
-const openAlertBadgeMob = document.getElementById(
-  'openAlertBadgeMob',
-) as HTMLElement | null;
 
 let refreshTimer: number | null = null;
 
@@ -108,7 +102,7 @@ interface PrinterTelemetryExt {
   inkDetectionMethod?: string | null;
   inkTelemetryAvailable?: boolean;
   inkTelemetryReason?: string | null;
-  ink?: Array<{ name: string; level: number | null; status: string }>;
+  ink?: { name: string; level: number | null; status: string }[];
   targetPrinterName?: string | null;
   targetIsDefault?: boolean;
 }

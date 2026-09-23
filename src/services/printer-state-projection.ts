@@ -9,13 +9,13 @@ export interface ProjectedPrinterState {
 }
 
 export class PrinterStateProjection {
-  private state: ProjectedPrinterState = {
+  private state = {
     connected: false,
     name: null,
     status: 'offline',
     lastCheckedAt: new Date().toISOString(),
     error: null,
-  };
+  } as ProjectedPrinterState;
 
   public reset(): void {
     this.state = {
@@ -116,8 +116,18 @@ export interface PrinterTelemetry {
   connectionType: 'usb' | 'network' | 'wsd' | 'virtual' | 'unknown';
   status: string;
   statusFlags: string[];
-  ink: Array<{ name: string; level: number | null; status: 'ok' | 'low' | 'empty' | 'unknown'; colorHint?: string }>;
-  inkDetectionMethod: 'snmp' | 'vendor-wmi' | 'printer-property' | 'error-state' | 'none';
+  ink: {
+    name: string;
+    level: number | null;
+    status: 'ok' | 'low' | 'empty' | 'unknown';
+    colorHint?: string;
+  }[];
+  inkDetectionMethod:
+    | 'snmp'
+    | 'vendor-wmi'
+    | 'printer-property'
+    | 'error-state'
+    | 'none';
   inkTelemetryAvailable: boolean;
   inkTelemetryReason?: string | null;
   lastCheckedAt: string;
@@ -132,7 +142,14 @@ export function getPrinterTelemetry(): PrinterTelemetry {
     driverName: null,
     portName: null,
     connectionType: 'usb',
-    status: s.status === 'ready' ? 'Idle' : s.status === 'printing' ? 'Printing' : s.status === 'offline' ? 'Offline' : 'Error',
+    status:
+      s.status === 'ready'
+        ? 'Idle'
+        : s.status === 'printing'
+          ? 'Printing'
+          : s.status === 'offline'
+            ? 'Offline'
+            : 'Error',
     statusFlags: [],
     ink: [],
     inkDetectionMethod: 'none',
@@ -250,6 +267,11 @@ export interface EdgeJobActionResult {
   alreadyInState?: boolean;
 }
 
+// TO REMOVE (functions): Since it is not going to be implemented
+// 1. `cancelPrintJobViaEdge`
+// 2. `pausePrintJobViaEdge`
+// 3. `resumePrintJobViaEdge`
+
 export async function cancelPrintJobViaEdge(
   _printerName: string,
   _spoolerJobId: number,
@@ -319,4 +341,3 @@ export async function watchJobForMalfunction(
 ): Promise<{ faultDetected: boolean; fault?: PrinterFault }> {
   return { faultDetected: false };
 }
-

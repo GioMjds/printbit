@@ -9,14 +9,9 @@ declare global {
   }
 }
 
-interface SessionResponse {
-  sessionId: string;
-  feedbackUrl: string;
-}
-
 type AppState = 'loading' | 'ready' | 'submitting' | 'done' | 'error';
 
-const CATEGORIES: Array<{ value: string; label: string }> = [
+const CATEGORIES = [
   { value: 'service', label: 'Service' },
   { value: 'print', label: 'Printing' },
   { value: 'copy', label: 'Copying' },
@@ -25,7 +20,7 @@ const CATEGORIES: Array<{ value: string; label: string }> = [
   { value: 'hardware', label: 'Hardware' },
   { value: 'software', label: 'Software' },
   { value: 'other', label: 'Other' },
-];
+] satisfies { value: string; label: string }[];
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 

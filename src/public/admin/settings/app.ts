@@ -1,5 +1,4 @@
 import {
-  AdminSettings,
   SettingsResponse,
   SummaryResponse,
   apiFetch,
@@ -243,8 +242,11 @@ function renderScanFilenamePreview(): void {
   const RANDOM = 'A1B2';
 
   const prefix = settingScanFilenamePrefix?.value.trim() || 'PrintBit-Scan';
-  const customEnabled = settingScanFilenameCustomPatternEnabled?.checked ?? false;
-  const customPattern = settingScanFilenameCustomPattern?.value.trim() || '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
+  const customEnabled =
+    settingScanFilenameCustomPatternEnabled?.checked ?? false;
+  const customPattern =
+    settingScanFilenameCustomPattern?.value.trim() ||
+    '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}';
   const dateFormat = settingScanFilenameDateFormat?.value ?? 'YYYYMMDD';
   const timeFormat = settingScanFilenameTimeFormat?.value ?? 'HHmmss';
   const includeRandom = settingScanFilenameIncludeRandom?.checked ?? false;
@@ -278,7 +280,8 @@ function renderScanFilenamePreview(): void {
   }
 
   // eslint-disable-next-line no-control-regex
-  const cleaned = baseName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+  const cleaned = baseName
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -297,11 +300,11 @@ function syncScanFilenameUI(): void {
     customPatternContainer.classList.toggle('hidden', !customEnabled);
   }
 
-  const presetElements: Array<HTMLSelectElement | HTMLInputElement | null> = [
+  const presetElements = [
     settingScanFilenameDateFormat,
     settingScanFilenameTimeFormat,
     settingScanFilenameIncludeRandom,
-  ];
+  ] satisfies (HTMLSelectElement | HTMLInputElement | null)[];
 
   presetElements.forEach((el) => {
     if (!el) return;
@@ -389,7 +392,8 @@ function renderTxnFormatPreview(): void {
   const dateFormat = settingTxnDateFormat?.value ?? 'YYYYMMDD';
   const includeTime = settingTxnIncludeTime?.checked ?? false;
   const customEnabled = settingTxnCustomPatternEnabled?.checked ?? false;
-  const customPattern = settingTxnCustomPattern?.value.trim() || '{PREFIX}-{DATE}-{RANDOM}';
+  const customPattern =
+    settingTxnCustomPattern?.value.trim() || '{PREFIX}-{DATE}-{RANDOM}';
 
   let dateStr = '';
   if (dateFormat === 'YYYYMMDD') dateStr = `${YYYY}${MM}${DD}`;
@@ -672,14 +676,20 @@ function applySettings(settings: SettingsResponse): void {
     customPattern: '{PREFIX}-{DATE}-{RANDOM}',
   };
   if (settingTxnPrefix) settingTxnPrefix.value = txnFmt.prefix ?? 'TXN';
-  if (settingTxnDateFormat) settingTxnDateFormat.value = txnFmt.dateFormat ?? 'YYYYMMDD';
-  if (settingTxnIncludeTime) settingTxnIncludeTime.checked = Boolean(txnFmt.includeTime);
-  if (settingTxnRandomLength) settingTxnRandomLength.value = String(txnFmt.randomSuffixLength ?? 4);
+  if (settingTxnDateFormat)
+    settingTxnDateFormat.value = txnFmt.dateFormat ?? 'YYYYMMDD';
+  if (settingTxnIncludeTime)
+    settingTxnIncludeTime.checked = Boolean(txnFmt.includeTime);
+  if (settingTxnRandomLength)
+    settingTxnRandomLength.value = String(txnFmt.randomSuffixLength ?? 4);
   if (settingTxnCustomPatternEnabled) {
-    settingTxnCustomPatternEnabled.checked = Boolean(txnFmt.customPatternEnabled);
+    settingTxnCustomPatternEnabled.checked = Boolean(
+      txnFmt.customPatternEnabled,
+    );
   }
   if (settingTxnCustomPattern) {
-    settingTxnCustomPattern.value = txnFmt.customPattern ?? '{PREFIX}-{DATE}-{RANDOM}';
+    settingTxnCustomPattern.value =
+      txnFmt.customPattern ?? '{PREFIX}-{DATE}-{RANDOM}';
   }
   syncTxnFormatUI();
 }
@@ -838,28 +848,40 @@ settingsForm.addEventListener('submit', (e) => {
     return;
   }
   if (settingA4ImagePrice && !isWholePeso(a4ImagePrice)) {
-    setMessage('A4 Photo/Image price must be a whole peso value (no decimals).');
+    setMessage(
+      'A4 Photo/Image price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingA4BwPrice && settingA4ColorPrice && a4ColorPrice < a4BwPrice) {
     setMessage('A4 Color price cannot be less than B&W price.');
     return;
   }
-  if (settingA4ColorPrice && settingA4ImagePrice && a4ImagePrice < a4ColorPrice) {
+  if (
+    settingA4ColorPrice &&
+    settingA4ImagePrice &&
+    a4ImagePrice < a4ColorPrice
+  ) {
     setMessage('A4 Photo/Image price cannot be less than Color price.');
     return;
   }
 
   if (settingShortBondBwPrice && !isWholePeso(shortBondBwPrice)) {
-    setMessage('Short (Letter) B&W price must be a whole peso value (no decimals).');
+    setMessage(
+      'Short (Letter) B&W price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingShortBondColorPrice && !isWholePeso(shortBondColorPrice)) {
-    setMessage('Short (Letter) Color price must be a whole peso value (no decimals).');
+    setMessage(
+      'Short (Letter) Color price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingShortBondImagePrice && !isWholePeso(shortBondImagePrice)) {
-    setMessage('Short (Letter) Photo/Image price must be a whole peso value (no decimals).');
+    setMessage(
+      'Short (Letter) Photo/Image price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (
@@ -875,20 +897,28 @@ settingsForm.addEventListener('submit', (e) => {
     settingShortBondImagePrice &&
     shortBondImagePrice < shortBondColorPrice
   ) {
-    setMessage('Short (Letter) Photo/Image price cannot be less than Color price.');
+    setMessage(
+      'Short (Letter) Photo/Image price cannot be less than Color price.',
+    );
     return;
   }
 
   if (settingLongBondBwPrice && !isWholePeso(longBondBwPrice)) {
-    setMessage('Long (Legal) B&W price must be a whole peso value (no decimals).');
+    setMessage(
+      'Long (Legal) B&W price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingLongBondColorPrice && !isWholePeso(longBondColorPrice)) {
-    setMessage('Long (Legal) Color price must be a whole peso value (no decimals).');
+    setMessage(
+      'Long (Legal) Color price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (settingLongBondImagePrice && !isWholePeso(longBondImagePrice)) {
-    setMessage('Long (Legal) Photo/Image price must be a whole peso value (no decimals).');
+    setMessage(
+      'Long (Legal) Photo/Image price must be a whole peso value (no decimals).',
+    );
     return;
   }
   if (
@@ -904,7 +934,9 @@ settingsForm.addEventListener('submit', (e) => {
     settingLongBondImagePrice &&
     longBondImagePrice < longBondColorPrice
   ) {
-    setMessage('Long (Legal) Photo/Image price cannot be less than Color price.');
+    setMessage(
+      'Long (Legal) Photo/Image price cannot be less than Color price.',
+    );
     return;
   }
 
@@ -913,7 +945,9 @@ settingsForm.addEventListener('submit', (e) => {
     return;
   }
   if (settingHighQualitySurcharge && !isWholePeso(highQualitySurcharge)) {
-    setMessage('High quality surcharge must be a whole peso value (no decimals).');
+    setMessage(
+      'High quality surcharge must be a whole peso value (no decimals).',
+    );
     return;
   }
 
@@ -961,7 +995,8 @@ settingsForm.addEventListener('submit', (e) => {
       setMessage('Scan filename prefix cannot exceed 50 characters.');
       return;
     }
-    const customPatternVal = settingScanFilenameCustomPattern?.value.trim() ?? '';
+    const customPatternVal =
+      settingScanFilenameCustomPattern?.value.trim() ?? '';
     if (customPatternVal.length > 100) {
       setMessage('Scan filename custom pattern cannot exceed 100 characters.');
       return;
@@ -972,11 +1007,11 @@ settingsForm.addEventListener('submit', (e) => {
       dateFormat: settingScanFilenameDateFormat?.value || 'YYYYMMDD',
       timeFormat: settingScanFilenameTimeFormat?.value || 'HHmmss',
       includeRandomSuffix: settingScanFilenameIncludeRandom?.checked ?? false,
-      customPatternEnabled: settingScanFilenameCustomPatternEnabled?.checked ?? false,
+      customPatternEnabled:
+        settingScanFilenameCustomPatternEnabled?.checked ?? false,
       customPattern: customPatternVal || '{PREFIX}_{YYYY}{MM}{DD}_{HH}{mm}{ss}',
     };
   }
-
 
   if (settingIdleTimeout) {
     const idleTimeoutValue = Number(settingIdleTimeout.value);
@@ -985,7 +1020,9 @@ settingsForm.addEventListener('submit', (e) => {
       idleTimeoutValue < 60 ||
       idleTimeoutValue > 3600
     ) {
-      setMessage('Idle timeout must be a whole number between 60 and 3600 seconds.');
+      setMessage(
+        'Idle timeout must be a whole number between 60 and 3600 seconds.',
+      );
       return;
     }
     payload.idleTimeoutSeconds = idleTimeoutValue;
@@ -1032,12 +1069,10 @@ settingsForm.addEventListener('submit', (e) => {
   // Print Limits
   if (settingMaxPagesPerSession) {
     const maxPages = Number(settingMaxPagesPerSession.value);
-    if (
-      !Number.isInteger(maxPages) ||
-      maxPages < 1 ||
-      maxPages > 500
-    ) {
-      setMessage('Max pages per session must be a whole number between 1 and 500.');
+    if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > 500) {
+      setMessage(
+        'Max pages per session must be a whole number between 1 and 500.',
+      );
       return;
     }
     payload.printLimits = {
@@ -1132,8 +1167,14 @@ settingsForm.addEventListener('submit', (e) => {
       return;
     }
     const randomLength = Number(settingTxnRandomLength.value);
-    if (!Number.isInteger(randomLength) || randomLength < 2 || randomLength > 12) {
-      setMessage('Random suffix length must be a whole number between 2 and 12.');
+    if (
+      !Number.isInteger(randomLength) ||
+      randomLength < 2 ||
+      randomLength > 12
+    ) {
+      setMessage(
+        'Random suffix length must be a whole number between 2 and 12.',
+      );
       return;
     }
     const customPatternVal = settingTxnCustomPattern?.value.trim() ?? '';
@@ -1177,7 +1218,9 @@ settingsForm.addEventListener('submit', (e) => {
         let serverError: string | undefined;
         if (!settingsResponse.ok) {
           try {
-            const errBody = (await settingsResponse.json()) as { error?: string };
+            const errBody = (await settingsResponse.json()) as {
+              error?: string;
+            };
             serverError = errBody.error;
           } catch {
             // ignore

@@ -229,7 +229,7 @@ export class ConsumablesSqliteStore {
          WHERE timestamp >= ?
          ORDER BY timestamp DESC, rowid DESC`,
       )
-      .all(sinceTimestamp) as Array<Record<string, unknown>>;
+      .all(sinceTimestamp) as Record<string, unknown>[];
       
     return rows.map((row) => this.toInkSnapshotEntry(row));
   }

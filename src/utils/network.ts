@@ -49,9 +49,9 @@ export function findMatchingIpv4ForSubnet(
  */
 export function getAllLocalIPv4s(
   customInterfaces?: NodeJS.Dict<os.NetworkInterfaceInfo[]>,
-): Array<{ name: string; address: string; isInternal: boolean }> {
+): { name: string; address: string; isInternal: boolean }[] {
   const interfaces = customInterfaces ?? os.networkInterfaces();
-  const results: Array<{ name: string; address: string; isInternal: boolean }> =
+  const results: { name: string; address: string; isInternal: boolean }[] =
     [];
 
   for (const name of Object.keys(interfaces)) {

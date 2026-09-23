@@ -1224,7 +1224,7 @@ export class WirelessSessionService {
       return null;
     }
 
-    const pages: Array<DocumentAnalysis['pages'][number]> = [];
+    const pages = [] as (DocumentAnalysis['pages'][number])[];
     for (const page of value.pages) {
       if (typeof page !== 'object' || page === null) {
         return null;
