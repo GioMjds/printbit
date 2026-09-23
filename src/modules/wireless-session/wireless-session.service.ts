@@ -1243,6 +1243,11 @@ export class WirelessSessionService {
         Number.isFinite(pageValue.coverage)
           ? Math.max(0, Math.min(1, pageValue.coverage))
           : undefined;
+      const contentCoverage =
+        typeof pageValue.contentCoverage === 'number' &&
+        Number.isFinite(pageValue.contentCoverage)
+          ? Math.max(0, Math.min(1, pageValue.contentCoverage))
+          : undefined;
       const classificationRaw = pageValue.classification;
       const classification:
         | 'blank'
@@ -1274,6 +1279,7 @@ export class WirelessSessionService {
         index: Math.floor(pageValue.index),
         isColor: pageValue.isColor,
         ...(coverage !== undefined ? { coverage } : {}),
+        ...(contentCoverage !== undefined ? { contentCoverage } : {}),
         ...(classification ? { classification } : {}),
         ...(isImagePage !== undefined ? { isImagePage } : {}),
         ...(isBlank !== undefined ? { isBlank } : {}),
@@ -1291,7 +1297,54 @@ export class WirelessSessionService {
         ? confidenceRaw
         : 'medium';
 
+    const analysisVersion =
+      typeof value.analysisVersion === 'number' &&
+      Number.isFinite(value.analysisVersion)
+        ? Math.floor(value.analysisVersion)
+        : undefined;
+
+    const blankPages = Array.isArray(value.blankPages)
+      ? value.blankPages
+          .filter(
+            (page): page is number =>
+              typeof page === 'number' && Number.isFinite(page),
+          )
+          .map((page) => Math.floor(page))
+      : undefined;
+
+    const blankPageCount =
+      typeof value.blankPageCount === 'number' &&
+      Number.isFinite(value.blankPageCount)
+        ? Math.max(0, Math.floor(value.blankPageCount))
+        : (blankPages ? blankPages.length : undefined);
+
+    const isEntirelyBlank =
+      typeof value.isEntirelyBlank === 'boolean'
+        ? value.isEntirelyBlank
+        : undefined;
+
+    const lowContentPages = Array.isArray(value.lowContentPages)
+      ? value.lowContentPages
+          .filter(
+            (page): page is number =>
+              typeof page === 'number' && Number.isFinite(page),
+          )
+          .map((page) => Math.floor(page))
+      : undefined;
+
+    const lowContentPageCount =
+      typeof value.lowContentPageCount === 'number' &&
+      Number.isFinite(value.lowContentPageCount)
+        ? Math.max(0, Math.floor(value.lowContentPageCount))
+        : (lowContentPages ? lowContentPages.length : undefined);
+
+    const hasLowContent =
+      typeof value.hasLowContent === 'boolean'
+        ? value.hasLowContent
+        : undefined;
+
     return {
+      ...(analysisVersion !== undefined ? { analysisVersion } : {}),
       fileType,
       pageCount: Math.max(0, Math.floor(value.pageCount)),
       pages,
@@ -1299,6 +1352,12 @@ export class WirelessSessionService {
       bwPages: Math.max(0, Math.floor(value.bwPages)),
       totalPages: Math.max(0, Math.floor(value.totalPages)),
       confidence,
+      ...(blankPages !== undefined ? { blankPages } : {}),
+      ...(blankPageCount !== undefined ? { blankPageCount } : {}),
+      ...(isEntirelyBlank !== undefined ? { isEntirelyBlank } : {}),
+      ...(lowContentPages !== undefined ? { lowContentPages } : {}),
+      ...(lowContentPageCount !== undefined ? { lowContentPageCount } : {}),
+      ...(hasLowContent !== undefined ? { hasLowContent } : {}),
     };
   }
 
