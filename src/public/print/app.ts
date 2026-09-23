@@ -1310,10 +1310,13 @@ continueBtn?.addEventListener('click', async () => {
     footerHint.textContent = `Proceeding to print configuration. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
     footerHint.classList.add('ready');
   }
-  if (!isPdfFilename(selectedFilename)) {
+  if (currentSelectedFile?.analysisStatus !== 'completed') {
     conversionWaitInFlight = true;
     setContinueButtonDisabled(true);
     showConversionDialog();
+    if (isPdfFilename(selectedFilename)) {
+      setConversionMessage('Preparing your document. This can take a moment.');
+    }
     const result = await waitForDocumentAnalysis(
       activeSessionId,
       selectedDocumentId,
@@ -1327,7 +1330,11 @@ continueBtn?.addEventListener('click', async () => {
       setContinueButtonDisabled(false);
       return;
     }
-    setConversionMessage('PDF ready. Opening print settings…');
+    setConversionMessage(
+      isPdfFilename(selectedFilename)
+        ? 'Document ready. Opening print settings…'
+        : 'PDF ready. Opening print settings…',
+    );
   }
   const destination =
     `/config?mode=print&sessionId=${encodeURIComponent(activeSessionId)}` +
