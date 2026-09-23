@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { isMainThread, workerData, parentPort } from 'node:worker_threads';
 import {
   COLOR_SATURATION_THRESHOLD,
+  LOW_CONTENT_COVERAGE_THRESHOLD,
   MAX_PIXELS_TO_SAMPLE,
 } from '@/config/document-analysis.config';
 
@@ -69,6 +70,12 @@ export interface DocumentAnalysisResult {
    * Compare against ANALYSIS_ALGORITHM_VERSION to detect stale cache entries.
    */
   analysisVersion: number;
+  blankPages: number[];
+  blankPageCount: number;
+  isEntirelyBlank: boolean;
+  lowContentPages: number[];
+  lowContentPageCount: number;
+  hasLowContent: boolean;
 }
 
 interface AnalyzeDocumentInput {
@@ -216,6 +223,34 @@ function computeFrameMetrics(frame: RgbaFrame): CoverageMetrics {
   };
 }
 
+function computeDocumentContentMetrics(
+  pages: PageAnalysis[],
+  totalPages: number,
+) {
+  const blankPages = pages.filter((p) => p.isBlank).map((p) => p.index);
+  const blankPageCount = blankPages.length;
+  const isEntirelyBlank = totalPages > 0 && blankPageCount === totalPages;
+  const lowContentPages = pages
+    .filter(
+      (p) =>
+        !p.isBlank &&
+        (p.contentCoverage ?? p.coverage ?? 0) <
+          LOW_CONTENT_COVERAGE_THRESHOLD,
+    )
+    .map((p) => p.index);
+  const lowContentPageCount = lowContentPages.length;
+  const hasLowContent = lowContentPageCount > 0;
+
+  return {
+    blankPages,
+    blankPageCount,
+    isEntirelyBlank,
+    lowContentPages,
+    lowContentPageCount,
+    hasLowContent,
+  };
+}
+
 async function analyzeImage(
   filePath: string,
   colorDetectionEnabled: boolean = true,
@@ -231,16 +266,31 @@ async function analyzeImage(
       imageCoverage: 1.0,
       isBlank: false,
     };
+    const pages = [page];
+    const {
+      blankPages,
+      blankPageCount,
+      isEntirelyBlank,
+      lowContentPages,
+      lowContentPageCount,
+      hasLowContent,
+    } = computeDocumentContentMetrics(pages, 1);
 
     return {
       fileType: 'image',
       pageCount: 1,
-      pages: [page],
+      pages,
       colorPages: 0,
       bwPages: 1,
       totalPages: 1,
       confidence: 'high',
       analysisVersion: ANALYSIS_ALGORITHM_VERSION,
+      blankPages,
+      blankPageCount,
+      isEntirelyBlank,
+      lowContentPages,
+      lowContentPageCount,
+      hasLowContent,
     };
   }
 
@@ -271,15 +321,31 @@ async function analyzeImage(
     isBlank,
   };
 
+  const pages = [page];
+  const {
+    blankPages,
+    blankPageCount,
+    isEntirelyBlank,
+    lowContentPages,
+    lowContentPageCount,
+    hasLowContent,
+  } = computeDocumentContentMetrics(pages, 1);
+
   return {
     fileType: 'image',
     pageCount: 1,
-    pages: [page],
+    pages,
     colorPages: page.isColor ? 1 : 0,
     bwPages: page.isColor ? 0 : 1,
     totalPages: 1,
     confidence: 'high',
     analysisVersion: ANALYSIS_ALGORITHM_VERSION,
+    blankPages,
+    blankPageCount,
+    isEntirelyBlank,
+    lowContentPages,
+    lowContentPageCount,
+    hasLowContent,
   };
 }
 
@@ -322,6 +388,15 @@ async function analyzePdfFile(
           : {}),
       });
     }
+    const {
+      blankPages,
+      blankPageCount,
+      isEntirelyBlank,
+      lowContentPages,
+      lowContentPageCount,
+      hasLowContent,
+    } = computeDocumentContentMetrics(pages, totalPages);
+
     return {
       fileType,
       pageCount: totalPages,
@@ -331,6 +406,12 @@ async function analyzePdfFile(
       totalPages,
       confidence: 'high',
       analysisVersion: ANALYSIS_ALGORITHM_VERSION,
+      blankPages,
+      blankPageCount,
+      isEntirelyBlank,
+      lowContentPages,
+      lowContentPageCount,
+      hasLowContent,
     };
   }
 
@@ -432,6 +513,15 @@ async function analyzePdfFile(
         ? 'low'
         : 'medium';
 
+  const {
+    blankPages,
+    blankPageCount,
+    isEntirelyBlank,
+    lowContentPages,
+    lowContentPageCount,
+    hasLowContent,
+  } = computeDocumentContentMetrics(pages, totalPages);
+
   return {
     fileType,
     pageCount: totalPages,
@@ -441,6 +531,12 @@ async function analyzePdfFile(
     totalPages,
     confidence,
     analysisVersion: ANALYSIS_ALGORITHM_VERSION,
+    blankPages,
+    blankPageCount,
+    isEntirelyBlank,
+    lowContentPages,
+    lowContentPageCount,
+    hasLowContent,
   };
 }
 
