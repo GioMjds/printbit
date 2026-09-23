@@ -11,11 +11,7 @@ import type {
   ReportIssueSessionEntry,
 } from './db';
 
-const SQLITE_FILE_PATH =
-  process.env.PRINTBIT_SQLITE_PATH ??
-  (process.env.NODE_ENV === 'test'
-    ? path.resolve('printbit-test.sqlite')
-    : path.resolve('printbit.sqlite'));
+const SQLITE_FILE_PATH = path.resolve('printbit.sqlite');
 const LOWDB_IMPORT_META_KEY = 'lowdb_import_v1';
 const SCHEMA_SNAPSHOT_META_KEY = 'schema_snapshot_v1';
 const RUNTIME_STATE_ROW_ID = 1;
@@ -712,6 +708,8 @@ export function getSqliteDb(): DatabaseSync {
   return sqliteDb;
 }
 
+<<<<<<< HEAD
+=======
 export function getAuthoritativeCoinStats(): {
   one: number;
   five: number;
@@ -742,6 +740,7 @@ export {
   type ReconciliationSummary,
 } from './models/transaction-reconciliation.model';
 
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 export {
   type WirelessSessionStorageEntry,
   type WirelessSessionDocumentStorageEntry,

@@ -61,11 +61,11 @@ Write-Host ""
 
 if ($networkProvider -eq "esp32") {
     if (Test-Path $ensureEsp32NetworkScript) {
-        Write-Host "[PrintBit] Ensuring ESP32 Wi-Fi static IP profile..." -ForegroundColor Yellow
+        Write-Host "[PrintBit] Ensuring ESP32 Wi-Fi connection..." -ForegroundColor Yellow
         try {
             & $ensureEsp32NetworkScript
         } catch {
-            Write-Host "[PrintBit] WARNING: Could not fully enforce ESP32 static IP profile: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "[PrintBit] WARNING: Could not fully ensure ESP32 Wi-Fi connection: $($_.Exception.Message)" -ForegroundColor Yellow
         }
         Write-Host ""
     } else {
@@ -207,7 +207,17 @@ if (-not $ready) {
 # the same address expected by the ESP32 captive portal firmware.
 $localIP = $null
 if ($networkProvider -eq "esp32") {
-    $localIP = $esp32KioskIp
+    $configuredKioskIp = [Environment]::GetEnvironmentVariable("PRINTBIT_ESP32_KIOSK_IP")
+    if (-not [string]::IsNullOrWhiteSpace($configuredKioskIp)) {
+        $localIP = $configuredKioskIp.Trim()
+    } else {
+        $ipCandidates = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPAddress -notmatch "^127\." -and $_.PrefixOrigin -ne "WellKnown" }
+        $preferred = $ipCandidates |
+            Where-Object { $_.IPAddress -like "192.168.4.*" } |
+            Select-Object -First 1
+        $localIP = if ($preferred) { $preferred.IPAddress } else { $esp32KioskIp }
+    }
     Write-Host "[PrintBit] ESP32 mode detected. Using kiosk IP: $localIP" -ForegroundColor Gray
 } else {
     # Prefer hotspot-style ranges (e.g. 192.168.4.x / 192.168.137.x) so the

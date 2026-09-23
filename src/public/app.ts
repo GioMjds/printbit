@@ -44,7 +44,6 @@ function syncFabVisibility(): void {
   const isFeedbackOpen = Boolean(document.getElementById('feedbackOverlay')?.classList.contains('is-visible'));
   const isWifiOpen = Boolean(document.getElementById('wifiOverlay')?.classList.contains('is-visible'));
   const isAdminOpen = Boolean(document.getElementById('adminOverlay')?.classList.contains('is-visible'));
-  const isReceiptPromptOpen = Boolean(document.getElementById('receiptPromptOverlay')?.classList.contains('is-visible'));
   const isIdleAttractorOpen = Boolean(
     document.getElementById('idleOverlay')?.classList.contains('is-visible') ||
     document.documentElement.classList.contains('kiosk-boot-idle')
@@ -63,7 +62,6 @@ function syncFabVisibility(): void {
     isFeedbackOpen ||
     isWifiOpen ||
     isAdminOpen ||
-    isReceiptPromptOpen ||
     isIdleAttractorOpen ||
     isIdleWarningOpen;
 
@@ -195,6 +193,8 @@ window.addEventListener('pagehide', (event) => {
   }
 });
 
+<<<<<<< HEAD
+=======
 // ── Optional Transaction Receipt Prompt ──────────────────────────────────────
 
 const receiptPromptOverlay = document.getElementById('receiptPromptOverlay');
@@ -286,11 +286,12 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 openPrint?.addEventListener('click', () => {
-  promptReceiptChoice('/print');
+  navigateTo('/print');
 });
-openCopy?.addEventListener('click', () => promptReceiptChoice('/copy'));
-openScan?.addEventListener('click', () => promptReceiptChoice('/scan'));
+openCopy?.addEventListener('click', () => navigateTo('/copy'));
+openScan?.addEventListener('click', () => navigateTo('/scan'));
 
 // ── Hotspot Wi-Fi connection modal (Public ESP32 Hotspot) ─────────────────────
 

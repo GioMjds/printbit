@@ -190,7 +190,7 @@ Related env knobs:
 - `PRINTBIT_ESP32_REGISTER_TOKEN` (default `printbit-register-token`) shared token for ESP32 `/kiosk/register`
 - `PRINTBIT_ESP32_KIOSK_SUBNET_PREFIX` (default `192.168.4.`) to detect kiosk IP for ESP32 mode
 - `PRINTBIT_ESP32_KIOSK_IP` (default `192.168.4.2`) kiosk IP used by launch/watchdog URLs and startup static-IP enforcement in ESP32 mode
-- `PRINTBIT_ESP32_STATIC_IP_ENFORCE` (default `true` in ESP32 mode) reconnects Wi-Fi + reapplies kiosk static IPv4 on startup scripts
+- `PRINTBIT_ESP32_STATIC_IP_ENFORCE` (default `false` in ESP32 mode) reconnects Wi-Fi; only reapplies kiosk static IPv4 when set to `true`
 - `PRINTBIT_ESP32_KIOSK_NETMASK` (default `255.255.255.0`) netmask used by startup static-IP enforcement
 - `PRINTBIT_ESP32_GATEWAY_IP` (optional) explicit ESP32 gateway override for startup static-IP enforcement (otherwise derived from `PRINTBIT_ESP32_AP_BASE_URL`)
 - `PRINTBIT_ESP32_WIFI_INTERFACE` (optional) explicit Windows Wi-Fi interface alias for startup static-IP enforcement

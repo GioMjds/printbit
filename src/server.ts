@@ -25,7 +25,6 @@ import {
 import { registerAppModules } from '@/app.module';
 import { getJobProcessor } from '@/modules/print-queue';
 import { initDB } from '@/core/database/db';
-import { transactionReconciliationService } from '@/services/transaction-reconciliation';
 import { detectDefaultPrinter } from '@/services/printer';
 import { detectScanner } from '@/services/scanner';
 import { startScanStorageCleanup } from '@/services/scan-storage';
@@ -605,14 +604,6 @@ async function initializePrintBit(): Promise<void> {
     await initDB();
     startupReadinessState.subsystems.database = 'ready';
     markStartup('SQLite database initialized');
-
-    markStartup('Reconciling transactions and historical data');
-    try {
-      await transactionReconciliationService.reconcileAll();
-      markStartup('Transaction reconciliation completed');
-    } catch (reconcileError) {
-      console.error('[SERVER] Transaction reconciliation encountered an error:', reconcileError);
-    }
 
     markStartup('Starting worker return pipe server');
     const workerReturnPipe = startWorkerReturnPipeServer({

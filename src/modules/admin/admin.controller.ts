@@ -29,9 +29,6 @@ import {
   processPendingRefund,
 } from '@/services/pending-refund';
 import { anomalyService } from '@/modules/anomaly/anomaly.service';
-import { transactionReconciliationService } from '@/services/transaction-reconciliation';
-import { transactionReconciliationStore } from '@/core/database/models/transaction-reconciliation.model';
-import { printJobStore } from '@/core/database/models/print-job.model';
 import { generateTestPagePdf } from '@/services/test-page';
 import {
   listInstalledPrinters,
@@ -70,9 +67,19 @@ import type {
   AlertSettings,
   PipelineSettings,
   ScannerDpiSettings,
+<<<<<<< HEAD
+  DeveloperModeSettings,
+=======
   SupportedDpi,
   TransactionIdFormatSettings,
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 } from './admin.schema';
+
+export const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
+  malwareScanningEnabled: true,
+  documentConversionEnabled: true,
+  colorDetectionEnabled: true,
+};
 import type { AdminQueueView } from '@/modules/anomaly/anomaly.schema';
 import { ConsumablesService } from './consumables.service';
 import { ReceiptService, type ReceiptPayload } from '@/modules/receipt';
@@ -84,12 +91,6 @@ import {
 } from '@/core/database/sqlite-storage';
 import { requestWindowsRestart, requestWindowsShutdown } from '@/services/windows-power';
 import { sendWorkerRequest } from '@/services/worker-command-pipe';
-
-export const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
-  malwareScanningEnabled: true,
-  documentConversionEnabled: true,
-  colorDetectionEnabled: true,
-};
 
 export interface AdminControllerDeps {
   io: SocketIOServer;
@@ -450,7 +451,6 @@ export class AdminController {
     this.router.post(
       '/verify-pin',
       requireAdminLocalAccess,
-      adminAuthRateLimit,
       this.handleVerifyPin,
     );
     this.router.post(
@@ -505,18 +505,6 @@ export class AdminController {
       requireAdminLocalAccess,
       requireAdminPin,
       this.handleGetEarningsAnalytics,
-    );
-    this.router.get(
-      '/reconciliation',
-      requireAdminLocalAccess,
-      requireAdminPin,
-      this.handleGetReconciliation,
-    );
-    this.router.post(
-      '/reconciliation/run',
-      requireAdminLocalAccess,
-      requireAdminPin,
-      this.handleRunReconciliation,
     );
     this.router.get(
       '/print-dispatch/latency',
@@ -837,18 +825,6 @@ export class AdminController {
   private handleVerifyPin = async (req: Request, res: Response) => {
     const pin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
 
-    const lockStatus = checkLockout();
-    if (lockStatus.locked) {
-      await this.adminService.appendAdminLog(
-        'admin_auth_blocked',
-        'Admin PIN verification blocked - account is locked.',
-      );
-      return res.status(423).json({
-        valid: false,
-        error: `Too many failed attempts. Try again in ${formatRemainingTime(lockStatus.remainingMs!)}.`,
-      });
-    }
-
     if (!pin) {
       return res.status(401).json({ valid: false, error: 'Invalid PIN' });
     }
@@ -871,20 +847,9 @@ export class AdminController {
     }
 
     if (!valid) {
-      const attempts = await recordFailedAttempt();
-      const attemptsLeft = Math.max(0, MAX_ATTEMPTS - attempts);
-      await this.adminService.appendAdminLog(
-        'admin_auth_failed',
-        `Staff PIN unlock failed (attempt ${attempts}/${MAX_ATTEMPTS}).`,
-      );
-      const message =
-        attemptsLeft > 0
-          ? `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`
-          : 'Too many failed attempts. Kiosk locked for 10 minutes.';
-      return res.status(401).json({ valid: false, error: message });
+      return res.status(401).json({ valid: false, error: 'Invalid PIN' });
     }
 
-    await clearLockout();
     const sessionToken = createAdminSession();
     res.cookie('adminToken', sessionToken, {
       httpOnly: true,
@@ -987,9 +952,7 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ? AND timestamp >= ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE, startIso) as
-        | Record<string, unknown>
-        | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE, startIso) as Record<string, unknown> | undefined;
       const totalRow = sqlite
         .prepare(
           `SELECT
@@ -998,9 +961,7 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as
-        | Record<string, unknown>
-        | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as Record<string, unknown> | undefined;
 
       const baseline = db.data!.inkRefillBaseline;
       const todayAdminTestPages = consumablesStore.sumUsagePagesBySource(
@@ -1012,8 +973,7 @@ export class AdminController {
       );
       const totalColor =
         Number(totalRow?.colorSum ?? 0) + totalAdminTestPages.colorPages;
-      const totalBw =
-        Number(totalRow?.bwSum ?? 0) + totalAdminTestPages.bwPages;
+      const totalBw = Number(totalRow?.bwSum ?? 0) + totalAdminTestPages.bwPages;
 
       const pageCounts = {
         todayColorPages:
@@ -1066,7 +1026,6 @@ export class AdminController {
         earnings: this.adminService.computeEarningsBuckets(),
         coinStats: db.data!.coinStats,
         jobStats: db.data!.jobStats,
-        reconciliation: transactionReconciliationService.getSummary(),
         hopperStats: db.data!.hopperStats,
         owedChangeOpenCount: db.data!.owedChanges.filter(
           (entry) => entry.status === 'open',
@@ -1284,8 +1243,7 @@ export class AdminController {
   private handleRestartSpooler = async (req: Request, res: Response) => {
     const requestId = randomUUID();
     const printerName =
-      typeof req.body?.printerName === 'string' &&
-      req.body.printerName.trim().length > 0
+      typeof req.body?.printerName === 'string' && req.body.printerName.trim().length > 0
         ? req.body.printerName.trim()
         : undefined;
 
@@ -1294,11 +1252,7 @@ export class AdminController {
       type?: string;
       outcome?: string;
       action?: string | null;
-      spoolerState?: {
-        isRunning: boolean;
-        status: string;
-        errorMessage?: string | null;
-      } | null;
+      spoolerState?: { isRunning: boolean; status: string; errorMessage?: string | null } | null;
       printerState?: string | null;
       issueKind?: string | null;
       message?: string | null;
@@ -1330,8 +1284,7 @@ export class AdminController {
       );
       return res.status(503).json({
         ok: false,
-        error:
-          'Worker did not respond. The C# hardware service may be offline.',
+        error: 'Worker did not respond. The C# hardware service may be offline.',
       });
     }
 
@@ -1339,9 +1292,7 @@ export class AdminController {
     const succeeded = outcome === 'recovered' || outcome === 'healthy';
 
     void this.adminService.appendAdminLog(
-      succeeded
-        ? 'admin_printer_spooler_restart_ok'
-        : 'admin_printer_spooler_restart_failed',
+      succeeded ? 'admin_printer_spooler_restart_ok' : 'admin_printer_spooler_restart_failed',
       `Printer spooler restart: outcome=${outcome}. ${workerResult.message ?? ''}`.trim(),
       {
         requestId,
@@ -1357,9 +1308,7 @@ export class AdminController {
       return res.status(409).json({
         ok: false,
         outcome,
-        error:
-          workerResult.message ??
-          'Worker is busy with an active print job. Try again shortly.',
+        error: workerResult.message ?? 'Worker is busy with an active print job. Try again shortly.',
       });
     }
 
@@ -1367,9 +1316,7 @@ export class AdminController {
       return res.status(422).json({
         ok: false,
         outcome,
-        message:
-          workerResult.message ??
-          'Physical printer fault detected. Manual intervention required.',
+        message: workerResult.message ?? 'Physical printer fault detected. Manual intervention required.',
         printerState: workerResult.printerState,
         issueKind: workerResult.issueKind,
       });
@@ -1391,24 +1338,6 @@ export class AdminController {
       spoolerState: workerResult.spoolerState,
       printerState: workerResult.printerState,
     });
-  };
-
-  private handleGetReconciliation = (_req: Request, res: Response) => {
-    const summary = transactionReconciliationService.getSummary();
-    const recent =
-      transactionReconciliationService.listReconciledTransactions(100);
-    res.json({ summary, recent });
-  };
-
-  private handleRunReconciliation = async (_req: Request, res: Response) => {
-    try {
-      const summary = await transactionReconciliationService.reconcileAll();
-      res.json({ ok: true, summary });
-    } catch (error) {
-      res.status(500).json({
-        error: error instanceof Error ? error.message : 'Reconciliation failed',
-      });
-    }
   };
 
   private handleGetEarningsAnalytics = (req: Request, res: Response) => {
@@ -1551,26 +1480,16 @@ export class AdminController {
     }
     if (!settings.scannerDpi) {
       settings.scannerDpi = {
-        copyGlass: 300 as const,
-        copyAdf: 300 as const,
-        scanGlass: 300 as const,
-        scanAdf: 300 as const,
+        copyGlass: 300,
+        copyAdf: 300,
+        scanGlass: 300,
+        scanAdf: 300,
       };
     }
     if (!settings.developerMode) {
       settings.developerMode = {
         enabled: false,
-        environmentTag: 'test' as const,
-      };
-    }
-    if (!settings.transactionIdFormat) {
-      settings.transactionIdFormat = {
-        prefix: 'TXN',
-        dateFormat: 'YYYYMMDD' as const,
-        includeTime: false,
-        randomSuffixLength: 4,
-        customPatternEnabled: false,
-        customPattern: '{PREFIX}-{DATE}-{RANDOM}',
+        environmentTag: 'test',
       };
     }
     res.json(settings);
@@ -1632,21 +1551,9 @@ export class AdminController {
       scanFilenameFormat?: unknown;
       pricingEngine?: {
         paperProfiles?: {
-          a4?: {
-            baseBwPrice?: number;
-            baseColorPrice?: number;
-            baseImagePrice?: number;
-          };
-          shortBond?: {
-            baseBwPrice?: number;
-            baseColorPrice?: number;
-            baseImagePrice?: number;
-          };
-          longBond?: {
-            baseBwPrice?: number;
-            baseColorPrice?: number;
-            baseImagePrice?: number;
-          };
+          a4?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number };
+          shortBond?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number };
+          longBond?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number };
         };
         bulkDiscountTiers?: {
           minPages?: number;
@@ -1672,14 +1579,6 @@ export class AdminController {
       };
       developerMode?: {
         enabled?: boolean;
-      };
-      transactionIdFormat?: {
-        prefix?: string;
-        dateFormat?: 'YYYYMMDD' | 'YYYY-MM-DD' | 'none';
-        includeTime?: boolean;
-        randomSuffixLength?: number;
-        customPatternEnabled?: boolean;
-        customPattern?: string;
       };
     };
 
@@ -1771,8 +1670,7 @@ export class AdminController {
       inkMonitoring: { ...originalSettings.inkMonitoring },
       consumablesForecasting: { ...originalSettings.consumablesForecasting },
       scanFilenameFormat: {
-        ...(originalSettings.scanFilenameFormat ||
-          DEFAULT_SCAN_FILENAME_FORMAT),
+        ...(originalSettings.scanFilenameFormat || DEFAULT_SCAN_FILENAME_FORMAT),
       },
       pricingEngine: {
         paperProfiles: {
@@ -1808,25 +1706,26 @@ export class AdminController {
         ...(originalSettings.pipelineSettings || {}),
       },
       printLimits: {
+        maxPagesPerSession: 30,
         ...(originalSettings.printLimits || {}),
       },
       uiBlocking: {
+        enabled: false,
+        mode: 'maintenance' as const,
+        customMessage: '',
         ...(originalSettings.uiBlocking || {}),
       },
       scannerDpi: {
+        copyGlass: 300 as const,
+        copyAdf: 300 as const,
+        scanGlass: 300 as const,
+        scanAdf: 300 as const,
         ...(originalSettings.scannerDpi || {}),
       },
       developerMode: {
+        enabled: false,
+        environmentTag: 'test' as const,
         ...(originalSettings.developerMode || {}),
-      },
-      transactionIdFormat: {
-        prefix: 'TXN',
-        dateFormat: 'YYYYMMDD' as const,
-        includeTime: false,
-        randomSuffixLength: 4,
-        customPatternEnabled: false,
-        customPattern: '{PREFIX}-{DATE}-{RANDOM}',
-        ...(originalSettings.transactionIdFormat || {}),
       },
     };
 
@@ -2263,7 +2162,8 @@ export class AdminController {
         }
       }
       if (
-        next.paperProfiles.a4.baseColorPrice < next.paperProfiles.a4.baseBwPrice
+        next.paperProfiles.a4.baseColorPrice <
+        next.paperProfiles.a4.baseBwPrice
       ) {
         return res.status(400).json({
           error:
@@ -2273,7 +2173,7 @@ export class AdminController {
       if (
         next.paperProfiles.a4.baseImagePrice !== undefined &&
         next.paperProfiles.a4.baseImagePrice <
-          next.paperProfiles.a4.baseColorPrice
+        next.paperProfiles.a4.baseColorPrice
       ) {
         return res.status(400).json({
           error:
@@ -2331,7 +2231,7 @@ export class AdminController {
       if (
         next.paperProfiles.shortBond.baseImagePrice !== undefined &&
         next.paperProfiles.shortBond.baseImagePrice <
-          next.paperProfiles.shortBond.baseColorPrice
+        next.paperProfiles.shortBond.baseColorPrice
       ) {
         return res.status(400).json({
           error:
@@ -2389,7 +2289,7 @@ export class AdminController {
       if (
         next.paperProfiles.longBond.baseImagePrice !== undefined &&
         next.paperProfiles.longBond.baseImagePrice <
-          next.paperProfiles.longBond.baseColorPrice
+        next.paperProfiles.longBond.baseColorPrice
       ) {
         return res.status(400).json({
           error:
@@ -2592,7 +2492,7 @@ export class AdminController {
               error: `scannerDpi.${field} must be 150, 300, or 600.`,
             });
           }
-          nextSettings.scannerDpi[field] = val as SupportedDpi;
+          nextSettings.scannerDpi[field] = val;
         }
       }
     }
@@ -2618,94 +2518,9 @@ export class AdminController {
       nextSettings.developerMode.environmentTag = 'test';
     }
 
-    if (body.transactionIdFormat !== undefined) {
-      if (
-        typeof body.transactionIdFormat !== 'object' ||
-        body.transactionIdFormat === null ||
-        Array.isArray(body.transactionIdFormat)
-      ) {
-        return res.status(400).json({
-          error: 'transactionIdFormat must be an object.',
-        });
-      }
-      const inc = body.transactionIdFormat;
-      const next: TransactionIdFormatSettings = {
-        ...(nextSettings.transactionIdFormat || {}),
-      };
-
-      if (inc.prefix !== undefined) {
-        if (typeof inc.prefix !== 'string' || inc.prefix.trim().length > 20) {
-          return res.status(400).json({
-            error:
-              'transactionIdFormat.prefix must be a string up to 20 characters.',
-          });
-        }
-        next.prefix = inc.prefix.trim() || 'TXN';
-      }
-      if (inc.dateFormat !== undefined) {
-        if (
-          inc.dateFormat !== 'YYYYMMDD' &&
-          inc.dateFormat !== 'YYYY-MM-DD' &&
-          inc.dateFormat !== 'none'
-        ) {
-          return res.status(400).json({
-            error:
-              'transactionIdFormat.dateFormat must be "YYYYMMDD", "YYYY-MM-DD", or "none".',
-          });
-        }
-        next.dateFormat = inc.dateFormat;
-      }
-      if (inc.includeTime !== undefined) {
-        if (typeof inc.includeTime !== 'boolean') {
-          return res.status(400).json({
-            error: 'transactionIdFormat.includeTime must be boolean.',
-          });
-        }
-        next.includeTime = inc.includeTime;
-      }
-      if (inc.randomSuffixLength !== undefined) {
-        if (
-          !isFiniteNumber(inc.randomSuffixLength) ||
-          !Number.isInteger(inc.randomSuffixLength) ||
-          inc.randomSuffixLength < 2 ||
-          inc.randomSuffixLength > 12
-        ) {
-          return res.status(400).json({
-            error:
-              'transactionIdFormat.randomSuffixLength must be a whole number between 2 and 12.',
-          });
-        }
-        next.randomSuffixLength = inc.randomSuffixLength;
-      }
-      if (inc.customPatternEnabled !== undefined) {
-        if (typeof inc.customPatternEnabled !== 'boolean') {
-          return res.status(400).json({
-            error: 'transactionIdFormat.customPatternEnabled must be boolean.',
-          });
-        }
-        next.customPatternEnabled = inc.customPatternEnabled;
-      }
-      if (inc.customPattern !== undefined) {
-        if (
-          typeof inc.customPattern !== 'string' ||
-          inc.customPattern.length > 120
-        ) {
-          return res.status(400).json({
-            error:
-              'transactionIdFormat.customPattern must be a string up to 120 characters.',
-          });
-        }
-        next.customPattern =
-          inc.customPattern.trim() || '{PREFIX}-{DATE}-{RANDOM}';
-      }
-
-      nextSettings.transactionIdFormat = next;
-    }
-
     const isUiBlockingModified =
       uiBlockingModified ||
-      nextSettings.uiBlocking.enabled !==
-        originalSettings.uiBlocking?.enabled ||
+      nextSettings.uiBlocking.enabled !== originalSettings.uiBlocking?.enabled ||
       nextSettings.uiBlocking.mode !== originalSettings.uiBlocking?.mode ||
       nextSettings.uiBlocking.customMessage !==
         originalSettings.uiBlocking?.customMessage;
@@ -2720,7 +2535,6 @@ export class AdminController {
       printLimits: nextSettings.printLimits,
       scannerDpi: nextSettings.scannerDpi,
       developerMode: nextSettings.developerMode,
-      transactionIdFormat: nextSettings.transactionIdFormat,
     });
     if (refreshConsumablesAlerts) {
       await this.consumablesService.evaluateAndPublishForecastAlerts();
@@ -3258,10 +3072,6 @@ export class AdminController {
       receiptResolution.status === 'ok' ? receiptResolution.payload : null;
     const receiptExpired = receiptResolution.status === 'expired';
 
-    const reconcileEntry =
-      transactionReconciliationStore.getByTransactionId(transactionId);
-    const printJob = printJobStore.getJobByTransactionId(transactionId);
-
     const found =
       logs.length > 0 ||
       ledgerEntries.length > 0 ||
@@ -3269,23 +3079,18 @@ export class AdminController {
       lifecycleRecord !== null ||
       pendingRefunds.length > 0 ||
       receiptResolution.status === 'ok' ||
-      receiptResolution.status === 'expired' ||
-      reconcileEntry !== null ||
-      printJob !== null;
+      receiptResolution.status === 'expired';
     if (!found) return null;
 
     const chargedAmount =
       receiptPayload?.chargedAmount ??
       ledgerEntries.find((entry) => entry.eventType === 'job_completed')
         ?.amount ??
-      reconcileEntry?.verifiedAmount ??
-      reconcileEntry?.requiredAmount ??
       recoverySession?.chargedAmount ??
       pendingRefunds[0]?.chargedAmount ??
       null;
     const mode =
       receiptPayload?.mode ??
-      reconcileEntry?.mode ??
       lifecycleRecord?.mode ??
       recoverySession?.mode ??
       (typeof logs[0]?.meta?.mode === 'string' ? logs[0].meta.mode : null) ??
@@ -3542,9 +3347,7 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as
-        | Record<string, unknown>
-        | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as Record<string, unknown> | undefined;
 
       const adminTestPages = consumablesStore.sumUsagePagesBySource(
         ADMIN_TEST_PAGE_USAGE_SOURCE,

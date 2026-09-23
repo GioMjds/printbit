@@ -163,31 +163,6 @@ export interface DeveloperModeSettings {
   environmentTag: 'test';
 }
 
-export interface TransactionIdFormatSettings {
-  prefix: string;
-  dateFormat: 'YYYYMMDD' | 'YYYY-MM-DD' | 'none';
-  includeTime: boolean;
-  randomSuffixLength: number;
-  customPatternEnabled: boolean;
-  customPattern: string;
-}
-
-export type ScanFilenameDateFormat =
-  | 'YYYY-MM-DD'
-  | 'YYYYMMDD'
-  | 'DD-MM-YYYY'
-  | 'none';
-export type ScanFilenameTimeFormat = 'HH-mm-ss' | 'HHmmss' | 'HHmm' | 'none';
-
-export interface ScanFilenameFormatSettings {
-  prefix: string;
-  dateFormat: ScanFilenameDateFormat;
-  timeFormat: ScanFilenameTimeFormat;
-  includeRandomSuffix: boolean;
-  customPatternEnabled: boolean;
-  customPattern: string;
-}
-
 export interface AdminSettings {
   pricing: PricingSettings;
   pricingEngine: PricingEngineSettings;
@@ -200,13 +175,11 @@ export interface AdminSettings {
   inkMonitoring: InkMonitoringSettings;
   consumablesForecasting: ConsumablesForecastingSettings;
   consumableEstimation: ConsumableEstimationSettings;
-  scanFilenameFormat: ScanFilenameFormatSettings;
-  pipelineSettings: PipelineSettings;
   printLimits: PrintLimitsSettings;
   uiBlocking: UiBlockingSettings;
   scannerDpi: ScannerDpiSettings;
   developerMode: DeveloperModeSettings;
-  transactionIdFormat?: TransactionIdFormatSettings;
+  pipelineSettings?: PipelineSettings;
 }
 
 export interface AdminLogEntry {

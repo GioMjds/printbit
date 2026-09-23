@@ -11,7 +11,7 @@ import {
   getTrustedTimestamp,
 } from './time-source';
 
-export interface AppendLedgerInput {
+interface AppendLedgerInput {
   eventType: FinancialEventType;
   amount: number;
   referenceId?: string | null;
@@ -20,7 +20,7 @@ export interface AppendLedgerInput {
   timestampMeta?: TrustedTimestampMeta | null;
 }
 
-export function serializeForHash(entry: {
+function serializeForHash(entry: {
   id: string;
   timestamp: string;
   eventType: FinancialEventType;
@@ -40,30 +40,8 @@ export function serializeForHash(entry: {
   });
 }
 
-export function computeHash(payload: string): string {
+function computeHash(payload: string): string {
   return createHash('sha256').update(payload).digest('hex');
-}
-
-export function recomputeLedgerChainHashes(
-  entries: FinancialLedgerEntry[] = db.data?.financialLedger ?? [],
-): void {
-  let prevHash: string | null = null;
-  for (let i = entries.length - 1; i >= 0; i -= 1) {
-    const row = entries[i];
-    row.previousHash = prevHash;
-    row.hash = computeHash(
-      serializeForHash({
-        id: row.id,
-        timestamp: row.timestamp,
-        eventType: row.eventType,
-        amount: row.amount,
-        referenceId: row.referenceId,
-        meta: row.meta ?? {},
-        previousHash: row.previousHash,
-      }),
-    );
-    prevHash = row.hash;
-  }
 }
 
 class FinancialLedgerService {
@@ -79,18 +57,6 @@ class FinancialLedgerService {
     await previousQueue;
 
     try {
-      if (input.referenceId && (input.eventType === 'job_completed' || input.eventType === 'job_started')) {
-        const existing = db.data!.financialLedger.find(
-          (e) =>
-            e.eventType === input.eventType &&
-            e.referenceId === input.referenceId &&
-            e.meta?.reconciliationStatus !== 'duplicate',
-        );
-        if (existing) {
-          return existing;
-        }
-      }
-
       if (input.eventType !== 'coin_inserted' && !input.timestamp) {
         assertTrustedTimeForFinancialOperation(
           `ledger_append:${input.eventType}`,
@@ -104,8 +70,6 @@ class FinancialLedgerService {
         ? Number(input.amount.toFixed(2))
         : 0;
       const meta = input.meta ?? {};
-      const isTest = Boolean(db.data?.settings?.developerMode?.enabled);
-      const environment: 'production' | 'test' = isTest ? 'test' : 'production';
       const entryTimestamp = input.timestamp || trusted.timestamp;
       const timestampMeta =
         input.timestampMeta ??
@@ -138,7 +102,6 @@ class FinancialLedgerService {
         meta,
         previousHash,
         hash: computeHash(hashPayload),
-        environment,
       };
 
       db.data!.financialLedger.unshift(entry);

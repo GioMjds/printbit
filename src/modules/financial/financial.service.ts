@@ -6,7 +6,6 @@ import {
 import path from 'node:path';
 import fs from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { formatTransactionId } from '@/services/transaction-id';
 import type { DatabaseSync } from 'node:sqlite';
 import type { Server } from 'socket.io';
 import {
@@ -528,9 +527,9 @@ export class FinancialService {
     const config = db.data?.settings?.pricingEngine;
     res.json({
       paperProfiles: config?.paperProfiles ?? {
-        a4: { baseBwPrice: 3, baseColorPrice: 18, baseImagePrice: 25 },
-        shortBond: { baseBwPrice: 3, baseColorPrice: 18, baseImagePrice: 25 },
-        longBond: { baseBwPrice: 4, baseColorPrice: 20, baseImagePrice: 30 },
+        a4: { baseBwPrice: 3, baseColorPrice: 18 },
+        shortBond: { baseBwPrice: 3, baseColorPrice: 18 },
+        longBond: { baseBwPrice: 4, baseColorPrice: 20 },
       },
       highQualitySurcharge:
         config?.highQualitySurcharge ??
@@ -1211,9 +1210,7 @@ export class FinancialService {
       idempotencyClaimed = true;
     }
 
-    const transactionId = formatTransactionId(
-      (req.body as ConfirmPaymentBody)?.mode,
-    );
+    const transactionId = randomUUID();
 
     const sendResponse = (status: number, body: unknown): void => {
       if (idempotencyClaimed) {

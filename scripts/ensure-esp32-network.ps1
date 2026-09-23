@@ -200,55 +200,33 @@ function Test-StaticIpProfile {
 
 $networkProvider = (Get-EnvString -Name "PRINTBIT_NETWORK_PROVIDER" -Default "esp32").ToLowerInvariant()
 if ($networkProvider -ne "esp32") {
-    Write-NetworkLog "Skipping ESP32 static-IP enforcement because PRINTBIT_NETWORK_PROVIDER='$networkProvider'."
-    return
-}
-
-$enforceStatic = Get-EnvBool -Name "PRINTBIT_ESP32_STATIC_IP_ENFORCE" -Default $true
-if (-not $enforceStatic) {
-    Write-NetworkLog "Skipping static-IP enforcement because PRINTBIT_ESP32_STATIC_IP_ENFORCE=false."
+    Write-NetworkLog "Skipping ESP32 network enforcement because PRINTBIT_NETWORK_PROVIDER='$networkProvider'."
     return
 }
 
 $ssid = Get-EnvString -Name "PRINTBIT_HOTSPOT_SSID" -Default "PrintBit"
-$kioskIp = Get-EnvString -Name "PRINTBIT_ESP32_KIOSK_IP" -Default "192.168.4.2"
-$netmask = Get-EnvString -Name "PRINTBIT_ESP32_KIOSK_NETMASK" -Default "255.255.255.0"
-$gateway = Resolve-Esp32GatewayIp
 $wifiInterface = Get-EnvString -Name "PRINTBIT_ESP32_WIFI_INTERFACE" -Default ""
+$enforceStatic = Get-EnvBool -Name "PRINTBIT_ESP32_STATIC_IP_ENFORCE" -Default $false
 
-if (-not (Test-Ipv4Address -Value $kioskIp)) {
-    throw "PRINTBIT_ESP32_KIOSK_IP is not a valid IPv4 address: '$kioskIp'."
-}
-if (-not (Test-Ipv4Address -Value $netmask)) {
-    throw "PRINTBIT_ESP32_KIOSK_NETMASK is not a valid IPv4 mask: '$netmask'."
-}
-if (-not (Test-Ipv4Address -Value $gateway)) {
-    throw "Resolved ESP32 gateway is not a valid IPv4 address: '$gateway'."
-}
-
-Write-NetworkLog "Ensuring ESP32 Wi-Fi profile. ssid='$ssid' staticIp='$kioskIp' netmask='$netmask' gateway='$gateway'"
-
-# Fast path: check if already connected and already configured with desired static IP and gateway
-$existingInterface = if (-not [string]::IsNullOrWhiteSpace($wifiInterface)) { $wifiInterface } else { Get-ConnectedWifiInterfaceName -Ssid $ssid }
-if (-not [string]::IsNullOrWhiteSpace($existingInterface)) {
-    if (Test-StaticIpProfile -InterfaceAlias $existingInterface -IpAddress $kioskIp -Gateway $gateway) {
-        Write-NetworkLog "Interface '$existingInterface' is already connected to '$ssid' and configured with static IP '$kioskIp' (gw '$gateway'). Skipping reconfiguration."
-        return
-    }
-}
-
+# 1. Connect to ESP32 Wi-Fi first
 if ([string]::IsNullOrWhiteSpace($wifiInterface)) {
-    Write-NetworkLog "Connecting to Wi-Fi profile '$ssid'..."
-    & netsh wlan connect name="$ssid" 2>&1 | ForEach-Object { Write-NetworkLog "$_" }
+    $existingInterface = Get-ConnectedWifiInterfaceName -Ssid $ssid
+    if (-not [string]::IsNullOrWhiteSpace($existingInterface)) {
+        $wifiInterface = $existingInterface
+        Write-NetworkLog "Already connected to '$ssid' on '$wifiInterface'."
+    } else {
+        Write-NetworkLog "Connecting to Wi-Fi profile '$ssid'..."
+        & netsh wlan connect name="$ssid" 2>&1 | ForEach-Object { Write-NetworkLog "$_" }
 
-    $deadline = (Get-Date).AddSeconds([Math]::Max(5, $WaitSeconds))
-    do {
-        $wifiInterface = Get-ConnectedWifiInterfaceName -Ssid $ssid
-        if (-not [string]::IsNullOrWhiteSpace($wifiInterface)) {
-            break
-        }
-        Start-Sleep -Seconds 1
-    } while ((Get-Date) -lt $deadline)
+        $deadline = (Get-Date).AddSeconds([Math]::Max(5, $WaitSeconds))
+        do {
+            $wifiInterface = Get-ConnectedWifiInterfaceName -Ssid $ssid
+            if (-not [string]::IsNullOrWhiteSpace($wifiInterface)) {
+                break
+            }
+            Start-Sleep -Seconds 1
+        } while ((Get-Date) -lt $deadline)
+    }
 } else {
     Write-NetworkLog "Using explicit Wi-Fi interface '$wifiInterface' from PRINTBIT_ESP32_WIFI_INTERFACE."
 }
@@ -262,6 +240,42 @@ if ([string]::IsNullOrWhiteSpace($wifiInterface)) {
 
 if ([string]::IsNullOrWhiteSpace($wifiInterface)) {
     throw "Could not resolve connected Wi-Fi interface for SSID '$ssid'. Ensure the Wi-Fi profile exists and auto-connect is enabled."
+}
+
+# 2. If static IP enforcement is NOT requested (default), ensure DHCP is active and return
+if (-not $enforceStatic) {
+    try {
+        $ipConfig = Get-NetIPInterface -InterfaceAlias $wifiInterface -AddressFamily IPv4 -ErrorAction SilentlyContinue
+        if ($ipConfig -and $ipConfig.Dhcp -ne 'Enabled') {
+            Write-NetworkLog "Reverting '$wifiInterface' from static IP to DHCP..."
+            & netsh interface ipv4 set address name="$wifiInterface" source=dhcp 2>&1 | ForEach-Object { Write-NetworkLog "$_" }
+            & netsh interface ipv4 set dnsservers name="$wifiInterface" source=dhcp 2>&1 | ForEach-Object { Write-NetworkLog "$_" }
+        }
+    } catch {
+        Write-NetworkLog "Note: Could not check/set DHCP on '$wifiInterface': $($_.Exception.Message)"
+    }
+    Write-NetworkLog "Connected to '$ssid' on '$wifiInterface' (dynamic IP/DHCP mode). Static IP enforcement skipped."
+    return
+}
+
+# 3. Static IP enforcement path (opt-in only via PRINTBIT_ESP32_STATIC_IP_ENFORCE=true)
+$kioskIp = Get-EnvString -Name "PRINTBIT_ESP32_KIOSK_IP" -Default "192.168.4.2"
+$netmask = Get-EnvString -Name "PRINTBIT_ESP32_KIOSK_NETMASK" -Default "255.255.255.0"
+$gateway = Resolve-Esp32GatewayIp
+
+if (-not (Test-Ipv4Address -Value $kioskIp)) {
+    throw "PRINTBIT_ESP32_KIOSK_IP is not a valid IPv4 address: '$kioskIp'."
+}
+if (-not (Test-Ipv4Address -Value $netmask)) {
+    throw "PRINTBIT_ESP32_KIOSK_NETMASK is not a valid IPv4 mask: '$netmask'."
+}
+if (-not (Test-Ipv4Address -Value $gateway)) {
+    throw "Resolved ESP32 gateway is not a valid IPv4 address: '$gateway'."
+}
+
+if (Test-StaticIpProfile -InterfaceAlias $wifiInterface -IpAddress $kioskIp -Gateway $gateway) {
+    Write-NetworkLog "Interface '$wifiInterface' is already configured with static IP '$kioskIp' (gw '$gateway'). Skipping reconfiguration."
+    return
 }
 
 Write-NetworkLog "Applying static IPv4 profile on interface '$wifiInterface'..."

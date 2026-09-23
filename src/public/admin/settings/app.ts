@@ -138,32 +138,6 @@ const settingDeveloperModeEnabled = document.getElementById(
   'settingDeveloperModeEnabled',
 ) as HTMLInputElement | null;
 
-// ── Transaction ID & Receipt Format ───────────────────────────
-const settingTxnPrefix = document.getElementById(
-  'settingTxnPrefix',
-) as HTMLInputElement | null;
-const settingTxnDateFormat = document.getElementById(
-  'settingTxnDateFormat',
-) as HTMLSelectElement | null;
-const settingTxnIncludeTime = document.getElementById(
-  'settingTxnIncludeTime',
-) as HTMLInputElement | null;
-const settingTxnRandomLength = document.getElementById(
-  'settingTxnRandomLength',
-) as HTMLInputElement | null;
-const settingTxnCustomPatternEnabled = document.getElementById(
-  'settingTxnCustomPatternEnabled',
-) as HTMLInputElement | null;
-const txnCustomPatternContainer = document.getElementById(
-  'txnCustomPatternContainer',
-) as HTMLElement | null;
-const settingTxnCustomPattern = document.getElementById(
-  'settingTxnCustomPattern',
-) as HTMLInputElement | null;
-const txnFormatPreviewText = document.getElementById(
-  'txnFormatPreviewText',
-) as HTMLElement | null;
-
 // ── Optional sections (may be commented out in HTML) ─────────────────────────
 const settingIdleTimeout = document.getElementById(
   'settingIdleTimeout',
@@ -375,6 +349,8 @@ document.querySelectorAll('.token-tag').forEach((tag) => {
 
 syncScanFilenameUI();
 
+<<<<<<< HEAD
+=======
 // ── Transaction ID Format Preview ─────────────────────────────────
 
 function renderTxnFormatPreview(): void {
@@ -455,6 +431,7 @@ txnFormatInputs.forEach((el) => {
 });
 
 syncTxnFormatUI();
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 
 function applySettings(settings: SettingsResponse): void {
   settingAdminPin.value = '';
@@ -665,6 +642,8 @@ function applySettings(settings: SettingsResponse): void {
     );
   }
   currentDeveloperModeEnabled = Boolean(settings.developerMode?.enabled);
+<<<<<<< HEAD
+=======
 
   // Transaction ID & Receipt Format
   const txnFmt = settings.transactionIdFormat ?? {
@@ -692,6 +671,7 @@ function applySettings(settings: SettingsResponse): void {
       txnFmt.customPattern ?? '{PREFIX}-{DATE}-{RANDOM}';
   }
   syncTxnFormatUI();
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 }
 
 export function populateForm(settings: SettingsResponse): void {
@@ -1150,6 +1130,8 @@ settingsForm.addEventListener('submit', (e) => {
     };
   }
 
+<<<<<<< HEAD
+=======
   // Transaction ID & Receipt Format
   if (settingTxnPrefix && settingTxnDateFormat && settingTxnRandomLength) {
     const txnPrefix = settingTxnPrefix.value.trim();
@@ -1193,6 +1175,7 @@ settingsForm.addEventListener('submit', (e) => {
     };
   }
 
+>>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
   const alertPayload =
     alertSeverityThreshold !== null ? buildAlertPayload() : null;
 
