@@ -21,8 +21,9 @@ import {
  *   2 — colour-op / content-op separation; white-paint guard (blank page fix)
  *   3 — persist content coverage separately from color coverage
  *   4 — forward original file type to preserve image classification across PDF conversion
+ *   5 — isolate Form XObjects from raster images, maintain graphics-state color stack, and auto-fallback converter
  */
-export const ANALYSIS_ALGORITHM_VERSION = 4;
+export const ANALYSIS_ALGORITHM_VERSION = 5;
 
 export type AnalyzedFileType =
   | 'pdf'
@@ -535,9 +536,13 @@ function analyzePageOperatorList(
   let hasImages = false;
   let hasContent = false;
 
-  // Tracks the most-recently-set color so we can evaluate it when a draw op fires.
-  let pendingRgb: [number, number, number] | null = null;
-  let pendingCmyk: [number, number, number, number] | null = null;
+  // Tracks the active color in the graphics state
+  let currentRgb: [number, number, number] | null = null;
+  let currentCmyk: [number, number, number, number] | null = null;
+  const colorStack: {
+    rgb: [number, number, number] | null;
+    cmyk: [number, number, number, number] | null;
+  }[] = [];
 
   let contentOpsCount = 0;
   let totalNonStructuralOps = 0;
@@ -552,13 +557,20 @@ function analyzePageOperatorList(
 
     totalNonStructuralOps += 1;
 
-    // ── CTM matrix tracking ────────────────────────────────────────────────
+    // ── CTM matrix tracking & graphics state stack ─────────────────────────
     if (op === ops.save) {
       ctmStack.push([...currentCtm]);
+      colorStack.push({
+        rgb: currentRgb ? [...currentRgb] : null,
+        cmyk: currentCmyk ? [...currentCmyk] : null,
+      });
       continue;
     }
     if (op === ops.restore) {
       currentCtm = ctmStack.pop() ?? [1, 0, 0, 1, 0, 0];
+      const poppedColor = colorStack.pop();
+      currentRgb = poppedColor ? poppedColor.rgb : null;
+      currentCmyk = poppedColor ? poppedColor.cmyk : null;
       continue;
     }
     if (op === ops.transform) {
@@ -580,38 +592,34 @@ function analyzePageOperatorList(
 
     // ── Color-state ops: record color, but do NOT mark page as having content ──
     if (op === ops.setFillRGBColor || op === ops.setStrokeRGBColor) {
-      pendingRgb = parseRgbArgs(opList.argsArray[i]);
+      currentRgb = parseRgbArgs(opList.argsArray[i]);
+      currentCmyk = null;
       continue;
     }
     if (op === ops.setFillCMYKColor || op === ops.setStrokeCMYKColor) {
       const args = opList.argsArray[i];
       if (Array.isArray(args) && args.length >= 4) {
-        pendingCmyk = args as [number, number, number, number];
+        currentCmyk = args as [number, number, number, number];
+        currentRgb = null;
       }
       continue;
     }
 
-    // ── Actual drawing ops: images, text renders, and path fills/strokes ──────
-    const isDrawingOp =
-      op === ops.paintImageXObject ||
-      op === ops.paintInlineImageXObject ||
-      op === ops.paintImageMaskXObject ||
-      op === ops.paintJpegXObject ||
-      op === ops.paintFormXObject ||
-      pathDrawingOps.has(op) ||
-      textRenderOps.has(op);
+    // ── Actual drawing ops: images, form XObjects, text renders, and path fills/strokes ──────
+    const isImageOp = imagePaintOps.has(op);
+    const isFormOp = op === ops.paintFormXObject;
+    const isTextOp = textRenderOps.has(op);
+    const isPathOp = pathDrawingOps.has(op);
+    const isDrawingOp = isImageOp || isFormOp || isPathOp || isTextOp;
 
     if (isDrawingOp) {
       contentOpsCount += 1;
 
       // ── White-paint guard ────────────────────────────────────────────────
-      // Painting with white on a white page is invisible.  Many PDF generators
+      // Painting with white on a white page is invisible. Many PDF generators
       // emit a white fill rectangle as a page background — this should NOT mark
-      // the page as having content.  Images and text are always counted (they
+      // the page as having content. Images and text are always counted (they
       // have their own colour data / are intentional even if "invisible").
-      const isImageOp = imagePaintOps.has(op) || op === ops.paintFormXObject;
-      const isTextOp = textRenderOps.has(op);
-
       if (isImageOp) {
         const det = Math.abs(
           currentCtm[0] * currentCtm[3] - currentCtm[1] * currentCtm[2],
@@ -624,23 +632,21 @@ function analyzePageOperatorList(
       const isWhitePaint =
         !isImageOp &&
         !isTextOp &&
-        // RGB white: all channels above 245
-        ((pendingRgb !== null &&
-          pendingRgb[0] > 245 &&
-          pendingRgb[1] > 245 &&
-          pendingRgb[2] > 245) ||
-          // CMYK white: C=M=Y=K=0 (no ink at all)
-          (pendingRgb === null &&
-            pendingCmyk !== null &&
-            pendingCmyk[0] < 0.01 &&
-            pendingCmyk[1] < 0.01 &&
-            pendingCmyk[2] < 0.01 &&
-            pendingCmyk[3] < 0.01));
+        ((currentRgb !== null &&
+          currentRgb[0] > 245 &&
+          currentRgb[1] > 245 &&
+          currentRgb[2] > 245) ||
+          (currentRgb === null &&
+            currentCmyk !== null &&
+            currentCmyk[0] < 0.01 &&
+            currentCmyk[1] < 0.01 &&
+            currentCmyk[2] < 0.01 &&
+            currentCmyk[3] < 0.01));
 
       // A path drawn with no explicit colour is in the current graphics state
-      // (defaulting to black in PDF).  Count it as real content.
+      // (defaulting to black in PDF). Count it as real content.
       const isDefaultColorPaint =
-        !isImageOp && !isTextOp && pendingRgb === null && pendingCmyk === null;
+        !isImageOp && !isTextOp && currentRgb === null && currentCmyk === null;
 
       if (!isWhitePaint) {
         hasContent = true;
@@ -651,21 +657,18 @@ function analyzePageOperatorList(
         hasImages = true;
         hasColor = true;
       } else if (!isWhitePaint) {
-        if (pendingRgb && !isDefaultColorPaint) {
-          const [r, g, b] = pendingRgb;
+        if (currentRgb && !isDefaultColorPaint) {
+          const [r, g, b] = currentRgb;
           if (Math.max(r, g, b) - Math.min(r, g, b) > 15) {
             hasColor = true;
           }
-        } else if (pendingCmyk) {
-          const [c, m, y] = pendingCmyk;
+        } else if (currentCmyk) {
+          const [c, m, y] = currentCmyk;
           if (c > 0.05 || m > 0.05 || y > 0.05) {
             hasColor = true;
           }
         }
       }
-
-      pendingRgb = null;
-      pendingCmyk = null;
     }
   }
 
@@ -749,13 +752,11 @@ async function analyzeDocumentDirect(
     fileType === 'pptx' ||
     fileType === 'ppt'
   ) {
-    if (!input.convertToPdfPreview) {
-      throw new Error(
-        'Document conversion function is required for Office document analysis.',
-      );
-    }
+    const convert =
+      input.convertToPdfPreview ??
+      (await import('@/services/preview')).convertToPdfPreview;
 
-    const pdfPath = await input.convertToPdfPreview(input.filePath);
+    const pdfPath = await convert(input.filePath);
     return analyzePdfFile(pdfPath, fileType, colorDetectionEnabled);
   }
 
