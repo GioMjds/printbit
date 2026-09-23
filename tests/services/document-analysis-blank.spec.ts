@@ -1,13 +1,13 @@
 import {
   ANALYSIS_ALGORITHM_VERSION,
-  DocumentAnalysisResult,
+  computeDocumentContentMetrics,
   PageAnalysis,
 } from '../../src/services/document-analysis';
 import { LOW_CONTENT_COVERAGE_THRESHOLD } from '../../src/config/document-analysis.config';
 
 describe('Document Analysis Blank & Low Content Metrics', () => {
-  it('exposes ANALYSIS_ALGORITHM_VERSION as 5', () => {
-    expect(ANALYSIS_ALGORITHM_VERSION).toBe(5);
+  it('exposes ANALYSIS_ALGORITHM_VERSION as 6', () => {
+    expect(ANALYSIS_ALGORITHM_VERSION).toBe(6);
   });
 
   it('exposes LOW_CONTENT_COVERAGE_THRESHOLD as 0.02', () => {
@@ -34,31 +34,13 @@ describe('Document Analysis Blank & Low Content Metrics', () => {
       },
     ];
 
-    const blankPages = pages.filter((p) => p.isBlank).map((p) => p.index);
-    const lowContentPages = pages
-      .filter(
-        (p) =>
-          !p.isBlank &&
-          (p.contentCoverage ?? p.coverage ?? 0) <
-            LOW_CONTENT_COVERAGE_THRESHOLD,
-      )
-      .map((p) => p.index);
-
-    const result: Partial<DocumentAnalysisResult> = {
-      totalPages: 2,
-      pages,
-      blankPages,
-      blankPageCount: blankPages.length,
-      isEntirelyBlank: blankPages.length === pages.length && pages.length > 0,
-      lowContentPages,
-      lowContentPageCount: lowContentPages.length,
-      hasLowContent: lowContentPages.length > 0,
-    };
+    const result = computeDocumentContentMetrics(pages, 2);
 
     expect(result.blankPages).toEqual([1, 2]);
     expect(result.blankPageCount).toBe(2);
     expect(result.isEntirelyBlank).toBe(true);
     expect(result.lowContentPages).toEqual([]);
+    expect(result.lowContentPageCount).toBe(0);
     expect(result.hasLowContent).toBe(false);
   });
 
@@ -90,22 +72,13 @@ describe('Document Analysis Blank & Low Content Metrics', () => {
       },
     ];
 
-    const blankPages = pages.filter((p) => p.isBlank).map((p) => p.index);
-    const lowContentPages = pages
-      .filter(
-        (p) =>
-          !p.isBlank &&
-          (p.contentCoverage ?? p.coverage ?? 0) <
-            LOW_CONTENT_COVERAGE_THRESHOLD,
-      )
-      .map((p) => p.index);
+    const result = computeDocumentContentMetrics(pages, 3);
 
-    const isEntirelyBlank =
-      blankPages.length === pages.length && pages.length > 0;
-
-    expect(blankPages).toEqual([2]);
-    expect(isEntirelyBlank).toBe(false);
-    expect(lowContentPages).toEqual([3]);
-    expect(lowContentPages.length > 0).toBe(true);
+    expect(result.blankPages).toEqual([2]);
+    expect(result.blankPageCount).toBe(1);
+    expect(result.isEntirelyBlank).toBe(false);
+    expect(result.lowContentPages).toEqual([3]);
+    expect(result.lowContentPageCount).toBe(1);
+    expect(result.hasLowContent).toBe(true);
   });
 });

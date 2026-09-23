@@ -1121,26 +1121,15 @@ export class WirelessSessionService {
 
       if (analyzed.analysis.isEntirelyBlank) {
         // 1. Purge from session store
-        const sessionStore = this.deps.sessionStore as {
-          deleteDocument?: (
-            sessionId: string,
-            documentId: string,
-          ) => Promise<unknown> | unknown;
-          removeDocument: (
-            sessionId: string,
-            documentId: string,
-          ) => Promise<unknown>;
-        };
         const targetLookupBefore = this.resolveAnalysisTargetDocument(
           job.sessionId,
           this.buildInternalBaseUrl(),
           job.documentId,
         );
-        if (typeof sessionStore.deleteDocument === 'function') {
-          sessionStore.deleteDocument(job.sessionId, job.documentId);
-        } else {
-          void sessionStore.removeDocument(job.sessionId, job.documentId);
-        }
+        await this.deps.sessionStore.removeDocument(
+          job.sessionId,
+          job.documentId,
+        );
 
         // 2. Clean up physical files from disk
         const targetLookup =

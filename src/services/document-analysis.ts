@@ -23,8 +23,9 @@ import {
  *   3 — persist content coverage separately from color coverage
  *   4 — forward original file type to preserve image classification across PDF conversion
  *   5 — isolate Form XObjects from raster images, maintain graphics-state color stack, and auto-fallback converter
+ *   6 — blank page detection, low content classification, and per-page metrics
  */
-export const ANALYSIS_ALGORITHM_VERSION = 5;
+export const ANALYSIS_ALGORITHM_VERSION = 6;
 
 export type AnalyzedFileType =
   | 'pdf'
@@ -223,7 +224,7 @@ function computeFrameMetrics(frame: RgbaFrame): CoverageMetrics {
   };
 }
 
-function computeDocumentContentMetrics(
+export function computeDocumentContentMetrics(
   pages: PageAnalysis[],
   totalPages: number,
 ) {
