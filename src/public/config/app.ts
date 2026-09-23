@@ -2464,7 +2464,7 @@ async function fetchDocumentAnalysis(
     const analysisParams = new URLSearchParams();
     if (sessionToken) analysisParams.set('token', sessionToken);
     const query = analysisParams.toString();
-    const endpoint = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/documents/${encodeURIComponent(documentId)}/analysis`;
+    const endpoint = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/analysis/${encodeURIComponent(documentId)}`;
     const url = query ? `${endpoint}?${query}` : endpoint;
     const resp = await fetchWithTimeout(url, 10_000);
     if (!resp.ok) return;
