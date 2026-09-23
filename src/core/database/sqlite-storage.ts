@@ -413,6 +413,17 @@ function ensureSchema(db: DatabaseSync): void {
       ON transaction_reconciliation(reconciliation_status);
     CREATE INDEX IF NOT EXISTS idx_txn_rec_created_at
       ON transaction_reconciliation(created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS coin_bridge_events (
+      event_id TEXT PRIMARY KEY,
+      coin_value INTEGER NOT NULL,
+      balance_after INTEGER NOT NULL,
+      processed_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_coin_bridge_events_processed_at
+      ON coin_bridge_events(processed_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_coin_bridge_events_coin_value
+      ON coin_bridge_events(coin_value);
   `);
 
   const wirelessDocumentColumnRows = db

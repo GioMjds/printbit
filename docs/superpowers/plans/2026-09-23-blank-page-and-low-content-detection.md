@@ -24,12 +24,15 @@
 ### Task 1: Analysis Engine - Blank Page and Low Content Metrics
 
 **Files:**
+
 - Modify: `src/config/document-analysis.config.ts:1-7`
 - Modify: `src/services/document-analysis.ts:20-75, 420-450, 680-720`
 - Test: `tests/services/document-analysis-blank.spec.ts`
 
 **Interfaces:**
+
 - Produces:
+
   ```typescript
   export interface DocumentAnalysisResult {
     fileType: AnalyzedFileType;
@@ -72,13 +75,32 @@ describe('Document Analysis Blank & Low Content Metrics', () => {
 
   it('identifies 100% blank document correctly from page metrics', () => {
     const pages: PageAnalysis[] = [
-      { index: 1, isColor: false, isBlank: true, coverage: 0, contentCoverage: 0, classification: 'blank' },
-      { index: 2, isColor: false, isBlank: true, coverage: 0, contentCoverage: 0, classification: 'blank' },
+      {
+        index: 1,
+        isColor: false,
+        isBlank: true,
+        coverage: 0,
+        contentCoverage: 0,
+        classification: 'blank',
+      },
+      {
+        index: 2,
+        isColor: false,
+        isBlank: true,
+        coverage: 0,
+        contentCoverage: 0,
+        classification: 'blank',
+      },
     ];
 
     const blankPages = pages.filter((p) => p.isBlank).map((p) => p.index);
     const lowContentPages = pages
-      .filter((p) => !p.isBlank && (p.contentCoverage ?? p.coverage ?? 0) < LOW_CONTENT_COVERAGE_THRESHOLD)
+      .filter(
+        (p) =>
+          !p.isBlank &&
+          (p.contentCoverage ?? p.coverage ?? 0) <
+            LOW_CONTENT_COVERAGE_THRESHOLD,
+      )
       .map((p) => p.index);
 
     const result: Partial<DocumentAnalysisResult> = {
@@ -101,17 +123,44 @@ describe('Document Analysis Blank & Low Content Metrics', () => {
 
   it('identifies mixed document with blank and low content pages', () => {
     const pages: PageAnalysis[] = [
-      { index: 1, isColor: false, isBlank: false, coverage: 0.15, contentCoverage: 0.15, classification: 'bw' },
-      { index: 2, isColor: false, isBlank: true, coverage: 0, contentCoverage: 0, classification: 'blank' },
-      { index: 3, isColor: false, isBlank: false, coverage: 0.008, contentCoverage: 0.008, classification: 'bw' },
+      {
+        index: 1,
+        isColor: false,
+        isBlank: false,
+        coverage: 0.15,
+        contentCoverage: 0.15,
+        classification: 'bw',
+      },
+      {
+        index: 2,
+        isColor: false,
+        isBlank: true,
+        coverage: 0,
+        contentCoverage: 0,
+        classification: 'blank',
+      },
+      {
+        index: 3,
+        isColor: false,
+        isBlank: false,
+        coverage: 0.008,
+        contentCoverage: 0.008,
+        classification: 'bw',
+      },
     ];
 
     const blankPages = pages.filter((p) => p.isBlank).map((p) => p.index);
     const lowContentPages = pages
-      .filter((p) => !p.isBlank && (p.contentCoverage ?? p.coverage ?? 0) < LOW_CONTENT_COVERAGE_THRESHOLD)
+      .filter(
+        (p) =>
+          !p.isBlank &&
+          (p.contentCoverage ?? p.coverage ?? 0) <
+            LOW_CONTENT_COVERAGE_THRESHOLD,
+      )
       .map((p) => p.index);
 
-    const isEntirelyBlank = blankPages.length === pages.length && pages.length > 0;
+    const isEntirelyBlank =
+      blankPages.length === pages.length && pages.length > 0;
 
     expect(blankPages).toEqual([2]);
     expect(isEntirelyBlank).toBe(false);
@@ -132,6 +181,7 @@ In `src/config/document-analysis.config.ts`:
 Add `export const LOW_CONTENT_COVERAGE_THRESHOLD = 0.02;`
 
 In `src/services/document-analysis.ts`:
+
 1. Bump `ANALYSIS_ALGORITHM_VERSION = 5`.
 2. Import `LOW_CONTENT_COVERAGE_THRESHOLD` from `@/config/document-analysis.config`.
 3. Add fields to `DocumentAnalysisResult`:
@@ -150,7 +200,8 @@ In `src/services/document-analysis.ts`:
      .filter(
        (p) =>
          !p.isBlank &&
-         (p.contentCoverage ?? p.coverage ?? 0) < LOW_CONTENT_COVERAGE_THRESHOLD,
+         (p.contentCoverage ?? p.coverage ?? 0) <
+           LOW_CONTENT_COVERAGE_THRESHOLD,
      )
      .map((p) => p.index);
    const lowContentPageCount = lowContentPages.length;
@@ -175,11 +226,13 @@ git commit -m "feat(analysis): add blank page and low content detection metrics"
 ### Task 2: Session Data Contracts & Normalization
 
 **Files:**
+
 - Modify: `src/services/session.ts:33-55`
 - Modify: `src/modules/wireless-session/wireless-session.service.ts:1285-1315`
 - Test: `tests/services/session-blank-contract.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `DocumentAnalysisResult` from Task 1.
 - Produces: `DocumentAnalysis` with `blankPages`, `blankPageCount`, `isEntirelyBlank`, `lowContentPages`, `lowContentPageCount`, `hasLowContent`.
 
@@ -230,6 +283,7 @@ Expected: FAIL or TypeScript type compilation error if `blankPages` doesn't exis
 
 In `src/services/session.ts`:
 Extend `DocumentAnalysis`:
+
 ```typescript
 export interface DocumentAnalysis {
   analysisVersion?: number;
@@ -280,10 +334,12 @@ git commit -m "feat(session): support blank and low content fields in DocumentAn
 ### Task 3: Backend Wireless Session Auto-Rejection Lifecycle
 
 **Files:**
+
 - Modify: `src/modules/wireless-session/wireless-session.service.ts:1108-1145`
 - Test: `tests/modules/wireless-session/blank-rejection.spec.ts`
 
 **Interfaces:**
+
 - Emits:
   - `DocumentRejected`: `{ sessionId: string, documentId: string, filename: string, reason: 'ALL_PAGES_BLANK', message: string }`
   - `AnalysisCompleted`: includes enriched `analysis` with blank and low-content info when `isEntirelyBlank === false`.
@@ -300,18 +356,26 @@ describe('Wireless Session Blank Page Rejection', () => {
       blankPageCount?: number;
     }) => {
       if (analysis.isEntirelyBlank) {
-        return { action: 'reject_and_delete', event: 'DocumentRejected', reason: 'ALL_PAGES_BLANK' };
+        return {
+          action: 'reject_and_delete',
+          event: 'DocumentRejected',
+          reason: 'ALL_PAGES_BLANK',
+        };
       }
       return { action: 'persist_and_complete', event: 'AnalysisCompleted' };
     };
 
-    expect(handleAnalysisResult({ isEntirelyBlank: true, blankPageCount: 1 })).toEqual({
+    expect(
+      handleAnalysisResult({ isEntirelyBlank: true, blankPageCount: 1 }),
+    ).toEqual({
       action: 'reject_and_delete',
       event: 'DocumentRejected',
       reason: 'ALL_PAGES_BLANK',
     });
 
-    expect(handleAnalysisResult({ isEntirelyBlank: false, blankPageCount: 1 })).toEqual({
+    expect(
+      handleAnalysisResult({ isEntirelyBlank: false, blankPageCount: 1 }),
+    ).toEqual({
       action: 'persist_and_complete',
       event: 'AnalysisCompleted',
     });
@@ -328,6 +392,7 @@ Expected: PASS.
 
 In `src/modules/wireless-session/wireless-session.service.ts`:
 Inside `processQueuedAnalysisJob`:
+
 ```typescript
 if (analyzed.analysis.isEntirelyBlank) {
   // 1. Purge from session store
@@ -342,7 +407,9 @@ if (analyzed.analysis.isEntirelyBlank) {
   if ('target' in targetLookup) {
     void fs.promises.unlink(targetLookup.target.filePath).catch(() => {});
     if (targetLookup.target.convertedPdfPath) {
-      void fs.promises.unlink(targetLookup.target.convertedPdfPath).catch(() => {});
+      void fs.promises
+        .unlink(targetLookup.target.convertedPdfPath)
+        .catch(() => {});
     }
   }
 
@@ -364,7 +431,8 @@ if (analyzed.analysis.isEntirelyBlank) {
     documentId: job.documentId,
     filename: analyzed.fileName,
     reason: 'ALL_PAGES_BLANK',
-    message: 'All pages in this file are blank. Blank documents cannot be sent to the kiosk.',
+    message:
+      'All pages in this file are blank. Blank documents cannot be sent to the kiosk.',
   });
 
   return;
@@ -388,10 +456,12 @@ git commit -m "feat(wireless-session): auto-delete and reject 100% blank uploade
 ### Task 4: Customer Upload UI Experience (`src/public/upload`)
 
 **Files:**
+
 - Modify: `src/public/upload/app.ts:740-840, 580-640`
 - Test: `tests/public/upload-blank-handling.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `DocumentRejected` and `AnalysisCompleted` socket events.
 - Features:
   - Local `rejectedBlankFileHashes` set tracking rejected SHA-256 hashes.
@@ -433,6 +503,7 @@ Expected: PASS.
 - [ ] **Step 3: Implement UI updates in `src/public/upload/app.ts`**
 
 In `src/public/upload/app.ts`:
+
 1. Add state:
    ```typescript
    const rejectedBlankFileHashes = new Set<string>();
@@ -503,11 +574,13 @@ git commit -m "feat(upload): display blank rejection and low content disclaimers
 ### Task 5: Kiosk File Selection & Pricing Disclaimers (`src/public/print` & `src/public/config`)
 
 **Files:**
+
 - Modify: `src/public/print/app.ts:15-30, 150-170, 620-675, 1090-1125`
 - Modify: `src/public/config/app.ts:1920-1950`
 - Test: `tests/public/print-blank-warning.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `DocumentRejected` and enriched `AnalysisCompleted` socket events.
 - Features:
   - File badges: `⚠ ${blankPageCount} Blank Page(s)` and `ℹ Low Content`.
@@ -528,7 +601,8 @@ describe('Print Kiosk Blank & Low Content Formatting', () => {
   });
 
   it('formats kiosk low content disclaimer text', () => {
-    const disclaimer = 'Notice: Pricing is based on kiosk price configurations and not page content density.';
+    const disclaimer =
+      'Notice: Pricing is based on kiosk price configurations and not page content density.';
     expect(disclaimer).toContain('kiosk price configurations');
   });
 });
@@ -542,6 +616,7 @@ Expected: PASS.
 - [ ] **Step 3: Update `src/public/print/app.ts` and `src/public/config/app.ts`**
 
 In `src/public/print/app.ts`:
+
 1. Extend `UploadedFile` interface:
    ```typescript
    analysis?: {
@@ -557,6 +632,7 @@ In `src/public/print/app.ts`:
    ```
 2. In `createFileItem`:
    Render badges for `blankPageCount > 0` and `hasLowContent`:
+
    ```typescript
    const blankBadge =
      file.analysis?.blankPageCount && file.analysis.blankPageCount > 0
@@ -567,6 +643,7 @@ In `src/public/print/app.ts`:
      ? `<span class="file-item__low-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(59,130,246,0.15);color:#3b82f6;font-size:11px;font-weight:600;margin-left:6px;">ℹ Low Content</span>`
      : '';
    ```
+
 3. In `updateSelectionFooterHint`:
    If `file.analysis?.blankPageCount > 0`: append blank page notice.
    If `file.analysis?.hasLowContent`: append pricing disclaimer.
@@ -575,7 +652,8 @@ In `src/public/print/app.ts`:
 
 In `src/public/config/app.ts`:
 Add callout disclaimer banner near price calculation if `hasLowContent === true`:
-> *ℹ Pricing Disclaimer: Kiosk pricing is determined by kiosk configuration per page and does not adjust for low content density or ink coverage.*
+
+> _ℹ Pricing Disclaimer: Kiosk pricing is determined by kiosk configuration per page and does not adjust for low content density or ink coverage._
 
 - [ ] **Step 4: Run test to verify**
 
@@ -594,6 +672,7 @@ git commit -m "feat(print,config): display blank page badges, footer hints, and 
 ### Task 6: Build Verification, Full Regression, and Graphify Sync
 
 **Files:**
+
 - Output bundles: `dist/`
 - Graphify index: `graphify-out/`
 
