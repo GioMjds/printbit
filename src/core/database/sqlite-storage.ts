@@ -708,8 +708,6 @@ export function getSqliteDb(): DatabaseSync {
   return sqliteDb;
 }
 
-<<<<<<< HEAD
-=======
 export function getAuthoritativeCoinStats(): {
   one: number;
   five: number;
@@ -740,7 +738,6 @@ export {
   type ReconciliationSummary,
 } from './models/transaction-reconciliation.model';
 
->>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 export {
   type WirelessSessionStorageEntry,
   type WirelessSessionDocumentStorageEntry,
