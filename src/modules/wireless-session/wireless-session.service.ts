@@ -1119,6 +1119,72 @@ export class WirelessSessionService {
         throw new Error(analyzed.error);
       }
 
+      if (analyzed.analysis.isEntirelyBlank) {
+        // 1. Purge from session store
+        const sessionStore = this.deps.sessionStore as {
+          deleteDocument?: (
+            sessionId: string,
+            documentId: string,
+          ) => Promise<unknown> | unknown;
+          removeDocument: (
+            sessionId: string,
+            documentId: string,
+          ) => Promise<unknown>;
+        };
+        const targetLookupBefore = this.resolveAnalysisTargetDocument(
+          job.sessionId,
+          this.buildInternalBaseUrl(),
+          job.documentId,
+        );
+        if (typeof sessionStore.deleteDocument === 'function') {
+          sessionStore.deleteDocument(job.sessionId, job.documentId);
+        } else {
+          void sessionStore.removeDocument(job.sessionId, job.documentId);
+        }
+
+        // 2. Clean up physical files from disk
+        const targetLookup =
+          'target' in targetLookupBefore
+            ? targetLookupBefore
+            : this.resolveAnalysisTargetDocument(
+                job.sessionId,
+                this.buildInternalBaseUrl(),
+                job.documentId,
+              );
+        if ('target' in targetLookup) {
+          void fs.promises.unlink(targetLookup.target.filePath).catch(() => {});
+          if (targetLookup.target.convertedPdfPath) {
+            void fs.promises
+              .unlink(targetLookup.target.convertedPdfPath)
+              .catch(() => {});
+          }
+        }
+
+        // 3. Log audit event
+        void adminService.appendAdminLog(
+          'document_rejected_blank',
+          `Document ${analyzed.fileName} rejected: all pages are blank.`,
+          {
+            sessionId: job.sessionId,
+            documentId: job.documentId,
+            filename: analyzed.fileName,
+            pageCount: analyzed.analysis.pageCount,
+          },
+        );
+
+        // 4. Emit rejection event
+        this.emitToSession(job.sessionId, 'DocumentRejected', {
+          sessionId: job.sessionId,
+          documentId: job.documentId,
+          filename: analyzed.fileName,
+          reason: 'ALL_PAGES_BLANK',
+          message:
+            'All pages in this file are blank. Blank documents cannot be sent to the kiosk.',
+        });
+
+        return;
+      }
+
       this.emitToSession(job.sessionId, 'AnalysisCompleted', {
         documentId: analyzed.documentId,
         filename: analyzed.fileName,
