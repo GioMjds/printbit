@@ -1,5 +1,3 @@
-import flatpickr from 'flatpickr';
-import type { Instance as FlatpickrInstance } from 'flatpickr/dist/types/instance';
 import {
   EarningsAnalyticsResponse,
   EarningsAnalyticsView,
@@ -66,25 +64,40 @@ let analyticsInFlight: Promise<void> | null = null;
 let analyticsInFlightKey: string | null = null;
 let analyticsRequestSeq = 0;
 
-// ── Flatpickr instance ──────────────────────────────────────────────────────
-let picker: FlatpickrInstance;
+function toLocalDateString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDateString(value: string): Date {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function syncDatePicker(): void {
+  if (!anchorDateInput) return;
+  anchorDateInput.max = toLocalDateString(new Date());
+  anchorDateInput.value = toLocalDateString(anchorDate);
+}
 
 function initCalendar(): void {
-  picker = flatpickr(anchorDateInput, {
-    defaultDate: anchorDate,
-    maxDate: 'today',
-    dateFormat: 'Y-m-d',
-    disableMobile: true,
-    onChange(selectedDates) {
-      if (!selectedDates[0]) return;
-      anchorDate = selectedDates[0];
-      void loadAnalyticsData().catch(showEarningsError);
-    },
+  syncDatePicker();
+  anchorDateInput?.addEventListener('change', () => {
+    if (!anchorDateInput.value) return;
+    anchorDate = parseLocalDateString(anchorDateInput.value);
+    syncDatePicker();
+    void loadAnalyticsData().catch(showEarningsError);
   });
 }
 
 calendarToggleBtn?.addEventListener('click', () => {
-  picker?.open();
+  try {
+    anchorDateInput?.showPicker();
+  } catch {
+    anchorDateInput?.focus();
+  }
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -278,7 +291,7 @@ viewButtons.forEach((btn) => {
     if (!isAnalyticsView(btn.dataset.view)) return;
     currentView = btn.dataset.view;
     anchorDate = new Date();
-    picker?.setDate(anchorDate, false);
+    syncDatePicker();
     setActiveViewButton(currentView);
     void loadAnalyticsData().catch(showEarningsError);
   });
@@ -286,14 +299,14 @@ viewButtons.forEach((btn) => {
 
 prevAnchorBtn.addEventListener('click', () => {
   anchorDate = shiftEarningsAnchor(currentView, anchorDate, -1);
-  picker?.setDate(anchorDate, false);
+  syncDatePicker();
   void loadAnalyticsData().catch(showEarningsError);
 });
 
 nextAnchorBtn.addEventListener('click', () => {
   if (!canNavigateToNextEarningsPeriod(currentView, anchorDate)) return;
   anchorDate = shiftEarningsAnchor(currentView, anchorDate, 1);
-  picker?.setDate(anchorDate, false);
+  syncDatePicker();
   void loadAnalyticsData().catch(showEarningsError);
 });
 
@@ -301,7 +314,6 @@ initAuth(async (signal) => {
   currentView = resolveInitialView();
   setActiveViewButton(currentView);
   initCalendar();
-  picker?.setDate(anchorDate, false);
   await loadData().catch(showEarningsError);
   if (signal.aborted) return;
   if (summaryRefreshTimer !== null) window.clearInterval(summaryRefreshTimer);
