@@ -102,7 +102,7 @@ function navigateTo(path: string) {
   navigateWithKioskMotion(path);
 }
 
-const PRINT_ONBOARDING_TRIGGER_KEY = 'printbit.showPrintOnboardingModal';
+// const PRINT_ONBOARDING_TRIGGER_KEY = 'printbit.showPrintOnboardingModal';
 
 const openPrint = document.getElementById('openPrintBtn');
 const openCopy = document.getElementById('openCopyBtn');
@@ -241,7 +241,9 @@ function promptReceiptChoice(destination: string): void {
   if (!receiptPromptOverlay) {
     try {
       sessionStorage.setItem('printbit.receiptPreference', 'yes');
-    } catch {}
+    } catch {
+      // Best-effort storage
+    }
     navigateTo(destination);
     return;
   }

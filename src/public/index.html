@@ -65,7 +65,10 @@
           <div class="wifi-inline-card__text">
             <span class="wifi-inline-card__step">Step 1</span>
             <h2 class="wifi-inline-card__title">Scan to connect to PrintBit</h2>
-            <p class="wifi-inline-card__sub">Connect to the kiosk hotspot using Google Lens (Android) or native camera (iOS) before uploading, copying, or scanning.</p>
+            <p class="wifi-inline-card__sub">
+              Connect to PrintBit Wi-Fi using Google Lens (Android) or native
+              camera (iOS) before uploading, copying, or scanning.
+            </p>
           </div>
         </div>
 
@@ -159,12 +162,29 @@
     </div>
 
     <div class="pricing-overlay" id="pricingOverlay" aria-hidden="true">
-      <section class="pricing-modal" role="dialog" aria-modal="true" aria-labelledby="pricingTitle">
-        <button class="pricing-close" id="closePricingBtn" type="button" aria-label="Close printing prices">×</button>
+      <section
+        class="pricing-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pricingTitle"
+      >
+        <button
+          class="pricing-close"
+          id="closePricingBtn"
+          type="button"
+          aria-label="Close printing prices"
+        >
+          ×
+        </button>
         <p class="pricing-modal__eyebrow">PRINT WITH CONFIDENCE</p>
         <h2 id="pricingTitle">Printing prices</h2>
-        <p class="pricing-modal__intro">Base prices are per page. Your total updates after you choose your document and settings.</p>
-        <div id="pricingGuideContent" aria-live="polite">Loading printing prices…</div>
+        <p class="pricing-modal__intro">
+          Base prices are per page. Your total updates after you choose your
+          document and settings.
+        </p>
+        <div id="pricingGuideContent" aria-live="polite">
+          Loading printing prices…
+        </div>
       </section>
     </div>
 
@@ -349,11 +369,15 @@
         stroke-linejoin="round"
         aria-hidden="true"
       >
-        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+        <path
+          d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"
+        />
         <line x1="7" y1="7" x2="7.01" y2="7" />
       </svg>
       <span class="pricing-fab__badge" aria-hidden="true">₱</span>
-      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--bottom">Printing prices</span>
+      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--bottom"
+        >Printing prices</span
+      >
     </button>
 
     <!-- Report floating button (Bottom-Right) -->
@@ -374,11 +398,15 @@
         stroke-linejoin="round"
         aria-hidden="true"
       >
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <path
+          d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+        />
         <line x1="12" y1="9" x2="12" y2="13" />
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
-      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left">Report Issue</span>
+      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left"
+        >Report Issue</span
+      >
     </button>
 
     <!-- Report QR modal -->
@@ -390,8 +418,15 @@
         aria-modal="true"
       >
         <div class="report-modal__badge" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path
+              d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"
+            />
             <path d="M8 8h3v3H8zM13 13h3v3h-3z" />
           </svg>
         </div>
@@ -437,7 +472,9 @@
         stroke-linejoin="round"
         aria-hidden="true"
       >
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <path
+          d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+        />
       </svg>
       <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left">Feedback</span>
     </button>
@@ -451,8 +488,15 @@
         aria-modal="true"
       >
         <div class="feedback-modal__badge" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.7A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z" />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path
+              d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.7A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z"
+            />
             <path d="M8 12h.01M12 12h.01M16 12h.01" stroke-linecap="round" />
           </svg>
         </div>
@@ -503,7 +547,9 @@
         <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
         <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
       </svg>
-      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left">Wi-Fi Help</span>
+      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left"
+        >Wi-Fi Help</span
+      >
     </button>
 
     <!-- Wi-Fi Help Modal -->
@@ -516,7 +562,14 @@
         aria-modal="true"
       >
         <div class="wifi-modal__badge" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M5 12.55a11 11 0 0 1 14.08 0" />
             <path d="M1.42 9a16 16 0 0 1 21.16 0" />
             <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
@@ -528,7 +581,8 @@
           Wi-Fi Connection Help
         </h3>
         <p class="wifi-modal__sub" id="wifiModalSub">
-          Follow these steps if scanning the QR code with your phone camera doesn't work.
+          Follow these steps if scanning the QR code with your phone camera
+          doesn't work.
         </p>
 
         <div class="wifi-info-card">
@@ -538,7 +592,9 @@
           </div>
           <div class="wifi-info-row">
             <span class="wifi-info-label">Password</span>
-            <span class="wifi-info-val" id="wifiPasswordVal">Open (No password required)</span>
+            <span class="wifi-info-val" id="wifiPasswordVal"
+              >Open (No password required)</span
+            >
           </div>
         </div>
 
@@ -547,35 +603,53 @@
             <span class="wifi-modal-step__num">1</span>
             <div class="wifi-modal-step__content">
               <strong>Connect manually in Wi-Fi settings</strong>
-              <span>Open your phone Settings &rarr; Wi-Fi and choose the network name above.</span>
+              <span
+                >Open your phone Settings &rarr; Wi-Fi and choose the network
+                name above.</span
+              >
             </div>
           </div>
           <div class="wifi-modal-step">
             <span class="wifi-modal-step__num">2</span>
             <div class="wifi-modal-step__content">
               <strong>Open network</strong>
-              <span>PrintBit Wi-Fi is an open network. No password is required.</span>
+              <span
+                >PrintBit Wi-Fi is an open network. No password is
+                required.</span
+              >
             </div>
           </div>
           <div class="wifi-modal-step">
             <span class="wifi-modal-step__num">3</span>
             <div class="wifi-modal-step__content">
               <strong>Continue without internet</strong>
-              <span>If your phone prompts &ldquo;No internet connection&rdquo;, select <em>Keep Connected</em> or <em>Continue</em>. You can proceed even without internet.</span>
+              <span
+                >If your phone prompts &ldquo;No internet connection&rdquo;,
+                select <em>Keep Connected</em> or <em>Continue</em>. You can
+                proceed even without internet.</span
+              >
             </div>
           </div>
         </div>
 
         <div class="wifi-modal-tip">
           <div class="wifi-modal-tip__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
           </div>
           <p class="wifi-modal-tip__text">
-            <strong>Important:</strong> Turn off your mobile data (cellular) so your phone doesn't bypass the kiosk connection.
+            <strong>Important:</strong> Turn off your mobile data (cellular) so
+            your phone doesn't bypass the kiosk connection.
           </p>
         </div>
 
@@ -631,7 +705,11 @@
     </div>
 
     <!-- Transaction Receipt Prompt Modal -->
-    <div class="receipt-prompt-overlay" id="receiptPromptOverlay" aria-hidden="true">
+    <div
+      class="receipt-prompt-overlay"
+      id="receiptPromptOverlay"
+      aria-hidden="true"
+    >
       <div
         class="receipt-prompt-modal"
         role="dialog"
@@ -640,8 +718,17 @@
         aria-modal="true"
       >
         <div class="receipt-prompt-modal__badge" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"
+            />
             <path d="M16 8h-8M16 12h-8M12 16h-4" />
           </svg>
         </div>
@@ -650,10 +737,14 @@
           Do you need a transaction receipt?
         </h3>
         <p class="receipt-prompt-modal__sub" id="receiptPromptSub">
-          Choose whether you would like an official digital e-receipt QR code upon completing your transaction.
+          Choose whether you would like an official digital e-receipt QR code
+          upon completing your transaction.
         </p>
         <div class="receipt-prompt-modal__timer-bar" aria-hidden="true">
-          <div class="receipt-prompt-modal__timer-progress" id="receiptPromptProgress"></div>
+          <div
+            class="receipt-prompt-modal__timer-progress"
+            id="receiptPromptProgress"
+          ></div>
         </div>
         <div class="receipt-prompt-modal__actions">
           <button
@@ -661,8 +752,18 @@
             id="receiptPromptYesBtn"
             type="button"
           >
-            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            <svg
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              width="18"
+              height="18"
+              aria-hidden="true"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clip-rule="evenodd"
+              />
             </svg>
             <span>Yes, I need a receipt</span>
           </button>
@@ -722,10 +823,33 @@
         <div class="idle-brand" aria-label="PrintBit">
           <span class="idle-brand__mark" aria-hidden="true">
             <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-              <rect x="7" y="4" width="18" height="11" rx="2.5" fill="currentColor" opacity="0.92" />
-              <rect x="4" y="12" width="24" height="14" rx="3.5" fill="currentColor" />
+              <rect
+                x="7"
+                y="4"
+                width="18"
+                height="11"
+                rx="2.5"
+                fill="currentColor"
+                opacity="0.92"
+              />
+              <rect
+                x="4"
+                y="12"
+                width="24"
+                height="14"
+                rx="3.5"
+                fill="currentColor"
+              />
               <rect x="7" y="20" width="18" height="9" rx="2" fill="#ffffff" />
-              <rect x="10" y="23" width="12" height="2" rx="1" fill="currentColor" opacity="0.55" />
+              <rect
+                x="10"
+                y="23"
+                width="12"
+                height="2"
+                rx="1"
+                fill="currentColor"
+                opacity="0.55"
+              />
             </svg>
           </span>
           <span class="idle-brand__name">PrintBit</span>
@@ -733,9 +857,7 @@
 
         <p class="idle-eyebrow">SELF-SERVICE PRINTING KIOSK</p>
 
-        <h1 class="idle-headline">
-          Print. Copy.<br />Scan.
-        </h1>
+        <h1 class="idle-headline">Print. Copy.<br />Scan.</h1>
 
         <!-- Tap-to-start call to action -->
         <div class="idle-cta" aria-live="polite">

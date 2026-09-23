@@ -2,7 +2,7 @@ export type SupportedLanguage = 'en' | 'fil';
 
 interface LanguageApiResponse {
   language: SupportedLanguage;
-  languages: Array<{ code: SupportedLanguage; label: string }>;
+  languages: { code: SupportedLanguage; label: string }[];
   highContrast: boolean;
   translations: Record<string, string>;
 }
