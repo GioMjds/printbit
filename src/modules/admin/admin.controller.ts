@@ -82,7 +82,7 @@ import {
   getSqliteDb,
   writeRuntimeState,
 } from '@/core/database/sqlite-storage';
-import { requestWindowsShutdown } from '@/services/windows-power';
+import { requestWindowsRestart, requestWindowsShutdown } from '@/services/windows-power';
 import { sendWorkerRequest } from '@/services/worker-command-pipe';
 
 export const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
@@ -114,6 +114,7 @@ export interface AdminControllerDeps {
     owedChangeId?: string;
   }>;
   shutdownWindows?: () => Promise<void>;
+  restartWindows?: () => Promise<void>;
 }
 
 // ── Validation helpers ─────────────────────────────────────────────────────
@@ -402,6 +403,12 @@ const adminShutdownRateLimit = createRateLimit({
   max: 3,
 });
 
+const adminRestartRateLimit = createRateLimit({
+  keyPrefix: 'admin-system-restart',
+  windowMs: 10 * 60_000,
+  max: 3,
+});
+
 const adminSpoolerRestartRateLimit = createRateLimit({
   keyPrefix: 'admin-printer-spooler-restart',
   windowMs: 2 * 60_000,
@@ -478,6 +485,13 @@ export class AdminController {
       requireAdminPin,
       adminShutdownRateLimit,
       this.handleSystemShutdown,
+    );
+    this.router.post(
+      '/system/restart',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      adminRestartRateLimit,
+      this.handleSystemRestart,
     );
     this.router.post(
       '/printer/restart-spooler',
@@ -1228,6 +1242,41 @@ export class AdminController {
       return res.status(503).json({
         ok: false,
         error: 'Windows shutdown could not be scheduled.',
+      });
+    }
+  };
+
+  private handleSystemRestart = async (_req: Request, res: Response) => {
+    const recovery = getRecoveryStatusSnapshot();
+    const hopper = this.deps.getHopperStatus();
+
+    if (recovery.sessionStats.inFlight > 0 || hopper.pending) {
+      return res.status(409).json({
+        ok: false,
+        error: 'Cannot restart while a customer operation is in progress.',
+      });
+    }
+
+    try {
+      await this.adminService.appendAdminLog(
+        'admin_system_restart_requested',
+        'Administrator requested a Windows restart from the System Control Center.',
+      );
+      await (this.deps.restartWindows ?? requestWindowsRestart)();
+      return res.status(202).json({
+        ok: true,
+        message: 'Windows restart scheduled.',
+      });
+    } catch (error) {
+      await this.adminService.appendAdminLog(
+        'admin_system_restart_failed',
+        `Windows restart could not be scheduled: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return res.status(503).json({
+        ok: false,
+        error: 'Windows restart could not be scheduled.',
       });
     }
   };

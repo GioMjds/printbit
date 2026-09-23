@@ -13,6 +13,16 @@ export const WINDOWS_SHUTDOWN_ARGS = [
   'PrintBit administrator requested shutdown',
 ] as const;
 
+export const WINDOWS_RESTART_ARGS = [
+  '/r',
+  '/t',
+  '0',
+  '/d',
+  'p:0:0',
+  '/c',
+  'PrintBit administrator requested restart',
+] as const;
+
 // Keep /t at zero and omit /f: Microsoft documents that a nonzero timeout
 // implies forced application closure. Source:
 // https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/shutdown
@@ -44,3 +54,18 @@ export async function requestWindowsShutdown(
     WINDOWS_SHUTDOWN_ARGS,
   );
 }
+
+export async function requestWindowsRestart(
+  options: RequestWindowsShutdownOptions = {},
+): Promise<void> {
+  const platform = options.platform ?? process.platform;
+  if (platform !== 'win32') {
+    throw new Error('Windows restart is only available on Windows hosts.');
+  }
+
+  await (options.runCommand ?? runShutdownCommand)(
+    'shutdown.exe',
+    WINDOWS_RESTART_ARGS,
+  );
+}
+

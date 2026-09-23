@@ -63,6 +63,9 @@ const restartSpoolerBtn = document.getElementById(
 const testPrintBtn = document.getElementById(
   'testPrintBtn',
 ) as HTMLButtonElement | null;
+const restartWindowsBtn = document.getElementById(
+  'restartWindowsBtn',
+) as HTMLButtonElement | null;
 const shutdownWindowsBtn = document.getElementById(
   'shutdownWindowsBtn',
 ) as HTMLButtonElement | null;
@@ -549,6 +552,42 @@ restartSpoolerBtn?.addEventListener('click', () => {
     )
     .finally(() => {
       restartSpoolerBtn.disabled = false;
+    });
+});
+
+// ── Windows restart ──────────────────────────────────────────────────────────
+
+restartWindowsBtn?.addEventListener('click', () => {
+  if (
+    !window.confirm(
+      'Restart the entire Windows kiosk? Make sure no customer operation is active.',
+    )
+  ) {
+    return;
+  }
+
+  restartWindowsBtn.disabled = true;
+  setMessage('Scheduling Windows restart...');
+
+  void apiFetch('/api/admin/system/restart', { method: 'POST' })
+    .then(async (res) => {
+      const body = (await res.json()) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+      };
+      if (!res.ok || body.ok !== true) {
+        throw new Error(body.error ?? 'Windows restart could not be scheduled.');
+      }
+      setMessage(body.message ?? 'Windows restart scheduled.');
+    })
+    .catch((error: unknown) => {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Windows restart could not be scheduled.',
+      );
+      restartWindowsBtn.disabled = false;
     });
 });
 
