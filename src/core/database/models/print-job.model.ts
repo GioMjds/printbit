@@ -110,8 +110,6 @@ export class PrintJobSqliteStore {
     getSqliteDb().prepare('DELETE FROM print_jobs WHERE job_id = ?').run(jobId);
   }
 
-<<<<<<< HEAD
-=======
   getJobByTransactionId(transactionId: string): PrintJobEntry | null {
     const row = getSqliteDb()
       .prepare(
@@ -178,8 +176,6 @@ export class PrintJobSqliteStore {
       scan,
     };
   }
-
->>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
   private toEntry(row: Record<string, unknown>): PrintJobEntry {
     return {
       jobId: String(row.job_id ?? ''),

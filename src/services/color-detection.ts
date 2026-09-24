@@ -45,23 +45,23 @@ interface PdfObjectStore {
   get(name: string, callback?: (obj: unknown) => void): unknown;
 }
 
-interface PdfPageProxy {
+export interface PdfPageProxy {
   getOperatorList(): Promise<PdfOperatorList>;
   cleanup(): void;
   objs?: PdfObjectStore;
 }
 
-interface PdfDocumentProxy {
+export interface PdfDocumentProxy {
   numPages: number;
   getPage(pageNum: number): Promise<PdfPageProxy>;
 }
 
-interface PdfDocumentLoadingTask {
+export interface PdfDocumentLoadingTask {
   promise: Promise<PdfDocumentProxy>;
   destroy(): Promise<void> | void;
 }
 
-interface PdfImageObject {
+export interface PdfImageObject {
   width: number;
   height: number;
   data?: Uint8Array | Uint8ClampedArray;
@@ -69,7 +69,7 @@ interface PdfImageObject {
   kind?: number;
 }
 
-interface ImageColorStats {
+export interface ImageColorStats {
   sampledPixels: number;
   colorPixels: number;
   colorRatio: number;
@@ -158,7 +158,7 @@ function isPendingPdfObjectLookupError(error: unknown): boolean {
  * @param page The PDF page proxy.
  * @param imageName The resource name of the image.
  */
-async function resolveImageObject(
+export async function resolveImageObject(
   page: PdfPageProxy,
   imageName: string,
 ): Promise<PdfImageObject | null> {
@@ -222,7 +222,7 @@ async function resolveImageObject(
  * @param image The image object containing raw data.
  * @returns Statistics regarding pixel color distribution.
  */
-function getImageColorStats(image: PdfImageObject): ImageColorStats {
+export function getImageColorStats(image: PdfImageObject): ImageColorStats {
   const width = image.width;
   const height = image.height;
   const data = image.data;

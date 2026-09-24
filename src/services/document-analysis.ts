@@ -6,6 +6,11 @@ import {
   COLOR_SATURATION_THRESHOLD,
   MAX_PIXELS_TO_SAMPLE,
 } from '@/config/document-analysis.config';
+import {
+  resolveImageObject,
+  getImageColorStats,
+  type PdfPageProxy,
+} from './color-detection';
 
 /**
  * Monotonically-increasing version for the document analysis algorithm.
@@ -22,8 +27,11 @@ import {
  *   3 — persist content coverage separately from color coverage
  *   4 — forward original file type to preserve image classification across PDF conversion
  *   5 — isolate Form XObjects from raster images, maintain graphics-state color stack, and auto-fallback converter
+ *   6 — ignore whitespace-only text operations and handle setFillGray/setStrokeGray in color detection
+ *   7 — sample embedded images for color, exclude grayscale/monochrome icons from color, and restrict image tier to converted image uploads
+ *   8 — include constructPath and rawFillPath in pathDrawingOps to recognize vector shapes and colored boxes
  */
-export const ANALYSIS_ALGORITHM_VERSION = 5;
+export const ANALYSIS_ALGORITHM_VERSION = 8;
 
 export type AnalyzedFileType =
   | 'pdf'
@@ -99,6 +107,8 @@ interface PdfOps {
   setStrokeRGBColor?: number;
   setFillCMYKColor?: number;
   setStrokeCMYKColor?: number;
+  setFillGray?: number;
+  setStrokeGray?: number;
   paintImageXObject?: number;
   paintInlineImageXObject?: number;
   paintImageMaskXObject?: number;
@@ -114,6 +124,8 @@ interface PdfOps {
   closeFillStroke?: number;
   closeEOFillStroke?: number;
   shadingFill?: number;
+  constructPath?: number;
+  rawFillPath?: number;
 }
 
 export function resolveFileType(
@@ -374,7 +386,7 @@ async function analyzePdfFile(
       try {
         const viewport = page.getViewport({ scale: 1 });
         const opList = (await page.getOperatorList()) as PdfOperatorList;
-        const analysis = analyzePageOperatorList(
+        const analysis = await analyzePageOperatorList(
           opList,
           ops,
           textRenderOps,
@@ -383,6 +395,7 @@ async function analyzePdfFile(
             pageWidth: viewport.width,
             pageHeight: viewport.height,
             isOriginalImage: options?.isOriginalImage,
+            page,
           },
         );
         coverage = analysis.coverage;
@@ -494,17 +507,41 @@ interface PageOperatorScanOptions {
   pageHeight?: number;
   isOriginalImage?: boolean;
   imageCoverageThreshold?: number;
+  page?: PdfPageProxy;
 }
 
 type Matrix6 = [number, number, number, number, number, number];
 
-function analyzePageOperatorList(
+export function hasVisibleGlyphs(args: unknown): boolean {
+  if (!Array.isArray(args) || args.length === 0) return false;
+  const glyphs = Array.isArray(args[args.length - 1])
+    ? args[args.length - 1]
+    : args[0];
+  if (!Array.isArray(glyphs)) return false;
+  for (const item of glyphs) {
+    if (typeof item === 'string') {
+      if (item.trim().length > 0) return true;
+    } else if (item && typeof item === 'object') {
+      const g = item as {
+        isSpace?: boolean;
+        unicode?: string;
+        fontChar?: string;
+      };
+      if (g.isSpace) continue;
+      const text = g.unicode ?? g.fontChar ?? '';
+      if (text.trim().length > 0) return true;
+    }
+  }
+  return false;
+}
+
+async function analyzePageOperatorList(
   opList: PdfOperatorList,
   ops: PdfOps,
   textRenderOps: Set<number> = new Set(),
   textStructuralOps: Set<number> = new Set(),
   options?: PageOperatorScanOptions,
-): PageAnalysisMetrics {
+): Promise<PageAnalysisMetrics> {
   const imagePaintOps = new Set(
     [
       ops.paintImageXObject,
@@ -529,6 +566,8 @@ function analyzePageOperatorList(
       ops.closeFillStroke,
       ops.closeEOFillStroke,
       ops.shadingFill,
+      ops.constructPath,
+      ops.rawFillPath,
     ].filter((op): op is number => typeof op === 'number'),
   );
 
@@ -604,12 +643,23 @@ function analyzePageOperatorList(
       }
       continue;
     }
+    if (op === ops.setFillGray || op === ops.setStrokeGray) {
+      currentRgb = null;
+      currentCmyk = null;
+      continue;
+    }
 
     // ── Actual drawing ops: images, form XObjects, text renders, and path fills/strokes ──────
     const isImageOp = imagePaintOps.has(op);
     const isFormOp = op === ops.paintFormXObject;
     const isTextOp = textRenderOps.has(op);
     const isPathOp = pathDrawingOps.has(op);
+
+    // Skip text operations that only contain invisible whitespace (e.g. spaces with colored styles)
+    if (isTextOp && !hasVisibleGlyphs(opList.argsArray[i])) {
+      continue;
+    }
+
     const isDrawingOp = isImageOp || isFormOp || isPathOp || isTextOp;
 
     if (isDrawingOp) {
@@ -655,7 +705,17 @@ function analyzePageOperatorList(
       // ── Color detection ──────────────────────────────────────────────────
       if (isImageOp) {
         hasImages = true;
-        hasColor = true;
+        const args = opList.argsArray[i];
+        const imageName =
+          Array.isArray(args) && typeof args[0] === 'string'
+            ? args[0]
+            : null;
+        if (imageName && options?.page) {
+          const imageObj = await resolveImageObject(options.page, imageName);
+          if (imageObj && getImageColorStats(imageObj).isColor) {
+            hasColor = true;
+          }
+        }
       } else if (!isWhitePaint) {
         if (currentRgb && !isDefaultColorPaint) {
           const [r, g, b] = currentRgb;
@@ -693,10 +753,8 @@ function analyzePageOperatorList(
       ? 0
       : 1.0
     : rawImageCoverage;
-  const threshold = options?.imageCoverageThreshold ?? 0.50;
-  const isImagePage = options?.isOriginalImage
-    ? !isBlank
-    : imageCoverage >= threshold;
+  // Only uploaded image file formats (converted to PDF) qualify for the image/photo pricing tier
+  const isImagePage = Boolean(options?.isOriginalImage && !isBlank);
 
   let classification: 'blank' | 'bw' | 'partial' | 'full_color' | 'image';
   if (isBlank) {
@@ -705,7 +763,7 @@ function analyzePageOperatorList(
     classification = 'bw';
   } else if (isImagePage) {
     classification = 'image';
-  } else if (estimatedCoverage > 0.8 || hasImages) {
+  } else if (estimatedCoverage > 0.8 || (hasImages && hasColor)) {
     classification = 'full_color';
   } else {
     classification = 'partial';

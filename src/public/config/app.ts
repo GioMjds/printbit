@@ -1956,6 +1956,7 @@ function updateSummary(): void {
 
   if (currentPrintQuote) {
     footerSummary.classList.add('ready');
+    footerSummary.textContent = 'Ready to print';
     if (footerBreakdown) {
       const parts: string[] = [];
       if (
@@ -2449,7 +2450,10 @@ continueBtn?.addEventListener('click', () => {
     copyPreviewPath: mode === 'copy' ? copyPreviewPath : null,
     copyPreviewReleaseToken: mode === 'copy' ? copyPreviewReleaseToken : null,
     detectedColorMode: mode === 'print' ? detectedColorMode : null,
-    colorMode: cfg.colorMode,
+    colorMode:
+      mode === 'print' && currentPrintQuote?.effectiveColorMode
+        ? currentPrintQuote.effectiveColorMode
+        : cfg.colorMode,
     quality: getSelectedQuality(),
     duplex: false,
     copies: mode === 'scan' ? 1 : getCopies(),

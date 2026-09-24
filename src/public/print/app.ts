@@ -126,6 +126,9 @@ const conversionMessage = document.getElementById(
 const conversionCancelBtn = document.getElementById(
   'conversionCancel',
 ) as HTMLButtonElement | null;
+const currentSelectedFile = document.getElementById(
+  'currentSelectedFile',
+) as HTMLButtonElement | null;
 
 let maxPagesPerSession =
   Number(sessionStorage.getItem('printbit.maxPagesPerSession')) || 30;

@@ -253,7 +253,6 @@ function renderScanFilenamePreview(): void {
     baseName = parts.filter(Boolean).join('-');
   }
 
-  // eslint-disable-next-line no-control-regex
   const cleaned = baseName
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
     .replace(/\s+/g, '-')
@@ -349,89 +348,7 @@ document.querySelectorAll('.token-tag').forEach((tag) => {
 
 syncScanFilenameUI();
 
-<<<<<<< HEAD
-=======
-// ── Transaction ID Format Preview ─────────────────────────────────
 
-function renderTxnFormatPreview(): void {
-  if (!txnFormatPreviewText) return;
-  const now = new Date();
-  const YYYY = String(now.getFullYear());
-  const MM = String(now.getMonth() + 1).padStart(2, '0');
-  const DD = String(now.getDate()).padStart(2, '0');
-  const HH = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
-  const RANDOM = 'A1B2';
-
-  const prefix = settingTxnPrefix?.value.trim() || 'TXN';
-  const dateFormat = settingTxnDateFormat?.value ?? 'YYYYMMDD';
-  const includeTime = settingTxnIncludeTime?.checked ?? false;
-  const customEnabled = settingTxnCustomPatternEnabled?.checked ?? false;
-  const customPattern =
-    settingTxnCustomPattern?.value.trim() || '{PREFIX}-{DATE}-{RANDOM}';
-
-  let dateStr = '';
-  if (dateFormat === 'YYYYMMDD') dateStr = `${YYYY}${MM}${DD}`;
-  else if (dateFormat === 'YYYY-MM-DD') dateStr = `${YYYY}-${MM}-${DD}`;
-
-  const timeStr = includeTime ? `${HH}${mm}${ss}` : '';
-
-  let result: string;
-  if (customEnabled) {
-    result = customPattern
-      .replace(/\{PREFIX\}/gi, prefix)
-      .replace(/\{DATE\}/gi, dateStr || `${YYYY}${MM}${DD}`)
-      .replace(/\{YYYY\}/g, YYYY)
-      .replace(/\{MM\}/g, MM)
-      .replace(/\{DD\}/g, DD)
-      .replace(/\{HH\}/g, HH)
-      .replace(/\{mm\}/g, mm)
-      .replace(/\{ss\}/g, ss)
-      .replace(/\{RANDOM\}/gi, RANDOM);
-  } else {
-    const parts: string[] = [prefix];
-    if (dateStr) parts.push(dateStr);
-    if (timeStr) parts.push(timeStr);
-    parts.push(RANDOM);
-    result = parts.join('-');
-  }
-
-  txnFormatPreviewText.textContent = result || 'TXN-A1B2';
-}
-
-function syncTxnFormatUI(): void {
-  const customEnabled = settingTxnCustomPatternEnabled?.checked ?? false;
-  if (txnCustomPatternContainer) {
-    txnCustomPatternContainer.classList.toggle('hidden', !customEnabled);
-  }
-  renderTxnFormatPreview();
-}
-
-const txnFormatInputs = [
-  settingTxnPrefix,
-  settingTxnDateFormat,
-  settingTxnIncludeTime,
-  settingTxnRandomLength,
-  settingTxnCustomPatternEnabled,
-  settingTxnCustomPattern,
-];
-
-txnFormatInputs.forEach((el) => {
-  if (!el) return;
-  const update = () => {
-    if (el === settingTxnCustomPatternEnabled) {
-      syncTxnFormatUI();
-    } else {
-      renderTxnFormatPreview();
-    }
-  };
-  el.addEventListener('input', update);
-  el.addEventListener('change', update);
-});
-
-syncTxnFormatUI();
->>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 
 function applySettings(settings: SettingsResponse): void {
   settingAdminPin.value = '';
@@ -642,36 +559,7 @@ function applySettings(settings: SettingsResponse): void {
     );
   }
   currentDeveloperModeEnabled = Boolean(settings.developerMode?.enabled);
-<<<<<<< HEAD
-=======
 
-  // Transaction ID & Receipt Format
-  const txnFmt = settings.transactionIdFormat ?? {
-    prefix: 'TXN',
-    dateFormat: 'YYYYMMDD' as const,
-    includeTime: false,
-    randomSuffixLength: 4,
-    customPatternEnabled: false,
-    customPattern: '{PREFIX}-{DATE}-{RANDOM}',
-  };
-  if (settingTxnPrefix) settingTxnPrefix.value = txnFmt.prefix ?? 'TXN';
-  if (settingTxnDateFormat)
-    settingTxnDateFormat.value = txnFmt.dateFormat ?? 'YYYYMMDD';
-  if (settingTxnIncludeTime)
-    settingTxnIncludeTime.checked = Boolean(txnFmt.includeTime);
-  if (settingTxnRandomLength)
-    settingTxnRandomLength.value = String(txnFmt.randomSuffixLength ?? 4);
-  if (settingTxnCustomPatternEnabled) {
-    settingTxnCustomPatternEnabled.checked = Boolean(
-      txnFmt.customPatternEnabled,
-    );
-  }
-  if (settingTxnCustomPattern) {
-    settingTxnCustomPattern.value =
-      txnFmt.customPattern ?? '{PREFIX}-{DATE}-{RANDOM}';
-  }
-  syncTxnFormatUI();
->>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 }
 
 export function populateForm(settings: SettingsResponse): void {
@@ -1130,52 +1018,7 @@ settingsForm.addEventListener('submit', (e) => {
     };
   }
 
-<<<<<<< HEAD
-=======
-  // Transaction ID & Receipt Format
-  if (settingTxnPrefix && settingTxnDateFormat && settingTxnRandomLength) {
-    const txnPrefix = settingTxnPrefix.value.trim();
-    if (txnPrefix.length > 20) {
-      setMessage('Transaction ID prefix cannot exceed 20 characters.');
-      return;
-    }
-    const dateFormatVal = settingTxnDateFormat.value;
-    if (
-      dateFormatVal !== 'YYYYMMDD' &&
-      dateFormatVal !== 'YYYY-MM-DD' &&
-      dateFormatVal !== 'none'
-    ) {
-      setMessage('Invalid transaction ID date format.');
-      return;
-    }
-    const randomLength = Number(settingTxnRandomLength.value);
-    if (
-      !Number.isInteger(randomLength) ||
-      randomLength < 2 ||
-      randomLength > 12
-    ) {
-      setMessage(
-        'Random suffix length must be a whole number between 2 and 12.',
-      );
-      return;
-    }
-    const customPatternVal = settingTxnCustomPattern?.value.trim() ?? '';
-    if (customPatternVal.length > 120) {
-      setMessage('Transaction ID custom pattern cannot exceed 120 characters.');
-      return;
-    }
 
-    payload.transactionIdFormat = {
-      prefix: txnPrefix || 'TXN',
-      dateFormat: dateFormatVal as 'YYYYMMDD' | 'YYYY-MM-DD' | 'none',
-      includeTime: settingTxnIncludeTime?.checked ?? false,
-      randomSuffixLength: randomLength,
-      customPatternEnabled: settingTxnCustomPatternEnabled?.checked ?? false,
-      customPattern: customPatternVal || '{PREFIX}-{DATE}-{RANDOM}',
-    };
-  }
-
->>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
   const alertPayload =
     alertSeverityThreshold !== null ? buildAlertPayload() : null;
 

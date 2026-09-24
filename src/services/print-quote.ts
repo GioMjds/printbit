@@ -289,12 +289,11 @@ export function buildPrintQuote(input: {
   // In Color mode: per-page grading bills photos/images at baseImagePrice,
   // colored pages at baseColorPrice, and B&W/blank at baseBwPrice.
   // In B&W mode: driver prints pure grayscale, all pages bill at baseBwPrice.
-  const effectiveColorMode: ColorMode = input.colorMode;
   let billableColorPages = 0;
   let billableBwPages = 0;
   let billableImagePages = 0;
 
-  if (effectiveColorMode === 'colored') {
+  if (input.colorMode === 'colored') {
     if (!usedFallbackAssumptions && input.analysis.confidence !== 'low') {
       for (const pageNum of selectedPages.selected) {
         const page = pageDetailsMap.get(pageNum);
@@ -321,6 +320,15 @@ export function buildPrintQuote(input: {
     billableColorPages = 0;
     billableImagePages = 0;
   }
+
+  // If the user requested 'colored' mode, but none of the selected pages actually contain color or image,
+  // downgrade the effectiveColorMode to 'grayscale' so downstream UI and printer driver use grayscale (no color ink).
+  const effectiveColorMode: ColorMode =
+    input.colorMode === 'colored' &&
+    billableColorPages === 0 &&
+    billableImagePages === 0
+      ? 'grayscale'
+      : input.colorMode;
 
   const quality: PrintQuality = input.quality ?? 'standard';
   const requiredAmount = adminService.calculateDocumentAmount(

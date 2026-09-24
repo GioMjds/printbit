@@ -67,19 +67,14 @@ import type {
   AlertSettings,
   PipelineSettings,
   ScannerDpiSettings,
-<<<<<<< HEAD
   DeveloperModeSettings,
-=======
-  SupportedDpi,
-  TransactionIdFormatSettings,
->>>>>>> 39192d9520fc5f430f33c78b2550d03fd0c5a05f
 } from './admin.schema';
 
-export const DEFAULT_PIPELINE_SETTINGS: PipelineSettings = {
+export const DEFAULT_PIPELINE_SETTINGS = {
   malwareScanningEnabled: true,
   documentConversionEnabled: true,
   colorDetectionEnabled: true,
-};
+} satisfies PipelineSettings;
 import type { AdminQueueView } from '@/modules/anomaly/anomaly.schema';
 import { ConsumablesService } from './consumables.service';
 import { ReceiptService, type ReceiptPayload } from '@/modules/receipt';
@@ -1706,25 +1701,15 @@ export class AdminController {
         ...(originalSettings.pipelineSettings || {}),
       },
       printLimits: {
-        maxPagesPerSession: 30,
         ...(originalSettings.printLimits || {}),
       },
       uiBlocking: {
-        enabled: false,
-        mode: 'maintenance' as const,
-        customMessage: '',
         ...(originalSettings.uiBlocking || {}),
       },
       scannerDpi: {
-        copyGlass: 300 as const,
-        copyAdf: 300 as const,
-        scanGlass: 300 as const,
-        scanAdf: 300 as const,
         ...(originalSettings.scannerDpi || {}),
       },
       developerMode: {
-        enabled: false,
-        environmentTag: 'test' as const,
         ...(originalSettings.developerMode || {}),
       },
     };

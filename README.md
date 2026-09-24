@@ -1,83 +1,106 @@
+<p align="center">
+  <img src="src/assets/logo.png" alt="PrintBit Logo" width="150" />
+</p>
+
 # **PrintBit**
 
-PrintBit is a Windows-based self-service kiosk application for coin-operated printing, scanning, and copy workflows.
+PrintBit is a web app coin-operated kiosk machine. Dedicated for printing document, photocopying documents, and even converting your documents into an soft copy.
 It is designed for campus usage (students, faculty, and staff) with phone-to-kiosk document upload and on-device job confirmation.
 
 ## Core capabilities
 
 - Coin balance via serial input (Arduino/coin acceptor).
 - Wireless upload sessions for print jobs (QR + hotspot flow).
-- Print and copy job charging tied to configurable pricing.
+- Print, copy, and scan job charging tied to configurable pricing.
 - **PH-localized Pricing Engine** (v1): Coverage-aware per-page pricing with threshold classification, bulk tier discounts, and whole-peso settlement.
-- Tokenized E-Receipt links for settled print/copy transactions (`/receipt/t/:token`).
-- Scan and scan-preview flow for copy mode.
+- Tokenized E-Receipt links for settled transactions (`/receipt/t/:token`).
+- Wireless scan-to-phone soft copy delivery with dual-QR completion.
 - Admin dashboard for earnings, logs, settings, and diagnostics.
 
-## End-user step-by-step guides
+## Customer workflow
 
-### Print
+### 0. Connect to PrintBit Wi-Fi
 
-1. Open **Print** on the kiosk.
-2. Scan the QR code with your phone and upload a file.
-3. Wait for your file to appear in **Received files** and select it.
-4. Tap **Continue to settings**.
-5. Choose print settings (color, copies, orientation, paper size, page range) and continue.
-6. Insert coins on the confirm screen until your balance covers the total, then confirm.
-7. Collect your printed pages.
+Before using mobile-connected features (uploading print files, downloading scanned soft copies, or viewing E-Receipts), customers must connect to the kiosk's local Wi-Fi:
+
+1. Scan the Wi-Fi QR code on the kiosk screen or manually connect to the Wi-Fi network:
+   - **SSID:** `PrintBit`
+2. If a captive portal pop-up appears, proceed or tap **Continue**.
+
+---
+
+### Kiosk service methods
+
+#### 1. Print
+
+1. Connect your phone to **PrintBit Wi-Fi**.
+2. Select **Print** on the kiosk screen.
+3. Scan the on-screen session QR code with your phone.
+4. Select and upload your document (PDF, DOCX, and other image file formats) on the mobile upload page.
+5. On the kiosk screen, select your file under **Received files** and tap **Continue to settings**.
+6. Configure print options (color mode, copies, orientation, paper size, page range) and continue.
+7. On the confirm screen, insert coins until your balance covers the total fee, then confirm payment.
+8. Collect your printed documents from the tray.
+9. _(Optional)_ Scan the **E-Receipt** QR code on the completion screen with your phone to view and save your digital receipt.
 
 Troubleshooting:
 
-- If no file appears, start a new session and upload again.
-- If you see a session expiry countdown, complete upload/selection before it reaches zero or start a fresh session.
-- Only one phone can actively own an upload session at a time; if ownership conflict appears, generate a new kiosk session.
-- If balance is insufficient, insert more coins before confirming.
+- If no file appears, generate a new kiosk session and upload again.
+- Complete upload and selection before the session timer expires.
+- If balance is insufficient, insert additional coins before confirming.
 
-### Copy
+#### 2. Copy
 
-1. Open **Copy** on the kiosk.
-2. Place the page face-down on the scanner glass.
-3. Tap **Check Document** and review the preview.
-4. If preview is correct, tap **Continue to Config**.
-5. Choose copy settings and continue to confirmation.
-6. Insert coins until the required amount is reached, then confirm.
-7. Collect your copied pages.
+1. Select **Copy** on the kiosk screen.
+2. Place the document face-down on the scanner glass.
+3. Tap **Check Document** to generate a scan preview.
+4. If the preview is correct, tap **Continue to Config**.
+5. Configure copy options (color mode, copies, paper size) and continue to confirmation.
+6. Insert coins until the required balance is met, then confirm payment.
+7. Collect your copied pages from the tray.
+8. _(Optional)_ Connect your phone to **PrintBit Wi-Fi** and scan the **E-Receipt** QR code on the completion screen to view and save your digital receipt.
 
 Troubleshooting:
 
 - If no document is detected, reposition the page and tap **Retry**.
 - If preview looks incorrect, tap **Check Document** again before continuing.
 
-### Scan
+#### 3. Scan (Soft Copy)
 
-1. Open **Scan** on the kiosk.
-2. Choose scan source, color mode, and resolution.
-3. Place your document and tap **Scan Document**.
-4. Review the scanned preview. Tap **Rescan** if needed.
-5. Tap **Get Soft Copy**.
-6. Choose delivery:
-   - **Wireless (QR):** scan the generated QR code to download.
+1. Connect your phone to **PrintBit Wi-Fi**.
+2. Select **Scan** on the kiosk screen.
+3. Select your desired export format (**PDF**, **JPG**, or **PNG**) and paper size.
+4. Place your document on the scanner and tap **Scan Document** (rescan or add pages if needed).
+5. Review the preview and tap **Proceed to Pay**.
+6. Insert coins until the soft-copy fee is covered, then confirm payment.
+7. The completion screen displays **two QR codes**:
+   - **Download QR Code:** Scan with your phone (connected to PrintBit Wi-Fi) to download the soft-copy file directly.
+   - **E-Receipt QR Code:** _(Optional)_ Scan to view and save your digital transaction receipt.
 
 Troubleshooting:
 
-- If scanner is unavailable, check scanner connection/power and retry.
-- If the QR link expires, refresh the wireless link.
-- USB mass storage is disabled in kiosk lockdown mode by design.
+- Ensure your phone remains connected to **PrintBit Wi-Fi** when scanning the download QR code.
+- If the scanner is busy or unavailable, check connections and retry.
 
-### E-Receipt (v1: print + copy)
+---
 
-- After successful **print** or **copy** payment confirmation, the confirm screen can show an E-Receipt QR/link when receipt generation succeeds.
-- Customer receipt URLs use tokenized routes: `/receipt/t/:token`.
-- Receipt links are retained for up to 24 hours. After expiry, customer links show an expired/invalid/revoked outcome.
-- Admin support path: **Admin -> Transactions -> Open E-Receipt** (transaction-context lookup).
+### E-Receipt
+
+- Available after payment confirmation across all 3 methods (**Print**, **Copy**, and **Scan**).
+- Customer receipt links use tokenized routes: `/receipt/t/:token`.
+- Retained for up to 24 hours. After expiry, links show an expired outcome.
+- Phone must be connected to **PrintBit Wi-Fi** to view the local E-Receipt.
+- Admin support lookup: **Admin -> Transactions -> Open E-Receipt**.
 
 ## Tech stack
 
-- **Backend:** Node.js, Express, Socket.IO, TypeScript
+- **Backend:** Node.js, Express, Socket.IO, TypeScript, C# Worker Service
 - **Storage:** SQLite (`printbit.sqlite`) for persisted kiosk state
 - **Upload handling:** Multer
-- **Printing:** Phased dispatcher (`PDFtoPrinter`, `GhostScript`, with optional Sumatra fallback)
+- **Printing:** Phased dispatcher (`SumatraPDF.exe`)
 - **Serial integration:** `serialport`
 - **Frontend:** Static HTML/CSS + TypeScript bundles under `src/public`
+- **Testing:** Jest, Supertest
 
 ## Quick start
 

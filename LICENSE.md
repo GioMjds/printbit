@@ -34,10 +34,12 @@ designed for deployment in campus environments.
 
 ### Contributors
 
-| Name            | GitHub                                 |
-| --------------- | -------------------------------------- |
-| Gio Majadas     | [@GioMjds](https://github.com/GioMjds) |
-| Harold Aldovino | [@Onib-H](https://github.com/Onib-H)   |
+| Name            | GitHub                                   |
+| --------------- | ---------------------------------------- |
+| Gio Majadas     | [@GioMjds](https://github.com/GioMjds)   |
+| Harold Aldovino | [@Onib-H](https://github.com/Onib-H)     |
+| Ryan Anin       | [@raii23](https://github.com/raii23)     |
+| Ben Dela Torre  | [@bendlttr](https://github.com/bendlttr) |
 
 ### Third-Party Licenses
 

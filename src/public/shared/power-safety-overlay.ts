@@ -14,6 +14,8 @@
  *    (`acceptingTransactions === true`).
  */
 
+import { Socket } from "socket.io";
+
 export type PowerOperationalState =
   | 'Operational'
   | 'PowerEmergency'
@@ -41,7 +43,7 @@ export interface PowerSafetyOverlayOptions {
    * Existing Socket.IO instance or getter function returning socket.
    * If omitted, falls back to `(window as any).io?.()`.
    */
-  socket?: any;
+  socket?: Socket;
 
   /**
    * Predicate indicating whether a paid print job is currently in-flight.
