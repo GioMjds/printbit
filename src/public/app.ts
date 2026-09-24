@@ -378,45 +378,69 @@ interface GuideStep {
 const guides = {
   print: [
     {
-      imageUrl: '/assets/print-steps/step-1.png',
+      imageUrl: '/assets/print-steps/print-1.png',
       captionKey: 'print.guide.step1',
       captionFallback:
         'Scan the QR code shown in the kiosk to open the upload page on your device.',
     },
     {
-      imageUrl: '/assets/print-steps/step-2.jpg',
+      imageUrl: '/assets/print-steps/print-1.1.png',
       captionKey: 'print.guide.step2',
       captionFallback: 'Upload your document file(s) from your device.',
     },
     {
-      imageUrl: '/assets/print-steps/step-3.jpg',
+      imageUrl: '/assets/print-steps/print-1.2.png',
       captionKey: 'print.guide.step3',
       captionFallback:
         'Press "Send to Kiosk" to transfer your file(s) to the kiosk.',
     },
     {
-      imageUrl: '/assets/print-steps/step-4.jpg',
+      imageUrl: '/assets/print-steps/print-2.png',
       captionKey: 'print.guide.step4',
       captionFallback:
-        'Wait for the upload to complete. If it is successful, please check in the kiosk to review your file(s).',
+        'See your file(s) uploaded to the kiosk. If you are ready to proceed, press "Proceed to Config" for the next step.',
     },
     {
-      imageUrl: '/assets/print-steps/step-5.png',
+      imageUrl: '/assets/print-steps/print-3.png',
       captionKey: 'print.guide.step5',
       captionFallback:
-        'Your uploaded file(s) will appear on the kiosk screen. Review your file(s) and press "Proceed to Config" for the next step.',
+        'You can modify your print settings (e.g. number of copies, color or black & white) and then press "Next Step" to insert coins.',
     },
     {
-      imageUrl: '/assets/print-steps/step-6.png',
+      imageUrl: '/assets/print-steps/print-4.png',
       captionKey: 'print.guide.step6',
       captionFallback:
-        'Configure your print settings (e.g. number of copies, color or black & white) and then press "Continue" for confirmation step and to insert coins.',
+        'You may now proceed inserting coins.',
     },
     {
-      imageUrl: '/assets/print-steps/step-7.png',
+      imageUrl: '/assets/print-steps/print-5.png',
       captionKey: 'print.guide.step7',
       captionFallback:
-        'You may now proceed to insert coins. Press "Confirm & Print" and wait for the printing to start.',
+        'If the amount you inserted is sufficient, "Confirm & Print" will be enabled.',
+    },
+    {
+      imageUrl: '/assets/print-steps/print-6.png',
+      captionKey: 'print.guide.step8',
+      captionFallback:
+        'Kiosk may warn you about checking the printer paper tray. Make sure the paper you want to print on is loaded in the tray, loaded straight, and not jammed.',
+    },
+    {
+      imageUrl: '/assets/print-steps/print-7.png',
+      captionKey: 'print.guide.step9',
+      captionFallback:
+        'Another reconfirmation of print details may be shown. If everything is correct, press "Print Now" to start printing.',
+    },
+    {
+      imageUrl: '/assets/print-steps/print-8.png',
+      captionKey: 'print.guide.step10',
+      captionFallback:
+        'The printer is processed in background.',
+    },
+    {
+      imageUrl: '/assets/print-steps/print-9.png',
+      captionKey: 'print.guide.step11',
+      captionFallback:
+        'After transaction, an optional E-Receipt QR code is shown for your convenience. You may scan it to download a soft copy of the receipt. You may use it to report issues or request refunds if needed.',
     },
   ],
   copy: [
@@ -424,7 +448,7 @@ const guides = {
       imageUrl: '/assets/copy-steps/copy-1.png',
       captionKey: 'copy.guide.step1',
       captionFallback:
-        'Place your document face-down first on the scanner glass. If it is ready, press "Check Document" on the kiosk screen to preview the scan.',
+        'Place your document face-down first on the scanner glass. Choose first what document size of the physical document you want to copy. If it is ready, press "Check Document" on the kiosk screen to preview the scan.',
     },
     {
       imageUrl: '/assets/copy-steps/copy-2.png',
@@ -441,7 +465,7 @@ const guides = {
       imageUrl: '/assets/copy-steps/copy-4.png',
       captionKey: 'copy.guide.step4',
       captionFallback:
-        'Select your preferred copy settings (size, color, copies) and proceed.',
+        'You can modify your print settings (e.g. number of copies, color or black & white) and then press "Next Step" to insert coins.',
     },
     {
       imageUrl: '/assets/copy-steps/copy-5.png',
@@ -453,7 +477,25 @@ const guides = {
       imageUrl: '/assets/copy-steps/copy-6.png',
       captionKey: 'copy.guide.step6',
       captionFallback:
-        'Wait for the copying to finish and collect your documents.',
+        'Kiosk may warn you about checking the printer paper tray. Make sure the paper you want to print on is loaded in the tray, loaded straight, and not jammed.',
+    },
+    {
+      imageUrl: '/assets/copy-steps/copy-7.png',
+      captionKey: 'copy.guide.step7',
+      captionFallback:
+        'Another reconfirmation of copy details may be shown. If everything is correct, press "Copy Now" to start copying.',
+    },
+    {
+      imageUrl: '/assets/copy-steps/copy-8.png',
+      captionKey: 'copy.guide.step8',
+      captionFallback:
+        'The printer is processed in background.',
+    },
+    {
+      imageUrl: '/assets/copy-steps/copy-9.png',
+      captionKey: 'copy.guide.step9',
+      captionFallback:
+        'After transaction, an optional E-Receipt QR code is shown for your convenience. You may scan it to download a soft copy of the receipt. You may use it to report issues or request refunds if needed. Make sure to pick up your original physical document from the scanner glass or document feeder after transaction.',
     },
   ],
   scan: [
@@ -461,7 +503,7 @@ const guides = {
       imageUrl: '/assets/scan-steps/scan-1.png',
       captionKey: 'scan.guide.step1',
       captionFallback:
-        'Place your document in the printer document feeder. If it is ready, press "Scan Document".',
+        'Place your document face-down first on the feeder. Choose first what document size of the physical document you want to convert as soft copy, as well as the soft copy file format. If it is ready, press "Scan Document" on the kiosk screen.',
     },
     {
       imageUrl: '/assets/scan-steps/scan-2.png',
@@ -485,7 +527,19 @@ const guides = {
       imageUrl: '/assets/scan-steps/scan-5.png',
       captionKey: 'scan.guide.step5',
       captionFallback:
-        'After confirmation, the kiosk generates the image QR code link to download as soft copy.',
+        'Press "Download Now" to download the scanned document. Make sure that your device is connected to the kiosk Wi-Fi hotspot to download the scanned document.',
+    },
+    {
+      imageUrl: '/assets/scan-steps/scan-6.png',
+      captionKey: 'scan.guide.step6',
+      captionFallback:
+        'You may now scan the Download File and/or E-Receipt QR codes to download a soft copy of the scanned document and/or receipt. You may use the receipt to report issues or request refunds if needed.',
+    },
+    {
+      imageUrl: '/assets/scan-steps/scan-6.1.png',
+      captionKey: 'scan.guide.step7',
+      captionFallback:
+        'Your downloaded feeded document are now available to your mobile device as an soft copy. Make sure to pick up your original physical document from the scanner glass or document feeder after transaction.',
     },
   ],
 } as const satisfies Record<string, GuideStep[]>;

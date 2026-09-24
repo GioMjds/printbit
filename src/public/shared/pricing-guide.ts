@@ -68,7 +68,7 @@ export function formatPricingGuide(pricing: PublicPricingConfig): string {
     })
     .join('');
 
-  return `<table class="pricing-table"><caption>Base price per page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">B&amp;W</th><th scope="col">Color</th></tr></thead><tbody>${rows}</tbody></table><p class="pricing-quality-note">High quality: +${formatPeso(pricing.highQualitySurcharge)} per page.</p>`;
+  return `<table class="pricing-table"><caption>Base price per page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">B&amp;W</th><th scope="col">Color</th></tr></thead><tbody>${rows}</tbody></table><p class="pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span>.</p>`;
 }
 
 export async function fetchPublicPricing(): Promise<PublicPricingConfig> {

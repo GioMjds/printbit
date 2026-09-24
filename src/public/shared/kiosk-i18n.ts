@@ -41,8 +41,13 @@ function getStoredContrast(): boolean {
 }
 
 function translatePhrase(text: string): string {
-  if (!text.trim()) return text;
-  return currentTranslations[text] ?? text;
+  const trimmed = text.trim();
+  if (!trimmed) return text;
+  if (currentTranslations[trimmed] !== undefined) {
+    return currentTranslations[trimmed];
+  }
+  const normalized = trimmed.replace(/\s+/g, ' ');
+  return currentTranslations[normalized] ?? text;
 }
 
 function applyTextNodeTranslation(node: Text): void {

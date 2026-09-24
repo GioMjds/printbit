@@ -519,8 +519,8 @@ export function attachPowerSafetyOverlay(
   }
 
   // Socket subscription helper
-  let attachedSocket: any = null;
-  const attachToSocket = (sock: any) => {
+  let attachedSocket: Socket | null = null;
+  const attachToSocket = (sock: Socket) => {
     if (!sock || attachedSocket === sock || typeof sock.on !== 'function') return;
     attachedSocket = sock;
     sock.on('workerPowerStatusChanged', handlePowerEvent);
@@ -540,7 +540,7 @@ export function attachPowerSafetyOverlay(
   }
 
   if (!attachedSocket && typeof window !== 'undefined') {
-    const ioFactory = (window as unknown as { io?: () => any }).io;
+    const ioFactory = (window as unknown as { io?: () => Socket }).io;
     if (typeof ioFactory === 'function') {
       try {
         attachToSocket(ioFactory());
