@@ -24,6 +24,7 @@ export interface PrintQuoteResult {
   billableColorPages: number;
   billableBwPages: number;
   billableImagePages: number;
+  billableImageBwPages: number;
   requestedColorMode: ColorMode;
   effectiveColorMode: ColorMode;
   quality: PrintQuality;
@@ -286,22 +287,27 @@ export function buildPrintQuote(input: {
   }
 
   // The selected print mode is the customer's billing choice.
-  // In Color mode: per-page grading bills photos/images at baseImagePrice,
+  // In Color mode: per-page grading bills photos/images at baseImagePrice (color) or baseImageBwPrice (B/W),
   // colored pages at baseColorPrice, and B&W/blank at baseBwPrice.
-  // In B&W mode: driver prints pure grayscale, all pages bill at baseBwPrice.
+  // In B&W mode: driver prints pure grayscale, photos/images bill at baseImageBwPrice and docs at baseBwPrice.
   let billableColorPages = 0;
   let billableBwPages = 0;
   let billableImagePages = 0;
+  let billableImageBwPages = 0;
 
   if (input.colorMode === 'colored') {
     if (!usedFallbackAssumptions && input.analysis.confidence !== 'low') {
       for (const pageNum of selectedPages.selected) {
         const page = pageDetailsMap.get(pageNum);
-        const isImage =
-          page?.classification === 'image' ||
-          Boolean(page?.isImagePage && page?.isColor);
+        const isImage = Boolean(
+          page?.classification === 'image' || page?.isImagePage,
+        );
         if (isImage) {
-          billableImagePages += 1;
+          if (page?.isColor) {
+            billableImagePages += 1;
+          } else {
+            billableImageBwPages += 1;
+          }
         } else if (page?.isColor) {
           billableColorPages += 1;
         } else {
@@ -309,19 +315,39 @@ export function buildPrintQuote(input: {
         }
       }
     } else {
-      // Fallback without reliable page detection: bill binary color/BW
-      billableColorPages = selectedColorPages;
-      billableBwPages = selectedBwPages;
-      billableImagePages = 0;
+      const isFileImage = input.analysis.fileType === 'image';
+      if (isFileImage) {
+        if (selectedColorPages > 0) {
+          billableImagePages = selectedCount;
+        } else {
+          billableImageBwPages = selectedCount;
+        }
+      } else {
+        // Fallback without reliable page detection: bill binary color/BW
+        billableColorPages = selectedColorPages;
+        billableBwPages = selectedBwPages;
+        billableImagePages = 0;
+        billableImageBwPages = 0;
+      }
     }
   } else {
-    // B&W Mode: forces all pages to baseBwPrice (zero color ink)
-    billableBwPages = selectedCount;
+    // B&W Mode: forces all pages to grayscale. Images bill at baseImageBwPrice, docs at baseBwPrice.
+    for (const pageNum of selectedPages.selected) {
+      const page = pageDetailsMap.get(pageNum);
+      const isImage = Boolean(
+        page?.classification === 'image' || page?.isImagePage,
+      );
+      if (isImage) {
+        billableImageBwPages += 1;
+      } else {
+        billableBwPages += 1;
+      }
+    }
     billableColorPages = 0;
     billableImagePages = 0;
   }
 
-  // If the user requested 'colored' mode, but none of the selected pages actually contain color or image,
+  // If the user requested 'colored' mode, but none of the selected pages actually contain color,
   // downgrade the effectiveColorMode to 'grayscale' so downstream UI and printer driver use grayscale (no color ink).
   const effectiveColorMode: ColorMode =
     input.colorMode === 'colored' &&
@@ -337,6 +363,7 @@ export function buildPrintQuote(input: {
       colorPages: billableColorPages,
       bwPages: billableBwPages,
       imagePages: billableImagePages,
+      imageBwPages: billableImageBwPages,
     },
     safeCopies,
     input.paperSize ?? 'A4',
@@ -358,6 +385,7 @@ export function buildPrintQuote(input: {
       billableColorPages,
       billableBwPages,
       billableImagePages,
+      billableImageBwPages,
       requestedColorMode: input.colorMode,
       effectiveColorMode,
       quality,
