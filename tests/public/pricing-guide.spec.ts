@@ -25,8 +25,11 @@ describe('pricing-guide', () => {
     const pricing = normalizePricingConfig({});
     const html = formatPricingGuide(pricing);
 
-    expect(html).toContain('<th scope="col">Photo / Image</th>');
+    expect(html).toContain('<th scope="col">Photo (Color)</th>');
+    expect(html).toContain('<th scope="col">Photo (B&amp;W)</th>');
     expect(html).toContain(`<td>${formatPeso(pricing.paperProfiles.a4.baseImagePrice)}</td>`);
+    expect(html).toContain(`<td>${formatPeso(pricing.paperProfiles.a4.baseImageBwPrice)}</td>`);
     expect(html).toContain(`<td>${formatPeso(pricing.paperProfiles.longBond.baseImagePrice)}</td>`);
+    expect(html).toContain(`<td>${formatPeso(pricing.paperProfiles.longBond.baseImageBwPrice)}</td>`);
   });
 });

@@ -447,6 +447,28 @@ export class WirelessSessionService {
 
     const startedAt = Date.now();
 
+    const targetExt = path.extname(target.filename).toLowerCase();
+    const isImage =
+      target.contentType.startsWith('image/') ||
+      ['.jpg', '.jpeg', '.png', '.gif'].includes(targetExt);
+
+    if (isImage) {
+      const mime =
+        targetExt === '.png'
+          ? 'image/png'
+          : targetExt === '.gif'
+            ? 'image/gif'
+            : 'image/jpeg';
+      res.setHeader('Content-Type', mime);
+      console.log('[preview] serving image file directly', {
+        path: target.filePath,
+        mime,
+        tookMs: Date.now() - startedAt,
+      });
+      res.sendFile(path.resolve(target.filePath));
+      return;
+    }
+
     try {
       const absolutePath = await this.resolveCanonicalPdfPath(
         sessionId,

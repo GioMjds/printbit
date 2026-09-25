@@ -115,6 +115,8 @@ interface PrintQuote {
   billableBwPages: number;
   /** Number of photo/image pages billed at baseImagePrice (Phase 2+). */
   billableImagePages?: number;
+  /** Number of photo/image pages billed at baseImageBwPrice. */
+  billableImageBwPages?: number;
   requestedColorMode: ColorMode;
   effectiveColorMode: ColorMode;
   quality: PrintQuality;
@@ -1964,7 +1966,15 @@ function updateSummary(): void {
         currentPrintQuote.billableImagePages > 0
       ) {
         parts.push(
-          `${currentPrintQuote.billableImagePages} ${currentPrintQuote.billableImagePages === 1 ? 'photo' : 'photos'}`,
+          `${currentPrintQuote.billableImagePages} photo (Color)`,
+        );
+      }
+      if (
+        currentPrintQuote.billableImageBwPages &&
+        currentPrintQuote.billableImageBwPages > 0
+      ) {
+        parts.push(
+          `${currentPrintQuote.billableImageBwPages} photo (B&W)`,
         );
       }
       if (currentPrintQuote.billableColorPages > 0) {
