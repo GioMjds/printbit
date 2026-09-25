@@ -1476,13 +1476,38 @@ export class FinancialService {
         analysisConfidence: quoteComputation.quote.analysisConfidence,
       };
 
-      const printSourcePath = target.convertedPdfPath ?? target.filePath;
+      let printSourcePath = target.convertedPdfPath ?? target.filePath;
       if (
         path.extname(target.filePath).toLowerCase() !== '.pdf' &&
         !target.convertedPdfPath
       ) {
-        sendResponse(409, buildAnalysisUnavailablePayload(target));
-        return;
+        // Attempt deferred conversion gate before print spooling
+        try {
+          const sourcePath = path.resolve(target.filePath);
+          const artifactPath = path.join(
+            path.dirname(sourcePath),
+            `${path.basename(target.documentId)}.pdf`,
+          );
+          if (fs.existsSync(artifactPath)) {
+            target.convertedPdfPath = artifactPath;
+          } else {
+            const { convertToPdfArtifact } = await import('@/services/preview');
+            await convertToPdfArtifact(sourcePath, artifactPath);
+            target.convertedPdfPath = artifactPath;
+          }
+          if (sessionId) {
+            this.deps.sessionStore.setDocumentConvertedPdfPath(
+              sessionId,
+              target.documentId,
+              artifactPath,
+            );
+          }
+          printSourcePath = artifactPath;
+        } catch (convErr) {
+          console.error('[payment] Pre-print PDF conversion failed:', convErr);
+          sendResponse(409, buildAnalysisUnavailablePayload(target));
+          return;
+        }
       }
       if (!fs.existsSync(printSourcePath)) {
         sendResponse(409, buildAnalysisUnavailablePayload(target));
