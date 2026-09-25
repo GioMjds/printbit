@@ -3,23 +3,23 @@ export type PaperProfileKey = 'a4' | 'shortBond' | 'longBond';
 export interface PublicPricingConfig {
   paperProfiles: Record<
     PaperProfileKey,
-    { baseBwPrice: number; baseColorPrice: number }
+    { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number }
   >;
   highQualitySurcharge: number;
 }
 
 const DEFAULT_PRICING = {
   paperProfiles: {
-    a4: { baseBwPrice: 3, baseColorPrice: 18 },
-    shortBond: { baseBwPrice: 3, baseColorPrice: 18 },
-    longBond: { baseBwPrice: 4, baseColorPrice: 20 },
+    shortBond: { baseBwPrice: 3, baseColorPrice: 18, baseImagePrice: 25 },
+    a4: { baseBwPrice: 3, baseColorPrice: 18, baseImagePrice: 25 },
+    longBond: { baseBwPrice: 4, baseColorPrice: 20, baseImagePrice: 30 },
   },
   highQualitySurcharge: 2,
 } satisfies PublicPricingConfig;
 
 const PAPER_LABELS = {
-  a4: 'A4',
   shortBond: 'Short bond',
+  a4: 'A4',
   longBond: 'Long bond',
 } satisfies Record<PaperProfileKey, string>;
 
@@ -41,12 +41,16 @@ export function normalizePricingConfig(raw: unknown): PublicPricingConfig {
       profiles?.[key]?.baseColorPrice,
       DEFAULT_PRICING.paperProfiles[key].baseColorPrice,
     ),
+    baseImagePrice: safeAmount(
+      profiles?.[key]?.baseImagePrice,
+      DEFAULT_PRICING.paperProfiles[key].baseImagePrice,
+    ),
   });
 
   return {
     paperProfiles: {
-      a4: profileFor('a4'),
       shortBond: profileFor('shortBond'),
+      a4: profileFor('a4'),
       longBond: profileFor('longBond'),
     },
     highQualitySurcharge: safeAmount(
@@ -64,11 +68,11 @@ export function formatPricingGuide(pricing: PublicPricingConfig): string {
   const rows = (Object.keys(PAPER_LABELS) as PaperProfileKey[])
     .map((key) => {
       const profile = pricing.paperProfiles[key];
-      return `<tr><th scope="row">${PAPER_LABELS[key]}</th><td>${formatPeso(profile.baseBwPrice)}</td><td>${formatPeso(profile.baseColorPrice)}</td></tr>`;
+      return `<tr><th scope="row">${PAPER_LABELS[key]}</th><td>${formatPeso(profile.baseBwPrice)}</td><td>${formatPeso(profile.baseColorPrice)}</td><td>${formatPeso(profile.baseImagePrice)}</td></tr>`;
     })
     .join('');
 
-  return `<table class="pricing-table"><caption>Base price per page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">B&amp;W</th><th scope="col">Color</th></tr></thead><tbody>${rows}</tbody></table><p class="pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span>.</p>`;
+  return `<table class="pricing-table"><caption>Base price per page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">B&amp;W</th><th scope="col">Color</th><th scope="col">Photo / Image</th></tr></thead><tbody>${rows}</tbody></table><p class="pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span>.</p>`;
 }
 
 export async function fetchPublicPricing(): Promise<PublicPricingConfig> {

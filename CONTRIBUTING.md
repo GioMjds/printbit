@@ -14,8 +14,7 @@ Useful commands:
 
 ```bash
 pnpm run build
-pnpm exec tsc --noEmit
-pnpm run db:migrate:legacy
+pnpm run start
 ```
 
 ## Workflow

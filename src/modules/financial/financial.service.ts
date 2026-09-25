@@ -526,10 +526,22 @@ export class FinancialService {
   getPricingConfig = (_req: Request, res: Response): void => {
     const config = db.data?.settings?.pricingEngine;
     res.json({
-      paperProfiles: config?.paperProfiles ?? {
-        a4: { baseBwPrice: 3, baseColorPrice: 18 },
-        shortBond: { baseBwPrice: 3, baseColorPrice: 18 },
-        longBond: { baseBwPrice: 4, baseColorPrice: 20 },
+      paperProfiles: {
+        a4: {
+          baseBwPrice: config?.paperProfiles?.a4?.baseBwPrice ?? 3,
+          baseColorPrice: config?.paperProfiles?.a4?.baseColorPrice ?? 18,
+          baseImagePrice: config?.paperProfiles?.a4?.baseImagePrice ?? 25,
+        },
+        shortBond: {
+          baseBwPrice: config?.paperProfiles?.shortBond?.baseBwPrice ?? 3,
+          baseColorPrice: config?.paperProfiles?.shortBond?.baseColorPrice ?? 18,
+          baseImagePrice: config?.paperProfiles?.shortBond?.baseImagePrice ?? 25,
+        },
+        longBond: {
+          baseBwPrice: config?.paperProfiles?.longBond?.baseBwPrice ?? 4,
+          baseColorPrice: config?.paperProfiles?.longBond?.baseColorPrice ?? 20,
+          baseImagePrice: config?.paperProfiles?.longBond?.baseImagePrice ?? 30,
+        },
       },
       highQualitySurcharge:
         config?.highQualitySurcharge ??
