@@ -29,12 +29,18 @@ export interface PricingSettings {
   highQualitySurcharge: number;
 }
 
-export interface PricingEnginePaperProfile {
-  baseBwPrice: number;
-  baseColorPrice: number;
+import type {
+  CoverageTierRates,
+  PaperPricingProfile,
+} from '@/core/database/models/admin.model';
+export { CoverageTierRates, PaperPricingProfile };
+
+export type PricingEnginePaperProfile = PaperPricingProfile & {
+  baseBwPrice?: number;
+  baseColorPrice?: number;
   baseImagePrice?: number;
   baseImageBwPrice?: number;
-}
+};
 
 export interface PricingEngineBulkDiscountTier {
   minPages: number;

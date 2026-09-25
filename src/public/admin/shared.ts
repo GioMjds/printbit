@@ -212,6 +212,15 @@ export interface DeveloperModeSettings {
   environmentTag: 'test';
 }
 
+export type CoverageTier = 'low' | 'medium' | 'high' | 'very_high';
+export type CoverageTierRates = Record<CoverageTier, number>;
+
+export interface PaperPricingProfile {
+  paperCost: number;
+  bwPrint: CoverageTierRates;
+  colorPrint: CoverageTierRates;
+}
+
 export interface AdminSettings {
   pricing: {
     printPerPage: number;
@@ -222,9 +231,9 @@ export interface AdminSettings {
   };
   pricingEngine: {
     paperProfiles: {
-      a4: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number; baseImageBwPrice: number };
-      shortBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number; baseImageBwPrice: number };
-      longBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number; baseImageBwPrice: number };
+      a4: PaperPricingProfile;
+      shortBond: PaperPricingProfile;
+      longBond: PaperPricingProfile;
     };
     bulkDiscountTiers: {
       minPages: number;

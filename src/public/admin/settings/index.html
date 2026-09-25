@@ -383,11 +383,20 @@
                   <table class="pricing-matrix" aria-label="Paper Size Pricing Matrix">
                     <thead>
                       <tr>
-                        <th scope="col" class="pricing-th pricing-th--paper">Bond Paper Size</th>
-                        <th scope="col" class="pricing-th">B&amp;W Rate</th>
-                        <th scope="col" class="pricing-th">Color Rate</th>
-                        <th scope="col" class="pricing-th">Photo / Image (Color)</th>
-                        <th scope="col" class="pricing-th">Photo / Image (B&amp;W)</th>
+                        <th rowspan="2" scope="col" class="pricing-th pricing-th--paper">Bond Paper Size</th>
+                        <th rowspan="2" scope="col" class="pricing-th">Paper Cost</th>
+                        <th colspan="4" scope="col" class="pricing-th" style="text-align: center; border-left: 1px solid rgba(167, 170, 225, 0.12);">B&amp;W Print Tiers</th>
+                        <th colspan="4" scope="col" class="pricing-th" style="text-align: center; border-left: 1px solid rgba(167, 170, 225, 0.12);">Color Print Tiers</th>
+                      </tr>
+                      <tr>
+                        <th scope="col" class="pricing-th" style="border-left: 1px solid rgba(167, 170, 225, 0.12);">Low (0–10%)</th>
+                        <th scope="col" class="pricing-th">Med (10–40%)</th>
+                        <th scope="col" class="pricing-th">High (40–70%)</th>
+                        <th scope="col" class="pricing-th">Max (70–100%)</th>
+                        <th scope="col" class="pricing-th" style="border-left: 1px solid rgba(167, 170, 225, 0.12);">Low (0–10%)</th>
+                        <th scope="col" class="pricing-th">Med (10–40%)</th>
+                        <th scope="col" class="pricing-th">High (40–70%)</th>
+                        <th scope="col" class="pricing-th">Max (70–100%)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -402,62 +411,55 @@
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingShortBondBwPrice"
-                              name="shortBondBwPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingShortBondPaperCost" name="shortBondPaperCost" type="number" min="0" step="1" class="field__input field__input--table" placeholder="1" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td" style="border-left: 1px solid rgba(167, 170, 225, 0.08);">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingShortBondBwLow" name="shortBondBwLow" type="number" min="0" step="1" class="field__input field__input--table" placeholder="2" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingShortBondColorPrice"
-                              name="shortBondColorPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingShortBondBwMedium" name="shortBondBwMedium" type="number" min="0" step="1" class="field__input field__input--table" placeholder="3" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingShortBondImagePrice"
-                              name="shortBondImagePrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingShortBondBwHigh" name="shortBondBwHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="6" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingShortBondImageBwPrice"
-                              data-testid="shortBondImageBwPrice"
-                              name="shortBondImageBwPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingShortBondBwVeryHigh" name="shortBondBwVeryHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="9" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td" style="border-left: 1px solid rgba(167, 170, 225, 0.08);">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingShortBondColorLow" name="shortBondColorLow" type="number" min="0" step="1" class="field__input field__input--table" placeholder="17" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingShortBondColorMedium" name="shortBondColorMedium" type="number" min="0" step="1" class="field__input field__input--table" placeholder="19" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingShortBondColorHigh" name="shortBondColorHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="24" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingShortBondColorVeryHigh" name="shortBondColorVeryHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="29" required />
                           </div>
                         </td>
                       </tr>
@@ -473,62 +475,55 @@
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingA4BwPrice"
-                              name="a4BwPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingA4PaperCost" name="a4PaperCost" type="number" min="0" step="1" class="field__input field__input--table" placeholder="1" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td" style="border-left: 1px solid rgba(167, 170, 225, 0.08);">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingA4BwLow" name="a4BwLow" type="number" min="0" step="1" class="field__input field__input--table" placeholder="2" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingA4ColorPrice"
-                              name="a4ColorPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingA4BwMedium" name="a4BwMedium" type="number" min="0" step="1" class="field__input field__input--table" placeholder="3" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingA4ImagePrice"
-                              name="a4ImagePrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingA4BwHigh" name="a4BwHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="6" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingA4ImageBwPrice"
-                              data-testid="a4ImageBwPrice"
-                              name="a4ImageBwPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingA4BwVeryHigh" name="a4BwVeryHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="9" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td" style="border-left: 1px solid rgba(167, 170, 225, 0.08);">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingA4ColorLow" name="a4ColorLow" type="number" min="0" step="1" class="field__input field__input--table" placeholder="17" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingA4ColorMedium" name="a4ColorMedium" type="number" min="0" step="1" class="field__input field__input--table" placeholder="19" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingA4ColorHigh" name="a4ColorHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="24" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingA4ColorVeryHigh" name="a4ColorVeryHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="29" required />
                           </div>
                         </td>
                       </tr>
@@ -544,62 +539,55 @@
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingLongBondBwPrice"
-                              name="longBondBwPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingLongBondPaperCost" name="longBondPaperCost" type="number" min="0" step="1" class="field__input field__input--table" placeholder="1" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td" style="border-left: 1px solid rgba(167, 170, 225, 0.08);">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingLongBondBwLow" name="longBondBwLow" type="number" min="0" step="1" class="field__input field__input--table" placeholder="3" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingLongBondColorPrice"
-                              name="longBondColorPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingLongBondBwMedium" name="longBondBwMedium" type="number" min="0" step="1" class="field__input field__input--table" placeholder="4" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingLongBondImagePrice"
-                              name="longBondImagePrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingLongBondBwHigh" name="longBondBwHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="8" required />
                           </div>
                         </td>
                         <td class="pricing-td">
                           <div class="field__wrap field__wrap--pre field__wrap--table">
                             <span class="field__affix">₱</span>
-                            <input
-                              id="settingLongBondImageBwPrice"
-                              data-testid="longBondImageBwPrice"
-                              name="longBondImageBwPrice"
-                              type="number"
-                              min="0"
-                              step="1"
-                              class="field__input field__input--table"
-                              placeholder="0"
-                              required
-                            />
+                            <input id="settingLongBondBwVeryHigh" name="longBondBwVeryHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="11" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td" style="border-left: 1px solid rgba(167, 170, 225, 0.08);">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingLongBondColorLow" name="longBondColorLow" type="number" min="0" step="1" class="field__input field__input--table" placeholder="19" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingLongBondColorMedium" name="longBondColorMedium" type="number" min="0" step="1" class="field__input field__input--table" placeholder="22" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingLongBondColorHigh" name="longBondColorHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="29" required />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input id="settingLongBondColorVeryHigh" name="longBondColorVeryHigh" type="number" min="0" step="1" class="field__input field__input--table" placeholder="34" required />
                           </div>
                         </td>
                       </tr>

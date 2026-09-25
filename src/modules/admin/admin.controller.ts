@@ -17,6 +17,8 @@ import {
 } from './admin.service';
 import {
   db,
+  defaultPricingEngine,
+  normalizePaperProfile,
   type AdminLogEntry,
   type LogMeta,
   type PendingRefundEntry,
@@ -2106,283 +2108,123 @@ export class AdminController {
         }
       }
 
-      if (incoming.paperProfiles?.a4) {
-        if (
-          !isFiniteNumber(incoming.paperProfiles.a4.baseBwPrice) ||
-          !isWholePeso(incoming.paperProfiles.a4.baseBwPrice)
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.a4.baseBwPrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        if (
-          !isFiniteNumber(incoming.paperProfiles.a4.baseColorPrice) ||
-          !isWholePeso(incoming.paperProfiles.a4.baseColorPrice)
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.a4.baseColorPrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        if (
-          incoming.paperProfiles.a4.baseImagePrice !== undefined &&
-          (!isFiniteNumber(incoming.paperProfiles.a4.baseImagePrice) ||
-            !isWholePeso(incoming.paperProfiles.a4.baseImagePrice))
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.a4.baseImagePrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        if (
-          incoming.paperProfiles.a4.baseImageBwPrice !== undefined &&
-          (!isFiniteNumber(incoming.paperProfiles.a4.baseImageBwPrice) ||
-            !isWholePeso(incoming.paperProfiles.a4.baseImageBwPrice))
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.a4.baseImageBwPrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        next.paperProfiles.a4.baseBwPrice =
-          incoming.paperProfiles.a4.baseBwPrice;
-        next.paperProfiles.a4.baseColorPrice =
-          incoming.paperProfiles.a4.baseColorPrice;
-        if (incoming.paperProfiles.a4.baseImagePrice !== undefined) {
-          next.paperProfiles.a4.baseImagePrice =
-            incoming.paperProfiles.a4.baseImagePrice;
-        }
-        if (incoming.paperProfiles.a4.baseImageBwPrice !== undefined) {
-          next.paperProfiles.a4.baseImageBwPrice =
-            incoming.paperProfiles.a4.baseImageBwPrice;
-        }
-      }
-      if (
-        next.paperProfiles.a4.baseColorPrice <
-        next.paperProfiles.a4.baseBwPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.a4.baseColorPrice cannot be less than baseBwPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.a4.baseImagePrice !== undefined &&
-        next.paperProfiles.a4.baseImagePrice <
-        next.paperProfiles.a4.baseColorPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.a4.baseImagePrice cannot be less than baseColorPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.a4.baseImageBwPrice !== undefined &&
-        next.paperProfiles.a4.baseImageBwPrice <
-        next.paperProfiles.a4.baseBwPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.a4.baseImageBwPrice cannot be less than baseBwPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.a4.baseImageBwPrice !== undefined &&
-        next.paperProfiles.a4.baseImagePrice !== undefined &&
-        next.paperProfiles.a4.baseImageBwPrice >
-        next.paperProfiles.a4.baseImagePrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.a4.baseImageBwPrice cannot be greater than baseImagePrice.',
-        });
-      }
+      const paperProfileKeys = ['a4', 'shortBond', 'longBond'] as const;
+      if (incoming.paperProfiles) {
+        for (const key of paperProfileKeys) {
+          const prof = incoming.paperProfiles[key] as any;
+          if (!prof) continue;
 
-      if (incoming.paperProfiles?.shortBond) {
-        if (
-          !isFiniteNumber(incoming.paperProfiles.shortBond.baseBwPrice) ||
-          !isWholePeso(incoming.paperProfiles.shortBond.baseBwPrice)
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.shortBond.baseBwPrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        if (
-          !isFiniteNumber(incoming.paperProfiles.shortBond.baseColorPrice) ||
-          !isWholePeso(incoming.paperProfiles.shortBond.baseColorPrice)
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.shortBond.baseColorPrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        if (
-          incoming.paperProfiles.shortBond.baseImagePrice !== undefined &&
-          (!isFiniteNumber(incoming.paperProfiles.shortBond.baseImagePrice) ||
-            !isWholePeso(incoming.paperProfiles.shortBond.baseImagePrice))
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.shortBond.baseImagePrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        if (
-          incoming.paperProfiles.shortBond.baseImageBwPrice !== undefined &&
-          (!isFiniteNumber(incoming.paperProfiles.shortBond.baseImageBwPrice) ||
-            !isWholePeso(incoming.paperProfiles.shortBond.baseImageBwPrice))
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.shortBond.baseImageBwPrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        next.paperProfiles.shortBond.baseBwPrice =
-          incoming.paperProfiles.shortBond.baseBwPrice;
-        next.paperProfiles.shortBond.baseColorPrice =
-          incoming.paperProfiles.shortBond.baseColorPrice;
-        if (incoming.paperProfiles.shortBond.baseImagePrice !== undefined) {
-          next.paperProfiles.shortBond.baseImagePrice =
-            incoming.paperProfiles.shortBond.baseImagePrice;
-        }
-        if (incoming.paperProfiles.shortBond.baseImageBwPrice !== undefined) {
-          next.paperProfiles.shortBond.baseImageBwPrice =
-            incoming.paperProfiles.shortBond.baseImageBwPrice;
-        }
-      }
-      if (
-        next.paperProfiles.shortBond.baseColorPrice <
-        next.paperProfiles.shortBond.baseBwPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.shortBond.baseColorPrice cannot be less than baseBwPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.shortBond.baseImagePrice !== undefined &&
-        next.paperProfiles.shortBond.baseImagePrice <
-        next.paperProfiles.shortBond.baseColorPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.shortBond.baseImagePrice cannot be less than baseColorPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.shortBond.baseImageBwPrice !== undefined &&
-        next.paperProfiles.shortBond.baseImageBwPrice <
-        next.paperProfiles.shortBond.baseBwPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.shortBond.baseImageBwPrice cannot be less than baseBwPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.shortBond.baseImageBwPrice !== undefined &&
-        next.paperProfiles.shortBond.baseImagePrice !== undefined &&
-        next.paperProfiles.shortBond.baseImageBwPrice >
-        next.paperProfiles.shortBond.baseImagePrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.shortBond.baseImageBwPrice cannot be greater than baseImagePrice.',
-        });
-      }
+          // Legacy format check: prof has baseBwPrice but no bwPrint
+          if (prof.bwPrint === undefined && prof.baseBwPrice !== undefined) {
+            if (
+              !isFiniteNumber(prof.baseBwPrice) ||
+              !isWholePeso(prof.baseBwPrice)
+            ) {
+              return res.status(400).json({
+                error: `pricingEngine.paperProfiles.${key}.baseBwPrice must be a whole peso value >= 0 (no decimals).`,
+              });
+            }
+            if (
+              !isFiniteNumber(prof.baseColorPrice) ||
+              !isWholePeso(prof.baseColorPrice)
+            ) {
+              return res.status(400).json({
+                error: `pricingEngine.paperProfiles.${key}.baseColorPrice must be a whole peso value >= 0 (no decimals).`,
+              });
+            }
+            if (prof.baseColorPrice < prof.baseBwPrice) {
+              return res.status(400).json({
+                error: `pricingEngine.paperProfiles.${key}.baseColorPrice cannot be less than baseBwPrice.`,
+              });
+            }
+            next.paperProfiles[key] = normalizePaperProfile(
+              prof,
+              next.paperProfiles[key],
+            );
+            continue;
+          }
 
-      if (incoming.paperProfiles?.longBond) {
-        if (
-          !isFiniteNumber(incoming.paperProfiles.longBond.baseBwPrice) ||
-          !isWholePeso(incoming.paperProfiles.longBond.baseBwPrice)
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.longBond.baseBwPrice must be a whole peso value >= 0 (no decimals).',
-          });
+          // New tiered format validation
+          const paperCost =
+            prof.paperCost !== undefined
+              ? prof.paperCost
+              : next.paperProfiles[key].paperCost;
+          if (!isFiniteNumber(paperCost) || !isWholePeso(paperCost)) {
+            return res.status(400).json({
+              error: `pricingEngine.paperProfiles.${key}.paperCost must be a whole peso value >= 0 (no decimals).`,
+            });
+          }
+
+          const currentBw =
+            next.paperProfiles[key].bwPrint ??
+            defaultPricingEngine.paperProfiles[key].bwPrint;
+          const currentColor =
+            next.paperProfiles[key].colorPrint ??
+            defaultPricingEngine.paperProfiles[key].colorPrint;
+
+          const bwPrint = { ...currentBw, ...(prof.bwPrint ?? {}) };
+          const colorPrint = { ...currentColor, ...(prof.colorPrint ?? {}) };
+
+          const tiers = ['low', 'medium', 'high', 'very_high'] as const;
+          for (const tier of tiers) {
+            if (!isFiniteNumber(bwPrint[tier]) || !isWholePeso(bwPrint[tier])) {
+              return res.status(400).json({
+                error: `pricingEngine.paperProfiles.${key}.bwPrint.${tier} must be a whole peso value >= 0 (no decimals).`,
+              });
+            }
+            if (
+              !isFiniteNumber(colorPrint[tier]) ||
+              !isWholePeso(colorPrint[tier])
+            ) {
+              return res.status(400).json({
+                error: `pricingEngine.paperProfiles.${key}.colorPrint.${tier} must be a whole peso value >= 0 (no decimals).`,
+              });
+            }
+            if (colorPrint[tier] < bwPrint[tier]) {
+              return res.status(400).json({
+                error: `pricingEngine.paperProfiles.${key}.colorPrint.${tier} cannot be less than bwPrint.${tier}.`,
+              });
+            }
+          }
+
+          if (bwPrint.medium < bwPrint.low) {
+            return res.status(400).json({
+              error: `pricingEngine.paperProfiles.${key}.bwPrint.medium cannot be less than bwPrint.low.`,
+            });
+          }
+          if (bwPrint.high < bwPrint.medium) {
+            return res.status(400).json({
+              error: `pricingEngine.paperProfiles.${key}.bwPrint.high cannot be less than bwPrint.medium.`,
+            });
+          }
+          if (bwPrint.very_high < bwPrint.high) {
+            return res.status(400).json({
+              error: `pricingEngine.paperProfiles.${key}.bwPrint.very_high cannot be less than bwPrint.high.`,
+            });
+          }
+
+          if (colorPrint.medium < colorPrint.low) {
+            return res.status(400).json({
+              error: `pricingEngine.paperProfiles.${key}.colorPrint.medium cannot be less than colorPrint.low.`,
+            });
+          }
+          if (colorPrint.high < colorPrint.medium) {
+            return res.status(400).json({
+              error: `pricingEngine.paperProfiles.${key}.colorPrint.high cannot be less than colorPrint.medium.`,
+            });
+          }
+          if (colorPrint.very_high < colorPrint.high) {
+            return res.status(400).json({
+              error: `pricingEngine.paperProfiles.${key}.colorPrint.very_high cannot be less than colorPrint.high.`,
+            });
+          }
+
+          next.paperProfiles[key] = {
+            paperCost,
+            bwPrint,
+            colorPrint,
+          };
         }
-        if (
-          !isFiniteNumber(incoming.paperProfiles.longBond.baseColorPrice) ||
-          !isWholePeso(incoming.paperProfiles.longBond.baseColorPrice)
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.longBond.baseColorPrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        if (
-          incoming.paperProfiles.longBond.baseImagePrice !== undefined &&
-          (!isFiniteNumber(incoming.paperProfiles.longBond.baseImagePrice) ||
-            !isWholePeso(incoming.paperProfiles.longBond.baseImagePrice))
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.longBond.baseImagePrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        if (
-          incoming.paperProfiles.longBond.baseImageBwPrice !== undefined &&
-          (!isFiniteNumber(incoming.paperProfiles.longBond.baseImageBwPrice) ||
-            !isWholePeso(incoming.paperProfiles.longBond.baseImageBwPrice))
-        ) {
-          return res.status(400).json({
-            error:
-              'pricingEngine.paperProfiles.longBond.baseImageBwPrice must be a whole peso value >= 0 (no decimals).',
-          });
-        }
-        next.paperProfiles.longBond.baseBwPrice =
-          incoming.paperProfiles.longBond.baseBwPrice;
-        next.paperProfiles.longBond.baseColorPrice =
-          incoming.paperProfiles.longBond.baseColorPrice;
-        if (incoming.paperProfiles.longBond.baseImagePrice !== undefined) {
-          next.paperProfiles.longBond.baseImagePrice =
-            incoming.paperProfiles.longBond.baseImagePrice;
-        }
-        if (incoming.paperProfiles.longBond.baseImageBwPrice !== undefined) {
-          next.paperProfiles.longBond.baseImageBwPrice =
-            incoming.paperProfiles.longBond.baseImageBwPrice;
-        }
-      }
-      if (
-        next.paperProfiles.longBond.baseColorPrice <
-        next.paperProfiles.longBond.baseBwPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.longBond.baseColorPrice cannot be less than baseBwPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.longBond.baseImagePrice !== undefined &&
-        next.paperProfiles.longBond.baseImagePrice <
-        next.paperProfiles.longBond.baseColorPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.longBond.baseImagePrice cannot be less than baseColorPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.longBond.baseImageBwPrice !== undefined &&
-        next.paperProfiles.longBond.baseImageBwPrice <
-        next.paperProfiles.longBond.baseBwPrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.longBond.baseImageBwPrice cannot be less than baseBwPrice.',
-        });
-      }
-      if (
-        next.paperProfiles.longBond.baseImageBwPrice !== undefined &&
-        next.paperProfiles.longBond.baseImagePrice !== undefined &&
-        next.paperProfiles.longBond.baseImageBwPrice >
-        next.paperProfiles.longBond.baseImagePrice
-      ) {
-        return res.status(400).json({
-          error:
-            'pricingEngine.paperProfiles.longBond.baseImageBwPrice cannot be greater than baseImagePrice.',
-        });
       }
 
       if (incoming.bulkDiscountTiers !== undefined) {

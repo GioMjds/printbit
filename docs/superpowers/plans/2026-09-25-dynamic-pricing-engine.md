@@ -11,6 +11,7 @@
 **Spec:** [`docs/superpowers/specs/2026-09-25-dynamic-pricing-engine-design.md`](file:///D:/giomj/Projects/printbit/docs/superpowers/specs/2026-09-25-dynamic-pricing-engine-design.md)
 
 ## Global Constraints
+
 - All prices and surcharges are stored and computed as whole pesos ($\ge 0$, no decimal cents) to match kiosk cash/coin payment mechanisms.
 - Zero new external dependencies — reuse already-installed `canvas`, `sharp`, and `pdfjs-dist`.
 - Existing SQLite databases must automatically normalize without manual migration scripts on kiosk boot.
@@ -21,13 +22,16 @@
 ### Task 1: Core Database Schema, Paper Profile Migration & Normalization
 
 **Files:**
+
 - Modify: `src/core/database/models/admin.model.ts:20-45`
 - Modify: `src/core/database/db.ts:260-310`, `540-620`
 - Test: `tests/services/pricing-engine-db.spec.ts`
 
 **Interfaces:**
+
 - Consumes: Existing `db.ts` settings initialization and SQLite storage.
 - Produces:
+
   ```ts
   export type CoverageTier = 'low' | 'medium' | 'high' | 'very_high';
   export interface CoverageTierRates {
@@ -70,12 +74,28 @@ describe('Pricing Engine Database Schema & Defaults', () => {
   it('normalizes legacy paper profiles into new tiered format without data loss', () => {
     const rawLegacy = {
       paperProfiles: {
-        a4: { baseBwPrice: 3, baseColorPrice: 18, baseImagePrice: 25, baseImageBwPrice: 10 },
-        shortBond: { baseBwPrice: 3, baseColorPrice: 18, baseImagePrice: 25, baseImageBwPrice: 10 },
-        longBond: { baseBwPrice: 4, baseColorPrice: 20, baseImagePrice: 30, baseImageBwPrice: 12 },
+        a4: {
+          baseBwPrice: 3,
+          baseColorPrice: 18,
+          baseImagePrice: 25,
+          baseImageBwPrice: 10,
+        },
+        shortBond: {
+          baseBwPrice: 3,
+          baseColorPrice: 18,
+          baseImagePrice: 25,
+          baseImageBwPrice: 10,
+        },
+        longBond: {
+          baseBwPrice: 4,
+          baseColorPrice: 20,
+          baseImagePrice: 30,
+          baseImageBwPrice: 12,
+        },
       },
     };
-    const normalized = (db as any).normalizePricingEngine?.(rawLegacy) ?? rawLegacy;
+    const normalized =
+      (db as any).normalizePricingEngine?.(rawLegacy) ?? rawLegacy;
     expect(normalized.paperProfiles.a4.paperCost).toBe(1);
     expect(normalized.paperProfiles.a4.bwPrint.low).toBe(2);
     expect(normalized.paperProfiles.a4.bwPrint.very_high).toBe(9);
@@ -97,6 +117,7 @@ Define `CoverageTier`, `CoverageTierRates`, and updated `PaperPricingProfile`.
 
 In `src/core/database/db.ts`:
 Update `defaultPricingEngine` with calibrated defaults:
+
 - A4/Short: `paperCost: 1`, `bwPrint: { low: 2, medium: 3, high: 6, very_high: 9 }`, `colorPrint: { low: 17, medium: 19, high: 24, very_high: 29 }`.
 - Long: `paperCost: 1`, `bwPrint: { low: 3, medium: 4, high: 8, very_high: 11 }`, `colorPrint: { low: 19, medium: 22, high: 29, very_high: 34 }`.
 
@@ -119,22 +140,25 @@ git commit -m "feat(pricing): update database schema for tiered coverage and pap
 ### Task 2: Uniform Canvas Pixel Coverage Metering in Document Analysis
 
 **Files:**
+
 - Modify: `src/services/document-analysis.ts`
 - Modify: `src/services/session.ts:30-55`
 - Test: `tests/services/document-analysis.spec.ts`
 - Test: `tests/services/direct-image-analysis.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `pdfjs-dist/legacy/build/pdf.mjs`, `canvas`, `sharp`.
 - Produces:
+
   ```ts
   export function resolveCoverageTier(contentCoverage: number): CoverageTier;
   export interface PageAnalysis {
     index: number;
     isColor: boolean;
-    coverage: number;             // contentCoverage (0.0 to 1.0)
-    colorCoverage: number;        // colorCoverage (0.0 to 1.0)
-    coverageTier: CoverageTier;   // 'low' | 'medium' | 'high' | 'very_high'
+    coverage: number; // contentCoverage (0.0 to 1.0)
+    colorCoverage: number; // colorCoverage (0.0 to 1.0)
+    coverageTier: CoverageTier; // 'low' | 'medium' | 'high' | 'very_high'
     isBlank: boolean;
     classification: 'blank' | 'bw' | 'color';
     fallbackReasonFlags?: string[];
@@ -154,6 +178,7 @@ Expected: FAIL with missing `coverageTier` and `resolveCoverageTier`.
 - [ ] **Step 3: Implement canvas rendering and uniform metering**
 
 In `src/services/document-analysis.ts`:
+
 - Bump `ANALYSIS_ALGORITHM_VERSION = 9`.
 - Export `resolveCoverageTier(contentCoverage: number): CoverageTier`:
   - `contentCoverage <= 0.10` $\rightarrow$ `'low'`
@@ -188,6 +213,7 @@ git commit -m "feat(analysis): implement uniform low-dpi canvas coverage meterin
 ### Task 3: Dynamic Output-Metered Quote Engine & Duplex Math
 
 **Files:**
+
 - Modify: `src/services/print-quote.ts`
 - Modify: `src/services/admin.ts:60-140`
 - Modify: `src/modules/admin/admin.service.ts:170-240`
@@ -196,8 +222,10 @@ git commit -m "feat(analysis): implement uniform low-dpi canvas coverage meterin
 - Test: `tests/services/admin-pricing-calculation.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `PaperPricingProfile` from Task 1, `PageAnalysis` from Task 2.
 - Produces:
+
   ```ts
   export interface PrintPageQuoteBreakdown {
     pageNumber: number;
@@ -232,6 +260,7 @@ git commit -m "feat(analysis): implement uniform low-dpi canvas coverage meterin
 - [ ] **Step 1: Write failing tests for duplex savings and dynamic tier quotes**
 
 In `tests/services/print-quote.spec.ts`:
+
 - Test 10-page B&W Low document in Simplex: 10 physical sheets @ ₱1 + 10 pages @ ₱2 = ₱30.
 - Test 10-page B&W Low document in Duplex: 5 physical sheets @ ₱1 + 10 pages @ ₱2 = ₱25 (saving ₱5).
 - Test image file containing B&W text: bills at `low` B&W tier (₱3 simplex), not photo tier (₱10).
@@ -246,6 +275,7 @@ Expected: FAIL with outdated quote logic.
 - [ ] **Step 3: Implement new quote engine calculation**
 
 In `src/services/print-quote.ts`:
+
 - Read `profile = pricingEngine.paperProfiles[profileKey]`.
 - Calculate `physicalSheets = (duplex ? Math.ceil(selectedCount / 2) : selectedCount) * safeCopies`.
 - Calculate `paperSubtotal = physicalSheets * profile.paperCost`.
@@ -274,6 +304,7 @@ git commit -m "feat(pricing): implement duplex-aware dynamic quote engine and ta
 ### Task 4: Admin API Validation & Settings Dashboard Updates
 
 **Files:**
+
 - Modify: `src/modules/admin/admin.schema.ts:25-45`
 - Modify: `src/modules/admin/admin.controller.ts:2230-2390`
 - Modify: `src/public/admin/shared.ts:220-235`
@@ -281,6 +312,7 @@ git commit -m "feat(pricing): implement duplex-aware dynamic quote engine and ta
 - Test: `tests/modules/admin/admin.spec.ts` (or admin settings test)
 
 **Interfaces:**
+
 - Consumes: `PaperPricingProfile` from Task 1.
 - Produces: Updated `PUT /api/admin/settings` handler validating `paperCost`, `bwPrint`, and `colorPrint` tables.
 
@@ -296,9 +328,10 @@ Expected: FAIL.
 - [ ] **Step 3: Implement admin validation and dashboard UI**
 
 In `src/modules/admin/admin.schema.ts` and `admin.controller.ts`:
+
 - Validate `paperCost`, `bwPrint`, and `colorPrint` for `a4`, `shortBond`, `longBond`.
 - Enforce whole-peso values and monotonicity checks.
-In `src/public/admin/settings/app.ts`:
+  In `src/public/admin/settings/app.ts`:
 - Update Pricing Engine settings form with table inputs for Paper Sheet Cost, B&W Tiers, and Color Tiers.
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -318,12 +351,14 @@ git commit -m "feat(admin): update admin pricing settings validation and dashboa
 ### Task 5: Public Pricing Guide & Client UI Flow
 
 **Files:**
+
 - Modify: `src/public/shared/pricing-guide.ts`
 - Modify: `src/public/config/app.ts:110-160`, `450-520`
 - Modify: `src/public/confirm/app.ts:100-160`
 - Test: `tests/public/pricing-guide.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `/api/pricing-config` returning `PublicPricingConfig` with paper profiles and tiers.
 - Produces: Customer UI with live duplex paper savings badge and transparent itemized receipt.
 
@@ -340,10 +375,11 @@ Expected: FAIL.
 - [ ] **Step 3: Implement public pricing guide and client preview/confirm UI**
 
 In `src/public/shared/pricing-guide.ts`:
+
 - Update `formatPricingGuide` to display paper cost and tier rates.
-In `src/public/config/app.ts`:
+  In `src/public/config/app.ts`:
 - Display duplex savings badge when 2-sided printing is enabled.
-In `src/public/confirm/app.ts`:
+  In `src/public/confirm/app.ts`:
 - Itemize paper cost vs. print cost in confirmation breakdown.
 - Transmit `quoteHash` to `/print` endpoint.
 
@@ -364,16 +400,19 @@ git commit -m "feat(ui): update public pricing guide and customer quote confirma
 ### Task 6: End-to-End Test Suite & Verification
 
 **Files:**
+
 - Create: `tests/e2e/dynamic-pricing-flow.spec.ts`
 - Modify: `tests/services/financial.spec.ts` (if applicable)
 
 **Interfaces:**
+
 - Consumes: Full stack (Analysis $\rightarrow$ Quote $\rightarrow$ Confirm).
 - Produces: Automated verification suite covering all requirements in `PRICING_CONFIGURATION_FIX.md`.
 
 - [ ] **Step 1: Create E2E test suite `tests/e2e/dynamic-pricing-flow.spec.ts`**
 
 Cover:
+
 1. JPG photo vs. DOCX containing full-page photo $\rightarrow$ both get priced identically at `very_high` color tier.
 2. JPG scan of black-and-white text $\rightarrow$ priced at `low` B&W tier (₱3 simplex).
 3. 10-page duplex print $\rightarrow$ verifies 5 physical sheets charged and ₱5 duplex savings.

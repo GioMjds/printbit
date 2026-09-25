@@ -1,6 +1,7 @@
 import {
   SettingsResponse,
   SummaryResponse,
+  PaperPricingProfile,
   apiFetch,
   setMessage,
   initAuth,
@@ -43,42 +44,35 @@ const settingColorDetection = document.getElementById(
 ) as HTMLInputElement | null;
 
 // ── Pricing Engine settings ──────────────────
-const settingA4BwPrice = document.getElementById(
-  'settingA4BwPrice',
-) as HTMLInputElement | null;
-const settingA4ColorPrice = document.getElementById(
-  'settingA4ColorPrice',
-) as HTMLInputElement | null;
-const settingA4ImagePrice = document.getElementById(
-  'settingA4ImagePrice',
-) as HTMLInputElement | null;
-const settingA4ImageBwPrice = (document.getElementById(
-  'settingA4ImageBwPrice',
-) || document.getElementById('a4ImageBwPrice')) as HTMLInputElement | null;
-const settingShortBondBwPrice = document.getElementById(
-  'settingShortBondBwPrice',
-) as HTMLInputElement | null;
-const settingShortBondColorPrice = document.getElementById(
-  'settingShortBondColorPrice',
-) as HTMLInputElement | null;
-const settingShortBondImagePrice = document.getElementById(
-  'settingShortBondImagePrice',
-) as HTMLInputElement | null;
-const settingShortBondImageBwPrice = (document.getElementById(
-  'settingShortBondImageBwPrice',
-) || document.getElementById('shortBondImageBwPrice')) as HTMLInputElement | null;
-const settingLongBondBwPrice = document.getElementById(
-  'settingLongBondBwPrice',
-) as HTMLInputElement | null;
-const settingLongBondColorPrice = document.getElementById(
-  'settingLongBondColorPrice',
-) as HTMLInputElement | null;
-const settingLongBondImagePrice = document.getElementById(
-  'settingLongBondImagePrice',
-) as HTMLInputElement | null;
-const settingLongBondImageBwPrice = (document.getElementById(
-  'settingLongBondImageBwPrice',
-) || document.getElementById('longBondImageBwPrice')) as HTMLInputElement | null;
+const settingA4PaperCost = document.getElementById('settingA4PaperCost') as HTMLInputElement | null;
+const settingA4BwLow = document.getElementById('settingA4BwLow') as HTMLInputElement | null;
+const settingA4BwMedium = document.getElementById('settingA4BwMedium') as HTMLInputElement | null;
+const settingA4BwHigh = document.getElementById('settingA4BwHigh') as HTMLInputElement | null;
+const settingA4BwVeryHigh = document.getElementById('settingA4BwVeryHigh') as HTMLInputElement | null;
+const settingA4ColorLow = document.getElementById('settingA4ColorLow') as HTMLInputElement | null;
+const settingA4ColorMedium = document.getElementById('settingA4ColorMedium') as HTMLInputElement | null;
+const settingA4ColorHigh = document.getElementById('settingA4ColorHigh') as HTMLInputElement | null;
+const settingA4ColorVeryHigh = document.getElementById('settingA4ColorVeryHigh') as HTMLInputElement | null;
+
+const settingShortBondPaperCost = document.getElementById('settingShortBondPaperCost') as HTMLInputElement | null;
+const settingShortBondBwLow = document.getElementById('settingShortBondBwLow') as HTMLInputElement | null;
+const settingShortBondBwMedium = document.getElementById('settingShortBondBwMedium') as HTMLInputElement | null;
+const settingShortBondBwHigh = document.getElementById('settingShortBondBwHigh') as HTMLInputElement | null;
+const settingShortBondBwVeryHigh = document.getElementById('settingShortBondBwVeryHigh') as HTMLInputElement | null;
+const settingShortBondColorLow = document.getElementById('settingShortBondColorLow') as HTMLInputElement | null;
+const settingShortBondColorMedium = document.getElementById('settingShortBondColorMedium') as HTMLInputElement | null;
+const settingShortBondColorHigh = document.getElementById('settingShortBondColorHigh') as HTMLInputElement | null;
+const settingShortBondColorVeryHigh = document.getElementById('settingShortBondColorVeryHigh') as HTMLInputElement | null;
+
+const settingLongBondPaperCost = document.getElementById('settingLongBondPaperCost') as HTMLInputElement | null;
+const settingLongBondBwLow = document.getElementById('settingLongBondBwLow') as HTMLInputElement | null;
+const settingLongBondBwMedium = document.getElementById('settingLongBondBwMedium') as HTMLInputElement | null;
+const settingLongBondBwHigh = document.getElementById('settingLongBondBwHigh') as HTMLInputElement | null;
+const settingLongBondBwVeryHigh = document.getElementById('settingLongBondBwVeryHigh') as HTMLInputElement | null;
+const settingLongBondColorLow = document.getElementById('settingLongBondColorLow') as HTMLInputElement | null;
+const settingLongBondColorMedium = document.getElementById('settingLongBondColorMedium') as HTMLInputElement | null;
+const settingLongBondColorHigh = document.getElementById('settingLongBondColorHigh') as HTMLInputElement | null;
+const settingLongBondColorVeryHigh = document.getElementById('settingLongBondColorVeryHigh') as HTMLInputElement | null;
 const settingScanDocument = document.getElementById(
   'settingScanDocument',
 ) as HTMLInputElement | null;
@@ -429,66 +423,34 @@ function applySettings(settings: SettingsResponse): void {
     );
 
   // Pricing Configuration
-  if (settingA4BwPrice) {
-    settingA4BwPrice.value = String(
-      settings.pricingEngine.paperProfiles.a4.baseBwPrice,
-    );
-  }
-  if (settingA4ColorPrice) {
-    settingA4ColorPrice.value = String(
-      settings.pricingEngine.paperProfiles.a4.baseColorPrice,
-    );
-  }
-  if (settingA4ImagePrice) {
-    settingA4ImagePrice.value = String(
-      settings.pricingEngine.paperProfiles.a4.baseImagePrice ?? 25,
-    );
-  }
-  if (settingA4ImageBwPrice) {
-    settingA4ImageBwPrice.value = String(
-      settings.pricingEngine.paperProfiles.a4.baseImageBwPrice ?? 10,
-    );
-  }
-  if (settingShortBondBwPrice) {
-    settingShortBondBwPrice.value = String(
-      settings.pricingEngine.paperProfiles.shortBond.baseBwPrice,
-    );
-  }
-  if (settingShortBondColorPrice) {
-    settingShortBondColorPrice.value = String(
-      settings.pricingEngine.paperProfiles.shortBond.baseColorPrice,
-    );
-  }
-  if (settingShortBondImagePrice) {
-    settingShortBondImagePrice.value = String(
-      settings.pricingEngine.paperProfiles.shortBond.baseImagePrice ?? 25,
-    );
-  }
-  if (settingShortBondImageBwPrice) {
-    settingShortBondImageBwPrice.value = String(
-      settings.pricingEngine.paperProfiles.shortBond.baseImageBwPrice ?? 10,
-    );
-  }
-  if (settingLongBondBwPrice) {
-    settingLongBondBwPrice.value = String(
-      settings.pricingEngine.paperProfiles.longBond.baseBwPrice,
-    );
-  }
-  if (settingLongBondColorPrice) {
-    settingLongBondColorPrice.value = String(
-      settings.pricingEngine.paperProfiles.longBond.baseColorPrice,
-    );
-  }
-  if (settingLongBondImagePrice) {
-    settingLongBondImagePrice.value = String(
-      settings.pricingEngine.paperProfiles.longBond.baseImagePrice ?? 30,
-    );
-  }
-  if (settingLongBondImageBwPrice) {
-    settingLongBondImageBwPrice.value = String(
-      settings.pricingEngine.paperProfiles.longBond.baseImageBwPrice ?? 12,
-    );
-  }
+  const populateProfile = (
+    prefix: 'A4' | 'ShortBond' | 'LongBond',
+    key: 'a4' | 'shortBond' | 'longBond',
+  ) => {
+    const p = settings.pricingEngine?.paperProfiles?.[key];
+    const costEl = document.getElementById(`setting${prefix}PaperCost`) as HTMLInputElement | null;
+    const bwLowEl = document.getElementById(`setting${prefix}BwLow`) as HTMLInputElement | null;
+    const bwMedEl = document.getElementById(`setting${prefix}BwMedium`) as HTMLInputElement | null;
+    const bwHighEl = document.getElementById(`setting${prefix}BwHigh`) as HTMLInputElement | null;
+    const bwVHighEl = document.getElementById(`setting${prefix}BwVeryHigh`) as HTMLInputElement | null;
+    const colLowEl = document.getElementById(`setting${prefix}ColorLow`) as HTMLInputElement | null;
+    const colMedEl = document.getElementById(`setting${prefix}ColorMedium`) as HTMLInputElement | null;
+    const colHighEl = document.getElementById(`setting${prefix}ColorHigh`) as HTMLInputElement | null;
+    const colVHighEl = document.getElementById(`setting${prefix}ColorVeryHigh`) as HTMLInputElement | null;
+
+    if (costEl && p) costEl.value = String(p.paperCost ?? 1);
+    if (bwLowEl && p) bwLowEl.value = String(p.bwPrint?.low ?? 2);
+    if (bwMedEl && p) bwMedEl.value = String(p.bwPrint?.medium ?? 3);
+    if (bwHighEl && p) bwHighEl.value = String(p.bwPrint?.high ?? 6);
+    if (bwVHighEl && p) bwVHighEl.value = String(p.bwPrint?.very_high ?? 9);
+    if (colLowEl && p) colLowEl.value = String(p.colorPrint?.low ?? 17);
+    if (colMedEl && p) colMedEl.value = String(p.colorPrint?.medium ?? 19);
+    if (colHighEl && p) colHighEl.value = String(p.colorPrint?.high ?? 24);
+    if (colVHighEl && p) colVHighEl.value = String(p.colorPrint?.very_high ?? 29);
+  };
+  populateProfile('A4', 'a4');
+  populateProfile('ShortBond', 'shortBond');
+  populateProfile('LongBond', 'longBond');
   if (settingScanDocument) {
     settingScanDocument.value = String(settings.pricing.scanDocument);
   }
@@ -716,200 +678,69 @@ settingsForm.addEventListener('submit', (e) => {
     return;
   }
 
-  // Pricing configuration values
-  const a4BwPrice = Number(settingA4BwPrice?.value ?? 0);
-  const a4ColorPrice = Number(settingA4ColorPrice?.value ?? 0);
-  const a4ImagePrice = Number(settingA4ImagePrice?.value ?? 0);
-  const a4ImageBwPrice = Number(settingA4ImageBwPrice?.value ?? 0);
-  const shortBondBwPrice = Number(settingShortBondBwPrice?.value ?? 0);
-  const shortBondColorPrice = Number(settingShortBondColorPrice?.value ?? 0);
-  const shortBondImagePrice = Number(settingShortBondImagePrice?.value ?? 0);
-  const shortBondImageBwPrice = Number(settingShortBondImageBwPrice?.value ?? 0);
-  const longBondBwPrice = Number(settingLongBondBwPrice?.value ?? 0);
-  const longBondColorPrice = Number(settingLongBondColorPrice?.value ?? 0);
-  const longBondImagePrice = Number(settingLongBondImagePrice?.value ?? 0);
-  const longBondImageBwPrice = Number(settingLongBondImageBwPrice?.value ?? 0);
-  const scanDocumentPrice = Number(settingScanDocument?.value ?? 0);
-  const highQualitySurcharge = Number(settingHighQualitySurcharge?.value ?? 0);
-
   const isWholePeso = (n: number): boolean => Number.isInteger(n) && n >= 0;
 
-  if (settingA4BwPrice && !isWholePeso(a4BwPrice)) {
-    setMessage('A4 B&W price must be a whole peso value (no decimals).');
-    return;
-  }
-  if (settingA4ColorPrice && !isWholePeso(a4ColorPrice)) {
-    setMessage('A4 Color price must be a whole peso value (no decimals).');
-    return;
-  }
-  if (settingA4ImagePrice && !isWholePeso(a4ImagePrice)) {
-    setMessage(
-      'A4 Photo/Image price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (settingA4ImageBwPrice && !isWholePeso(a4ImageBwPrice)) {
-    setMessage(
-      'A4 Photo/Image (B&W) price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (settingA4BwPrice && settingA4ColorPrice && a4ColorPrice < a4BwPrice) {
-    setMessage('A4 Color price cannot be less than B&W price.');
-    return;
-  }
-  if (
-    settingA4ColorPrice &&
-    settingA4ImagePrice &&
-    a4ImagePrice < a4ColorPrice
-  ) {
-    setMessage('A4 Photo/Image price cannot be less than Color price.');
-    return;
-  }
-  if (
-    settingA4BwPrice &&
-    settingA4ImageBwPrice &&
-    a4ImageBwPrice < a4BwPrice
-  ) {
-    setMessage('A4 Photo/Image (B&W) price cannot be less than B&W price.');
-    return;
-  }
-  if (
-    settingA4ImagePrice &&
-    settingA4ImageBwPrice &&
-    a4ImageBwPrice > a4ImagePrice
-  ) {
-    setMessage(
-      'A4 Photo/Image (B&W) price cannot be greater than Photo/Image price.',
-    );
-    return;
-  }
+  const validateProfile = (
+    prefix: 'A4' | 'ShortBond' | 'LongBond',
+    label: string,
+  ): PaperPricingProfile | null => {
+    const costEl = document.getElementById(`setting${prefix}PaperCost`) as HTMLInputElement | null;
+    const bwLowEl = document.getElementById(`setting${prefix}BwLow`) as HTMLInputElement | null;
+    const bwMedEl = document.getElementById(`setting${prefix}BwMedium`) as HTMLInputElement | null;
+    const bwHighEl = document.getElementById(`setting${prefix}BwHigh`) as HTMLInputElement | null;
+    const bwVHighEl = document.getElementById(`setting${prefix}BwVeryHigh`) as HTMLInputElement | null;
+    const colLowEl = document.getElementById(`setting${prefix}ColorLow`) as HTMLInputElement | null;
+    const colMedEl = document.getElementById(`setting${prefix}ColorMedium`) as HTMLInputElement | null;
+    const colHighEl = document.getElementById(`setting${prefix}ColorHigh`) as HTMLInputElement | null;
+    const colVHighEl = document.getElementById(`setting${prefix}ColorVeryHigh`) as HTMLInputElement | null;
 
-  if (settingShortBondBwPrice && !isWholePeso(shortBondBwPrice)) {
-    setMessage(
-      'Short B&W price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (settingShortBondColorPrice && !isWholePeso(shortBondColorPrice)) {
-    setMessage(
-      'Short Color price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (settingShortBondImagePrice && !isWholePeso(shortBondImagePrice)) {
-    setMessage(
-      'Short Photo/Image price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (settingShortBondImageBwPrice && !isWholePeso(shortBondImageBwPrice)) {
-    setMessage(
-      'Short Photo/Image (B&W) price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (
-    settingShortBondBwPrice &&
-    settingShortBondColorPrice &&
-    shortBondColorPrice < shortBondBwPrice
-  ) {
-    setMessage('Short Color price cannot be less than B&W price.');
-    return;
-  }
-  if (
-    settingShortBondColorPrice &&
-    settingShortBondImagePrice &&
-    shortBondImagePrice < shortBondColorPrice
-  ) {
-    setMessage(
-      'Short Photo/Image price cannot be less than Color price.',
-    );
-    return;
-  }
-  if (
-    settingShortBondBwPrice &&
-    settingShortBondImageBwPrice &&
-    shortBondImageBwPrice < shortBondBwPrice
-  ) {
-    setMessage(
-      'Short Photo/Image (B&W) price cannot be less than B&W price.',
-    );
-    return;
-  }
-  if (
-    settingShortBondImagePrice &&
-    settingShortBondImageBwPrice &&
-    shortBondImageBwPrice > shortBondImagePrice
-  ) {
-    setMessage(
-      'Short Photo/Image (B&W) price cannot be greater than Photo/Image price.',
-    );
-    return;
-  }
+    const paperCost = Number(costEl?.value ?? 0);
+    const bwLow = Number(bwLowEl?.value ?? 0);
+    const bwMed = Number(bwMedEl?.value ?? 0);
+    const bwHigh = Number(bwHighEl?.value ?? 0);
+    const bwVHigh = Number(bwVHighEl?.value ?? 0);
+    const colLow = Number(colLowEl?.value ?? 0);
+    const colMed = Number(colMedEl?.value ?? 0);
+    const colHigh = Number(colHighEl?.value ?? 0);
+    const colVHigh = Number(colVHighEl?.value ?? 0);
 
-  if (settingLongBondBwPrice && !isWholePeso(longBondBwPrice)) {
-    setMessage(
-      'Long B&W price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (settingLongBondColorPrice && !isWholePeso(longBondColorPrice)) {
-    setMessage(
-      'Long Color price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (settingLongBondImagePrice && !isWholePeso(longBondImagePrice)) {
-    setMessage(
-      'Long Photo/Image price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (settingLongBondImageBwPrice && !isWholePeso(longBondImageBwPrice)) {
-    setMessage(
-      'Long Photo/Image (B&W) price must be a whole peso value (no decimals).',
-    );
-    return;
-  }
-  if (
-    settingLongBondBwPrice &&
-    settingLongBondColorPrice &&
-    longBondColorPrice < longBondBwPrice
-  ) {
-    setMessage('Long Color price cannot be less than B&W price.');
-    return;
-  }
-  if (
-    settingLongBondColorPrice &&
-    settingLongBondImagePrice &&
-    longBondImagePrice < longBondColorPrice
-  ) {
-    setMessage(
-      'Long Photo/Image price cannot be less than Color price.',
-    );
-    return;
-  }
-  if (
-    settingLongBondBwPrice &&
-    settingLongBondImageBwPrice &&
-    longBondImageBwPrice < longBondBwPrice
-  ) {
-    setMessage(
-      'Long Photo/Image (B&W) price cannot be less than B&W price.',
-    );
-    return;
-  }
-  if (
-    settingLongBondImagePrice &&
-    settingLongBondImageBwPrice &&
-    longBondImageBwPrice > longBondImagePrice
-  ) {
-    setMessage(
-      'Long Photo/Image (B&W) price cannot be greater than Photo/Image price.',
-    );
-    return;
-  }
+    const values = [paperCost, bwLow, bwMed, bwHigh, bwVHigh, colLow, colMed, colHigh, colVHigh];
+    if (values.some((v) => !isWholePeso(v))) {
+      setMessage(`${label} prices must be whole peso values >= 0 (no decimals).`);
+      return null;
+    }
+
+    if (bwMed < bwLow || bwHigh < bwMed || bwVHigh < bwHigh) {
+      setMessage(`${label} B&W tier rates must be non-decreasing (Low <= Med <= High <= Max).`);
+      return null;
+    }
+
+    if (colMed < colLow || colHigh < colMed || colVHigh < colHigh) {
+      setMessage(`${label} Color tier rates must be non-decreasing (Low <= Med <= High <= Max).`);
+      return null;
+    }
+
+    if (colLow < bwLow || colMed < bwMed || colHigh < bwHigh || colVHigh < bwVHigh) {
+      setMessage(`${label} Color rates cannot be less than B&W rates for the same tier.`);
+      return null;
+    }
+
+    return {
+      paperCost,
+      bwPrint: { low: bwLow, medium: bwMed, high: bwHigh, very_high: bwVHigh },
+      colorPrint: { low: colLow, medium: colMed, high: colHigh, very_high: colVHigh },
+    };
+  };
+
+  const a4Profile = validateProfile('A4', 'A4');
+  if (!a4Profile) return;
+  const shortBondProfile = validateProfile('ShortBond', 'Short Bond');
+  if (!shortBondProfile) return;
+  const longBondProfile = validateProfile('LongBond', 'Long Bond');
+  if (!longBondProfile) return;
+
+  const scanDocumentPrice = Number(settingScanDocument?.value ?? 0);
+  const highQualitySurcharge = Number(settingHighQualitySurcharge?.value ?? 0);
 
   if (settingScanDocument && !isWholePeso(scanDocumentPrice)) {
     setMessage('Scan document rate must be a whole peso value (no decimals).');
@@ -924,31 +755,16 @@ settingsForm.addEventListener('submit', (e) => {
 
   const payload: Record<string, unknown> = {
     pricing: {
-      printPerPage: shortBondBwPrice,
+      printPerPage: shortBondProfile.bwPrint.low,
       scanDocument: scanDocumentPrice,
-      colorSurcharge: shortBondColorPrice - shortBondBwPrice,
+      colorSurcharge: shortBondProfile.colorPrint.low - shortBondProfile.bwPrint.low,
       highQualitySurcharge,
     },
     pricingEngine: {
       paperProfiles: {
-        a4: {
-          baseBwPrice: a4BwPrice,
-          baseColorPrice: a4ColorPrice,
-          baseImagePrice: a4ImagePrice,
-          baseImageBwPrice: a4ImageBwPrice,
-        },
-        shortBond: {
-          baseBwPrice: shortBondBwPrice,
-          baseColorPrice: shortBondColorPrice,
-          baseImagePrice: shortBondImagePrice,
-          baseImageBwPrice: shortBondImageBwPrice,
-        },
-        longBond: {
-          baseBwPrice: longBondBwPrice,
-          baseColorPrice: longBondColorPrice,
-          baseImagePrice: longBondImagePrice,
-          baseImageBwPrice: longBondImageBwPrice,
-        },
+        a4: a4Profile,
+        shortBond: shortBondProfile,
+        longBond: longBondProfile,
       },
       highQualitySurcharge,
     },

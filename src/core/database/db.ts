@@ -532,7 +532,7 @@ function normalizeProfilePrice(value: unknown, fallback: number): number {
   return Math.max(0, Math.floor(Number.isFinite(num) ? num : fallback));
 }
 
-function normalizePaperProfile(
+export function normalizePaperProfile(
   candidate: unknown,
   fallback: PaperPricingProfile,
 ): PaperPricingProfile {

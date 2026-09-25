@@ -17,6 +17,7 @@ import {
   acquireIdempotencyKey,
   storeIdempotencyKey,
   releaseIdempotencyKey,
+  defaultPricingEngine,
 } from '@/services/db';
 import {
   evaluateInkPreflight,
@@ -512,30 +513,8 @@ export class FinancialService {
   getPricingConfig = (_req: Request, res: Response): void => {
     const config = db.data?.settings?.pricingEngine;
     res.json({
-      paperProfiles: {
-        a4: {
-          baseBwPrice: config?.paperProfiles?.a4?.baseBwPrice ?? 3,
-          baseColorPrice: config?.paperProfiles?.a4?.baseColorPrice ?? 18,
-          baseImagePrice: config?.paperProfiles?.a4?.baseImagePrice ?? 25,
-          baseImageBwPrice: config?.paperProfiles?.a4?.baseImageBwPrice ?? 10,
-        },
-        shortBond: {
-          baseBwPrice: config?.paperProfiles?.shortBond?.baseBwPrice ?? 3,
-          baseColorPrice:
-            config?.paperProfiles?.shortBond?.baseColorPrice ?? 18,
-          baseImagePrice:
-            config?.paperProfiles?.shortBond?.baseImagePrice ?? 25,
-          baseImageBwPrice:
-            config?.paperProfiles?.shortBond?.baseImageBwPrice ?? 10,
-        },
-        longBond: {
-          baseBwPrice: config?.paperProfiles?.longBond?.baseBwPrice ?? 4,
-          baseColorPrice: config?.paperProfiles?.longBond?.baseColorPrice ?? 20,
-          baseImagePrice: config?.paperProfiles?.longBond?.baseImagePrice ?? 30,
-          baseImageBwPrice:
-            config?.paperProfiles?.longBond?.baseImageBwPrice ?? 12,
-        },
-      },
+      paperProfiles:
+        config?.paperProfiles ?? defaultPricingEngine.paperProfiles,
       highQualitySurcharge:
         config?.highQualitySurcharge ??
         db.data?.settings?.pricing?.highQualitySurcharge ??
