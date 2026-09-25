@@ -329,6 +329,7 @@
                         <span class="info-tag" id="copiesTag">1 Copy</span>
                         <span class="info-tag" id="orientationTag">Portrait</span>
                         <span class="info-tag" id="qualityTag">Standard</span>
+                        <span class="info-tag" id="duplexTag" hidden>2-Sided</span>
                         <span class="info-tag" id="rotationTag" hidden>0°</span>
                       </div>
                     </div>
@@ -359,6 +360,18 @@
 
           <!-- Grounded Financial Summary -->
           <div class="summary-finance-footer">
+            <div class="summary-finance-row summary-finance-row--subtotal" id="paperCostRow" hidden>
+              <span class="summary-finance-row__label" id="paperCostLabel">Paper Sheets</span>
+              <span class="summary-finance-row__amount" id="paperCostValue">₱ 0</span>
+            </div>
+            <div class="summary-finance-row summary-finance-row--subtotal" id="printCostRow" hidden>
+              <span class="summary-finance-row__label">Print Ink Metering</span>
+              <span class="summary-finance-row__amount" id="printCostValue">₱ 0</span>
+            </div>
+            <div class="summary-finance-row summary-finance-row--savings" id="duplexSavingsRow" hidden style="color: #4ade80;">
+              <span class="summary-finance-row__label">Duplex Paper Savings</span>
+              <span class="summary-finance-row__amount" id="duplexSavingsValue">-₱ 0</span>
+            </div>
             <div class="summary-finance-row summary-finance-row--total">
               <span class="summary-finance-row__label">Total Price</span>
               <span class="summary-finance-row__amount" id="priceValue">₱ 0</span>

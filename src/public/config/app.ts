@@ -130,6 +130,13 @@ interface PrintQuote {
     | 'high-confidence-page-detection'
     | 'fallback-assumptions';
   analysisFallbackReasonFlags: string[];
+  physicalSheets?: number;
+  paperSubtotal?: number;
+  printSubtotal?: number;
+  duplexSavings?: number;
+  quoteId?: string;
+  expiresAt?: string;
+  quoteHash?: string;
 }
 
 interface PreviewConfig {
@@ -1647,6 +1654,14 @@ function getSelectedQuality(): PrintQuality {
     : 'standard';
 }
 
+function getIsDuplex(): boolean {
+  return (
+    document.querySelector<HTMLInputElement>(
+      'input[name="duplex"][value="duplex"]:checked',
+    ) !== null
+  );
+}
+
 function getCopies(): number {
   const maxCopies = getMaxCopiesAllowed();
   return Math.max(
@@ -1777,7 +1792,7 @@ async function refreshPrintQuote(): Promise<void> {
       rotationDeg: cfg.rotationDeg,
       paperSize: cfg.paperSize,
       pageRange: getPageRange(),
-      duplex: false,
+      duplex: getIsDuplex(),
     };
 
     if (mode === 'print') {
@@ -1990,11 +2005,36 @@ function updateSummary(): void {
           ? parts.join(' · ')
           : `${currentPrintQuote.selectedPages} ${currentPrintQuote.selectedPages === 1 ? 'page' : 'pages'}`;
 
+      let duplexNote = '';
+      if (
+        currentPrintQuote.duplex &&
+        currentPrintQuote.duplexSavings &&
+        currentPrintQuote.duplexSavings > 0
+      ) {
+        duplexNote = ` · 2-Sided (Saved ₱${currentPrintQuote.duplexSavings})`;
+      } else if (currentPrintQuote.duplex) {
+        duplexNote = ` · 2-Sided`;
+      }
+
       footerBreakdown.textContent =
         `${pageDesc} × ` +
-        `${n} ${n === 1 ? 'copy' : 'copies'} · ` +
+        `${n} ${n === 1 ? 'copy' : 'copies'}${duplexNote} · ` +
         `${currentPrintQuote.effectiveColorMode === 'colored' ? 'Color' : 'Grayscale'} · ` +
         `${cfg.paperSize} · ${currentPrintQuote.quality === 'high' ? 'High quality' : 'Standard quality'}`;
+
+      const duplexBadge = document.getElementById('duplexSavingsBadge');
+      if (
+        currentPrintQuote.duplex &&
+        currentPrintQuote.duplexSavings &&
+        currentPrintQuote.duplexSavings > 0
+      ) {
+        if (duplexBadge) {
+          duplexBadge.textContent = `🌱 Saved ₱${currentPrintQuote.duplexSavings} on paper (${currentPrintQuote.physicalSheets ?? Math.ceil(currentPrintQuote.selectedPages / 2) * n} sheets used)`;
+          duplexBadge.style.display = 'block';
+        }
+      } else {
+        if (duplexBadge) duplexBadge.style.display = 'none';
+      }
     }
     if (footerTotal)
       footerTotal.textContent = `₱${currentPrintQuote.requiredAmount}`;
@@ -2467,7 +2507,7 @@ continueBtn?.addEventListener('click', () => {
         ? currentPrintQuote.effectiveColorMode
         : cfg.colorMode,
     quality: getSelectedQuality(),
-    duplex: false,
+    duplex: getIsDuplex(),
     copies: mode === 'scan' ? 1 : getCopies(),
     orientation: cfg.orientation,
     rotationDeg: cfg.rotationDeg,

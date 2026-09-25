@@ -12,6 +12,7 @@ export interface PhysicalPrintSelection {
   rotationDeg?: number;
   paperSize: 'A4' | 'Short' | 'Long';
   pageRange?: PageRangeSelection;
+  duplex?: boolean;
 }
 
 export function buildPhysicalPrintSettings(
@@ -27,5 +28,6 @@ export function buildPhysicalPrintSettings(
     paperSize: selection.paperSize,
     scaling: DEFAULT_PRINT_SCALING,
     pageRange: selection.pageRange ?? { type: 'all' as const },
+    duplex: selection.duplex ?? false,
   };
 }

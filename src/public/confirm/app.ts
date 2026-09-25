@@ -123,6 +123,7 @@ export interface PrintConfig {
   detectedColorMode?: 'colored' | 'grayscale' | null;
   colorMode: 'colored' | 'grayscale';
   quality?: 'standard' | 'high';
+  duplex?: boolean;
   copies: number;
   orientation: 'portrait' | 'landscape';
   rotationDeg?: number;
@@ -183,6 +184,20 @@ type PrintQuote = {
     | 'high-confidence-page-detection'
     | 'fallback-assumptions';
   analysisFallbackReasonFlags: string[];
+  physicalSheets?: number;
+  paperSubtotal?: number;
+  printSubtotal?: number;
+  duplexSavings?: number;
+  quoteId?: string;
+  expiresAt?: string;
+  quoteHash?: string;
+  pageBreakdown?: Array<{
+    pageNumber: number;
+    isColor: boolean;
+    coverage: number;
+    coverageTier: 'low' | 'medium' | 'high' | 'very_high';
+    printCost: number;
+  }>;
 };
 
 type PrintErrorSeverity = 'warning' | 'recoverable' | 'fatal';
@@ -237,6 +252,14 @@ function truncateFilename(name: string, maxLen = 32): string {
 
 const modeValue = document.getElementById('modeValue');
 const priceValue = document.getElementById('priceValue');
+const paperCostRow = document.getElementById('paperCostRow');
+const paperCostLabel = document.getElementById('paperCostLabel');
+const paperCostValue = document.getElementById('paperCostValue');
+const printCostRow = document.getElementById('printCostRow');
+const printCostValue = document.getElementById('printCostValue');
+const duplexSavingsRow = document.getElementById('duplexSavingsRow');
+const duplexSavingsValue = document.getElementById('duplexSavingsValue');
+const duplexTag = document.getElementById('duplexTag');
 const balanceValue = document.getElementById('balanceValue');
 const balanceRing = document.getElementById('balanceRing');
 const balanceArc = document.getElementById('balanceArc') as SVGCircleElement | null;
@@ -1113,6 +1136,45 @@ export function populateJobSummary(cfg: PrintConfig): void {
   if (modalQuality) {
     modalQuality.textContent =
       cfg.quality === 'high' ? 'High Quality' : 'Standard';
+  }
+
+  if (cfg.duplex) {
+    duplexTag?.removeAttribute('hidden');
+  } else {
+    duplexTag?.setAttribute('hidden', '');
+  }
+
+  if (
+    quote &&
+    quote.paperSubtotal !== undefined &&
+    quote.printSubtotal !== undefined
+  ) {
+    if (paperCostLabel) {
+      const sheets = quote.physicalSheets ?? quote.selectedPages;
+      paperCostLabel.textContent = `Paper (${sheets} ${sheets === 1 ? 'sheet' : 'sheets'})`;
+    }
+    if (paperCostValue) {
+      paperCostValue.textContent = `₱ ${quote.paperSubtotal}`;
+    }
+    paperCostRow?.removeAttribute('hidden');
+
+    if (printCostValue) {
+      printCostValue.textContent = `₱ ${quote.printSubtotal}`;
+    }
+    printCostRow?.removeAttribute('hidden');
+
+    if (quote.duplexSavings && quote.duplexSavings > 0) {
+      if (duplexSavingsValue) {
+        duplexSavingsValue.textContent = `-₱ ${quote.duplexSavings}`;
+      }
+      duplexSavingsRow?.removeAttribute('hidden');
+    } else {
+      duplexSavingsRow?.setAttribute('hidden', '');
+    }
+  } else {
+    paperCostRow?.setAttribute('hidden', '');
+    printCostRow?.setAttribute('hidden', '');
+    duplexSavingsRow?.setAttribute('hidden', '');
   }
 }
 
@@ -2497,6 +2559,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
           ...buildPhysicalPrintSettings(config, getDisplayColorMode()),
           previewPath: config.copyPreviewPath,
           spoolerCorrelationKey,
+          quoteHash: currentPrintQuote?.quoteHash ?? config.quote?.quoteHash,
         }),
       });
 
@@ -2561,6 +2624,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
           documentId: config.documentId,
           ...buildPhysicalPrintSettings(config, getDisplayColorMode()),
           spoolerCorrelationKey,
+          quoteHash: currentPrintQuote?.quoteHash ?? config.quote?.quoteHash,
         }),
       });
 
