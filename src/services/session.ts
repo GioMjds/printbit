@@ -18,17 +18,40 @@ import {
   type WirelessSessionStorageEntry,
 } from '@/core/database/sqlite-storage';
 import { discardStagedUpload, promoteStagedUpload } from '@/services/upload-staging';
+import type { CoverageTier } from '@/core/database/models/admin.model';
+export { CoverageTier };
 
-export interface DocumentPageAnalysis {
+export interface PageAnalysis {
   index: number;
   isColor: boolean;
-  coverage?: number;
-  contentCoverage?: number;
-  classification?: 'blank' | 'bw' | 'partial' | 'full_color' | 'image';
-  isImagePage?: boolean;
-  isBlank?: boolean;
+  coverage: number;             // contentCoverage (0.0 to 1.0)
+  colorCoverage: number;        // colorCoverage (0.0 to 1.0)
+  coverageTier: CoverageTier;   // 'low' | 'medium' | 'high' | 'very_high'
+  isBlank: boolean;
+  classification: 'blank' | 'bw' | 'color';
   fallbackReasonFlags?: string[];
+  contentCoverage?: number;
+  isImagePage?: boolean;
 }
+
+export function resolveCoverageTier(contentCoverage: number): CoverageTier {
+  if (contentCoverage <= 0.10) return 'low';
+  if (contentCoverage <= 0.40) return 'medium';
+  if (contentCoverage <= 0.70) return 'high';
+  return 'very_high';
+}
+
+export type DocumentPageAnalysis = PageAnalysis & {
+  coverage?: number;
+  colorCoverage?: number;
+  coverageTier?: CoverageTier;
+  isBlank?: boolean;
+  classification?: 'blank' | 'bw' | 'color' | 'partial' | 'full_color' | 'image';
+  fallbackReasonFlags?: string[];
+  contentCoverage?: number;
+  isImagePage?: boolean;
+  imageCoverage?: number;
+};
 
 export interface DocumentAnalysis {
   analysisVersion?: number;
@@ -924,42 +947,62 @@ export class SessionStore {
         typeof pageCandidate.coverage === 'number' &&
         Number.isFinite(pageCandidate.coverage)
           ? Math.max(0, Math.min(1, pageCandidate.coverage))
-          : undefined;
+          : 0;
+      const colorCoverage =
+        typeof pageCandidate.colorCoverage === 'number' &&
+        Number.isFinite(pageCandidate.colorCoverage)
+          ? Math.max(0, Math.min(1, pageCandidate.colorCoverage))
+          : 0;
       const contentCoverage =
         typeof pageCandidate.contentCoverage === 'number' &&
         Number.isFinite(pageCandidate.contentCoverage)
           ? Math.max(0, Math.min(1, pageCandidate.contentCoverage))
-          : undefined;
+          : coverage;
+      const isBlank =
+        typeof pageCandidate.isBlank === 'boolean'
+          ? pageCandidate.isBlank
+          : (contentCoverage ?? coverage) < 0.001;
+      const isColor = pageCandidate.isColor === true;
+      const coverageTier: CoverageTier =
+        pageCandidate.coverageTier === 'low' ||
+        pageCandidate.coverageTier === 'medium' ||
+        pageCandidate.coverageTier === 'high' ||
+        pageCandidate.coverageTier === 'very_high'
+          ? pageCandidate.coverageTier
+          : resolveCoverageTier(contentCoverage ?? coverage);
       const classification:
         | 'blank'
         | 'bw'
+        | 'color'
         | 'partial'
         | 'full_color'
-        | 'image'
-        | undefined =
+        | 'image' =
         pageCandidate.classification === 'blank' ||
         pageCandidate.classification === 'bw' ||
+        pageCandidate.classification === 'color' ||
         pageCandidate.classification === 'partial' ||
         pageCandidate.classification === 'full_color' ||
         pageCandidate.classification === 'image'
           ? pageCandidate.classification
-          : undefined;
-      const isBlank =
-        typeof pageCandidate.isBlank === 'boolean'
-          ? pageCandidate.isBlank
-          : undefined;
+          : isBlank
+            ? 'blank'
+            : isColor
+              ? 'color'
+              : 'bw';
       const isImagePage =
         typeof pageCandidate.isImagePage === 'boolean'
           ? pageCandidate.isImagePage
           : undefined;
       return {
         index: Math.floor(pageCandidate.index),
-        isColor: pageCandidate.isColor,
-        ...(coverage !== undefined ? { coverage } : {}),
+        isColor,
+        coverage,
+        colorCoverage,
+        coverageTier,
+        classification,
+        isBlank,
         ...(contentCoverage !== undefined ? { contentCoverage } : {}),
-        ...(classification ? { classification } : {}),
         ...(isImagePage !== undefined ? { isImagePage } : {}),
-        ...(isBlank !== undefined ? { isBlank } : {}),
         ...(fallbackReasonFlags
           ? { fallbackReasonFlags: fallbackReasonFlags as string[] }
           : {}),

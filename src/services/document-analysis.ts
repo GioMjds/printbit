@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
+import { createCanvas } from 'canvas';
 import { isMainThread, workerData, parentPort } from 'node:worker_threads';
+import type { CoverageTier } from '@/core/database/models/admin.model';
+export { CoverageTier };
 import {
   COLOR_SATURATION_THRESHOLD,
   MAX_PIXELS_TO_SAMPLE,
@@ -30,8 +33,16 @@ import {
  *   6 — ignore whitespace-only text operations and handle setFillGray/setStrokeGray in color detection
  *   7 — sample embedded images for color, exclude grayscale/monochrome icons from color, and restrict image tier to converted image uploads
  *   8 — include constructPath and rawFillPath in pathDrawingOps to recognize vector shapes and colored boxes
+ *   9 — uniform low-DPI canvas coverage metering for PDF pages and images; coverage tiers (low, medium, high, very_high)
  */
-export const ANALYSIS_ALGORITHM_VERSION = 8;
+export const ANALYSIS_ALGORITHM_VERSION = 9;
+
+export function resolveCoverageTier(contentCoverage: number): CoverageTier {
+  if (contentCoverage <= 0.10) return 'low';
+  if (contentCoverage <= 0.40) return 'medium';
+  if (contentCoverage <= 0.70) return 'high';
+  return 'very_high';
+}
 
 export type AnalyzedFileType =
   | 'pdf'
@@ -47,19 +58,15 @@ export type AnalyzedFileType =
 export interface PageAnalysis {
   index: number;
   isColor: boolean;
-  coverage?: number;
-  /**
-   * Ratio of all visible non-white content on the page.
-   * `coverage` tracks color coverage for pricing tiers; this field is used
-   * to decide whether a B/W page is genuinely near-blank.
-   */
+  coverage: number;             // contentCoverage (0.0 to 1.0)
+  colorCoverage: number;        // colorCoverage (0.0 to 1.0)
+  coverageTier: CoverageTier;   // 'low' | 'medium' | 'high' | 'very_high'
+  isBlank: boolean;
+  classification: 'blank' | 'bw' | 'color';
+  fallbackReasonFlags?: string[];
   contentCoverage?: number;
-  classification?: 'blank' | 'bw' | 'partial' | 'full_color' | 'image';
-  /** True when the source file is a raster image (uploaded image file). Used for photo/image pricing tier. */
   isImagePage?: boolean;
   imageCoverage?: number;
-  isBlank?: boolean;
-  fallbackReasonFlags?: string[];
 }
 
 export type AnalysisConfidence = 'high' | 'medium' | 'low';
@@ -233,31 +240,8 @@ async function analyzeImage(
   filePath: string,
   colorDetectionEnabled: boolean = true,
 ): Promise<DocumentAnalysisResult> {
-  if (!colorDetectionEnabled) {
-    const page: PageAnalysis = {
-      index: 1,
-      isColor: false,
-      coverage: 0,
-      contentCoverage: 0,
-      classification: 'bw',
-      isImagePage: true,
-      imageCoverage: 1.0,
-      isBlank: false,
-    };
-
-    return {
-      fileType: 'image',
-      pageCount: 1,
-      pages: [page],
-      colorPages: 0,
-      bwPages: 1,
-      totalPages: 1,
-      confidence: 'high',
-      analysisVersion: ANALYSIS_ALGORITHM_VERSION,
-    };
-  }
-
-  const { data, info } = await sharp(filePath)
+  const { data, info } = await (sharp as any)(filePath)
+    .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
@@ -267,21 +251,23 @@ async function analyzeImage(
     height: info.height,
   });
   const isBlank = metrics.contentCoverage < 0.001;
-  const isColor = !isBlank && metrics.colorCoverage > 0.05; // Threshold: > 5% color pixels = colored page
+  const isColor = colorDetectionEnabled && !isBlank && metrics.colorCoverage > 0.02;
+  const coverageTier = resolveCoverageTier(metrics.contentCoverage);
+  const classification: 'blank' | 'bw' | 'color' = isBlank
+    ? 'blank'
+    : isColor
+      ? 'color'
+      : 'bw';
 
   const page: PageAnalysis = {
     index: 1,
     isColor,
-    coverage: metrics.colorCoverage,
-    contentCoverage: metrics.contentCoverage,
-    classification: isBlank
-      ? 'blank'
-      : isColor
-        ? 'image' // Source-file images always get photo/image pricing tier
-        : 'bw',
-    isImagePage: !isBlank, // Mark as image page for photo pricing (blank images are excluded)
-    imageCoverage: isBlank ? 0 : 1.0,
+    coverage: metrics.contentCoverage,
+    colorCoverage: colorDetectionEnabled ? metrics.colorCoverage : 0,
+    coverageTier,
     isBlank,
+    classification,
+    contentCoverage: metrics.contentCoverage,
   };
 
   return {
@@ -302,7 +288,29 @@ async function analyzePdfFile(
   colorDetectionEnabled: boolean = true,
   options?: { isOriginalImage?: boolean },
 ): Promise<DocumentAnalysisResult> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  let pdfjs: any;
+  let canvasFactory: (w: number, h: number) => any = createCanvas;
+  try {
+    const mod = (process as any).getBuiltinModule
+      ? (process as any).getBuiltinModule('node:module')
+      : require('node:module');
+    const nativeRequire = mod.createRequire(
+      typeof __filename !== 'undefined' ? __filename : path.join(process.cwd(), 'index.js'),
+    );
+    pdfjs = nativeRequire('pdfjs-dist/legacy/build/pdf.mjs');
+    try {
+      const pdfjsPath = nativeRequire.resolve('pdfjs-dist/legacy/build/pdf.mjs');
+      const pdfjsReq = mod.createRequire(pdfjsPath);
+      const napiCanvas = pdfjsReq('@napi-rs/canvas');
+      if (napiCanvas && typeof napiCanvas.createCanvas === 'function') {
+        canvasFactory = (w: number, h: number) => napiCanvas.createCanvas(w, h);
+      }
+    } catch {
+      // Keep default createCanvas
+    }
+  } catch {
+    pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  }
   const data = new Uint8Array(await fs.promises.readFile(pdfPath));
   const loadingTask = pdfjs.getDocument({ data, verbosity: 0 });
   const doc = await loadingTask.promise;
@@ -312,27 +320,15 @@ async function analyzePdfFile(
     await loadingTask.destroy();
     const pages: PageAnalysis[] = [];
     for (let pageNum = 1; pageNum <= totalPages; pageNum += 1) {
-      const isBlank = false;
-      const isColor = false;
       pages.push({
         index: pageNum,
         isColor: false,
         coverage: 0,
-        contentCoverage: 0,
-        classification: options?.isOriginalImage
-          ? isBlank
-            ? 'blank'
-            : isColor
-              ? 'image'
-              : 'bw'
-          : 'bw',
+        colorCoverage: 0,
+        coverageTier: 'low',
+        classification: 'bw',
         isBlank: false,
-        ...(options?.isOriginalImage
-          ? {
-              isImagePage: !isBlank,
-              imageCoverage: isBlank ? 0 : 1.0,
-            }
-          : {}),
+        contentCoverage: 0,
       });
     }
     return {
@@ -378,42 +374,76 @@ async function analyzePdfFile(
     for (let pageNum = 1; pageNum <= totalPages; pageNum += 1) {
       const page = await doc.getPage(pageNum);
       let coverage = 0;
+      let colorCoverage = 0;
       let isColor = false;
-      let classification: 'blank' | 'bw' | 'partial' | 'full_color' | 'image' = 'bw';
-      let isBlank = true;
-      let isImagePage = false;
-      let imageCoverage = 0;
+      let isBlank = false;
+      let coverageTier: CoverageTier = 'low';
+      let classification: 'blank' | 'bw' | 'color' = 'bw';
+      const fallbackFlags: string[] = [];
 
       try {
-        const viewport = page.getViewport({ scale: 1 });
-        const opList = (await page.getOperatorList()) as PdfOperatorList;
-        const analysis = await analyzePageOperatorList(
-          opList,
-          ops,
-          textRenderOps,
-          textStructuralOps,
-          {
-            pageWidth: viewport.width,
-            pageHeight: viewport.height,
-            isOriginalImage: options?.isOriginalImage,
-            page,
-          },
-        );
-        coverage = analysis.coverage;
-        isColor = analysis.hasColor;
-        isBlank = analysis.isBlank;
-        classification = analysis.classification;
-        isImagePage = Boolean(analysis.isImagePage);
-        imageCoverage = analysis.imageCoverage ?? 0;
-      } catch (error) {
+        const viewport = page.getViewport({ scale: 0.5 });
+        const canvas = canvasFactory(Math.ceil(viewport.width), Math.ceil(viewport.height));
+        const ctx = canvas.getContext('2d');
+        await (page.render as any)({
+          canvasContext: ctx as any,
+          viewport,
+          canvas: canvas as any,
+        }).promise;
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const metrics = computeFrameMetrics({
+          data: imgData.data,
+          width: canvas.width,
+          height: canvas.height,
+        });
+
+        isBlank = metrics.contentCoverage < 0.001;
+        isColor = !isBlank && metrics.colorCoverage > 0.02;
+        coverageTier = resolveCoverageTier(metrics.contentCoverage);
+        classification = isBlank ? 'blank' : isColor ? 'color' : 'bw';
+        coverage = metrics.contentCoverage;
+        colorCoverage = metrics.colorCoverage;
+      } catch (canvasErr) {
         console.warn(
-          `[document-analysis] Page ${pageNum} operator scan failed; defaulting to colored.`,
-          error,
+          `[document-analysis] Page ${pageNum} canvas render failed; falling back to operator list scan.`,
+          canvasErr,
         );
-        coverage = 1;
-        isColor = true;
-        classification = 'full_color';
+        fallbackFlags.push('canvas_render_failed_fallback_operator_scan');
         fallbackPageCount += 1;
+
+        try {
+          const viewport = page.getViewport({ scale: 1 });
+          const opList = (await page.getOperatorList()) as PdfOperatorList;
+          const analysis = await analyzePageOperatorList(
+            opList,
+            ops,
+            textRenderOps,
+            textStructuralOps,
+            {
+              pageWidth: viewport.width,
+              pageHeight: viewport.height,
+              page,
+            },
+          );
+          coverage = analysis.coverage;
+          colorCoverage = analysis.hasColor ? analysis.coverage : 0;
+          isColor = analysis.hasColor;
+          isBlank = analysis.isBlank;
+          coverageTier = resolveCoverageTier(coverage);
+          classification = isBlank ? 'blank' : isColor ? 'color' : 'bw';
+        } catch (opErr) {
+          console.warn(
+            `[document-analysis] Page ${pageNum} operator scan failed; defaulting to colored.`,
+            opErr,
+          );
+          fallbackFlags.push('operator_scan_failed_default_color');
+          coverage = 1;
+          colorCoverage = 1;
+          isColor = true;
+          isBlank = false;
+          coverageTier = 'very_high';
+          classification = 'color';
+        }
       } finally {
         page.cleanup();
       }
@@ -422,15 +452,14 @@ async function analyzePdfFile(
         index: pageNum,
         isColor,
         coverage,
-        contentCoverage: coverage,
+        colorCoverage,
+        coverageTier,
         classification,
         isBlank,
-        isImagePage,
-        imageCoverage,
-        fallbackReasonFlags:
-          fallbackPageCount > 0
-            ? ['operator_scan_failed_default_color']
-            : undefined,
+        contentCoverage: coverage,
+        ...(fallbackFlags.length > 0
+          ? { fallbackReasonFlags: fallbackFlags }
+          : {}),
       });
     }
   } finally {
@@ -798,9 +827,7 @@ async function analyzeDocumentDirect(
     fileType === 'pdf' ||
     (fileType === 'image' && path.extname(input.filePath).toLowerCase() === '.pdf')
   ) {
-    return analyzePdfFile(input.filePath, fileType, colorDetectionEnabled, {
-      isOriginalImage: fileType === 'image',
-    });
+    return analyzePdfFile(input.filePath, fileType, colorDetectionEnabled);
   }
 
   if (
