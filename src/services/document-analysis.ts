@@ -167,7 +167,8 @@ export function resolveFileType(
     ext === '.jpg' ||
     ext === '.jpeg' ||
     ext === '.png' ||
-    ext === '.webp'
+    ext === '.webp' ||
+    ext === '.gif'
   ) {
     return 'image';
   }

@@ -1326,16 +1326,28 @@ export class WirelessSessionService {
     }
     const target = targetLookup.target;
     const absoluteFilePath = path.resolve(target.filePath);
+    const targetExt = path.extname(target.filename).toLowerCase();
+    const isOriginalImage =
+      target.contentType.startsWith('image/') ||
+      ['.jpg', '.jpeg', '.png', '.gif'].includes(targetExt);
+    const originalFileType = isOriginalImage
+      ? 'image'
+      : resolveFileType(target.contentType, target.filename);
+
     let analysisFilePath: string;
-    try {
-      analysisFilePath = await this.resolveCanonicalPdfPath(sessionId, target);
-    } catch (error) {
-      const reason =
-        error instanceof Error ? error.message : 'Unknown conversion error';
-      return {
-        error: `Document conversion failed before analysis: ${reason}`,
-        status: 422,
-      };
+    if (isOriginalImage) {
+      analysisFilePath = absoluteFilePath;
+    } else {
+      try {
+        analysisFilePath = await this.resolveCanonicalPdfPath(sessionId, target);
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : 'Unknown conversion error';
+        return {
+          error: `Document conversion failed before analysis: ${reason}`,
+          status: 422,
+        };
+      }
     }
     const configFingerprint = this.buildPricingConfigFingerprint();
     const fileHash = await this.computeFileHash(absoluteFilePath);
@@ -1380,19 +1392,12 @@ export class WirelessSessionService {
       }
     }
 
-    const isOriginalImage =
-      target.contentType.startsWith('image/') ||
-      ['.jpg', '.jpeg', '.png'].includes(
-        path.extname(target.filename).toLowerCase(),
-      );
-    const originalFileType = isOriginalImage
-      ? 'image'
-      : resolveFileType(target.contentType, target.filename);
-
     const analysis = await analyzeDocument({
       filePath: analysisFilePath,
-      contentType: 'application/pdf',
-      filename: `${path.basename(target.filename, path.extname(target.filename))}.pdf`,
+      contentType: isOriginalImage ? target.contentType : 'application/pdf',
+      filename: isOriginalImage
+        ? target.filename
+        : `${path.basename(target.filename, path.extname(target.filename))}.pdf`,
       originalFileType,
     });
 
