@@ -242,6 +242,33 @@ export class FeedbackSqliteStore {
     };
   }
 
+  countOpen(): number {
+    const db = getSqliteDb();
+    const row = db
+      .prepare(
+        "SELECT COUNT(*) AS total FROM feedback_entries WHERE status = 'open'",
+      )
+      .get() as { total?: unknown };
+    return Number(row?.total ?? 0);
+  }
+
+  getFeedbackStats(): { total: number; open: number; resolved: number } {
+    const db = getSqliteDb();
+    const rows = db
+      .prepare(
+        'SELECT status, COUNT(*) AS count FROM feedback_entries GROUP BY status',
+      )
+      .all() as { status?: unknown; count?: unknown }[];
+    let open = 0;
+    let resolved = 0;
+    for (const row of rows) {
+      const count = Number(row.count ?? 0);
+      if (row.status === 'open') open += count;
+      else if (row.status === 'resolved') resolved += count;
+    }
+    return { total: open + resolved, open, resolved };
+  }
+
   findFeedbackById(feedbackId: string): FeedbackEntry | null {
     const row = getSqliteDb()
       .prepare(

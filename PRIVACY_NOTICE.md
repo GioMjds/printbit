@@ -161,17 +161,17 @@ PrintBit retains personal information only for as long as it is necessary for th
 
 PrintBit should apply the following retention schedule:
 
-**Temporary uploaded/printed files:** [Insert actual period, e.g. immediately after completion / X minutes or hours]
+**Temporary uploaded/printed files:** Immediately after completion of the transaction
 
-**Scanned documents:** [Insert actual period]
+**Scanned documents:** Immediately after completion of the transaction
 
-**QR document retrieval data:** [Insert actual period]
+**QR document retrieval data:** Immediately after the configured retrieval period
 
-**Transaction records:** [Insert actual period]
+**Transaction records:** Immediately after the configured retention period
 
-**Operational and error logs:** [Insert actual period]
+**Operational and error logs:** Immediately after the configured retention period
 
-**Administrative records:** [Insert actual period]
+**Administrative records:** Immediately after the configured retention period
 
 After the applicable retention period, personal information and temporary files should be securely deleted, anonymized, or otherwise disposed of in a manner that prevents unauthorized recovery or further processing.
 

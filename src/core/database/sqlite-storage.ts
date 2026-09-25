@@ -103,6 +103,10 @@ function openSqliteDatabase(): DatabaseSync {
   const db = new DatabaseSync(SQLITE_FILE_PATH);
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA synchronous = NORMAL;');
+  db.exec('PRAGMA cache_size = -64000;');
+  db.exec('PRAGMA temp_store = MEMORY;');
+  db.exec('PRAGMA mmap_size = 268435456;');
   db.exec('PRAGMA busy_timeout = 5000;');
   return db;
 }
@@ -161,7 +165,9 @@ function ensureSchema(db: DatabaseSync): void {
       timestamp_meta_json TEXT,
       type TEXT NOT NULL,
       message TEXT NOT NULL,
-      meta_json TEXT
+      meta_json TEXT,
+      is_transaction INTEGER NOT NULL DEFAULT 0,
+      transaction_id TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_admin_logs_timestamp
       ON admin_logs(timestamp DESC);
@@ -214,6 +220,8 @@ function ensureSchema(db: DatabaseSync): void {
       ON feedback_entries(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_feedback_entries_status
       ON feedback_entries(status);
+    CREATE INDEX IF NOT EXISTS idx_feedback_entries_status_timestamp
+      ON feedback_entries(status, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_feedback_entries_session_id
       ON feedback_entries(session_id);
 
@@ -247,8 +255,12 @@ function ensureSchema(db: DatabaseSync): void {
       ON report_issue_entries(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_report_issue_entries_status
       ON report_issue_entries(status);
+    CREATE INDEX IF NOT EXISTS idx_report_issue_entries_status_timestamp
+      ON report_issue_entries(status, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_report_issue_entries_category
       ON report_issue_entries(category);
+    CREATE INDEX IF NOT EXISTS idx_report_issue_entries_category_timestamp
+      ON report_issue_entries(category, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_report_issue_entries_session_id
       ON report_issue_entries(session_id);
 
@@ -583,6 +595,33 @@ function ensureSchema(db: DatabaseSync): void {
     );
     appliedMigrations.push('pricing_analysis_cache.algorithm_version');
   }
+
+  const adminLogColumnRows = db
+    .prepare('PRAGMA table_info(admin_logs)')
+    .all() as Record<string, unknown>[];
+  const adminLogColumns = new Set(
+    adminLogColumnRows
+      .map((row) => (typeof row.name === 'string' ? row.name : ''))
+      .filter((name) => name.length > 0),
+  );
+  if (!adminLogColumns.has('is_transaction')) {
+    db.exec(
+      'ALTER TABLE admin_logs ADD COLUMN is_transaction INTEGER NOT NULL DEFAULT 0',
+    );
+    appliedMigrations.push('admin_logs.is_transaction');
+  }
+  if (!adminLogColumns.has('transaction_id')) {
+    db.exec('ALTER TABLE admin_logs ADD COLUMN transaction_id TEXT');
+    appliedMigrations.push('admin_logs.transaction_id');
+  }
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_admin_logs_is_tx_ts ON admin_logs(is_transaction, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_admin_logs_tx_id ON admin_logs(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_feedback_entries_status_timestamp ON feedback_entries(status, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_report_issue_entries_status_timestamp ON report_issue_entries(status, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_report_issue_entries_category_timestamp ON report_issue_entries(category, timestamp DESC);
+  `);
 
   if (appliedMigrations.length > 0) {
     console.info(

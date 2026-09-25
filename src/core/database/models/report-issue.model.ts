@@ -389,6 +389,45 @@ export class ReportIssueSqliteStore {
     };
   }
 
+  countOpen(): number {
+    const db = getSqliteDb();
+    const row = db
+      .prepare(
+        "SELECT COUNT(*) AS total FROM report_issue_entries WHERE status != 'resolved'",
+      )
+      .get() as { total?: unknown };
+    return Number(row?.total ?? 0);
+  }
+
+  getReportIssueStats(): {
+    total: number;
+    open: number;
+    acknowledged: number;
+    resolved: number;
+  } {
+    const db = getSqliteDb();
+    const rows = db
+      .prepare(
+        'SELECT status, COUNT(*) AS count FROM report_issue_entries GROUP BY status',
+      )
+      .all() as { status?: unknown; count?: unknown }[];
+    let open = 0;
+    let acknowledged = 0;
+    let resolved = 0;
+    for (const row of rows) {
+      const count = Number(row.count ?? 0);
+      if (row.status === 'open') open += count;
+      else if (row.status === 'acknowledged') acknowledged += count;
+      else if (row.status === 'resolved') resolved += count;
+    }
+    return {
+      total: open + acknowledged + resolved,
+      open,
+      acknowledged,
+      resolved,
+    };
+  }
+
   getReportIssueById(id: string): ReportIssueEntry | null {
     const row = getSqliteDb()
       .prepare(

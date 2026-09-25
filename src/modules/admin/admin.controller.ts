@@ -81,6 +81,8 @@ import { ReceiptService, type ReceiptPayload } from '@/modules/receipt';
 import {
   ADMIN_TEST_PAGE_USAGE_SOURCE,
   consumablesStore,
+  feedbackStore,
+  reportIssueStore,
   getSqliteDb,
   writeRuntimeState,
 } from '@/core/database/sqlite-storage';
@@ -897,12 +899,8 @@ export class AdminController {
     const anomalyOpenCount = db.data!.anomalyIncidents.filter(
       (entry) => entry.status === 'open',
     ).length;
-    const feedbackOpenCount = (db.data!.feedback ?? []).filter(
-      (entry) => entry.status === 'open',
-    ).length;
-    const reportIssuesOpenCount = (db.data!.reportIssues ?? []).filter(
-      (entry) => entry.status === 'open',
-    ).length;
+    const feedbackOpenCount = feedbackStore.countOpen();
+    const reportIssuesOpenCount = reportIssueStore.countOpen();
     const pendingRefunds = db.data!.pendingRefunds ?? [];
     const openRefunds = pendingRefunds.filter(
       (entry) => entry.status === 'open',
@@ -1038,11 +1036,11 @@ export class AdminController {
           openCount: anomalyOpenCount,
         },
         feedbackStats: {
-          totalCount: (db.data!.feedback ?? []).length,
+          totalCount: feedbackStore.getFeedbackStats().total,
           openCount: feedbackOpenCount,
         },
         reportStats: {
-          totalCount: (db.data!.reportIssues ?? []).length,
+          totalCount: reportIssueStore.getReportIssueStats().total,
           openCount: reportIssuesOpenCount,
         },
         recoveryStats: {
@@ -1102,11 +1100,11 @@ export class AdminController {
           openCount: anomalyOpenCount,
         },
         feedbackStats: {
-          totalCount: (db.data!.feedback ?? []).length,
+          totalCount: feedbackStore.getFeedbackStats().total,
           openCount: feedbackOpenCount,
         },
         reportStats: {
-          totalCount: (db.data!.reportIssues ?? []).length,
+          totalCount: reportIssueStore.getReportIssueStats().total,
           openCount: reportIssuesOpenCount,
         },
         recoveryStats: {

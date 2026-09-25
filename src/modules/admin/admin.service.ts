@@ -424,11 +424,11 @@ export class AdminService {
   }
 
   listSystemLogs(limit: number): AdminLogEntry[] {
-    return this.listAllSystemLogs().slice(0, this.normalizeLimit(limit));
+    return adminLogStore.listSystemLogs(this.normalizeLimit(limit));
   }
 
   listAllSystemLogs(): AdminLogEntry[] {
-    return this.listAllLogs().filter((entry) => !this.isTransactionLog(entry));
+    return adminLogStore.listAllSystemLogs();
   }
 
   listTransactionLogs(
@@ -442,40 +442,44 @@ export class AdminService {
   }
 
   listAllTransactionLogs(filters: TransactionLogFilters): AdminLogEntry[] {
-    const logs = this.filterTransactionLogs(
-      this.listAllLogs().filter((entry) => this.isTransactionLog(entry)),
-      filters,
-    );
+    const rawTxLogs = adminLogStore.listAllTransactionLogs();
+    const logs = this.filterTransactionLogs(rawTxLogs, filters);
     return this.groupLogsByTransaction(logs);
   }
 
   private groupLogsByTransaction(logs: AdminLogEntry[]): AdminLogEntry[] {
-    const groups = new Map<string, AdminLogEntry[]>();
+    const groups = new Map<
+      string,
+      { latest: AdminLogEntry; earliestTs: string }
+    >();
     const withoutId: AdminLogEntry[] = [];
 
     for (const log of logs) {
       const id = this.getTransactionId(log);
       if (id) {
-        if (!groups.has(id)) groups.set(id, []);
-        groups.get(id)!.push(log);
+        const existing = groups.get(id);
+        if (!existing) {
+          groups.set(id, { latest: log, earliestTs: log.timestamp });
+        } else {
+          if (log.timestamp < existing.earliestTs) {
+            existing.earliestTs = log.timestamp;
+          }
+        }
       } else {
         withoutId.push(log);
       }
     }
 
     const grouped: AdminLogEntry[] = [];
-    for (const txLogs of groups.values()) {
-      txLogs.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
-      const latest = txLogs[0];
-      const earliest = txLogs[txLogs.length - 1];
+    for (const { latest, earliestTs } of groups.values()) {
       grouped.push({
         ...latest,
-        timestamp: earliest.timestamp,
+        timestamp: earliestTs,
       });
     }
 
-    return [...grouped, ...withoutId].sort(
-      (a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp),
+    return [...grouped, ...withoutId].sort((a, b) =>
+      b.timestamp < a.timestamp ? -1 : b.timestamp > a.timestamp ? 1 : 0,
     );
   }
 
@@ -502,17 +506,11 @@ export class AdminService {
   }
 
   clearSystemLogs(): number {
-    return adminLogStore.deleteByIds(
-      this.listAllSystemLogs().map((entry) => entry.id),
-    );
+    return adminLogStore.clearSystemLogs();
   }
 
   clearTransactionLogs(): number {
-    return adminLogStore.deleteByIds(
-      this.listAllLogs()
-        .filter((entry) => this.isTransactionLog(entry))
-        .map((entry) => entry.id),
-    );
+    return adminLogStore.clearTransactionLogs();
   }
 
   async incrementCoinStats(coinValue: number): Promise<void> {

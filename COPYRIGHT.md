@@ -28,9 +28,12 @@ its contributors. The project encompasses:
 
 ## Contributors
 
-| Name                      | GitHub                                 | Contribution   |
-| ------------------------- | -------------------------------------- | -------------- |
-| Gio Majadas               | [@GioMjds](https://github.com/GioMjds) | Lead Developer |
+| Name            | Contribution   |
+| --------------- | -------------- |
+| Gio Majadas     | Lead Developer |
+| Harold Aldovino | Developer      |
+| Ryan Anin       | Documentation  |
+| Ben Dela Torre  | Documentation  |
 
 ---
 
@@ -43,9 +46,8 @@ own license for terms of use.
 
 Notable third-party tools used at runtime:
 
-- **ClamAV** — Copyright © Cisco Systems, Inc. Licensed under GPL-2.0.
 - **pdfjs-dist** — Copyright © Mozilla Foundation. Licensed under Apache 2.0.
-- **SumatraPDF / pdf-to-printer** — Copyright © their respective authors.
+- **SumatraPDF** — Copyright © their respective authors.
 - **LibreOffice** (optional headless rendering) — Copyright © The Document
   Foundation. Licensed under MPL-2.0.
 

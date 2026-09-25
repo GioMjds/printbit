@@ -17,11 +17,14 @@ export interface PricingSettings {
 
 export type PricingEngineRoundingMode = 'whole_peso_total_only';
 
-export interface PricingEnginePaperProfile {
+export interface PaperPricingProfile {
   baseBwPrice: number;
   baseColorPrice: number;
   baseImagePrice: number;
+  baseImageBwPrice: number;
 }
+
+export type PricingEnginePaperProfile = PaperPricingProfile;
 
 export interface PricingEngineBulkDiscountTier {
   minPages: number;
@@ -247,11 +250,56 @@ function changesFromRun(result: unknown): number {
     : 0;
 }
 
+export function classifyLogTransaction(
+  type: string,
+  meta?: LogMeta | null,
+): { isTransaction: boolean; transactionId: string | null } {
+  const rawTxId =
+    meta?.transactionId ??
+    meta?.transaction_id ??
+    (meta?.jobId ? String(meta.jobId) : null);
+  const txId =
+    typeof rawTxId === 'string' && rawTxId.trim().length > 0
+      ? rawTxId.trim()
+      : null;
+
+  if (txId) return { isTransaction: true, transactionId: txId };
+
+  const mode = meta?.mode;
+  if (mode === 'print' || mode === 'copy' || mode === 'scan') {
+    return { isTransaction: true, transactionId: null };
+  }
+
+  const lowerType = type.toLowerCase();
+  if (
+    lowerType === 'hopper_dispense_failed' ||
+    lowerType === 'trusted_time_unsynced'
+  ) {
+    return { isTransaction: true, transactionId: null };
+  }
+
+  const isTxPrefix =
+    lowerType.startsWith('print_') ||
+    lowerType.startsWith('copy_') ||
+    lowerType.startsWith('scan_') ||
+    lowerType.startsWith('payment_') ||
+    lowerType.startsWith('refund_') ||
+    lowerType.startsWith('settlement_');
+
+  return { isTransaction: isTxPrefix, transactionId: null };
+}
+
 export class AdminLogSqliteStore {
+  private appendCounter = 0;
+
   append(entry: AdminLogEntry, maxRows: number): void {
     try {
       withTransaction(() => {
         const db = getSqliteDb();
+        const { isTransaction, transactionId } = classifyLogTransaction(
+          entry.type,
+          entry.meta,
+        );
         db.prepare(
           `INSERT INTO admin_logs (
             id,
@@ -259,8 +307,10 @@ export class AdminLogSqliteStore {
             timestamp_meta_json,
             type,
             message,
-            meta_json
-          ) VALUES (?, ?, ?, ?, ?, ?)`,
+            meta_json,
+            is_transaction,
+            transaction_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           entry.id,
           entry.timestamp,
@@ -268,16 +318,22 @@ export class AdminLogSqliteStore {
           entry.type,
           entry.message,
           jsonOrNull(entry.meta),
+          isTransaction ? 1 : 0,
+          transactionId,
         );
-        db.prepare(
-          `DELETE FROM admin_logs
-           WHERE rowid NOT IN (
-             SELECT rowid
-             FROM admin_logs
-             ORDER BY timestamp DESC, rowid DESC
-             LIMIT ?
-           )`,
-        ).run(Math.max(1, Math.floor(maxRows)));
+
+        this.appendCounter++;
+        if (this.appendCounter % 50 === 0) {
+          db.prepare(
+            `DELETE FROM admin_logs
+             WHERE rowid NOT IN (
+               SELECT rowid
+               FROM admin_logs
+               ORDER BY timestamp DESC, rowid DESC
+               LIMIT ?
+             )`,
+          ).run(Math.max(1, Math.floor(maxRows)));
+        }
       });
     } catch (error) {
       console.error('[SQLITE] Failed to append admin log.', {
@@ -286,6 +342,81 @@ export class AdminLogSqliteStore {
       });
       throw error;
     }
+  }
+
+  listSystemLogs(limit: number): AdminLogEntry[] {
+    const db = getSqliteDb();
+    const rows = db
+      .prepare(
+        `SELECT
+          id,
+          timestamp,
+          timestamp_meta_json,
+          type,
+          message,
+          meta_json
+         FROM admin_logs
+         WHERE is_transaction = 0
+         ORDER BY timestamp DESC, rowid DESC
+         LIMIT ?`,
+      )
+      .all(Math.max(1, Math.floor(limit))) as Record<string, unknown>[];
+
+    return rows.map((row) => this.toLogEntry(row));
+  }
+
+  listAllSystemLogs(): AdminLogEntry[] {
+    const db = getSqliteDb();
+    const rows = db
+      .prepare(
+        `SELECT
+          id,
+          timestamp,
+          timestamp_meta_json,
+          type,
+          message,
+          meta_json
+         FROM admin_logs
+         WHERE is_transaction = 0
+         ORDER BY timestamp DESC, rowid DESC`,
+      )
+      .all() as Record<string, unknown>[];
+
+    return rows.map((row) => this.toLogEntry(row));
+  }
+
+  listAllTransactionLogs(): AdminLogEntry[] {
+    const db = getSqliteDb();
+    const rows = db
+      .prepare(
+        `SELECT
+          id,
+          timestamp,
+          timestamp_meta_json,
+          type,
+          message,
+          meta_json
+         FROM admin_logs
+         WHERE is_transaction = 1
+         ORDER BY timestamp DESC, rowid DESC`,
+      )
+      .all() as Record<string, unknown>[];
+
+    return rows.map((row) => this.toLogEntry(row));
+  }
+
+  clearSystemLogs(): number {
+    const result = getSqliteDb()
+      .prepare('DELETE FROM admin_logs WHERE is_transaction = 0')
+      .run();
+    return changesFromRun(result);
+  }
+
+  clearTransactionLogs(): number {
+    const result = getSqliteDb()
+      .prepare('DELETE FROM admin_logs WHERE is_transaction = 1')
+      .run();
+    return changesFromRun(result);
   }
 
   list(limit: number): AdminLogEntry[] {

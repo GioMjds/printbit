@@ -65,6 +65,7 @@ import {
   PricingSettings,
   PricingEngineRoundingMode,
   PricingEnginePaperProfile,
+  PaperPricingProfile,
   PricingEngineBulkDiscountTier,
   PricingEngineSettings,
   InkTelemetryUnknownPolicy,
@@ -103,6 +104,7 @@ export {
   PricingSettings,
   PricingEngineRoundingMode,
   PricingEnginePaperProfile,
+  PaperPricingProfile,
   PricingEngineBulkDiscountTier,
   PricingEngineSettings,
   InkTelemetryUnknownPolicy,
@@ -259,6 +261,32 @@ export type Schema = {
   inkRefillBaseline: InkRefillBaseline;
 };
 
+export const defaultPricingEngine: PricingEngineSettings = {
+  paperProfiles: {
+    a4: {
+      baseBwPrice: 3,
+      baseColorPrice: 18,
+      baseImagePrice: 25,
+      baseImageBwPrice: 10,
+    },
+    shortBond: {
+      baseBwPrice: 3,
+      baseColorPrice: 18,
+      baseImagePrice: 25,
+      baseImageBwPrice: 10,
+    },
+    longBond: {
+      baseBwPrice: 4,
+      baseColorPrice: 20,
+      baseImagePrice: 30,
+      baseImageBwPrice: 12,
+    },
+  },
+  bulkDiscountTiers: [],
+  rounding: 'whole_peso_total_only',
+  highQualitySurcharge: 2,
+};
+
 const DEFAULT_DATA: Schema = {
   adminLockout: {
     failedAttempts: 0,
@@ -274,28 +302,7 @@ const DEFAULT_DATA: Schema = {
       colorSurcharge: 2,
       highQualitySurcharge: 2,
     },
-    pricingEngine: {
-      paperProfiles: {
-        a4: {
-          baseBwPrice: 3,
-          baseColorPrice: 18,
-          baseImagePrice: 25,
-        },
-        shortBond: {
-          baseBwPrice: 3,
-          baseColorPrice: 18,
-          baseImagePrice: 25,
-        },
-        longBond: {
-          baseBwPrice: 4,
-          baseColorPrice: 20,
-          baseImagePrice: 30,
-        },
-      },
-      bulkDiscountTiers: [],
-      rounding: 'whole_peso_total_only',
-      highQualitySurcharge: 2,
-    },
+    pricingEngine: defaultPricingEngine,
     idleTimeoutSeconds: 120,
     idleScreenTimeoutSeconds: 30,
     adminPin:
@@ -516,6 +523,96 @@ function normalizePricingEngineBulkDiscountTiers(
   }
   normalized.sort((a, b) => a.minPages - b.minPages);
   return normalized;
+}
+
+function normalizeProfilePrice(value: unknown, fallback: number): number {
+  if (value === null || value === undefined) return fallback;
+  const num = typeof value === 'number' ? value : Number(value);
+  return Math.max(0, Math.floor(Number.isFinite(num) ? num : fallback));
+}
+
+export function normalizePricingEngine(
+  rawPricingEngine: unknown,
+): PricingEngineSettings {
+  const candidate = (
+    typeof rawPricingEngine === 'object' && rawPricingEngine !== null
+      ? rawPricingEngine
+      : {}
+  ) as Partial<PricingEngineSettings>;
+
+  const a4 = candidate.paperProfiles?.a4;
+  const shortBond = candidate.paperProfiles?.shortBond;
+  const longBond = candidate.paperProfiles?.longBond;
+
+  return {
+    paperProfiles: {
+      a4: {
+        baseBwPrice: normalizeProfilePrice(
+          a4?.baseBwPrice,
+          defaultPricingEngine.paperProfiles.a4.baseBwPrice,
+        ),
+        baseColorPrice: normalizeProfilePrice(
+          a4?.baseColorPrice,
+          defaultPricingEngine.paperProfiles.a4.baseColorPrice,
+        ),
+        baseImagePrice: normalizeProfilePrice(
+          a4?.baseImagePrice,
+          defaultPricingEngine.paperProfiles.a4.baseImagePrice,
+        ),
+        baseImageBwPrice: normalizeProfilePrice(
+          a4?.baseImageBwPrice,
+          defaultPricingEngine.paperProfiles.a4.baseImageBwPrice,
+        ),
+      },
+      shortBond: {
+        baseBwPrice: normalizeProfilePrice(
+          shortBond?.baseBwPrice,
+          defaultPricingEngine.paperProfiles.shortBond.baseBwPrice,
+        ),
+        baseColorPrice: normalizeProfilePrice(
+          shortBond?.baseColorPrice,
+          defaultPricingEngine.paperProfiles.shortBond.baseColorPrice,
+        ),
+        baseImagePrice: normalizeProfilePrice(
+          shortBond?.baseImagePrice,
+          defaultPricingEngine.paperProfiles.shortBond.baseImagePrice,
+        ),
+        baseImageBwPrice: normalizeProfilePrice(
+          shortBond?.baseImageBwPrice,
+          defaultPricingEngine.paperProfiles.shortBond.baseImageBwPrice,
+        ),
+      },
+      longBond: {
+        baseBwPrice: normalizeProfilePrice(
+          longBond?.baseBwPrice,
+          defaultPricingEngine.paperProfiles.longBond.baseBwPrice,
+        ),
+        baseColorPrice: normalizeProfilePrice(
+          longBond?.baseColorPrice,
+          defaultPricingEngine.paperProfiles.longBond.baseColorPrice,
+        ),
+        baseImagePrice: normalizeProfilePrice(
+          longBond?.baseImagePrice,
+          defaultPricingEngine.paperProfiles.longBond.baseImagePrice,
+        ),
+        baseImageBwPrice: normalizeProfilePrice(
+          longBond?.baseImageBwPrice,
+          defaultPricingEngine.paperProfiles.longBond.baseImageBwPrice,
+        ),
+      },
+    },
+    bulkDiscountTiers: normalizePricingEngineBulkDiscountTiers(
+      candidate.bulkDiscountTiers,
+      defaultPricingEngine.bulkDiscountTiers,
+    ),
+    rounding: 'whole_peso_total_only',
+    highQualitySurcharge: wholePeso(
+      finiteOr(
+        candidate.highQualitySurcharge,
+        defaultPricingEngine.highQualitySurcharge,
+      ),
+    ),
+  };
 }
 
 export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
@@ -1125,97 +1222,7 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
           ),
         ),
       },
-      pricingEngine: (() => {
-        const defaultPricingEngine = DEFAULT_DATA.settings.pricingEngine;
-        const a4 = pricingEngine?.paperProfiles?.a4;
-        const shortBond = pricingEngine?.paperProfiles?.shortBond;
-        const longBond = pricingEngine?.paperProfiles?.longBond;
-
-        return {
-          paperProfiles: {
-            a4: {
-              baseBwPrice: Math.max(
-                0,
-                finiteOr(
-                  a4?.baseBwPrice,
-                  defaultPricingEngine.paperProfiles.a4.baseBwPrice,
-                ),
-              ),
-              baseColorPrice: Math.max(
-                0,
-                finiteOr(
-                  a4?.baseColorPrice,
-                  defaultPricingEngine.paperProfiles.a4.baseColorPrice,
-                ),
-              ),
-              baseImagePrice: Math.max(
-                0,
-                finiteOr(
-                  a4?.baseImagePrice,
-                  defaultPricingEngine.paperProfiles.a4.baseImagePrice,
-                ),
-              ),
-            },
-            shortBond: {
-              baseBwPrice: Math.max(
-                0,
-                finiteOr(
-                  shortBond?.baseBwPrice,
-                  defaultPricingEngine.paperProfiles.shortBond.baseBwPrice,
-                ),
-              ),
-              baseColorPrice: Math.max(
-                0,
-                finiteOr(
-                  shortBond?.baseColorPrice,
-                  defaultPricingEngine.paperProfiles.shortBond.baseColorPrice,
-                ),
-              ),
-              baseImagePrice: Math.max(
-                0,
-                finiteOr(
-                  shortBond?.baseImagePrice,
-                  defaultPricingEngine.paperProfiles.shortBond.baseImagePrice,
-                ),
-              ),
-            },
-            longBond: {
-              baseBwPrice: Math.max(
-                0,
-                finiteOr(
-                  longBond?.baseBwPrice,
-                  defaultPricingEngine.paperProfiles.longBond.baseBwPrice,
-                ),
-              ),
-              baseColorPrice: Math.max(
-                0,
-                finiteOr(
-                  longBond?.baseColorPrice,
-                  defaultPricingEngine.paperProfiles.longBond.baseColorPrice,
-                ),
-              ),
-              baseImagePrice: Math.max(
-                0,
-                finiteOr(
-                  longBond?.baseImagePrice,
-                  defaultPricingEngine.paperProfiles.longBond.baseImagePrice,
-                ),
-              ),
-            },
-          },
-          bulkDiscountTiers: normalizePricingEngineBulkDiscountTiers(
-            pricingEngine?.bulkDiscountTiers,
-            defaultPricingEngine.bulkDiscountTiers,
-          ),
-          rounding: 'whole_peso_total_only',
-          highQualitySurcharge: wholePeso(
-            finiteOr(
-              pricingEngine?.highQualitySurcharge,
-              defaultPricingEngine.highQualitySurcharge,
-            ),
-          ),
-        };
-      })(),
+      pricingEngine: normalizePricingEngine(pricingEngine),
       idleTimeoutSeconds: finiteOr(
         data?.settings?.idleTimeoutSeconds,
         DEFAULT_DATA.settings.idleTimeoutSeconds,

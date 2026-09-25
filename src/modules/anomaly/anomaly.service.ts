@@ -84,34 +84,40 @@ export class AnomalyService {
     const limit = this.clampLimit(options.limit);
     const offset = Math.max(0, Math.floor(options.offset ?? 0));
 
-    const filtered = db
-      .data!.anomalyIncidents.filter((entry) => {
-        if (options.view === 'active') {
-          if (entry.status === 'resolved') return false;
-        } else if (options.view === 'archived') {
-          if (entry.status !== 'resolved') return false;
-        } else if (options.status && entry.status !== options.status) {
-          return false;
-        }
-        if (options.severity && entry.severity !== options.severity)
-          return false;
-        if (options.category && entry.category !== options.category)
-          return false;
-        return true;
-      })
-      .sort((a, b) => {
-        const aTs = this.toIncidentTimestamp(a.lastDetectedAt);
-        const bTs = this.toIncidentTimestamp(b.lastDetectedAt);
-        return bTs - aTs;
-      });
-
     const all = db.data!.anomalyIncidents;
+    let openCount = 0;
+    let acknowledgedCount = 0;
+    let resolvedCount = 0;
+
+    const filtered: AnomalyIncidentEntry[] = [];
+
+    for (const entry of all) {
+      if (entry.status === 'open') openCount++;
+      else if (entry.status === 'acknowledged') acknowledgedCount++;
+      else if (entry.status === 'resolved') resolvedCount++;
+
+      if (options.view === 'active') {
+        if (entry.status === 'resolved') continue;
+      } else if (options.view === 'archived') {
+        if (entry.status !== 'resolved') continue;
+      } else if (options.status && entry.status !== options.status) {
+        continue;
+      }
+      if (options.severity && entry.severity !== options.severity) continue;
+      if (options.category && entry.category !== options.category) continue;
+
+      filtered.push(entry);
+    }
+
+    filtered.sort((a, b) =>
+      (b.lastDetectedAt ?? '').localeCompare(a.lastDetectedAt ?? ''),
+    );
+
     return {
       total: filtered.length,
-      openCount: all.filter((entry) => entry.status === 'open').length,
-      acknowledgedCount: all.filter((entry) => entry.status === 'acknowledged')
-        .length,
-      resolvedCount: all.filter((entry) => entry.status === 'resolved').length,
+      openCount,
+      acknowledgedCount,
+      resolvedCount,
       items: filtered.slice(offset, offset + limit),
     };
   }
