@@ -1,5 +1,8 @@
+import { randomUUID, createHash } from 'node:crypto';
 import { adminService } from './admin';
-import { db, type ColorMode, type PrintQuality } from './db';
+import { db, type ColorMode, type PrintQuality, defaultPricingEngine } from './db';
+import type { CoverageTier } from '@/core/database/models/admin.model';
+import { resolveCoverageTier } from './document-analysis';
 import type { DocumentAnalysis } from './session';
 
 type PageRangeSelectionPayload =
@@ -12,22 +15,43 @@ interface ParsedPageRange {
   error?: string;
 }
 
+export interface PrintPageQuoteBreakdown {
+  pageNumber: number;
+  isColor: boolean;
+  coverage: number;
+  coverageTier: CoverageTier;
+  printCost: number;
+}
+
 export interface PrintQuoteResult {
   requiredAmount: number;
   copies: number;
   duplex: boolean;
-  pageRange: string | null;
-  totalPages: number;
+  paperSize: 'A4' | 'Short' | 'Long';
   selectedPages: number;
+  totalPages: number;
+  physicalSheets: number;
+  paperCostPerSheet: number;
+  paperSubtotal: number;
+  printSubtotal: number;
+  qualitySubtotal: number;
+  duplexSavings: number;
+  requestedColorMode: ColorMode;
+  effectiveColorMode: ColorMode;
+  quality: PrintQuality;
+  pageBreakdown: PrintPageQuoteBreakdown[];
+  // Quote integrity
+  quoteId: string;
+  quoteHash: string;
+  expiresAt: string;
+  // Keep legacy metadata fields if consumers use them:
   selectedColorPages: number;
   selectedBwPages: number;
   billableColorPages: number;
   billableBwPages: number;
   billableImagePages: number;
   billableImageBwPages: number;
-  requestedColorMode: ColorMode;
-  effectiveColorMode: ColorMode;
-  quality: PrintQuality;
+  pageRange: string | null;
   pricing: {
     printPerPage: number;
     colorSurcharge: number;
@@ -286,89 +310,111 @@ export function buildPrintQuote(input: {
     };
   }
 
-  // The selected print mode is the customer's billing choice.
-  // In Color mode: per-page grading bills photos/images at baseImagePrice (color) or baseImageBwPrice (B/W),
-  // colored pages at baseColorPrice, and B&W/blank at baseBwPrice.
-  // In B&W mode: driver prints pure grayscale, photos/images bill at baseImageBwPrice and docs at baseBwPrice.
+  const paperSize: 'A4' | 'Short' | 'Long' = input.paperSize ?? 'A4';
+  const profileKey =
+    paperSize === 'Long'
+      ? 'longBond'
+      : paperSize === 'Short'
+        ? 'shortBond'
+        : 'a4';
+  const engineCfg = db.data?.settings?.pricingEngine;
+  const profile =
+    engineCfg?.paperProfiles?.[profileKey] ??
+    defaultPricingEngine.paperProfiles[profileKey];
+
+  const duplex = Boolean(input.duplex);
+  const physicalSheetsPerCopy = duplex
+    ? Math.ceil(selectedCount / 2)
+    : selectedCount;
+  const totalPhysicalSheets = physicalSheetsPerCopy * safeCopies;
+  const paperCostPerSheet = profile.paperCost;
+  const paperSubtotal = totalPhysicalSheets * paperCostPerSheet;
+  const duplexSavings =
+    (selectedCount * safeCopies - totalPhysicalSheets) * paperCostPerSheet;
+
+  // If the user requested 'colored' mode, but none of the selected pages actually contain color,
+  // downgrade the effectiveColorMode to 'grayscale' so downstream UI and printer driver use grayscale (no color ink).
+  const effectiveColorMode: ColorMode =
+    input.colorMode === 'colored' && selectedColorPages === 0
+      ? 'grayscale'
+      : input.colorMode;
+
+  const pageBreakdown: PrintPageQuoteBreakdown[] = [];
+  let singleCopyPrintCost = 0;
   let billableColorPages = 0;
   let billableBwPages = 0;
   let billableImagePages = 0;
   let billableImageBwPages = 0;
 
-  if (input.colorMode === 'colored') {
-    if (!usedFallbackAssumptions && input.analysis.confidence !== 'low') {
-      for (const pageNum of selectedPages.selected) {
-        const page = pageDetailsMap.get(pageNum);
-        const isImage = Boolean(
-          page?.classification === 'image' || page?.isImagePage,
-        );
-        if (isImage) {
-          if (page?.isColor) {
-            billableImagePages += 1;
-          } else {
-            billableImageBwPages += 1;
-          }
-        } else if (page?.isColor) {
-          billableColorPages += 1;
-        } else {
-          billableBwPages += 1;
-        }
+  for (const pageNum of selectedPages.selected) {
+    const page = pageDetailsMap.get(pageNum);
+    const isPageColor = page ? Boolean(page.isColor) : pageNum <= selectedColorPages;
+    const rawCoverage = page?.coverage ?? (page as any)?.contentCoverage ?? 0;
+    const coverage =
+      typeof rawCoverage === 'number' && Number.isFinite(rawCoverage)
+        ? rawCoverage
+        : 0;
+    const coverageTier: CoverageTier =
+      page?.coverageTier ?? resolveCoverageTier(coverage);
+    const isColorPrint = effectiveColorMode === 'colored' && isPageColor;
+    const pageRate = isColorPrint
+      ? profile.colorPrint[coverageTier]
+      : profile.bwPrint[coverageTier];
+
+    singleCopyPrintCost += pageRate;
+    pageBreakdown.push({
+      pageNumber: pageNum,
+      isColor: isPageColor,
+      coverage,
+      coverageTier,
+      printCost: pageRate,
+    });
+
+    const isImage = Boolean(
+      page?.classification === 'image' ||
+        page?.isImagePage ||
+        (usedFallbackAssumptions && input.analysis.fileType === 'image'),
+    );
+    if (isColorPrint) {
+      if (isImage) {
+        billableImagePages += 1;
+      } else {
+        billableColorPages += 1;
       }
     } else {
-      const isFileImage = input.analysis.fileType === 'image';
-      if (isFileImage) {
-        if (selectedColorPages > 0) {
-          billableImagePages = selectedCount;
-        } else {
-          billableImageBwPages = selectedCount;
-        }
-      } else {
-        // Fallback without reliable page detection: bill binary color/BW
-        billableColorPages = selectedColorPages;
-        billableBwPages = selectedBwPages;
-        billableImagePages = 0;
-        billableImageBwPages = 0;
-      }
-    }
-  } else {
-    // B&W Mode: forces all pages to grayscale. Images bill at baseImageBwPrice, docs at baseBwPrice.
-    for (const pageNum of selectedPages.selected) {
-      const page = pageDetailsMap.get(pageNum);
-      const isImage = Boolean(
-        page?.classification === 'image' || page?.isImagePage,
-      );
       if (isImage) {
         billableImageBwPages += 1;
       } else {
         billableBwPages += 1;
       }
     }
-    billableColorPages = 0;
-    billableImagePages = 0;
   }
 
-  // If the user requested 'colored' mode, but none of the selected pages actually contain color,
-  // downgrade the effectiveColorMode to 'grayscale' so downstream UI and printer driver use grayscale (no color ink).
-  const effectiveColorMode: ColorMode =
-    input.colorMode === 'colored' &&
-    billableColorPages === 0 &&
-    billableImagePages === 0
-      ? 'grayscale'
-      : input.colorMode;
-
+  const printSubtotal = singleCopyPrintCost * safeCopies;
   const quality: PrintQuality = input.quality ?? 'standard';
-  const requiredAmount = adminService.calculateDocumentAmount(
-    'print',
-    {
-      colorPages: billableColorPages,
-      bwPages: billableBwPages,
-      imagePages: billableImagePages,
-      imageBwPages: billableImageBwPages,
-    },
-    safeCopies,
-    input.paperSize ?? 'A4',
-    quality,
-  );
+  const surchargePerSide =
+    quality === 'high' ? (engineCfg?.highQualitySurcharge ?? 2) : 0;
+  const qualitySubtotal = surchargePerSide * selectedCount * safeCopies;
+
+  const requiredAmount = paperSubtotal + printSubtotal + qualitySubtotal;
+
+  const quoteId = randomUUID();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const quoteHash = createHash('sha256')
+    .update(
+      JSON.stringify({
+        fileHash: (input.analysis as any).fileHash ?? input.analysis.fileType,
+        paperSize,
+        colorMode: input.colorMode,
+        copies: safeCopies,
+        duplex,
+        pageRange: parsedRange.normalized,
+        quality,
+        requiredAmount,
+        pricingVersion: 9,
+      }),
+    )
+    .digest('hex');
 
   const pricing = adminService.getPricingSettings();
   return {
@@ -376,19 +422,30 @@ export function buildPrintQuote(input: {
     quote: {
       requiredAmount,
       copies: safeCopies,
-      duplex: Boolean(input.duplex),
-      pageRange: parsedRange.normalized,
-      totalPages,
+      duplex,
+      paperSize,
       selectedPages: selectedCount,
+      totalPages,
+      physicalSheets: totalPhysicalSheets,
+      paperCostPerSheet,
+      paperSubtotal,
+      printSubtotal,
+      qualitySubtotal,
+      duplexSavings,
+      requestedColorMode: input.colorMode,
+      effectiveColorMode,
+      quality,
+      pageBreakdown,
+      quoteId,
+      quoteHash,
+      expiresAt,
       selectedColorPages,
       selectedBwPages,
       billableColorPages,
       billableBwPages,
       billableImagePages,
       billableImageBwPages,
-      requestedColorMode: input.colorMode,
-      effectiveColorMode,
-      quality,
+      pageRange: parsedRange.normalized,
       pricing: {
         printPerPage: pricing.printPerPage,
         colorSurcharge: pricing.colorSurcharge,

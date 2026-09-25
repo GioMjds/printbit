@@ -9,7 +9,8 @@ import {
   type PricingSettings,
 } from '@/modules/admin/admin.schema';
 import { type PrintQuality, type TrustedTimestampMeta } from '@/core/database/shared.schema';
-import { db } from '@/services/db';
+import type { CoverageTier } from '@/core/database/models/admin.model';
+import { db, defaultPricingEngine } from '@/services/db';
 import { getTrustedTimestamp } from '@/services/time-source';
 import { adminLogStore } from '@/core/database/sqlite-storage';
 import { financialLedgerService } from '@/services/financial-ledger';
@@ -156,10 +157,15 @@ export class AdminService {
     colorOrPageCounts:
       | ColorMode
       | {
-          colorPages: number;
-          bwPages: number;
+          colorPages?: number;
+          bwPages?: number;
           imagePages?: number;
           imageBwPages?: number;
+          coverageTier?: CoverageTier;
+          tierCounts?: {
+            bw?: Partial<Record<CoverageTier, number>>;
+            color?: Partial<Record<CoverageTier, number>>;
+          };
         },
     copies: number,
     paperSize: 'A4' | 'Short' | 'Long' = 'A4',
@@ -179,16 +185,9 @@ export class AdminService {
         : paperSize === 'Short' || (paperSize as any) === 'Letter'
           ? 'shortBond'
           : 'a4';
-    const profile = engineCfg?.paperProfiles?.[profileKey] ?? {
-      baseBwPrice: profileKey === 'longBond' ? 4 : 3,
-      baseColorPrice: profileKey === 'longBond' ? 20 : 18,
-      baseImagePrice: profileKey === 'longBond' ? 30 : 25,
-      baseImageBwPrice: profileKey === 'longBond' ? 12 : 10,
-    };
-    const baseImagePrice =
-      profile.baseImagePrice ?? (profileKey === 'longBond' ? 30 : 25);
-    const baseImageBwPrice =
-      profile.baseImageBwPrice ?? (profileKey === 'longBond' ? 12 : 10);
+    const profile =
+      engineCfg?.paperProfiles?.[profileKey] ??
+      defaultPricingEngine.paperProfiles[profileKey];
 
     const counts =
       typeof colorOrPageCounts === 'string'
@@ -199,6 +198,7 @@ export class AdminService {
             imageBwPages: 0,
           }
         : colorOrPageCounts;
+
     const safeColorPages = Math.max(0, Math.floor(counts.colorPages ?? 0));
     const safeBwPages = Math.max(0, Math.floor(counts.bwPages ?? 0));
     const safeImagePages = Math.max(
@@ -211,31 +211,69 @@ export class AdminService {
         'imageBwPages' in counts && counts.imageBwPages ? counts.imageBwPages : 0,
       ),
     );
+
+    const defaultTier: CoverageTier = counts.coverageTier ?? 'low';
+    const colorTierRate = profile.colorPrint[defaultTier];
+    const bwTierRate = profile.bwPrint[defaultTier];
+
+    // Images default to very_high tier
+    const imageColorRate = profile.colorPrint.very_high;
+    const imageBwRate = profile.bwPrint.very_high;
+
+    let printSubtotalPerCopy =
+      safeColorPages * colorTierRate +
+      safeBwPages * bwTierRate +
+      safeImagePages * imageColorRate +
+      safeImageBwPages * imageBwRate;
+
+    let totalPages =
+      safeColorPages + safeBwPages + safeImagePages + safeImageBwPages;
+
+    if (counts.tierCounts) {
+      if (counts.tierCounts.bw) {
+        for (const [tier, count] of Object.entries(counts.tierCounts.bw)) {
+          const c = Math.max(0, Math.floor(count ?? 0));
+          printSubtotalPerCopy += c * profile.bwPrint[tier as CoverageTier];
+          totalPages += c;
+        }
+      }
+      if (counts.tierCounts.color) {
+        for (const [tier, count] of Object.entries(counts.tierCounts.color)) {
+          const c = Math.max(0, Math.floor(count ?? 0));
+          printSubtotalPerCopy += c * profile.colorPrint[tier as CoverageTier];
+          totalPages += c;
+        }
+      }
+    }
+
+    const paperSubtotalPerCopy = totalPages * profile.paperCost;
     const surchargePerPg =
       quality === 'high'
         ? (engineCfg?.highQualitySurcharge ??
           pricing?.highQualitySurcharge ??
           2)
         : 0;
-    const totalPages =
-      safeColorPages + safeBwPages + safeImagePages + safeImageBwPages;
-    const subtotalExact =
-      (safeColorPages * profile.baseColorPrice +
-        safeBwPages * profile.baseBwPrice +
-        safeImagePages * baseImagePrice +
-        safeImageBwPages * baseImageBwPrice +
-        totalPages * surchargePerPg) *
+    const qualitySubtotalPerCopy = totalPages * surchargePerPg;
+
+    const totalExact =
+      (paperSubtotalPerCopy + printSubtotalPerCopy + qualitySubtotalPerCopy) *
       safeCopies;
-    return Math.ceil(subtotalExact);
+
+    return Math.ceil(totalExact);
   }
 
   calculateDocumentAmount(
     mode: Exclude<PrintMode, 'scan'>,
     pageCounts: {
-      colorPages: number;
-      bwPages: number;
+      colorPages?: number;
+      bwPages?: number;
       imagePages?: number;
       imageBwPages?: number;
+      coverageTier?: CoverageTier;
+      tierCounts?: {
+        bw?: Partial<Record<CoverageTier, number>>;
+        color?: Partial<Record<CoverageTier, number>>;
+      };
     },
     copies: number,
     paperSize: 'A4' | 'Short' | 'Long' = 'A4',
