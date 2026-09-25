@@ -23,11 +23,7 @@ import {
   getPrinterTelemetry,
   refreshPrinterTelemetry,
 } from '@/services/printer-state-projection';
-import {
-  isCoinSlotLocked,
-  isCoinSlotLockedBy,
-  getCoinSlotLockOwnerId,
-} from '@/services/hardware-state-projection';
+import { isCoinSlotLockedBy } from '@/services/hardware-state-projection';
 import {
   powerSafetyService,
   type PowerSafetyService,
@@ -36,7 +32,6 @@ import {
   ESP32_COIN_BRIDGE_API_KEY,
   ESP32_COIN_BRIDGE_RELAXED_MODE,
   ESP32_COIN_BRIDGE_SOURCE,
-  ESP32_ALWAYS_ACCEPT_COINS,
   PRINT_SPOOLER_MONITOR_WINDOW_MS,
 } from '@/config/http.config';
 import {
@@ -48,13 +43,8 @@ import {
 import { adminService } from '@/services/admin';
 import { financialLedgerService } from '@/services/financial-ledger';
 import { settlementService } from '@/services/settlement';
-import {
-  printFile,
-  type PrintDispatchResult,
-  type PrintJobOptions,
-} from '@/services/printer';
+import { printFile, type PrintJobOptions } from '@/services/printer';
 import { withPrintQuality } from '@/services/print-job-options';
-import { persistAndEmitPrintLifecycleState } from '@/services/print-lifecycle-state';
 import type { SessionStore, UploadedDocument } from '@/services/session';
 import { buildPrintQuote } from '@/services/print-quote';
 import { BLOCKED_STATUSES } from '@/utils';
@@ -75,7 +65,6 @@ import {
   upsertSpoolerFailureRefund,
 } from '@/services/pending-refund';
 import { evaluateConsumablesForecastAlerts } from '@/modules/admin/consumables.service';
-import { PrintDispatchError } from '@/services/printer';
 import {
   normalizeRotationDeg,
   parseRotationDeg,
@@ -84,7 +73,6 @@ import { ReceiptService } from '@/modules/receipt/receipt.service';
 import { estimateInkUsageByJob } from '@/services/consumable-estimator';
 import {
   buildPrintJobEnqueuePayload,
-  getJobProcessor,
   enqueuePrintJob,
   PrintJobEnqueueError,
 } from '@/modules/print-queue';
@@ -122,10 +110,8 @@ interface ConfirmPaymentBody {
   paymentLeaseId?: string;
 }
 
-const LEGACY_UPLOAD_STAGING_DIR = path.resolve('uploads/staging/legacy');
 const ACCEPTED_COIN_VALUES = new Set([1, 5, 10, 20]);
 type CoinSource = 'test-ui' | 'esp32-http';
-const COIN_TELEMETRY_MAX_AGE_MS = 45_000;
 const COIN_BRIDGE_EVENTS_TABLE = 'coin_bridge_events';
 
 class CoinCreditRejectedError extends Error {
@@ -535,15 +521,19 @@ export class FinancialService {
         },
         shortBond: {
           baseBwPrice: config?.paperProfiles?.shortBond?.baseBwPrice ?? 3,
-          baseColorPrice: config?.paperProfiles?.shortBond?.baseColorPrice ?? 18,
-          baseImagePrice: config?.paperProfiles?.shortBond?.baseImagePrice ?? 25,
-          baseImageBwPrice: config?.paperProfiles?.shortBond?.baseImageBwPrice ?? 10,
+          baseColorPrice:
+            config?.paperProfiles?.shortBond?.baseColorPrice ?? 18,
+          baseImagePrice:
+            config?.paperProfiles?.shortBond?.baseImagePrice ?? 25,
+          baseImageBwPrice:
+            config?.paperProfiles?.shortBond?.baseImageBwPrice ?? 10,
         },
         longBond: {
           baseBwPrice: config?.paperProfiles?.longBond?.baseBwPrice ?? 4,
           baseColorPrice: config?.paperProfiles?.longBond?.baseColorPrice ?? 20,
           baseImagePrice: config?.paperProfiles?.longBond?.baseImagePrice ?? 30,
-          baseImageBwPrice: config?.paperProfiles?.longBond?.baseImageBwPrice ?? 12,
+          baseImageBwPrice:
+            config?.paperProfiles?.longBond?.baseImageBwPrice ?? 12,
         },
       },
       highQualitySurcharge:
@@ -1596,8 +1586,7 @@ export class FinancialService {
       mode === 'print'
         ? await refreshPrinterTelemetry()
         : getPrinterTelemetry();
-    let jobDispatchedAt: string | null = null;
-    let dispatchResult: PrintDispatchResult | null = null;
+    const jobDispatchedAt: string | null = null;
 
     let receipt: Record<string, unknown> | null = null;
 
@@ -1864,7 +1853,6 @@ export class FinancialService {
       return;
     }
 
-    const settledAmount = settlement.chargedAmount;
     const settledChangeState = settlement.change.state;
     const settledChangeRequested = settlement.change.requested;
     const settledChangeDispensed = settlement.change.dispensed;
