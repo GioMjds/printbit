@@ -17,11 +17,19 @@ export interface PricingSettings {
 
 export type PricingEngineRoundingMode = 'whole_peso_total_only';
 
+export type CoverageTier = 'low' | 'medium' | 'high' | 'very_high';
+
+export interface CoverageTierRates {
+  low: number;
+  medium: number;
+  high: number;
+  very_high: number;
+}
+
 export interface PaperPricingProfile {
-  baseBwPrice: number;
-  baseColorPrice: number;
-  baseImagePrice: number;
-  baseImageBwPrice: number;
+  paperCost: number;
+  bwPrint: CoverageTierRates;
+  colorPrint: CoverageTierRates;
 }
 
 export type PricingEnginePaperProfile = PaperPricingProfile;
@@ -34,9 +42,9 @@ export interface PricingEngineBulkDiscountTier {
 
 export interface PricingEngineSettings {
   paperProfiles: {
-    a4: PricingEnginePaperProfile;
-    shortBond: PricingEnginePaperProfile;
-    longBond: PricingEnginePaperProfile;
+    a4: PaperPricingProfile;
+    shortBond: PaperPricingProfile;
+    longBond: PaperPricingProfile;
   };
   bulkDiscountTiers: PricingEngineBulkDiscountTier[];
   rounding: PricingEngineRoundingMode;

@@ -64,6 +64,8 @@ import {
   AdminLockout,
   PricingSettings,
   PricingEngineRoundingMode,
+  CoverageTier,
+  CoverageTierRates,
   PricingEnginePaperProfile,
   PaperPricingProfile,
   PricingEngineBulkDiscountTier,
@@ -103,6 +105,8 @@ export {
   AdminLockout,
   PricingSettings,
   PricingEngineRoundingMode,
+  CoverageTier,
+  CoverageTierRates,
   PricingEnginePaperProfile,
   PaperPricingProfile,
   PricingEngineBulkDiscountTier,
@@ -264,22 +268,19 @@ export type Schema = {
 export const defaultPricingEngine: PricingEngineSettings = {
   paperProfiles: {
     a4: {
-      baseBwPrice: 3,
-      baseColorPrice: 18,
-      baseImagePrice: 25,
-      baseImageBwPrice: 10,
+      paperCost: 1,
+      bwPrint: { low: 2, medium: 3, high: 6, very_high: 9 },
+      colorPrint: { low: 17, medium: 19, high: 24, very_high: 29 },
     },
     shortBond: {
-      baseBwPrice: 3,
-      baseColorPrice: 18,
-      baseImagePrice: 25,
-      baseImageBwPrice: 10,
+      paperCost: 1,
+      bwPrint: { low: 2, medium: 3, high: 6, very_high: 9 },
+      colorPrint: { low: 17, medium: 19, high: 24, very_high: 29 },
     },
     longBond: {
-      baseBwPrice: 4,
-      baseColorPrice: 20,
-      baseImagePrice: 30,
-      baseImageBwPrice: 12,
+      paperCost: 1,
+      bwPrint: { low: 3, medium: 4, high: 8, very_high: 11 },
+      colorPrint: { low: 19, medium: 22, high: 29, very_high: 34 },
     },
   },
   bulkDiscountTiers: [],
@@ -531,6 +532,97 @@ function normalizeProfilePrice(value: unknown, fallback: number): number {
   return Math.max(0, Math.floor(Number.isFinite(num) ? num : fallback));
 }
 
+function normalizePaperProfile(
+  candidate: unknown,
+  fallback: PaperPricingProfile,
+): PaperPricingProfile {
+  if (typeof candidate !== 'object' || candidate === null) {
+    return {
+      paperCost: fallback.paperCost,
+      bwPrint: { ...fallback.bwPrint },
+      colorPrint: { ...fallback.colorPrint },
+    };
+  }
+
+  const raw = candidate as Record<string, unknown>;
+
+  const hasNewFields =
+    typeof raw.bwPrint === 'object' &&
+    raw.bwPrint !== null &&
+    typeof raw.colorPrint === 'object' &&
+    raw.colorPrint !== null;
+
+  const isLegacy =
+    !hasNewFields &&
+    ('baseBwPrice' in raw ||
+      'baseColorPrice' in raw ||
+      'baseImagePrice' in raw ||
+      'baseImageBwPrice' in raw);
+
+  if (isLegacy) {
+    const baseBwPrice = normalizeProfilePrice(raw.baseBwPrice, 3);
+    const baseColorPrice = normalizeProfilePrice(raw.baseColorPrice, 18);
+    const baseImageBwPrice =
+      raw.baseImageBwPrice !== undefined && raw.baseImageBwPrice !== null
+        ? normalizeProfilePrice(raw.baseImageBwPrice, 10)
+        : 10;
+    const baseImagePrice =
+      raw.baseImagePrice !== undefined && raw.baseImagePrice !== null
+        ? normalizeProfilePrice(raw.baseImagePrice, 25)
+        : 25;
+
+    return {
+      paperCost: 1,
+      bwPrint: {
+        low: Math.max(0, baseBwPrice - 1),
+        medium: baseBwPrice,
+        high: Math.max(0, Math.round((baseBwPrice + baseImageBwPrice) / 2) - 1),
+        very_high: Math.max(0, baseImageBwPrice - 1),
+      },
+      colorPrint: {
+        low: Math.max(0, baseColorPrice - 1),
+        medium: baseColorPrice + 1,
+        high: Math.max(0, baseImagePrice - 1),
+        very_high: baseImagePrice + 4,
+      },
+    };
+  }
+
+  const bwCandidate =
+    typeof raw.bwPrint === 'object' && raw.bwPrint !== null
+      ? (raw.bwPrint as Record<string, unknown>)
+      : {};
+  const colorCandidate =
+    typeof raw.colorPrint === 'object' && raw.colorPrint !== null
+      ? (raw.colorPrint as Record<string, unknown>)
+      : {};
+
+  return {
+    paperCost: normalizeProfilePrice(raw.paperCost, fallback.paperCost),
+    bwPrint: {
+      low: normalizeProfilePrice(bwCandidate.low, fallback.bwPrint.low),
+      medium: normalizeProfilePrice(bwCandidate.medium, fallback.bwPrint.medium),
+      high: normalizeProfilePrice(bwCandidate.high, fallback.bwPrint.high),
+      very_high: normalizeProfilePrice(
+        bwCandidate.very_high,
+        fallback.bwPrint.very_high,
+      ),
+    },
+    colorPrint: {
+      low: normalizeProfilePrice(colorCandidate.low, fallback.colorPrint.low),
+      medium: normalizeProfilePrice(
+        colorCandidate.medium,
+        fallback.colorPrint.medium,
+      ),
+      high: normalizeProfilePrice(colorCandidate.high, fallback.colorPrint.high),
+      very_high: normalizeProfilePrice(
+        colorCandidate.very_high,
+        fallback.colorPrint.very_high,
+      ),
+    },
+  };
+}
+
 export function normalizePricingEngine(
   rawPricingEngine: unknown,
 ): PricingEngineSettings {
@@ -538,77 +630,37 @@ export function normalizePricingEngine(
     typeof rawPricingEngine === 'object' && rawPricingEngine !== null
       ? rawPricingEngine
       : {}
-  ) as Partial<PricingEngineSettings>;
+  ) as Record<string, unknown>;
 
-  const a4 = candidate.paperProfiles?.a4;
-  const shortBond = candidate.paperProfiles?.shortBond;
-  const longBond = candidate.paperProfiles?.longBond;
+  const rawProfiles = (
+    typeof candidate.paperProfiles === 'object' && candidate.paperProfiles !== null
+      ? candidate.paperProfiles
+      : {}
+  ) as Record<string, unknown>;
 
   return {
     paperProfiles: {
-      a4: {
-        baseBwPrice: normalizeProfilePrice(
-          a4?.baseBwPrice,
-          defaultPricingEngine.paperProfiles.a4.baseBwPrice,
-        ),
-        baseColorPrice: normalizeProfilePrice(
-          a4?.baseColorPrice,
-          defaultPricingEngine.paperProfiles.a4.baseColorPrice,
-        ),
-        baseImagePrice: normalizeProfilePrice(
-          a4?.baseImagePrice,
-          defaultPricingEngine.paperProfiles.a4.baseImagePrice,
-        ),
-        baseImageBwPrice: normalizeProfilePrice(
-          a4?.baseImageBwPrice,
-          defaultPricingEngine.paperProfiles.a4.baseImageBwPrice,
-        ),
-      },
-      shortBond: {
-        baseBwPrice: normalizeProfilePrice(
-          shortBond?.baseBwPrice,
-          defaultPricingEngine.paperProfiles.shortBond.baseBwPrice,
-        ),
-        baseColorPrice: normalizeProfilePrice(
-          shortBond?.baseColorPrice,
-          defaultPricingEngine.paperProfiles.shortBond.baseColorPrice,
-        ),
-        baseImagePrice: normalizeProfilePrice(
-          shortBond?.baseImagePrice,
-          defaultPricingEngine.paperProfiles.shortBond.baseImagePrice,
-        ),
-        baseImageBwPrice: normalizeProfilePrice(
-          shortBond?.baseImageBwPrice,
-          defaultPricingEngine.paperProfiles.shortBond.baseImageBwPrice,
-        ),
-      },
-      longBond: {
-        baseBwPrice: normalizeProfilePrice(
-          longBond?.baseBwPrice,
-          defaultPricingEngine.paperProfiles.longBond.baseBwPrice,
-        ),
-        baseColorPrice: normalizeProfilePrice(
-          longBond?.baseColorPrice,
-          defaultPricingEngine.paperProfiles.longBond.baseColorPrice,
-        ),
-        baseImagePrice: normalizeProfilePrice(
-          longBond?.baseImagePrice,
-          defaultPricingEngine.paperProfiles.longBond.baseImagePrice,
-        ),
-        baseImageBwPrice: normalizeProfilePrice(
-          longBond?.baseImageBwPrice,
-          defaultPricingEngine.paperProfiles.longBond.baseImageBwPrice,
-        ),
-      },
+      a4: normalizePaperProfile(
+        rawProfiles.a4,
+        defaultPricingEngine.paperProfiles.a4,
+      ),
+      shortBond: normalizePaperProfile(
+        rawProfiles.shortBond,
+        defaultPricingEngine.paperProfiles.shortBond,
+      ),
+      longBond: normalizePaperProfile(
+        rawProfiles.longBond,
+        defaultPricingEngine.paperProfiles.longBond,
+      ),
     },
     bulkDiscountTiers: normalizePricingEngineBulkDiscountTiers(
-      candidate.bulkDiscountTiers,
+      candidate.bulkDiscountTiers as PricingEngineBulkDiscountTier[] | undefined,
       defaultPricingEngine.bulkDiscountTiers,
     ),
     rounding: 'whole_peso_total_only',
     highQualitySurcharge: wholePeso(
       finiteOr(
-        candidate.highQualitySurcharge,
+        candidate.highQualitySurcharge as number | undefined,
         defaultPricingEngine.highQualitySurcharge,
       ),
     ),
