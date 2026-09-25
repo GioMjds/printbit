@@ -1817,8 +1817,10 @@ export const db: {
   data: Schema | null;
   read: () => Promise<void>;
   write: () => Promise<void>;
+  normalizePricingEngine: (raw: unknown) => PricingEngineSettings;
 } = {
   data: null,
+  normalizePricingEngine,
   async read() {
     initSqliteStorage();
     migrateSchemaSnapshotToRuntimeState();
