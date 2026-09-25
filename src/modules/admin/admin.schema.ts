@@ -32,6 +32,8 @@ export interface PricingSettings {
 export interface PricingEnginePaperProfile {
   baseBwPrice: number;
   baseColorPrice: number;
+  baseImagePrice?: number;
+  baseImageBwPrice?: number;
 }
 
 export interface PricingEngineBulkDiscountTier {

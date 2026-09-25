@@ -222,9 +222,9 @@ export interface AdminSettings {
   };
   pricingEngine: {
     paperProfiles: {
-      a4: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number };
-      shortBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number };
-      longBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number };
+      a4: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number; baseImageBwPrice: number };
+      shortBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number; baseImageBwPrice: number };
+      longBond: { baseBwPrice: number; baseColorPrice: number; baseImagePrice: number; baseImageBwPrice: number };
     };
     bulkDiscountTiers: {
       minPages: number;

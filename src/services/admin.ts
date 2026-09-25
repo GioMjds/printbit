@@ -25,7 +25,7 @@ interface SocketEmitter {
   emit: (event: string, ...args: unknown[]) => void;
 }
 
-class AdminService {
+export class AdminService {
   private readonly MAX_LOGS = 3000;
   private io: SocketEmitter | null = null;
 
@@ -43,7 +43,14 @@ class AdminService {
 
   calculateJobAmount(
     mode: PrintMode,
-    colorOrPageCounts: ColorMode | { colorPages: number; bwPages: number },
+    colorOrPageCounts:
+      | ColorMode
+      | {
+          colorPages: number;
+          bwPages: number;
+          imagePages?: number;
+          imageBwPages?: number;
+        },
     copies: number,
     paperSize: 'A4' | 'Letter' | 'Legal' = 'A4',
     quality: PrintQuality = 'standard',
@@ -63,9 +70,12 @@ class AdminService {
       baseBwPrice: profileKey === 'longBond' ? 4 : 3,
       baseColorPrice: profileKey === 'longBond' ? 20 : 18,
       baseImagePrice: profileKey === 'longBond' ? 30 : 25,
+      baseImageBwPrice: profileKey === 'longBond' ? 12 : 10,
     };
     const baseImagePrice =
       profile.baseImagePrice ?? (profileKey === 'longBond' ? 30 : 25);
+    const baseImageBwPrice =
+      profile.baseImageBwPrice ?? (profileKey === 'longBond' ? 12 : 10);
 
     const counts =
       typeof colorOrPageCounts === 'string'
@@ -73,6 +83,7 @@ class AdminService {
             colorPages: colorOrPageCounts === 'colored' ? 1 : 0,
             bwPages: colorOrPageCounts === 'colored' ? 0 : 1,
             imagePages: 0,
+            imageBwPages: 0,
           }
         : colorOrPageCounts;
     const safeColorPages = Math.max(0, Math.floor(counts.colorPages ?? 0));
@@ -81,15 +92,23 @@ class AdminService {
       0,
       Math.floor('imagePages' in counts && counts.imagePages ? counts.imagePages : 0),
     );
+    const safeImageBwPages = Math.max(
+      0,
+      Math.floor(
+        'imageBwPages' in counts && counts.imageBwPages ? counts.imageBwPages : 0,
+      ),
+    );
     const surchargePerPg =
       quality === 'high'
         ? (engineCfg?.highQualitySurcharge ?? pricing?.highQualitySurcharge ?? 2)
         : 0;
-    const totalPages = safeColorPages + safeBwPages + safeImagePages;
+    const totalPages =
+      safeColorPages + safeBwPages + safeImagePages + safeImageBwPages;
     const subtotalExact =
       (safeColorPages * profile.baseColorPrice +
         safeBwPages * profile.baseBwPrice +
         safeImagePages * baseImagePrice +
+        safeImageBwPages * baseImageBwPrice +
         totalPages * surchargePerPg) *
       safeCopies;
     return Math.ceil(subtotalExact);
@@ -97,7 +116,12 @@ class AdminService {
 
   calculateDocumentAmount(
     mode: Exclude<PrintMode, 'scan'>,
-    pageCounts: { colorPages: number; bwPages: number; imagePages?: number },
+    pageCounts: {
+      colorPages: number;
+      bwPages: number;
+      imagePages?: number;
+      imageBwPages?: number;
+    },
     copies: number,
     paperSize: 'A4' | 'Letter' | 'Legal' = 'A4',
     quality: PrintQuality = 'standard',

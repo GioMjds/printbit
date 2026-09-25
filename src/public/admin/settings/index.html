@@ -419,12 +419,32 @@
                   </div>
                   <div class="field">
                     <label class="field__lbl" for="settingA4ImagePrice"
-                      >A4 — Photo/Image per page</label
+                      >A4 — Photo/Image (Color) per page</label
                     >
                     <div class="field__wrap field__wrap--pre">
                       <span class="field__affix">₱</span>
                       <input
                         id="settingA4ImagePrice"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="field__input"
+                        placeholder="Whole pesos"
+                        required
+                      />
+                    </div>
+                    <p class="field__hint">Whole pesos only</p>
+                  </div>
+                  <div class="field">
+                    <label class="field__lbl" for="settingA4ImageBwPrice"
+                      >A4 — Photo/Image (B&W) per page</label
+                    >
+                    <div class="field__wrap field__wrap--pre">
+                      <span class="field__affix">₱</span>
+                      <input
+                        id="settingA4ImageBwPrice"
+                        data-testid="a4ImageBwPrice"
+                        name="a4ImageBwPrice"
                         type="number"
                         min="0"
                         step="1"
@@ -475,12 +495,32 @@
                   </div>
                   <div class="field">
                     <label class="field__lbl" for="settingShortBondImagePrice"
-                      >Short (Letter) — Photo/Image per page</label
+                      >Short (Letter) — Photo/Image (Color) per page</label
                     >
                     <div class="field__wrap field__wrap--pre">
                       <span class="field__affix">₱</span>
                       <input
                         id="settingShortBondImagePrice"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="field__input"
+                        placeholder="Whole pesos"
+                        required
+                      />
+                    </div>
+                    <p class="field__hint">Whole pesos only</p>
+                  </div>
+                  <div class="field">
+                    <label class="field__lbl" for="settingShortBondImageBwPrice"
+                      >Short (Letter) — Photo/Image (B&W) per page</label
+                    >
+                    <div class="field__wrap field__wrap--pre">
+                      <span class="field__affix">₱</span>
+                      <input
+                        id="settingShortBondImageBwPrice"
+                        data-testid="shortBondImageBwPrice"
+                        name="shortBondImageBwPrice"
                         type="number"
                         min="0"
                         step="1"
@@ -531,12 +571,32 @@
                   </div>
                   <div class="field">
                     <label class="field__lbl" for="settingLongBondImagePrice"
-                      >Long (Legal) — Photo/Image per page</label
+                      >Long (Legal) — Photo/Image (Color) per page</label
                     >
                     <div class="field__wrap field__wrap--pre">
                       <span class="field__affix">₱</span>
                       <input
                         id="settingLongBondImagePrice"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="field__input"
+                        placeholder="Whole pesos"
+                        required
+                      />
+                    </div>
+                    <p class="field__hint">Whole pesos only</p>
+                  </div>
+                  <div class="field">
+                    <label class="field__lbl" for="settingLongBondImageBwPrice"
+                      >Long (Legal) — Photo/Image (B&W) per page</label
+                    >
+                    <div class="field__wrap field__wrap--pre">
+                      <span class="field__affix">₱</span>
+                      <input
+                        id="settingLongBondImageBwPrice"
+                        data-testid="longBondImageBwPrice"
+                        name="longBondImageBwPrice"
                         type="number"
                         min="0"
                         step="1"
