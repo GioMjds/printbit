@@ -316,33 +316,6 @@ async function analyzePdfFile(
   const doc = await loadingTask.promise;
   const totalPages = doc.numPages;
 
-  if (!colorDetectionEnabled) {
-    await loadingTask.destroy();
-    const pages: PageAnalysis[] = [];
-    for (let pageNum = 1; pageNum <= totalPages; pageNum += 1) {
-      pages.push({
-        index: pageNum,
-        isColor: false,
-        coverage: 0,
-        colorCoverage: 0,
-        coverageTier: 'low',
-        classification: 'bw',
-        isBlank: false,
-        contentCoverage: 0,
-      });
-    }
-    return {
-      fileType,
-      pageCount: totalPages,
-      pages,
-      colorPages: 0,
-      bwPages: totalPages,
-      totalPages,
-      confidence: 'high',
-      analysisVersion: ANALYSIS_ALGORITHM_VERSION,
-    };
-  }
-
   const ops = (pdfjs.OPS ?? {}) as PdfOps;
   const pdfjsAllOps = (pdfjs.OPS ?? {}) as Record<string, number>;
   const textRenderOps = new Set<number>(
@@ -398,11 +371,11 @@ async function analyzePdfFile(
         });
 
         isBlank = metrics.contentCoverage < 0.001;
-        isColor = !isBlank && metrics.colorCoverage > 0.02;
+        isColor = colorDetectionEnabled && !isBlank && metrics.colorCoverage > 0.02;
         coverageTier = resolveCoverageTier(metrics.contentCoverage);
         classification = isBlank ? 'blank' : isColor ? 'color' : 'bw';
         coverage = metrics.contentCoverage;
-        colorCoverage = metrics.colorCoverage;
+        colorCoverage = colorDetectionEnabled ? metrics.colorCoverage : 0;
       } catch (canvasErr) {
         console.warn(
           `[document-analysis] Page ${pageNum} canvas render failed; falling back to operator list scan.`,
@@ -426,8 +399,8 @@ async function analyzePdfFile(
             },
           );
           coverage = analysis.coverage;
-          colorCoverage = analysis.hasColor ? analysis.coverage : 0;
-          isColor = analysis.hasColor;
+          isColor = colorDetectionEnabled && analysis.hasColor;
+          colorCoverage = isColor ? analysis.coverage : 0;
           isBlank = analysis.isBlank;
           coverageTier = resolveCoverageTier(coverage);
           classification = isBlank ? 'blank' : isColor ? 'color' : 'bw';
@@ -438,11 +411,11 @@ async function analyzePdfFile(
           );
           fallbackFlags.push('operator_scan_failed_default_color');
           coverage = 1;
-          colorCoverage = 1;
-          isColor = true;
+          isColor = colorDetectionEnabled;
+          colorCoverage = colorDetectionEnabled ? 1 : 0;
           isBlank = false;
           coverageTier = 'very_high';
-          classification = 'color';
+          classification = colorDetectionEnabled ? 'color' : 'bw';
         }
       } finally {
         page.cleanup();

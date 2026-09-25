@@ -41,7 +41,9 @@ export function resolveCoverageTier(contentCoverage: number): CoverageTier {
   return 'very_high';
 }
 
-export type DocumentPageAnalysis = PageAnalysis & {
+export interface DocumentPageAnalysis {
+  index: number;
+  isColor: boolean;
   coverage?: number;
   colorCoverage?: number;
   coverageTier?: CoverageTier;
@@ -51,7 +53,7 @@ export type DocumentPageAnalysis = PageAnalysis & {
   contentCoverage?: number;
   isImagePage?: boolean;
   imageCoverage?: number;
-};
+}
 
 export interface DocumentAnalysis {
   analysisVersion?: number;

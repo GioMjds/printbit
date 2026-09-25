@@ -172,4 +172,25 @@ describe('Document Analysis - Uniform Canvas Metering (PDF)', () => {
     expect(page.coverageTier).toBe('low');
     expect(page.coverage).toBeLessThan(0.001);
   });
+
+  it('meters coverage and assigns coverageTier even when colorDetectionEnabled is false', async () => {
+    const result = await analyzeDocument({
+      filePath: fullColorPdfPath,
+      contentType: 'application/pdf',
+      filename: 'test-full-color.pdf',
+      colorDetectionEnabled: false,
+    });
+
+    expect(result.fileType).toBe('pdf');
+    expect(result.pageCount).toBe(1);
+    expect(result.colorPages).toBe(0);
+    expect(result.bwPages).toBe(1);
+
+    const page = result.pages[0];
+    expect(page.isColor).toBe(false);
+    expect(page.colorCoverage).toBe(0);
+    expect(page.classification).toBe('bw');
+    expect(page.coverageTier).toBe('very_high');
+    expect(page.coverage).toBeGreaterThan(0.7);
+  });
 });
