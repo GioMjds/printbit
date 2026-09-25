@@ -129,10 +129,22 @@ const conversionCancelBtn = document.getElementById(
 const currentSelectedFile = document.getElementById(
   'currentSelectedFile',
 ) as HTMLButtonElement | null;
+const printLimitTipMessage = document.getElementById(
+  'printLimitTipMessage',
+) as HTMLElement | null;
 
 let maxPagesPerSession =
   Number(sessionStorage.getItem('printbit.maxPagesPerSession')) || 30;
 sessionStorage.setItem('printbit.maxPagesPerSession', String(maxPagesPerSession));
+
+function updatePrintLimitLabel(limit: number): void {
+  const el =
+    printLimitTipMessage ?? document.getElementById('printLimitTipMessage');
+  if (el) {
+    el.textContent = `A maximum of ${limit} pages can be printed in this session. Your selected page range multiplied by copies must stay within ${limit} pages.`;
+  }
+}
+updatePrintLimitLabel(maxPagesPerSession);
 
 async function fetchKioskSettings(): Promise<void> {
   try {
@@ -148,6 +160,7 @@ async function fetchKioskSettings(): Promise<void> {
           'printbit.maxPagesPerSession',
           String(maxPagesPerSession),
         );
+        updatePrintLimitLabel(maxPagesPerSession);
       }
     }
   } catch (err) {
@@ -999,6 +1012,20 @@ function attachSocket(sid: string): void {
   socket.emit('joinSession', sid);
   socket.on('UploadCompleted', () => void checkUploadStatus());
   socket.on('UploadRemoved', () => void checkUploadStatus());
+  socket.on(
+    'systemSettingsChanged',
+    (data?: { printLimits?: { maxPagesPerSession?: number } }) => {
+      const limit = data?.printLimits?.maxPagesPerSession;
+      if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
+        maxPagesPerSession = limit;
+        sessionStorage.setItem('printbit.maxPagesPerSession', String(limit));
+        updatePrintLimitLabel(limit);
+        if (activeSessionId) {
+          void checkUploadStatus();
+        }
+      }
+    },
+  );
 
   // Analysis progress events
   socket.on('AnalysisStarted', (info: unknown) => {
