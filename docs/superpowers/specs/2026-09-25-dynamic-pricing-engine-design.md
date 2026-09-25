@@ -3,7 +3,7 @@
 **Date:** 2026-09-25  
 **Topic:** PrintBit Output-Metered Dynamic Pricing Engine  
 **Status:** Approved Design  
-**Reference:** `PRICING_CONFIGURATION_FIX.md`  
+**Reference:** `PRICING_CONFIGURATION_FIX.md`
 
 ---
 
@@ -12,6 +12,7 @@
 Previously, PrintBit determined whether a page was billed as a standard document page or an expensive "photo/image" page based on the source file format (`fileType === 'image'` or `isImagePage` derived from image uploads).
 
 This had fundamental flaws:
+
 1. **Format Spoofing / Exploits:** An image converted or renamed into a `.docx` or `.pdf` was billed as a standard document (e.g., ₱18 instead of ₱25/₱30), despite consuming identical color ink on paper.
 2. **Reverse Penalty:** A user uploading a black-and-white text document as a `.jpg` or `.png` (such as a phone scan or receipt) was billed at the high photo rate (₱10/₱25) instead of the standard B&W document rate (₱3).
 3. **No Duplex Cost Reflection:** 2-sided (duplex) printing consumes half the physical paper sheets of 1-sided printing, but quotes did not decouple physical paper sheet costs from printed page costs.
@@ -55,15 +56,15 @@ Tamper-Proof Quote (quoteHash, fileHash, optionsHash)
 export type CoverageTier = 'low' | 'medium' | 'high' | 'very_high';
 
 export interface CoverageTierRates {
-  low: number;       // 0% – 10% ink coverage
-  medium: number;    // >10% – 40% ink coverage
-  high: number;      // >40% – 70% ink coverage
+  low: number; // 0% – 10% ink coverage
+  medium: number; // >10% – 40% ink coverage
+  high: number; // >40% – 70% ink coverage
   very_high: number; // >70% – 100% ink coverage
 }
 
 export interface PaperPricingProfile {
-  paperCost: number;             // Cost per physical sheet (e.g. ₱1)
-  bwPrint: CoverageTierRates;    // Print cost per printed side (B&W)
+  paperCost: number; // Cost per physical sheet (e.g. ₱1)
+  bwPrint: CoverageTierRates; // Print cost per printed side (B&W)
   colorPrint: CoverageTierRates; // Print cost per printed side (Color)
 }
 
@@ -81,16 +82,18 @@ export interface PricingEngineSettings {
 
 ### 3.2 Calibrated Default Rates (Whole Pesos)
 
-| Profile | Paper Cost (sheet) | B&W Low (0-10%) | B&W Med (10-40%) | B&W High (40-70%) | B&W Very High (70-100%) | Color Low (0-10%) | Color Med (10-40%) | Color High (40-70%) | Color Very High (70-100%) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **A4** | ₱1 | ₱2 *(Total ₱3)* | ₱3 *(Total ₱4)* | ₱6 *(Total ₱7)* | ₱9 *(Total ₱10)* | ₱17 *(Total ₱18)* | ₱19 *(Total ₱20)* | ₱24 *(Total ₱25)* | ₱29 *(Total ₱30)* |
-| **Short** | ₱1 | ₱2 *(Total ₱3)* | ₱3 *(Total ₱4)* | ₱6 *(Total ₱7)* | ₱9 *(Total ₱10)* | ₱17 *(Total ₱18)* | ₱19 *(Total ₱20)* | ₱24 *(Total ₱25)* | ₱29 *(Total ₱30)* |
-| **Long** | ₱1 | ₱3 *(Total ₱4)* | ₱4 *(Total ₱5)* | ₱8 *(Total ₱9)* | ₱11 *(Total ₱12)* | ₱19 *(Total ₱20)* | ₱22 *(Total ₱23)* | ₱29 *(Total ₱30)* | ₱34 *(Total ₱35)* |
+| Profile   | Paper Cost (sheet) | B&W Low (0-10%) | B&W Med (10-40%) | B&W High (40-70%) | B&W Very High (70-100%) | Color Low (0-10%) | Color Med (10-40%) | Color High (40-70%) | Color Very High (70-100%) |
+| :-------- | :----------------- | :-------------- | :--------------- | :---------------- | :---------------------- | :---------------- | :----------------- | :------------------ | :------------------------ |
+| **A4**    | ₱1                 | ₱2 _(Total ₱3)_ | ₱3 _(Total ₱4)_  | ₱6 _(Total ₱7)_   | ₱9 _(Total ₱10)_        | ₱17 _(Total ₱18)_ | ₱19 _(Total ₱20)_  | ₱24 _(Total ₱25)_   | ₱29 _(Total ₱30)_         |
+| **Short** | ₱1                 | ₱2 _(Total ₱3)_ | ₱3 _(Total ₱4)_  | ₱6 _(Total ₱7)_   | ₱9 _(Total ₱10)_        | ₱17 _(Total ₱18)_ | ₱19 _(Total ₱20)_  | ₱24 _(Total ₱25)_   | ₱29 _(Total ₱30)_         |
+| **Long**  | ₱1                 | ₱3 _(Total ₱4)_ | ₱4 _(Total ₱5)_  | ₱8 _(Total ₱9)_   | ₱11 _(Total ₱12)_       | ₱19 _(Total ₱20)_ | ₱22 _(Total ₱23)_  | ₱29 _(Total ₱30)_   | ₱34 _(Total ₱35)_         |
 
-*High Quality Surcharge:* ₱2 per printed side (unchanged).
+_High Quality Surcharge:_ ₱2 per printed side (unchanged).
 
 ### 3.3 Seamless In-Memory Database Normalization
+
 When loading older databases with legacy fields (`baseBwPrice`, `baseColorPrice`, `baseImagePrice`, `baseImageBwPrice`), `normalizePricingEngine` in `src/core/database/db.ts` automatically populates the new schema without data loss or downtime:
+
 - `paperCost`: 1
 - `bwPrint`: `{ low: baseBwPrice - 1, medium: baseBwPrice, high: Math.round((baseBwPrice + baseImageBwPrice) / 2) - 1, very_high: baseImageBwPrice - 1 }`
 - `colorPrint`: `{ low: baseColorPrice - 1, medium: baseColorPrice + 1, high: baseImagePrice - 1, very_high: baseImagePrice + 4 }`
@@ -100,6 +103,7 @@ When loading older databases with legacy fields (`baseBwPrice`, `baseColorPrice`
 ## 4. Document Analysis & Metering (`src/services/document-analysis.ts`)
 
 ### 4.1 Pixel-Level Ink Metering (`computeFrameMetrics`)
+
 - Rendered pages or image frames are sampled down to ~50,000 pixels (scale ~36–50 DPI).
 - **Ink Pixel Detection:** Alpha > 10 and $(R < 245 \lor G < 245 \lor B < 245)$.
 - **Color Pixel Detection:** $\max(R,G,B) - \min(R,G,B) > \text{COLOR\_SATURATION\_THRESHOLD}$.
@@ -110,40 +114,45 @@ When loading older databases with legacy fields (`baseBwPrice`, `baseColorPrice`
   - `isColor`: `!isBlank && colorCoverage > 0.02`
 
 ### 4.2 Coverage Tier Resolution
+
 ```ts
 export function resolveCoverageTier(contentCoverage: number): CoverageTier {
-  if (contentCoverage <= 0.10) return 'low';
-  if (contentCoverage <= 0.40) return 'medium';
-  if (contentCoverage <= 0.70) return 'high';
+  if (contentCoverage <= 0.1) return 'low';
+  if (contentCoverage <= 0.4) return 'medium';
+  if (contentCoverage <= 0.7) return 'high';
   return 'very_high';
 }
 ```
 
 ### 4.3 Rendering Pipeline
+
 - **PDF & Converted Office Files:** Rendered page-by-page via `pdfjs-dist` to an in-memory `node-canvas` at scale 0.5. `getImageData` passes to `computeFrameMetrics`. Operator list analysis remains as a secondary fallback.
 - **Uploaded Images:** Decoded and resized via `sharp` to a 400px bounding box, passed directly to `computeFrameMetrics`.
 - **Algorithm Version:** Monotonically bumped from `8` to `9` (`ANALYSIS_ALGORITHM_VERSION = 9`), forcing stale cache entries in `pricingAnalysisCacheStore` to recompute automatically.
 
 ### 4.4 Updated `PageAnalysis`
+
 ```ts
 export interface PageAnalysis {
   index: number;
   isColor: boolean;
-  coverage: number;             // contentCoverage (0.0 to 1.0)
-  colorCoverage: number;        // colorCoverage (0.0 to 1.0)
-  coverageTier: CoverageTier;   // 'low' | 'medium' | 'high' | 'very_high'
+  coverage: number; // contentCoverage (0.0 to 1.0)
+  colorCoverage: number; // colorCoverage (0.0 to 1.0)
+  coverageTier: CoverageTier; // 'low' | 'medium' | 'high' | 'very_high'
   isBlank: boolean;
   classification: 'blank' | 'bw' | 'color';
   fallbackReasonFlags?: string[];
 }
 ```
-*(Removed: `isImagePage` and `imageCoverage`.)*
+
+_(Removed: `isImagePage` and `imageCoverage`.)_
 
 ---
 
 ## 5. Quote Calculation Engine (`src/services/print-quote.ts`)
 
 ### 5.1 Pricing Math
+
 1. **Selected Pages:** Parsed from range (e.g. `all` or `1-5`). Let $N = |\text{selectedPages}|$.
 2. **Physical Sheets:**
    - Simplex: $S = N \times \text{copies}$
@@ -163,7 +172,9 @@ export interface PageAnalysis {
    - $\text{requiredAmount} = \text{paperSubtotal} + \text{printSubtotal} + \text{qualitySubtotal} - \text{bulkDiscounts}$
 
 ### 5.2 Quote Output Structure
+
 Includes itemized per-page breakdown and tamper-proof hash:
+
 ```ts
 export interface PrintPageQuoteBreakdown {
   pageNumber: number;
@@ -201,6 +212,7 @@ export interface PrintQuoteResult {
 ## 6. Admin Settings, Public Guide & Client UI Flow
 
 ### 6.1 Admin API & Settings Dashboard
+
 - `PUT /api/admin/settings` validates `paperProfiles`:
   - `paperCost >= 0`
   - Tier monotonicity: $\text{low} \le \text{medium} \le \text{high} \le \text{very\_high}$
@@ -208,11 +220,13 @@ export interface PrintQuoteResult {
 - Admin UI tab displays editable whole-peso inputs for Paper Sheet Cost and each coverage tier.
 
 ### 6.2 Public Pricing Guide (`/api/pricing-config` & `pricing-guide.ts`)
+
 - Returns the updated public pricing schema with `paperProfiles` containing `paperCost`, `bwPrint`, and `colorPrint`.
 - Renders an informative breakdown explaining coverage tiers (Low: text, Med: logos/charts, High: heavy graphics, Very High: full photos) and highlighting Duplex Paper Savings.
 
 ### 6.3 Customer Kiosk Flow
-- **Config Screen (`src/public/config/app.ts`):** Toggling Duplex immediately reflects reduced physical sheets and displays a green savings badge (e.g., *"Saved ₱5 on paper"*).
+
+- **Config Screen (`src/public/config/app.ts`):** Toggling Duplex immediately reflects reduced physical sheets and displays a green savings badge (e.g., _"Saved ₱5 on paper"_).
 - **Confirm Screen (`src/public/confirm/app.ts`):** Itemizes paper cost vs. print cost and submits the signed `quoteHash` to guarantee pricing integrity.
 
 ---
