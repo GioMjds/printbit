@@ -205,14 +205,14 @@ function setDocumentConversionEnabled(enabled: boolean): void {
 
   if (fileInput) {
     fileInput.accept = enabled
-      ? '.pdf,.doc,.docx,.jpeg,.jpg,.png'
-      : '.pdf,.jpeg,.jpg,.png';
+      ? '.pdf,.doc,.docx,.jpeg,.jpg,.png,.gif'
+      : '.pdf,.jpeg,.jpg,.png,.gif';
   }
 
   if (uploadSubTitle) {
     uploadSubTitle.textContent = enabled
-      ? 'PDF, DOCX, JPG, and PNG files only · up to 25 MB each'
-      : 'PDF, JPG, and PNG files only · up to 25 MB each';
+      ? 'PDF, DOCX, JPG, PNG, and GIF files only · up to 25 MB each'
+      : 'PDF, JPG, PNG, and GIF files only · up to 25 MB each';
   }
 
   if (dropZoneHint) {
@@ -254,6 +254,7 @@ function normalizeMimeByExtension(
     jpg: 'image/jpeg',
     jpeg: 'image/jpeg',
     png: 'image/png',
+    gif: 'image/gif',
   };
 
   if (normalizedMime !== '' && normalizedMime !== 'application/octet-stream') {
@@ -273,6 +274,7 @@ function collectUnsupportedFiles(files: File[]): UnsupportedFilesResult {
     'application/pdf',
     'image/jpeg',
     'image/png',
+    'image/gif',
   ]);
   if (documentConversionEnabled) {
     allowedMimeTypes.add('application/msword');

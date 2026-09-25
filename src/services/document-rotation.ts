@@ -6,7 +6,7 @@ import { PDFDocument, degrees } from 'pdf-lib';
 
 export type RotationDeg = 0 | 90 | 180 | 270;
 
-const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif']);
 
 export function parseRotationDeg(value: unknown): RotationDeg | null {
   if (value === 0 || value === 90 || value === 180 || value === 270) {

@@ -157,6 +157,7 @@ const ALLOWED_TYPES = new Map<string, string>([
   ],
   ['image/jpeg', '.jpg'],
   ['image/png', '.png'],
+  ['image/gif', '.gif'],
 ]);
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB

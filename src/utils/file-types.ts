@@ -7,6 +7,7 @@ export const ALLOWED_MIME_TYPES = new Set([
   // Images
   'image/jpeg',
   'image/png',
+  'image/gif',
   'application/octet-stream',
 ]);
 
@@ -17,6 +18,7 @@ export const ALLOWED_EXTENSIONS = new Set([
   '.jpg',
   '.jpeg',
   '.png',
+  '.gif',
 ]);
 
 export const REPORT_ATTACHMENT_ALLOWED_MIME_TYPES = new Set([
@@ -60,6 +62,10 @@ export const MAGIC_SIGNATURES: Record<string, MagicSignature[]> = {
   // Images
   'image/jpeg': [{ bytes: [0xff, 0xd8, 0xff] }],
   'image/png': [{ bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] }],
+  'image/gif': [
+    { bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] },
+    { bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] },
+  ],
 };
 
 export const REPORT_ATTACHMENT_MAGIC_SIGNATURES: Record<
@@ -82,6 +88,7 @@ export const EXTENSION_MIME_MAP: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
+  '.gif': 'image/gif',
 };
 
 export const REPORT_ATTACHMENT_EXTENSION_MIME_MAP: Record<string, string> = {
