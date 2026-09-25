@@ -16,15 +16,13 @@ declare const io: (opts?: {
   disconnect(): void;
 };
 
-const logsBody = document.getElementById('logsBody') as HTMLElement;
-const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
-const exportLogsBtn = document.getElementById(
-  'exportLogsBtn',
-) as HTMLButtonElement;
-const clearLogsBtn = document.getElementById('clearLogsBtn') as HTMLButtonElement;
-const prevPageBtn = document.getElementById('prevPageBtn') as HTMLButtonElement;
-const nextPageBtn = document.getElementById('nextPageBtn') as HTMLButtonElement;
-const pageInfo = document.getElementById('pageInfo') as HTMLElement;
+const logsBody = typeof document !== 'undefined' ? (document.getElementById('logsBody') as HTMLElement) : (null as unknown as HTMLElement);
+const refreshBtn = typeof document !== 'undefined' ? (document.getElementById('refreshBtn') as HTMLButtonElement) : (null as unknown as HTMLButtonElement);
+const exportLogsBtn = typeof document !== 'undefined' ? (document.getElementById('exportLogsBtn') as HTMLButtonElement) : (null as unknown as HTMLButtonElement);
+const clearLogsBtn = typeof document !== 'undefined' ? (document.getElementById('clearLogsBtn') as HTMLButtonElement) : (null as unknown as HTMLButtonElement);
+const prevPageBtn = typeof document !== 'undefined' ? (document.getElementById('prevPageBtn') as HTMLButtonElement) : (null as unknown as HTMLButtonElement);
+const nextPageBtn = typeof document !== 'undefined' ? (document.getElementById('nextPageBtn') as HTMLButtonElement) : (null as unknown as HTMLButtonElement);
+const pageInfo = typeof document !== 'undefined' ? (document.getElementById('pageInfo') as HTMLElement) : (null as unknown as HTMLElement);
 
 const PAGE_SIZE = 20;
 let refreshTimer: number | null = null;
@@ -215,80 +213,82 @@ async function clearAllLogs(): Promise<void> {
   setMessage('All system logs cleared.');
 }
 
-// Filter chips
-document.querySelectorAll<HTMLButtonElement>('.logs-filter-chip').forEach((chip) => {
-  chip.addEventListener('click', () => {
-    document.querySelectorAll('.logs-filter-chip').forEach((c) => c.classList.remove('is-active'));
-    chip.classList.add('is-active');
-    activeFilter = (chip.dataset.filter as LogFilter) || 'all';
-    currentPage = 1;
-    renderPage();
-  });
-});
-
-refreshBtn.addEventListener('click', () => {
-  setMessage('Refreshing...');
-  void loadData()
-    .then(() => setMessage('System logs refreshed.'))
-    .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : 'Refresh failed.'),
-    );
-});
-
-exportLogsBtn.addEventListener('click', () => {
-  setMessage('Preparing system logs export...');
-  void apiFetch('/api/admin/logs/system/export.csv')
-    .then(async (response) => {
-      if (!response.ok) throw new Error('Failed to export system logs.');
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `printbit-admin-system-logs-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-      setMessage('System logs exported.');
-    })
-    .catch((error: unknown) => {
-      const msg =
-        error instanceof Error ? error.message : 'Failed to export system logs.';
-      setMessage(msg);
-    });
-});
-
-clearLogsBtn.addEventListener('click', () => {
-  void clearAllLogs().catch(showRefreshError);
-});
-
-prevPageBtn.addEventListener('click', () => {
-  if (currentPage > 1) {
-    currentPage--;
-    renderPage();
-  }
-});
-
-nextPageBtn.addEventListener('click', () => {
-  if (currentPage < totalPages()) {
-    currentPage++;
-    renderPage();
-  }
-});
-
 function showRefreshError(error: unknown): void {
   setMessage(
     error instanceof Error ? error.message : 'Automatic refresh failed.',
   );
 }
 
-initAuth(async (signal) => {
-  connectSocket();
-  await loadData();
-  if (signal.aborted) return;
-  if (refreshTimer !== null) window.clearInterval(refreshTimer);
-  refreshTimer = window.setInterval(
-    () => void loadData().catch(showRefreshError),
-    10_000,
-  );
-});
+if (typeof document !== 'undefined') {
+  // Filter chips
+  document.querySelectorAll<HTMLButtonElement>('.logs-filter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.logs-filter-chip').forEach((c) => c.classList.remove('is-active'));
+      chip.classList.add('is-active');
+      activeFilter = (chip.dataset.filter as LogFilter) || 'all';
+      currentPage = 1;
+      renderPage();
+    });
+  });
+
+  refreshBtn?.addEventListener('click', () => {
+    setMessage('Refreshing...');
+    void loadData()
+      .then(() => setMessage('System logs refreshed.'))
+      .catch((e: unknown) =>
+        setMessage(e instanceof Error ? e.message : 'Refresh failed.'),
+      );
+  });
+
+  exportLogsBtn?.addEventListener('click', () => {
+    setMessage('Preparing system logs export...');
+    void apiFetch('/api/admin/logs/system/export.csv')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Failed to export system logs.');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `printbit-admin-system-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+        setMessage('System logs exported.');
+      })
+      .catch((error: unknown) => {
+        const msg =
+          error instanceof Error ? error.message : 'Failed to export system logs.';
+        setMessage(msg);
+      });
+  });
+
+  clearLogsBtn?.addEventListener('click', () => {
+    void clearAllLogs().catch(showRefreshError);
+  });
+
+  prevPageBtn?.addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderPage();
+    }
+  });
+
+  nextPageBtn?.addEventListener('click', () => {
+    if (currentPage < totalPages()) {
+      currentPage++;
+      renderPage();
+    }
+  });
+
+  initAuth(async (signal) => {
+    connectSocket();
+    await loadData();
+    if (signal.aborted) return;
+    if (refreshTimer !== null) window.clearInterval(refreshTimer);
+    refreshTimer = window.setInterval(
+      () => void loadData().catch(showRefreshError),
+      10_000,
+    );
+  });
+}

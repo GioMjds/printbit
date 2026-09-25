@@ -139,7 +139,7 @@ document.getElementById('documentCareClose')?.addEventListener('click', () => { 
 documentCareModal?.addEventListener('click', (event) => { if (event.target === documentCareModal) document.getElementById('documentCareClose')?.click(); });
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') document.getElementById('documentCareClose')?.click(); });
 
-type CopyPaperSize = 'A4' | 'Letter' | 'Legal';
+type CopyPaperSize = 'A4' | 'Short' | 'Long';
 
 const copySourcePaperSizeRadios = document.querySelectorAll<HTMLInputElement>(
   'input[name="copySourcePaperSize"]',
@@ -153,14 +153,14 @@ function getSelectedCopyPaperSize(): CopyPaperSize {
   const checked = document.querySelector<HTMLInputElement>(
     'input[name="copySourcePaperSize"]:checked',
   );
-  if (checked?.value === 'Letter' || checked?.value === 'Legal') {
+  if (checked?.value === 'Short' || checked?.value === 'Long') {
     return checked.value;
   }
   return 'A4';
 }
 
 function updateCopySourceInstructions(paperSize: CopyPaperSize): void {
-  const isAdf = paperSize === 'Legal';
+  const isAdf = paperSize === 'Long';
   if (copyStep1Desc) {
     copyStep1Desc.textContent = isAdf
       ? 'Insert document face-up into the ADF, short edge first'
@@ -738,13 +738,13 @@ async function checkForDocument(): Promise<void> {
       showError(
         data.error ??
           'No document detected. Place your document face-down on the scanner glass and try again.',
-        paperSize === 'Legal',
+        paperSize === 'Long',
       );
     }
   } catch {
     showOverlay(false);
     setCopySourceRadiosDisabled(false);
-    showError('Could not reach the scanner. Please try again.', paperSize === 'Legal');
+    showError('Could not reach the scanner. Please try again.', paperSize === 'Long');
   } finally {
     setBackNavigationLocked(false);
     if (checkDocBtn) checkDocBtn.disabled = false;
@@ -777,8 +777,12 @@ window.addEventListener('beforeunload', clearPreviewImageUrl);
 
 async function initializeCopyPage(): Promise<void> {
   const savedSourceSize = sessionStorage.getItem('printbit.copySourcePaperSize');
-  if (savedSourceSize === 'A4' || savedSourceSize === 'Letter' || savedSourceSize === 'Legal') {
+  if (savedSourceSize === 'A4' || savedSourceSize === 'Short' || savedSourceSize === 'Long') {
     setCopySourcePaperSize(savedSourceSize);
+  } else if (savedSourceSize === 'Letter') {
+    setCopySourcePaperSize('Short');
+  } else if (savedSourceSize === 'Legal') {
+    setCopySourcePaperSize('Long');
   } else {
     updateCopySourceInstructions('A4');
   }

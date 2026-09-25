@@ -116,7 +116,7 @@ interface ConfirmPaymentBody {
   quality?: 'standard' | 'high';
   orientation?: 'portrait' | 'landscape';
   rotationDeg?: number;
-  paperSize?: 'A4' | 'Letter' | 'Legal';
+  paperSize?: 'A4' | 'Short' | 'Long';
   pageRange?: unknown;
   duplex?: boolean;
   paymentLeaseId?: string;
@@ -808,11 +808,11 @@ export class FinancialService {
     const requestedQuality: 'standard' | 'high' =
       req.body?.quality === 'high' ? 'high' : 'standard';
     const duplex = req.body?.duplex === true;
-    const requestedPaperSize: 'A4' | 'Letter' | 'Legal' =
-      req.body?.paperSize === 'Legal'
-        ? 'Legal'
-        : req.body?.paperSize === 'Letter'
-          ? 'Letter'
+    const requestedPaperSize: 'A4' | 'Short' | 'Long' =
+      req.body?.paperSize === 'Long' || req.body?.paperSize === 'Legal'
+        ? 'Long'
+        : req.body?.paperSize === 'Short' || req.body?.paperSize === 'Letter'
+          ? 'Short'
           : 'A4';
 
     const quoteComputation = buildPrintQuote({
@@ -1303,11 +1303,11 @@ export class FinancialService {
       return;
     }
     const rotationDeg = normalizeRotationDeg(req.body?.rotationDeg, 0);
-    const paperSize: 'A4' | 'Letter' | 'Legal' =
-      req.body?.paperSize === 'Legal'
-        ? 'Legal'
-        : req.body?.paperSize === 'Letter'
-          ? 'Letter'
+    const paperSize: 'A4' | 'Short' | 'Long' =
+      req.body?.paperSize === 'Long' || req.body?.paperSize === 'Legal'
+        ? 'Long'
+        : req.body?.paperSize === 'Short' || req.body?.paperSize === 'Letter'
+          ? 'Short'
           : 'A4';
     const quality: 'standard' | 'high' =
       req.body?.quality === 'high' ? 'high' : 'standard';

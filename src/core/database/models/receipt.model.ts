@@ -23,7 +23,7 @@ export interface ReceiptChangeSnapshot {
 export interface ReceiptPrintConfigurationSnapshot {
   copies: number | null;
   colorMode: 'colored' | 'grayscale' | null;
-  paperSize: 'A4' | 'Letter' | 'Legal' | null;
+  paperSize: 'A4' | 'Short' | 'Long' | null;
   quality: 'standard' | 'high' | null;
   duplex: boolean | null;
   orientation: 'portrait' | 'landscape' | null;
@@ -589,8 +589,8 @@ export class ReceiptSqliteStore {
             : null,
         paperSize:
           rawConfiguration.paperSize === 'A4' ||
-          rawConfiguration.paperSize === 'Letter' ||
-          rawConfiguration.paperSize === 'Legal'
+          rawConfiguration.paperSize === 'Short' ||
+          rawConfiguration.paperSize === 'Long'
             ? rawConfiguration.paperSize
             : null,
         quality:

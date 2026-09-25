@@ -52,7 +52,7 @@ export class AdminService {
           imageBwPages?: number;
         },
     copies: number,
-    paperSize: 'A4' | 'Letter' | 'Legal' = 'A4',
+    paperSize: 'A4' | 'Short' | 'Long' = 'A4',
     quality: PrintQuality = 'standard',
   ): number {
     const safeCopies = Math.max(1, Math.floor(copies));
@@ -65,7 +65,11 @@ export class AdminService {
 
     // Pricing Engine logic is now mandatory
     const profileKey =
-      paperSize === 'Legal' ? 'longBond' : paperSize === 'Letter' ? 'shortBond' : 'a4';
+      paperSize === 'Long' || (paperSize as any) === 'Legal'
+        ? 'longBond'
+        : paperSize === 'Short' || (paperSize as any) === 'Letter'
+          ? 'shortBond'
+          : 'a4';
     const profile = engineCfg?.paperProfiles?.[profileKey] ?? {
       baseBwPrice: profileKey === 'longBond' ? 4 : 3,
       baseColorPrice: profileKey === 'longBond' ? 20 : 18,
@@ -123,7 +127,7 @@ export class AdminService {
       imageBwPages?: number;
     },
     copies: number,
-    paperSize: 'A4' | 'Letter' | 'Legal' = 'A4',
+    paperSize: 'A4' | 'Short' | 'Long',
     quality: PrintQuality = 'standard',
   ): number {
     return this.calculateJobAmount(mode, pageCounts, copies, paperSize, quality);

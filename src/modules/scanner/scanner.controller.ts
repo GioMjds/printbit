@@ -23,7 +23,7 @@ type InteractiveScanBody = {
   source?: 'feeder' | 'glass';
   color?: 'color' | 'grayscale';
   dpi?: string | number;
-  paperSize?: 'A4' | 'Letter' | 'Legal';
+  paperSize?: 'A4' | 'Short' | 'Long';
   format?: 'pdf' | 'jpg' | 'png';
 };
 
@@ -120,7 +120,7 @@ export class ScannerController {
         source: body.source as 'feeder' | 'glass',
         color: body.color as 'color' | 'grayscale',
         dpi: body.dpi as string | number,
-        paperSize: body.paperSize as 'A4' | 'Letter' | 'Legal',
+        paperSize: body.paperSize as 'A4' | 'Short' | 'Long',
         format: body.format as 'pdf' | 'jpg' | 'png' | undefined,
       });
       res.json(result);
@@ -174,6 +174,8 @@ export class ScannerController {
         filename: safeFilename,
         io: this.deps.io,
         publicBaseUrl: this.deps.resolvePublicBaseUrl(req).toString(),
+        orientation: req.body?.orientation,
+        rotationDeg: req.body?.rotationDeg,
       });
       res.json(result);
     } catch (error) {
@@ -229,6 +231,14 @@ export class ScannerController {
       const message = this.getErrorMessage(error, 'Charging failed.');
       if (message === 'Scanned file not found.') {
         res.status(404).json({ error: message });
+        return;
+      }
+      if (message.startsWith('Invalid rotation')) {
+        res.status(400).json({ error: message });
+        return;
+      }
+      if (message.startsWith('Rotation is not supported')) {
+        res.status(409).json({ error: message });
         return;
       }
 
@@ -488,11 +498,11 @@ export class ScannerController {
     }
 
     const body = (req.body ?? {}) as {
-      paperSize?: 'A4' | 'Letter' | 'Legal';
+      paperSize?: 'A4' | 'Short' | 'Long';
     };
     try {
       const preview = await this.scannerService.previewScan(
-        body.paperSize as 'A4' | 'Letter' | 'Legal',
+        body.paperSize as 'A4' | 'Short' | 'Long',
       );
       res.json(preview);
     } catch (error) {

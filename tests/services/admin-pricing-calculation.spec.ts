@@ -46,15 +46,15 @@ describe('AdminService Pricing Calculations with Image B/W', () => {
     expect(amount).toBe(10);
   });
 
-  it('calculates amount for 1 Image Color page and 1 Image B/W page on Legal with 2 copies', () => {
+  it('calculates amount for 1 Image Color page and 1 Image B/W page on Long with 2 copies', () => {
     const amount = adminService.calculateDocumentAmount(
       'print',
       { colorPages: 0, bwPages: 0, imagePages: 1, imageBwPages: 1 },
       2,
-      'Legal',
+      'Long',
       'standard',
     );
-    // Legal: baseImagePrice = 30, baseImageBwPrice = 12 -> (30 + 12) * 2 = 84
+    // Long: baseImagePrice = 30, baseImageBwPrice = 12 -> (30 + 12) * 2 = 84
     expect(amount).toBe(84);
   });
 });

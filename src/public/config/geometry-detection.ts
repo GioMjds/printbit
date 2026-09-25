@@ -1,5 +1,5 @@
 export type Orientation = 'portrait' | 'landscape';
-export type PaperSize = 'A4' | 'Letter' | 'Legal';
+export type PaperSize = 'A4' | 'Short' | 'Long';
 
 export interface DocumentDimensions {
   width: number;
@@ -27,8 +27,8 @@ export function detectOrientationFromDimensions(
 
 /**
  * Detects paper size from document dimensions in points (72 DPI).
- * - Legal: long dimension > 880 pt (e.g. Long Bond @ 936 pt, US Legal @ 1008 pt)
- * - Letter: long dimension < 815 pt (e.g. US Letter @ 792 pt)
+ * - Long: long dimension > 880 pt (e.g. Long Bond @ 936 pt, US Legal @ 1008 pt)
+ * - Short: long dimension < 815 pt (e.g. US Letter / Short Bond @ 792 pt)
  * - A4: otherwise (e.g. A4 @ ~842 pt)
  */
 export function detectPaperSizeFromDimensions(
@@ -44,7 +44,7 @@ export function detectPaperSizeFromDimensions(
     return null;
   }
   const longDim = Math.max(width, height);
-  if (longDim > 880) return 'Legal';
-  if (longDim < 815) return 'Letter';
+  if (longDim > 880) return 'Long';
+  if (longDim < 815) return 'Short';
   return 'A4';
 }

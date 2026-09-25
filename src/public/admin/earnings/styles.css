@@ -130,6 +130,8 @@
 }
 
 .anchor-btn--calendar {
+  position: relative;
+  overflow: hidden;
   width: auto;
   padding: 0 12px;
   gap: 6px;
@@ -154,12 +156,26 @@
 
 .anchor-input {
   position: absolute;
-  width: 0;
-  height: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0;
-  padding: 0;
+  cursor: pointer;
   border: 0;
-  pointer-events: none;
+  padding: 0;
+  margin: 0;
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.anchor-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* ─── Period label + trend grid ────────────────────────────────────────────── */
@@ -352,7 +368,8 @@
   color: var(--white);
 }
 .view-switch__btn:focus-visible,
-.anchor-btn:focus-visible {
+.anchor-btn:focus-visible,
+.anchor-btn--calendar:focus-within {
   outline: 2px solid var(--lavender);
   outline-offset: 2px;
 }

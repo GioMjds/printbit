@@ -60,7 +60,7 @@ export interface PrintJobSettings {
   colorMode?: 'colored' | 'grayscale';
   orientation?: 'portrait' | 'landscape';
   rotationDeg?: number;
-  paperSize?: 'A4' | 'Letter' | 'Legal';
+  paperSize?: 'A4' | 'Short' | 'Long';
   duplex?: boolean;
   pageRange?: string | null;
 }
@@ -96,9 +96,9 @@ export interface PrintJobRequest {
   rotationDeg: number;
 
   /**
-   * Paper size: A4, Letter, Legal
+   * Paper size: A4, Short, Long
    */
-  paperSize: 'A4' | 'Letter' | 'Legal';
+  paperSize: 'A4' | 'Short' | 'Long';
 
   /**
    * Duplex (double-sided) printing

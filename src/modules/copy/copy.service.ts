@@ -78,7 +78,7 @@ export interface GetCopyQuoteInput {
   copies?: number;
   colorMode?: 'colored' | 'grayscale';
   quality?: 'standard' | 'high';
-  paperSize?: 'A4' | 'Letter' | 'Legal';
+  paperSize?: 'A4' | 'Short' | 'Long';
   pageRange?: unknown;
   duplex?: boolean;
 }
@@ -118,7 +118,7 @@ interface NormalizedCopyJobInput {
   quality: 'standard' | 'high';
   orientation: 'portrait' | 'landscape';
   rotationDeg: RotationDeg;
-  paperSize: 'A4' | 'Letter' | 'Legal';
+  paperSize: 'A4' | 'Short' | 'Long';
   pageRange?: unknown;
   duplex: boolean;
   amount?: number;
@@ -175,7 +175,7 @@ export class CopyService {
     copies: number;
     colorMode: 'colored' | 'grayscale';
     quality?: 'standard' | 'high';
-    paperSize: 'A4' | 'Letter' | 'Legal';
+    paperSize: 'A4' | 'Short' | 'Long';
     pageRange?: unknown;
     duplex: boolean;
   }): Promise<
@@ -802,7 +802,12 @@ export class CopyService {
       copies: input.copies ?? 1,
       colorMode: input.colorMode ?? 'grayscale',
       quality: input.quality === 'high' ? 'high' : 'standard',
-      paperSize: input.paperSize ?? 'A4',
+      paperSize:
+        input.paperSize === 'Long' || (input.paperSize as any) === 'Legal'
+          ? 'Long'
+          : input.paperSize === 'Short' || (input.paperSize as any) === 'Letter'
+            ? 'Short'
+            : 'A4',
       pageRange: input.pageRange ?? { type: 'all' },
       duplex: input.duplex === true,
     });
@@ -837,11 +842,11 @@ export class CopyService {
       input.orientation && VALID_ORIENTATIONS.has(input.orientation)
         ? (input.orientation as 'portrait' | 'landscape')
         : 'portrait';
-    const safePaperSize: 'A4' | 'Letter' | 'Legal' =
-      input.paperSize === 'Legal'
-        ? 'Legal'
-        : input.paperSize === 'Letter'
-          ? 'Letter'
+    const safePaperSize: 'A4' | 'Short' | 'Long' =
+      input.paperSize === 'Long'
+        ? 'Long'
+        : input.paperSize === 'Short'
+          ? 'Short'
           : 'A4';
     const safeRotationDeg = normalizeRotationDeg(input.rotationDeg, 0);
     const safePreviewPath =

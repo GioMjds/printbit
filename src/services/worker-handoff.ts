@@ -32,7 +32,7 @@ export async function handoffToWorker(input: {
     duplex?: boolean;
     orientation?: string | null;
     rotationDeg?: number;
-    paperSize?: 'A4' | 'Letter' | 'Legal';
+    paperSize?: 'A4' | 'Short' | 'Long';
     quality?: 'standard' | 'high';
     scaling?: PrintScaling;
   };

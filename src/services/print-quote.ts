@@ -183,7 +183,7 @@ export function buildPrintQuote(input: {
   analysis: DocumentAnalysis;
   colorMode: ColorMode;
   copies: number;
-  paperSize?: 'A4' | 'Letter' | 'Legal';
+  paperSize?: 'A4' | 'Short' | 'Long';
   pageRange?: unknown;
   duplex?: boolean;
   quality?: PrintQuality;

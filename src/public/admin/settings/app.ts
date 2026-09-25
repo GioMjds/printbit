@@ -787,25 +787,25 @@ settingsForm.addEventListener('submit', (e) => {
 
   if (settingShortBondBwPrice && !isWholePeso(shortBondBwPrice)) {
     setMessage(
-      'Short (Letter) B&W price must be a whole peso value (no decimals).',
+      'Short B&W price must be a whole peso value (no decimals).',
     );
     return;
   }
   if (settingShortBondColorPrice && !isWholePeso(shortBondColorPrice)) {
     setMessage(
-      'Short (Letter) Color price must be a whole peso value (no decimals).',
+      'Short Color price must be a whole peso value (no decimals).',
     );
     return;
   }
   if (settingShortBondImagePrice && !isWholePeso(shortBondImagePrice)) {
     setMessage(
-      'Short (Letter) Photo/Image price must be a whole peso value (no decimals).',
+      'Short Photo/Image price must be a whole peso value (no decimals).',
     );
     return;
   }
   if (settingShortBondImageBwPrice && !isWholePeso(shortBondImageBwPrice)) {
     setMessage(
-      'Short (Letter) Photo/Image (B&W) price must be a whole peso value (no decimals).',
+      'Short Photo/Image (B&W) price must be a whole peso value (no decimals).',
     );
     return;
   }
@@ -814,7 +814,7 @@ settingsForm.addEventListener('submit', (e) => {
     settingShortBondColorPrice &&
     shortBondColorPrice < shortBondBwPrice
   ) {
-    setMessage('Short (Letter) Color price cannot be less than B&W price.');
+    setMessage('Short Color price cannot be less than B&W price.');
     return;
   }
   if (
@@ -823,7 +823,7 @@ settingsForm.addEventListener('submit', (e) => {
     shortBondImagePrice < shortBondColorPrice
   ) {
     setMessage(
-      'Short (Letter) Photo/Image price cannot be less than Color price.',
+      'Short Photo/Image price cannot be less than Color price.',
     );
     return;
   }
@@ -833,7 +833,7 @@ settingsForm.addEventListener('submit', (e) => {
     shortBondImageBwPrice < shortBondBwPrice
   ) {
     setMessage(
-      'Short (Letter) Photo/Image (B&W) price cannot be less than B&W price.',
+      'Short Photo/Image (B&W) price cannot be less than B&W price.',
     );
     return;
   }
@@ -843,32 +843,32 @@ settingsForm.addEventListener('submit', (e) => {
     shortBondImageBwPrice > shortBondImagePrice
   ) {
     setMessage(
-      'Short (Letter) Photo/Image (B&W) price cannot be greater than Photo/Image price.',
+      'Short Photo/Image (B&W) price cannot be greater than Photo/Image price.',
     );
     return;
   }
 
   if (settingLongBondBwPrice && !isWholePeso(longBondBwPrice)) {
     setMessage(
-      'Long (Legal) B&W price must be a whole peso value (no decimals).',
+      'Long B&W price must be a whole peso value (no decimals).',
     );
     return;
   }
   if (settingLongBondColorPrice && !isWholePeso(longBondColorPrice)) {
     setMessage(
-      'Long (Legal) Color price must be a whole peso value (no decimals).',
+      'Long Color price must be a whole peso value (no decimals).',
     );
     return;
   }
   if (settingLongBondImagePrice && !isWholePeso(longBondImagePrice)) {
     setMessage(
-      'Long (Legal) Photo/Image price must be a whole peso value (no decimals).',
+      'Long Photo/Image price must be a whole peso value (no decimals).',
     );
     return;
   }
   if (settingLongBondImageBwPrice && !isWholePeso(longBondImageBwPrice)) {
     setMessage(
-      'Long (Legal) Photo/Image (B&W) price must be a whole peso value (no decimals).',
+      'Long Photo/Image (B&W) price must be a whole peso value (no decimals).',
     );
     return;
   }
@@ -877,7 +877,7 @@ settingsForm.addEventListener('submit', (e) => {
     settingLongBondColorPrice &&
     longBondColorPrice < longBondBwPrice
   ) {
-    setMessage('Long (Legal) Color price cannot be less than B&W price.');
+    setMessage('Long Color price cannot be less than B&W price.');
     return;
   }
   if (
@@ -886,7 +886,7 @@ settingsForm.addEventListener('submit', (e) => {
     longBondImagePrice < longBondColorPrice
   ) {
     setMessage(
-      'Long (Legal) Photo/Image price cannot be less than Color price.',
+      'Long Photo/Image price cannot be less than Color price.',
     );
     return;
   }
@@ -896,7 +896,7 @@ settingsForm.addEventListener('submit', (e) => {
     longBondImageBwPrice < longBondBwPrice
   ) {
     setMessage(
-      'Long (Legal) Photo/Image (B&W) price cannot be less than B&W price.',
+      'Long Photo/Image (B&W) price cannot be less than B&W price.',
     );
     return;
   }
@@ -906,7 +906,7 @@ settingsForm.addEventListener('submit', (e) => {
     longBondImageBwPrice > longBondImagePrice
   ) {
     setMessage(
-      'Long (Legal) Photo/Image (B&W) price cannot be greater than Photo/Image price.',
+      'Long Photo/Image (B&W) price cannot be greater than Photo/Image price.',
     );
     return;
   }

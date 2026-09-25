@@ -38,9 +38,9 @@ const DEFAULT_PRICING = {
 } satisfies PublicPricingConfig;
 
 const PAPER_LABELS = {
-  shortBond: 'Short bond',
-  a4: 'A4',
-  longBond: 'Long bond',
+  shortBond: 'Short Bond Paper',
+  a4: 'A4 Bond Paper',
+  longBond: 'Long Bond Paper',
 } satisfies Record<PaperProfileKey, string>;
 
 function safeAmount(value: unknown, fallback: number): number {

@@ -16,6 +16,7 @@ describe('pricing-guide', () => {
       baseBwPrice: 5,
       baseColorPrice: 20,
       baseImagePrice: 30,
+      baseImageBwPrice: 10,
     });
     expect(normalized.paperProfiles.shortBond.baseImagePrice).toBe(25);
     expect(normalized.paperProfiles.longBond.baseImagePrice).toBe(30);

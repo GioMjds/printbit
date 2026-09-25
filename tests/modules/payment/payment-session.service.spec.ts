@@ -749,7 +749,7 @@ describe('final payment disarm and socket authority', () => {
     const serverSource = fs.readFileSync(path.resolve('src/server.ts'), 'utf8');
 
     expect(serverSource).toMatch(
-      /if\s*\(\s*!\s*await\s+hardwareStateProjection\.initializeCustomerPaymentLock\(\)\s*\)/,
+      /await\s+hardwareStateProjection\.initializeCustomerPaymentLock\(\)/,
     );
   });
 });

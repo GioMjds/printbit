@@ -44,7 +44,7 @@ void initializePageIdleTimeout({
 type ScanSource = 'feeder' | 'glass';
 type ScanColor = 'color' | 'grayscale';
 type ScanDpi = '150' | '300' | '600';
-type ScanPaperSize = 'A4' | 'Letter' | 'Legal';
+type ScanPaperSize = 'A4' | 'Short' | 'Long';
 export type ScanExportFormat = 'pdf' | 'jpg' | 'png';
 
 interface ScanResponse {
@@ -68,7 +68,11 @@ interface StoredScanConfig {
   currentPage?: number;
   paperSize?: string;
   scanFormat?: ScanExportFormat;
+  rotationDeg?: number;
 }
+
+type RotationDeg = 0 | 90 | 180 | 270;
+let scanRotationDeg: RotationDeg = 0;
 
 type PdfjsLib = {
   GlobalWorkerOptions: { workerSrc: string };
@@ -118,9 +122,16 @@ const pageCountText = document.getElementById('pageCountText') as HTMLElement;
 const previewControls = document.getElementById(
   'previewControls',
 ) as HTMLElement;
+const pagerGroup = document.getElementById('pagerGroup') as HTMLElement | null;
 const pagePrev = document.getElementById('pagePrev') as HTMLButtonElement;
 const pageNext = document.getElementById('pageNext') as HTMLButtonElement;
 const pagerLabel = document.getElementById('pagerLabel') as HTMLElement;
+const rotateScanBtn = document.getElementById(
+  'rotateScanBtn',
+) as HTMLButtonElement | null;
+const rotateScanLabel = document.getElementById(
+  'rotateScanLabel',
+) as HTMLElement | null;
 
 const scanBtn = document.getElementById('scanBtn') as HTMLButtonElement;
 const scanBtnLabel = document.getElementById('scanBtnLabel') as HTMLElement;
@@ -259,7 +270,7 @@ function getSelectedScanPaperSize(): ScanPaperSize {
   const checked = document.querySelector<HTMLInputElement>(
     'input[name="scanSourcePaperSize"]:checked',
   );
-  if (checked?.value === 'Letter' || checked?.value === 'Legal') {
+  if (checked?.value === 'Short' || checked?.value === 'Long') {
     return checked.value;
   }
   return 'A4';
@@ -381,8 +392,10 @@ async function renderPdfPage(n: number): Promise<void> {
   pageCountText.textContent = `${pdfPageCount} page${pdfPageCount !== 1 ? 's' : ''}`;
 
   const multi = pdfPageCount > 1;
-  previewControls.style.display = multi ? 'flex' : 'none';
+  if (pagerGroup) pagerGroup.style.display = multi ? 'flex' : 'none';
   pageCountBadge.style.display = multi ? 'inline-flex' : 'none';
+  previewControls.style.display = 'flex';
+  applyScanRotation();
 
   saveScanStateToSession();
 }
@@ -492,6 +505,30 @@ async function releaseScanFile(
   }
 }
 
+function applyScanRotation(): void {
+  if (!scannedResult) return;
+  const activeEl =
+    scannedPdfCanvas && scannedPdfCanvas.style.display !== 'none'
+      ? scannedPdfCanvas
+      : scannedImage;
+  const w = activeEl?.clientWidth || scannedResult.clientWidth || 300;
+  const h = activeEl?.clientHeight || scannedResult.clientHeight || 400;
+  const scale =
+    scanRotationDeg === 90 || scanRotationDeg === 270
+      ? Math.min(w / h, h / w)
+      : 1;
+
+  scannedResult.style.setProperty('--preview-rotation', `${scanRotationDeg}deg`);
+  scannedResult.style.setProperty(
+    '--preview-rotation-scale',
+    scale.toFixed(4),
+  );
+  if (rotateScanLabel) {
+    rotateScanLabel.textContent =
+      scanRotationDeg === 0 ? 'Rotate 90°' : `Rotate (${scanRotationDeg}°)`;
+  }
+}
+
 function showPreview(
   name: 'idle' | 'scanning' | 'result' | 'error',
   hint?: string,
@@ -501,6 +538,12 @@ function showPreview(
     el.classList.toggle('hidden', key !== name);
   }
   if (hint !== undefined) previewHint.textContent = hint;
+  if (name === 'result') {
+    previewControls.style.display = 'flex';
+    applyScanRotation();
+  } else {
+    previewControls.style.display = 'none';
+  }
 }
 
 function goToPage(n: number): void {
@@ -514,6 +557,9 @@ function goToPage(n: number): void {
 
   n = Math.max(0, Math.min(scannedPages.length - 1, n));
   currentPage = n;
+  scannedImage.onload = () => {
+    applyScanRotation();
+  };
   scannedImage.src = scannedPages[n];
   scannedImage.removeAttribute('data-gray');
 
@@ -528,9 +574,11 @@ function goToPage(n: number): void {
 
 function updatePager(): void {
   const multi = scannedPages.length > 1;
-  previewControls.style.display = multi ? 'flex' : 'none';
+  if (pagerGroup) pagerGroup.style.display = multi ? 'flex' : 'none';
   pageCountBadge.style.display = multi ? 'inline-flex' : 'none';
+  previewControls.style.display = 'flex';
   if (scannedPages.length > 0) goToPage(currentPage);
+  applyScanRotation();
 }
 
 function formatPeso(value: number): string {
@@ -577,10 +625,13 @@ function saveScanStateToSession(
       sessionId: null,
       colorMode: 'colored',
       copies: 1,
-      orientation: 'portrait',
+      orientation:
+        scanRotationDeg === 90 || scanRotationDeg === 270
+          ? 'landscape'
+          : 'portrait',
       paperSize,
       scanFormat,
-      rotationDeg: 0,
+      rotationDeg: scanRotationDeg,
     }),
   );
 }
@@ -634,10 +685,14 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
 
   if (
     storedConfig.paperSize === 'A4' ||
-    storedConfig.paperSize === 'Letter' ||
-    storedConfig.paperSize === 'Legal'
+    storedConfig.paperSize === 'Short' ||
+    storedConfig.paperSize === 'Long'
   ) {
     setScanSourcePaperSize(storedConfig.paperSize);
+  } else if (storedConfig.paperSize === 'Letter') {
+    setScanSourcePaperSize('Short');
+  } else if (storedConfig.paperSize === 'Legal') {
+    setScanSourcePaperSize('Long');
   }
   setScanSourceRadiosDisabled(true);
 
@@ -649,6 +704,16 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
     setScanExportFormat(storedConfig.scanFormat);
   }
   setScanFormatRadiosDisabled(true);
+
+  if (
+    storedConfig.rotationDeg === 90 ||
+    storedConfig.rotationDeg === 180 ||
+    storedConfig.rotationDeg === 270
+  ) {
+    scanRotationDeg = storedConfig.rotationDeg;
+  } else {
+    scanRotationDeg = 0;
+  }
 
   if (restoredFilename.toLowerCase().endsWith('.pdf')) {
     try {
@@ -663,6 +728,7 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
     showPreview('result', 'Restored your scanned document preview.');
     updatePager();
   }
+  applyScanRotation();
   hideScanTroubleshooting();
   updateSoftCopyPricingUi();
   if (clearBtn) clearBtn.style.display = 'flex';
@@ -859,6 +925,8 @@ function clearScan(): void {
   setScanSourceRadiosDisabled(false);
   setScanFormatRadiosDisabled(false);
   hideScanTroubleshooting();
+  scanRotationDeg = 0;
+  applyScanRotation();
   showPreview('idle', 'Insert document into the feeder and press Scan');
   previewControls.style.display = 'none';
   pageCountBadge.style.display = 'none';
@@ -876,6 +944,18 @@ function clearScan(): void {
 
 clearBtn?.addEventListener('click', () => {
   if (!scanBtn.disabled) clearScan();
+});
+
+rotateScanBtn?.addEventListener('click', () => {
+  scanRotationDeg = (((scanRotationDeg + 90) % 360) as RotationDeg);
+  applyScanRotation();
+  saveScanStateToSession();
+});
+
+window.addEventListener('resize', () => {
+  if (stateResult && !stateResult.classList.contains('hidden')) {
+    applyScanRotation();
+  }
 });
 
 proceedBtn.addEventListener('click', () => {

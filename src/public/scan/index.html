@@ -230,46 +230,61 @@
             </div>
             <!-- /preview-area -->
 
-            <!-- Page navigation -->
+            <!-- Preview controls: page navigation & rotate -->
             <div
               class="preview-controls"
               id="previewControls"
               style="display: none"
               role="toolbar"
-              aria-label="Page navigation"
+              aria-label="Preview controls"
             >
+              <div class="preview-controls__pager" id="pagerGroup" style="display: none">
+                <button
+                  class="pager-btn"
+                  id="pagePrev"
+                  aria-label="Previous page"
+                  disabled
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                      fill-rule="evenodd"
+                      d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0
+                      01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+                <span class="pager-label" id="pagerLabel" aria-live="polite"
+                  >1 / 1</span
+                >
+                <button
+                  class="pager-btn"
+                  id="pageNext"
+                  aria-label="Next page"
+                  disabled
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                      fill-rule="evenodd"
+                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0
+                      011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
               <button
-                class="pager-btn"
-                id="pagePrev"
-                aria-label="Previous page"
-                disabled
+                type="button"
+                class="rotate-btn"
+                id="rotateScanBtn"
+                aria-label="Rotate document 90 degrees"
+                title="Rotate document 90 degrees"
               >
-                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path
-                    fill-rule="evenodd"
-                    d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0
-                    01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                    clip-rule="evenodd"
-                  />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24" />
+                  <path d="M21 3v6h-6" />
                 </svg>
-              </button>
-              <span class="pager-label" id="pagerLabel" aria-live="polite"
-                >1 / 1</span
-              >
-              <button
-                class="pager-btn"
-                id="pageNext"
-                aria-label="Next page"
-                disabled
-              >
-                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path
-                    fill-rule="evenodd"
-                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0
-                    011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
+                <span id="rotateScanLabel">Rotate 90°</span>
               </button>
             </div>
           </div>
@@ -297,7 +312,7 @@
                 <input
                   type="radio"
                   name="scanSourcePaperSize"
-                  value="Letter"
+                  value="Short"
                 />
                 <span class="source-size-option__label">Short Bond</span>
               </label>
@@ -305,7 +320,7 @@
                 <input
                   type="radio"
                   name="scanSourcePaperSize"
-                  value="Legal"
+                  value="Long"
                 />
                 <span class="source-size-option__label">Long Bond</span>
               </label>

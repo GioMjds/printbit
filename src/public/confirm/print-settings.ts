@@ -10,7 +10,7 @@ export interface PhysicalPrintSelection {
   quality?: 'standard' | 'high';
   orientation: 'portrait' | 'landscape';
   rotationDeg?: number;
-  paperSize: 'A4' | 'Letter' | 'Legal';
+  paperSize: 'A4' | 'Short' | 'Long';
   pageRange?: PageRangeSelection;
 }
 

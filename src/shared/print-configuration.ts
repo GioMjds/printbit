@@ -1,13 +1,13 @@
 /** Wire/layout contract: see docs/printing-configuration.md. Units are PDF points. */
-export type PaperSize = 'A4' | 'Letter' | 'Legal';
+export type PaperSize = 'A4' | 'Short' | 'Long';
 export type Orientation = 'portrait' | 'landscape';
 export type PrintScaling = 'fit' | 'actual';
 export const DEFAULT_PRINT_SCALING: PrintScaling = 'fit';
 export const PRINT_MARGIN_POINTS = 14.4;
 export const PAPER_POINTS = {
   A4: [595.28, 841.89],
-  Letter: [612, 792],
-  Legal: [612, 936],
+  Short: [612, 792],
+  Long: [612, 936],
 } satisfies Record<PaperSize, readonly [number, number]>;
 
 export interface PrintConfiguration {

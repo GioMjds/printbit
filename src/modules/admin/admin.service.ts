@@ -162,7 +162,7 @@ export class AdminService {
           imageBwPages?: number;
         },
     copies: number,
-    paperSize: 'A4' | 'Letter' | 'Legal' = 'A4',
+    paperSize: 'A4' | 'Short' | 'Long' = 'A4',
     quality: PrintQuality = 'standard',
   ): number {
     const safeCopies = Math.max(1, Math.floor(copies));
@@ -174,9 +174,9 @@ export class AdminService {
     }
 
     const profileKey =
-      paperSize === 'Legal'
+      paperSize === 'Long' || (paperSize as any) === 'Legal'
         ? 'longBond'
-        : paperSize === 'Letter'
+        : paperSize === 'Short' || (paperSize as any) === 'Letter'
           ? 'shortBond'
           : 'a4';
     const profile = engineCfg?.paperProfiles?.[profileKey] ?? {
@@ -238,7 +238,7 @@ export class AdminService {
       imageBwPages?: number;
     },
     copies: number,
-    paperSize: 'A4' | 'Letter' | 'Legal' = 'A4',
+    paperSize: 'A4' | 'Short' | 'Long' = 'A4',
     quality: PrintQuality = 'standard',
   ): number {
     return this.calculateJobAmount(

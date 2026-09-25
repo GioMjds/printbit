@@ -508,8 +508,8 @@ export class ReceiptService {
             : previousConfiguration.colorMode,
         paperSize:
           configuration?.paperSize === 'A4' ||
-          configuration?.paperSize === 'Letter' ||
-          configuration?.paperSize === 'Legal'
+          configuration?.paperSize === 'Short' ||
+          configuration?.paperSize === 'Long'
             ? configuration.paperSize
             : previousConfiguration.paperSize,
         quality:

@@ -126,7 +126,7 @@ export interface PrintConfig {
   copies: number;
   orientation: 'portrait' | 'landscape';
   rotationDeg?: number;
-  paperSize: 'A4' | 'Letter' | 'Legal';
+  paperSize: 'A4' | 'Short' | 'Long';
   pageRange?: PageRangeSelection;
   totalPages?: number;
   quote?: PrintQuote;
@@ -910,14 +910,14 @@ function formatColorMode(mode: 'colored' | 'grayscale'): string {
 }
 
 function formatPaperSizeForPricing(
-  paperSize: 'A4' | 'Letter' | 'Legal',
+  paperSize: 'A4' | 'Short' | 'Long',
 ): string {
   switch (paperSize) {
     case 'A4':
       return 'A4 Bond Paper';
-    case 'Letter':
+    case 'Short':
       return 'Short Bond Paper';
-    case 'Legal':
+    case 'Long':
       return 'Long Bond Paper';
     default:
       return paperSize;
@@ -1016,7 +1016,12 @@ export function populateJobSummary(cfg: PrintConfig): void {
     modalCopiesRow?.setAttribute('hidden', '');
     modalPagesRow?.setAttribute('hidden', '');
     modalOrientationRow?.setAttribute('hidden', '');
-    modalRotationRow?.setAttribute('hidden', '');
+    if (cfg.rotationDeg && cfg.rotationDeg !== 0) {
+      if (modalRotation) modalRotation.textContent = `${cfg.rotationDeg}°`;
+      modalRotationRow?.removeAttribute('hidden');
+    } else {
+      modalRotationRow?.setAttribute('hidden', '');
+    }
     modalPaperRow?.setAttribute('hidden', '');
     return;
   }
@@ -2428,6 +2433,8 @@ modalConfirmBtn?.addEventListener('click', async () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filename: config.scanFilename,
+          orientation: config.orientation,
+          rotationDeg: config.rotationDeg,
         }),
       });
 

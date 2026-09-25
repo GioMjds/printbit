@@ -11,12 +11,12 @@ describe('Direct Image Analysis (Sharp)', () => {
   beforeAll(async () => {
     fs.mkdirSync(tmpDir, { recursive: true });
     // Generate 100x100 vibrant red image
-    await sharp({
+    await (sharp as any)({
       create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 0, b: 0 } },
     }).png().toFile(colorImagePath);
 
     // Generate 100x100 pure grayscale image
-    await sharp({
+    await (sharp as any)({
       create: { width: 100, height: 100, channels: 3, background: { r: 128, g: 128, b: 128 } },
     }).png().toFile(bwImagePath);
   });

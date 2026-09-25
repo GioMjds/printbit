@@ -976,16 +976,18 @@ const scanReleaseToken =
 const hasStoredOrientation =
   storedConfig?.orientation === 'landscape' ||
   storedConfig?.orientation === 'portrait';
-const hasStoredPaperSize =
-  storedConfig?.paperSize === 'A4' ||
-  storedConfig?.paperSize === 'Letter' ||
-  storedConfig?.paperSize === 'Legal';
+const normalizedStoredPaperSize: PaperSize | null =
+  storedConfig?.paperSize === 'Short' || storedConfig?.paperSize === 'Letter'
+    ? 'Short'
+    : storedConfig?.paperSize === 'Long' || storedConfig?.paperSize === 'Legal'
+      ? 'Long'
+      : storedConfig?.paperSize === 'A4'
+        ? 'A4'
+        : null;
+const hasStoredPaperSize = normalizedStoredPaperSize !== null;
 const initialOrientation: Orientation =
   storedConfig?.orientation === 'landscape' ? 'landscape' : 'portrait';
-const initialPaperSize: PaperSize =
-  storedConfig?.paperSize === 'Letter' || storedConfig?.paperSize === 'Legal'
-    ? storedConfig.paperSize
-    : 'A4';
+const initialPaperSize: PaperSize = normalizedStoredPaperSize ?? 'A4';
 const initialQuality: PrintQuality =
   storedConfig?.quality === 'high' ? 'high' : 'standard';
 let rotationDeg: RotationDeg =

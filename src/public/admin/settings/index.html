@@ -379,239 +379,239 @@
                   </svg>
                   <h3 class="sg__title">Pricing Configuration</h3>
                 </div>
-                <div class="fields">
-                  <!-- A4 Bond Paper -->
-                  <div class="field">
-                    <label class="field__lbl" for="settingA4BwPrice"
-                      >A4 — B&W per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingA4BwPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingA4ColorPrice"
-                      >A4 — Color per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingA4ColorPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingA4ImagePrice"
-                      >A4 — Photo/Image (Color) per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingA4ImagePrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingA4ImageBwPrice"
-                      >A4 — Photo/Image (B&W) per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingA4ImageBwPrice"
-                        data-testid="a4ImageBwPrice"
-                        name="a4ImageBwPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
+                <div class="pricing-matrix-wrap">
+                  <table class="pricing-matrix" aria-label="Paper Size Pricing Matrix">
+                    <thead>
+                      <tr>
+                        <th scope="col" class="pricing-th pricing-th--paper">Bond Paper Size</th>
+                        <th scope="col" class="pricing-th">B&amp;W Rate</th>
+                        <th scope="col" class="pricing-th">Color Rate</th>
+                        <th scope="col" class="pricing-th">Photo / Image (Color)</th>
+                        <th scope="col" class="pricing-th">Photo / Image (B&amp;W)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Short Bond Paper -->
+                      <tr class="pricing-row">
+                        <td class="pricing-td pricing-td--paper">
+                          <div class="pricing-paper-cell">
+                            <span class="pricing-paper-name">Short Bond Paper</span>
+                            <span class="pricing-paper-dim">8.5 × 11 in</span>
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingShortBondBwPrice"
+                              name="shortBondBwPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingShortBondColorPrice"
+                              name="shortBondColorPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingShortBondImagePrice"
+                              name="shortBondImagePrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingShortBondImageBwPrice"
+                              data-testid="shortBondImageBwPrice"
+                              name="shortBondImageBwPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                      </tr>
 
-                  <!-- Short Bond Paper (Letter) -->
-                  <div class="field">
-                    <label class="field__lbl" for="settingShortBondBwPrice"
-                      >Short (Letter) — B&W per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingShortBondBwPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingShortBondColorPrice"
-                      >Short (Letter) — Color per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingShortBondColorPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingShortBondImagePrice"
-                      >Short (Letter) — Photo/Image (Color) per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingShortBondImagePrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingShortBondImageBwPrice"
-                      >Short (Letter) — Photo/Image (B&W) per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingShortBondImageBwPrice"
-                        data-testid="shortBondImageBwPrice"
-                        name="shortBondImageBwPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
+                      <!-- A4 Bond Paper -->
+                      <tr class="pricing-row">
+                        <td class="pricing-td pricing-td--paper">
+                          <div class="pricing-paper-cell">
+                            <span class="pricing-paper-name">A4 Bond Paper</span>
+                            <span class="pricing-paper-dim">8.27 × 11.69 in</span>
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingA4BwPrice"
+                              name="a4BwPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingA4ColorPrice"
+                              name="a4ColorPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingA4ImagePrice"
+                              name="a4ImagePrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingA4ImageBwPrice"
+                              data-testid="a4ImageBwPrice"
+                              name="a4ImageBwPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                      </tr>
 
-                  <!-- Long Bond Paper (Legal) -->
-                  <div class="field">
-                    <label class="field__lbl" for="settingLongBondBwPrice"
-                      >Long (Legal) — B&W per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingLongBondBwPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingLongBondColorPrice"
-                      >Long (Legal) — Color per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingLongBondColorPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingLongBondImagePrice"
-                      >Long (Legal) — Photo/Image (Color) per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingLongBondImagePrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
-                  <div class="field">
-                    <label class="field__lbl" for="settingLongBondImageBwPrice"
-                      >Long (Legal) — Photo/Image (B&W) per page</label
-                    >
-                    <div class="field__wrap field__wrap--pre">
-                      <span class="field__affix">₱</span>
-                      <input
-                        id="settingLongBondImageBwPrice"
-                        data-testid="longBondImageBwPrice"
-                        name="longBondImageBwPrice"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="field__input"
-                        placeholder="Whole pesos"
-                        required
-                      />
-                    </div>
-                    <p class="field__hint">Whole pesos only</p>
-                  </div>
+                      <!-- Long Bond Paper -->
+                      <tr class="pricing-row">
+                        <td class="pricing-td pricing-td--paper">
+                          <div class="pricing-paper-cell">
+                            <span class="pricing-paper-name">Long Bond Paper</span>
+                            <span class="pricing-paper-dim">8.5 × 13 in</span>
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingLongBondBwPrice"
+                              name="longBondBwPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingLongBondColorPrice"
+                              name="longBondColorPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingLongBondImagePrice"
+                              name="longBondImagePrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td class="pricing-td">
+                          <div class="field__wrap field__wrap--pre field__wrap--table">
+                            <span class="field__affix">₱</span>
+                            <input
+                              id="settingLongBondImageBwPrice"
+                              data-testid="longBondImageBwPrice"
+                              name="longBondImageBwPrice"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="field__input field__input--table"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
 
-                  <!-- Scan Base Rate -->
+                <!-- Additional Pricing Rules (Scan, Quality Surcharge) -->
+                <div class="pricing-additional-grid">
                   <div class="field">
                     <label class="field__lbl" for="settingScanDocument"
-                      >Scan Document (Flat)</label
+                      >Scan Document (Flat rate)</label
                     >
                     <div class="field__wrap field__wrap--pre">
                       <span class="field__affix">₱</span>
@@ -625,10 +625,9 @@
                         required
                       />
                     </div>
-                    <p class="field__hint">Whole pesos only</p>
+                    <p class="field__hint">Flat charge per document scanned (whole pesos only)</p>
                   </div>
 
-                  <!-- High Quality Surcharge -->
                   <div class="field">
                     <label class="field__lbl" for="settingHighQualitySurcharge"
                       >High Quality — Surcharge per page</label
@@ -645,7 +644,7 @@
                         required
                       />
                     </div>
-                    <p class="field__hint">Whole pesos only</p>
+                    <p class="field__hint">Applied when customer selects High Quality print mode</p>
                   </div>
                 </div>
               </div>

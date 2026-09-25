@@ -31,7 +31,7 @@ export interface CopyJobSettings {
   colorMode: 'colored' | 'grayscale';
   orientation: 'portrait' | 'landscape';
   rotationDeg: 0 | 90 | 180 | 270;
-  paperSize: 'A4' | 'Letter' | 'Legal';
+  paperSize: 'A4' | 'Short' | 'Long';
 }
 
 export interface ScanJobSettings {
@@ -40,7 +40,7 @@ export interface ScanJobSettings {
   colorMode: 'colored' | 'grayscale';
   duplex: boolean;
   format: ScanFormat;
-  paperSize: 'A4' | 'Letter' | 'Legal';
+  paperSize: 'A4' | 'Short' | 'Long';
 }
 
 export interface BaseJob {
@@ -83,7 +83,7 @@ class JobStore {
     payment: CopyJob['payment'],
   ): CopyJob {
     const now = new Date().toISOString();
-    const job: CopyJob = {
+    const job = {
       id: randomUUID(),
       type: 'copy',
       state: 'queued',
@@ -93,7 +93,7 @@ class JobStore {
       updatedAt: now,
       settings,
       payment,
-    };
+    } satisfies CopyJob;
     this.jobs.set(job.id, job);
     return job;
   }

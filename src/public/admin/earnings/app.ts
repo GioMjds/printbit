@@ -42,7 +42,7 @@ const anchorDateInput = document.getElementById(
 ) as HTMLInputElement;
 const calendarToggleBtn = document.getElementById(
   'calendarToggleBtn',
-) as HTMLButtonElement;
+) as HTMLElement | null;
 
 const earningsDeck = document.querySelector<HTMLElement>('.earnings-deck')!;
 const selectedPeriodAmount = document.getElementById('selectedPeriodAmount')!;
@@ -92,11 +92,13 @@ function initCalendar(): void {
   });
 }
 
-calendarToggleBtn?.addEventListener('click', () => {
-  try {
-    anchorDateInput?.showPicker();
-  } catch {
-    anchorDateInput?.focus();
+calendarToggleBtn?.addEventListener('click', (e) => {
+  if (e.target !== anchorDateInput) {
+    try {
+      anchorDateInput?.showPicker();
+    } catch {
+      anchorDateInput?.focus();
+    }
   }
 });
 

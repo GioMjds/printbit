@@ -44,7 +44,7 @@ const VALID_SOURCES = new Set(['adf', 'flatbed']);
 const VALID_DPI = new Set([150, 300, 600]);
 const VALID_COLOR_MODES = new Set(['colored', 'grayscale']);
 const VALID_FORMATS = new Set(['pdf', 'jpg', 'png']);
-const VALID_PAPER_SIZES = new Set(['A4', 'Letter', 'Legal']);
+const VALID_PAPER_SIZES = new Set(['A4', 'Short', 'Long', 'Letter', 'Legal']);
 
 const FORMAT_CONTENT_TYPES: Record<string, string> = {
   pdf: 'application/pdf',
@@ -58,12 +58,18 @@ const SCAN_RELEASE_TOKEN_TTL_MS = 45 * 60 * 1000;
 
 type ScannerPageSource = 'feeder' | 'glass';
 type ScannerPageColor = 'color' | 'grayscale';
-type ScannerPaperSize = 'A4' | 'Letter' | 'Legal';
+type ScannerPaperSize = 'A4' | 'Short' | 'Long';
+
+function normalizeScannerPaperSize(paperSize: string): ScannerPaperSize {
+  if (paperSize === 'Letter' || paperSize === 'Short') return 'Short';
+  if (paperSize === 'Legal' || paperSize === 'Long') return 'Long';
+  return 'A4';
+}
 
 const toCopyPreviewSource = (
   paperSize: ScannerPaperSize,
 ): 'adf' | 'flatbed' =>
-  paperSize === 'Legal' ? 'adf' : 'flatbed';
+  paperSize === 'Long' ? 'adf' : 'flatbed';
 
 export interface ScannerStatusResponse {
   connected: boolean;
@@ -97,6 +103,8 @@ export interface SoftCopyChargeInput {
   filename: string;
   io: SocketIOServer;
   publicBaseUrl: string;
+  orientation?: 'portrait' | 'landscape';
+  rotationDeg?: number;
 }
 
 export interface SoftCopyChargeResult {
@@ -365,7 +373,7 @@ export class ScannerService {
       safeDpi = parsedDpi as SupportedDpi;
     }
     if (!VALID_PAPER_SIZES.has(paperSize)) {
-      throw new Error('Invalid paperSize. Accepted: "A4", "Letter", "Legal"');
+      throw new Error('Invalid paperSize. Accepted: "A4", "Short", "Long"');
     }
 
     const runtime = getScannerStatus();
@@ -391,7 +399,7 @@ export class ScannerService {
       colorMode: this.toColorMode(color),
       duplex: false,
       format: scanFormat,
-      paperSize,
+      paperSize: normalizeScannerPaperSize(paperSize),
     };
 
     const result = await getAdapter().scan(settings, 'uploads/scans');
@@ -427,7 +435,7 @@ export class ScannerService {
   async chargeSoftCopy(
     input: SoftCopyChargeInput,
   ): Promise<SoftCopyChargeResult> {
-    const { filename, io, publicBaseUrl } = input;
+    const { filename, io, publicBaseUrl, orientation, rotationDeg } = input;
 
     const sourcePath = path.resolve('uploads', 'scans', filename);
     if (!fs.existsSync(sourcePath)) {
@@ -442,6 +450,7 @@ export class ScannerService {
         downloadLink = await this.createWirelessLink(
           filename,
           new URL(publicBaseUrl),
+          { orientation, rotationDeg },
         );
       } catch {
         // Ignore link creation errors on already-paid path
@@ -624,6 +633,7 @@ export class ScannerService {
       downloadLink = await this.createWirelessLink(
         filename,
         new URL(publicBaseUrl),
+        { orientation, rotationDeg },
       );
     } catch (linkError) {
       console.error('[SCAN] Failed to generate download link for scan charge.', {
@@ -748,7 +758,7 @@ export class ScannerService {
       throw new Error('Invalid format. Accepted: "pdf", "jpg", "png"');
     }
     if (!VALID_PAPER_SIZES.has(paperSize)) {
-      throw new Error('Invalid paperSize. Accepted: "A4", "Letter", "Legal"');
+      throw new Error('Invalid paperSize. Accepted: "A4", "Short", "Long"');
     }
 
     return {
@@ -757,7 +767,7 @@ export class ScannerService {
       colorMode: colorMode as 'colored' | 'grayscale',
       duplex,
       format: format as 'pdf' | 'jpg' | 'png',
-      paperSize: paperSize as ScannerPaperSize,
+      paperSize: normalizeScannerPaperSize(paperSize),
     };
   }
 
@@ -831,10 +841,11 @@ export class ScannerService {
     error?: string;
   }> {
     if (!VALID_PAPER_SIZES.has(paperSize)) {
-      throw new Error('Invalid paperSize. Accepted: "A4", "Letter", "Legal"');
+      throw new Error('Invalid paperSize. Accepted: "A4", "Short", "Long"');
     }
 
-    const source = toCopyPreviewSource(paperSize);
+    const normalizedPaperSize = normalizeScannerPaperSize(paperSize);
+    const source = toCopyPreviewSource(normalizedPaperSize);
     const dpi = this.resolveConfiguredDpi('copy', source);
 
     console.log(`[SCAN-PREVIEW] Starting copy pre-scan (${dpi} DPI color)…`);
@@ -845,7 +856,7 @@ export class ScannerService {
       colorMode: 'colored' as const,
       duplex: false,
       format: 'pdf' as const,
-      paperSize,
+      paperSize: normalizedPaperSize,
     };
 
     try {

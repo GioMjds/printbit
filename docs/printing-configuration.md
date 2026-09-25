@@ -2,7 +2,7 @@
 
 ## Contract
 
-The kiosk always selects **Fit**. A4, Letter and Legal remain selectable physical
+The kiosk always selects **Fit**. A4, Short and Long remain selectable physical
 targets; the source PDF's size does not select the output paper. Staff must load
 paper matching the selected target. This change does not add tray sensing or an
 administrator loaded-paper gate.
@@ -14,7 +14,7 @@ not a binary/library shared across the two languages.
 
 | Setting | Kiosk/Node | Worker sidecar |
 | --- | --- | --- |
-| Physical target | `paperSize`: `A4`, `Letter`, `Legal` | Same; default A4 |
+| Physical target | `paperSize`: `A4`, `Short`, `Long` | Same; default A4 |
 | Scaling | `scaling`: `fit` | Same; missing values default Fit |
 | Orientation | `portrait`, `landscape` | Same |
 | Rotation | `rotationDeg`: 0, 90, 180, 270 clockwise | Same |
@@ -36,8 +36,8 @@ One PDF point is 1/72 inch. Portrait target sizes are exact contract constants:
 | Paper | Width (pt) | Height (pt) |
 | --- | ---: | ---: |
 | A4 | 595.28 | 841.89 |
-| Letter | 612 | 792 |
-| Legal | 612 | 936 |
+| Short | 612 | 792 |
+| Long | 612 | 936 |
 
 Landscape swaps target width and height. Native PDF rotation and the user's
 rotation are applied once, before calculating Fit. The visible PDF page is the
@@ -55,7 +55,7 @@ y = (th - sh * scale) / 2
 ```
 
 This is the worker's existing application safety inset, NOT a measurement of the
-installed driver's printable area. Fit can enlarge small sources. The Letter
+installed driver's printable area. Fit can enlarge small sources. The Short
 612 × 792 fixture gives scale 0.9529411765, x 14.4, y 18.6352941; the rotated
 landscape fixture gives the same scale. Both language test suites assert these.
 

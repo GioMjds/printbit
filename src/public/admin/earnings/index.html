@@ -413,16 +413,10 @@
                     />
                   </svg>
                 </button>
-                <input
-                  id="anchorDateInput"
-                  class="anchor-input"
-                  type="date"
-                  aria-label="Select earnings period anchor date"
-                />
-                <button
+                <label
                   id="calendarToggleBtn"
                   class="anchor-btn anchor-btn--calendar"
-                  type="button"
+                  for="anchorDateInput"
                   aria-label="Choose a historical earnings date"
                 >
                   <svg
@@ -436,7 +430,13 @@
                       clip-rule="evenodd"
                     />
                   </svg>
-                </button>
+                  <input
+                    id="anchorDateInput"
+                    class="anchor-input"
+                    type="date"
+                    aria-label="Select earnings period anchor date"
+                  />
+                </label>
                 <button
                   id="nextAnchorBtn"
                   class="anchor-btn"

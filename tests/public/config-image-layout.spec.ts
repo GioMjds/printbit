@@ -27,7 +27,7 @@ describe('image preview layout', () => {
     preview.naturalH = 792;
     preview.zoomScale = 1;
     preview.latestImageInfo = { naturalWidth: 612, naturalHeight: 792 };
-    preview.printConfig = { paperSize: 'Letter', orientation: 'portrait', scaling: 'fit', rotationDeg: 0 };
+    preview.printConfig = { paperSize: 'Short', orientation: 'portrait', scaling: 'fit', rotationDeg: 0 };
     preview.resizeSheet();
     preview.layoutImage();
     const initialWidth = parseFloat(preview.img.style.width);

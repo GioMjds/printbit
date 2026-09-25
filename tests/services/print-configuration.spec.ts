@@ -5,7 +5,7 @@ import { handoffToWorker } from '../../src/services/worker-handoff';
 import { buildPhysicalPrintSettings } from '../../src/public/confirm/print-settings';
 
 describe('print configuration boundary', () => {
-  it.each(['A4', 'Letter', 'Legal'] as const)('hands off explicit Fit and retained %s settings', async (paperSize) => {
+  it.each(['A4', 'Short', 'Long'] as const)('hands off explicit Fit and retained %s settings', async (paperSize) => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'print-contract-'));
     try {
       const source = path.join(dir, 'source.pdf');
@@ -19,7 +19,7 @@ describe('print configuration boundary', () => {
   });
 
   it('keeps automatic Fit in the confirmation request', () => {
-    expect(buildPhysicalPrintSettings({ copies: 2, paperSize: 'Legal', orientation: 'landscape', quality: 'high' }, 'colored'))
-      .toMatchObject({ scaling: 'fit', copies: 2, paperSize: 'Legal', orientation: 'landscape', quality: 'high', colorMode: 'colored' });
+    expect(buildPhysicalPrintSettings({ copies: 2, paperSize: 'Long', orientation: 'landscape', quality: 'high' }, 'colored'))
+      .toMatchObject({ scaling: 'fit', copies: 2, paperSize: 'Long', orientation: 'landscape', quality: 'high', colorMode: 'colored' });
   });
 });
