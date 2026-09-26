@@ -40,6 +40,7 @@ export interface PrintQuoteResult {
   effectiveColorMode: ColorMode;
   quality: PrintQuality;
   pageBreakdown: PrintPageQuoteBreakdown[];
+  meteredCoveragePercentage: number;
   // Quote integrity
   quoteId: string;
   quoteHash: string;
@@ -415,6 +416,15 @@ export function buildPrintQuote(input: {
     requiredAmount,
   });
 
+  const totalCoverage = pageBreakdown.reduce((sum, p) => sum + p.coverage, 0);
+  const meteredCoveragePercentage =
+    pageBreakdown.length > 0
+      ? Math.max(
+          0,
+          Math.min(100, Math.round((totalCoverage / pageBreakdown.length) * 100)),
+        )
+      : 0;
+
   const pricing = adminService.getPricingSettings();
   return {
     ok: true,
@@ -435,6 +445,7 @@ export function buildPrintQuote(input: {
       effectiveColorMode,
       quality,
       pageBreakdown,
+      meteredCoveragePercentage,
       quoteId,
       quoteHash,
       expiresAt,

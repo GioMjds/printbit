@@ -137,6 +137,14 @@ interface PrintQuote {
   quoteId?: string;
   expiresAt?: string;
   quoteHash?: string;
+  meteredCoveragePercentage?: number;
+  pageBreakdown?: Array<{
+    pageNumber: number;
+    isColor: boolean;
+    coverage: number;
+    coverageTier: string;
+    printCost: number;
+  }>;
 }
 
 interface PreviewConfig {
@@ -1237,24 +1245,25 @@ function renderColorDetectionEvidence(): void {
     selectedColorPages: quote.selectedColorPages,
     selectedBwPages: quote.selectedBwPages,
     analysisConfidence: quote.analysisConfidence,
+    pageBreakdown: quote.pageBreakdown,
+    meteredCoveragePercentage: quote.meteredCoveragePercentage,
   });
-  const pageLabel = evidence.selectedPages === 1 ? 'page' : 'pages';
 
   if (colorDetectionSummary) {
-    colorDetectionSummary.textContent = `Color detected on ${evidence.colorPercentage}% of selected ${pageLabel}`;
+    colorDetectionSummary.textContent = `${evidence.meteredCoveragePercentage}% metered ink coverage`;
   }
   if (colorDetectionMeter) {
     colorDetectionMeter.setAttribute(
       'aria-valuenow',
-      String(evidence.colorPercentage),
+      String(evidence.meteredCoveragePercentage),
     );
     colorDetectionMeter.setAttribute(
       'aria-label',
-      `${evidence.colorPercentage}% of selected pages contain color`,
+      `${evidence.meteredCoveragePercentage}% metered ink coverage`,
     );
   }
   if (colorDetectionMeterFill) {
-    colorDetectionMeterFill.style.width = `${evidence.colorPercentage}%`;
+    colorDetectionMeterFill.style.width = `${evidence.meteredCoveragePercentage}%`;
   }
   if (colorDetectionCounts) {
     colorDetectionCounts.textContent = `${evidence.colorPages} Color · ${evidence.grayscalePages} Grayscale`;

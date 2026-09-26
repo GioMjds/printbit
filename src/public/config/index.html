@@ -384,12 +384,13 @@
             >
               <div class="detection-evidence__eyebrow">Document check</div>
               <div class="detection-evidence__summary" id="colorDetectionSummary">
-                Color analysis unavailable
+                Coverage analysis unavailable
               </div>
               <div
                 class="detection-evidence__meter"
+                id="colorDetectionMeter"
                 role="progressbar"
-                aria-label="Color pages detected"
+                aria-label="Metered ink coverage"
                 aria-valuemin="0"
                 aria-valuemax="100"
                 aria-valuenow="0"
@@ -401,9 +402,9 @@
               <details class="detection-evidence__details">
                 <summary>How is this detected?</summary>
                 <p>
-                  A page is marked Color when the analysis finds colored content
-                  or an embedded color image. This percentage describes pages,
-                  not the amount of ink on each page.
+                  Pages are analyzed for content and ink density to calculate
+                  the metered ink percentage. This reflects the estimated ink usage
+                  used for tiered print pricing.
                 </p>
               </details>
             </aside>
