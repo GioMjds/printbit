@@ -37,6 +37,11 @@ export class PreviewService {
   }
 
   async convertToPdfPreview(sourcePath: string): Promise<string> {
+    const resolvedPath = path.resolve(sourcePath);
+    if (path.extname(resolvedPath).toLowerCase() === '.pdf') {
+      return resolvedPath;
+    }
+
     fs.mkdirSync(PREVIEW_CACHE_DIR, { recursive: true });
 
     const stats = await fs.promises.stat(sourcePath);

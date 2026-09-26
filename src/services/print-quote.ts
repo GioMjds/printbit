@@ -21,6 +21,7 @@ export interface PrintPageQuoteBreakdown {
   coverage: number;
   coverageTier: CoverageTier;
   printCost: number;
+  isBlank?: boolean;
 }
 
 export interface PrintQuoteResult {
@@ -41,6 +42,8 @@ export interface PrintQuoteResult {
   quality: PrintQuality;
   pageBreakdown: PrintPageQuoteBreakdown[];
   meteredCoveragePercentage: number;
+  isEntirelyBlank?: boolean;
+  blankPageCount?: number;
   // Quote integrity
   quoteId: string;
   quoteHash: string;
@@ -365,6 +368,7 @@ export function buildPrintQuote(input: {
       ? profile.colorPrint[coverageTier]
       : profile.bwPrint[coverageTier];
 
+    const isBlank = page ? Boolean(page.isBlank || page.classification === 'blank' || coverage < 0.001) : coverage < 0.001;
     singleCopyPrintCost += pageRate;
     pageBreakdown.push({
       pageNumber: pageNum,
@@ -372,6 +376,7 @@ export function buildPrintQuote(input: {
       coverage,
       coverageTier,
       printCost: pageRate,
+      isBlank,
     });
 
     const isImage = Boolean(
@@ -424,6 +429,9 @@ export function buildPrintQuote(input: {
           Math.min(100, Math.round((totalCoverage / pageBreakdown.length) * 100)),
         )
       : 0;
+  const blankPageCount = pageBreakdown.filter((p) => p.isBlank).length;
+  const isEntirelyBlank =
+    pageBreakdown.length > 0 && blankPageCount === pageBreakdown.length;
 
   const pricing = adminService.getPricingSettings();
   return {
@@ -446,6 +454,8 @@ export function buildPrintQuote(input: {
       quality,
       pageBreakdown,
       meteredCoveragePercentage,
+      isEntirelyBlank,
+      blankPageCount,
       quoteId,
       quoteHash,
       expiresAt,

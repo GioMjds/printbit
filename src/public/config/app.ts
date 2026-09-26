@@ -138,12 +138,15 @@ interface PrintQuote {
   expiresAt?: string;
   quoteHash?: string;
   meteredCoveragePercentage?: number;
+  isEntirelyBlank?: boolean;
+  blankPageCount?: number;
   pageBreakdown?: Array<{
     pageNumber: number;
     isColor: boolean;
     coverage: number;
     coverageTier: string;
     printCost: number;
+    isBlank?: boolean;
   }>;
 }
 
@@ -1250,7 +1253,7 @@ function renderColorDetectionEvidence(): void {
   });
 
   if (colorDetectionSummary) {
-    colorDetectionSummary.textContent = `${evidence.meteredCoveragePercentage}% metered ink coverage`;
+    colorDetectionSummary.textContent = `${evidence.meteredCoveragePercentage}% metered ink coverage · ${evidence.tierLabel} (${evidence.tierRangeLabel})`;
   }
   if (colorDetectionMeter) {
     colorDetectionMeter.setAttribute(
@@ -1259,7 +1262,7 @@ function renderColorDetectionEvidence(): void {
     );
     colorDetectionMeter.setAttribute(
       'aria-label',
-      `${evidence.meteredCoveragePercentage}% metered ink coverage`,
+      `${evidence.meteredCoveragePercentage}% metered ink coverage (${evidence.tierLabel} ${evidence.tierRangeLabel})`,
     );
   }
   if (colorDetectionMeterFill) {
@@ -1746,11 +1749,22 @@ function setPrintContinueState(): void {
     Boolean(pageModeCustom?.checked) &&
     Boolean(pageRangeInput?.validationMessage);
   const hasCopiesError = Boolean(copiesInput?.validationMessage);
+  const isBlankJob = Boolean(
+    currentPrintQuote?.isEntirelyBlank ||
+      (currentPrintQuote &&
+        currentPrintQuote.selectedPages > 0 &&
+        currentPrintQuote.pageBreakdown &&
+        currentPrintQuote.pageBreakdown.length > 0 &&
+        currentPrintQuote.pageBreakdown.every(
+          (p) => p.coverage === 0 || p.isBlank === true,
+        )),
+  );
   const canContinue =
     Boolean(currentPrintQuote) &&
     !quoteLoading &&
     !hasCustomRangeError &&
-    !hasCopiesError;
+    !hasCopiesError &&
+    !isBlankJob;
   setContinueEnabled(canContinue);
 }
 
@@ -2005,6 +2019,26 @@ function updateSummary(): void {
   }
 
   if (currentPrintQuote) {
+    const isBlankJob = Boolean(
+      currentPrintQuote.isEntirelyBlank ||
+        (currentPrintQuote.selectedPages > 0 &&
+          currentPrintQuote.pageBreakdown &&
+          currentPrintQuote.pageBreakdown.length > 0 &&
+          currentPrintQuote.pageBreakdown.every(
+            (p) => p.coverage === 0 || p.isBlank === true,
+          )),
+    );
+    if (isBlankJob) {
+      footerSummary.classList.remove('ready');
+      footerSummary.textContent = 'Cannot print blank document';
+      if (footerBreakdown) {
+        footerBreakdown.textContent =
+          'All selected pages are blank (0% ink). Please change page range or select another file.';
+      }
+      if (footerTotal) footerTotal.textContent = '—';
+      return;
+    }
+
     footerSummary.classList.add('ready');
     footerSummary.textContent = 'Ready to print';
     if (footerBreakdown) {

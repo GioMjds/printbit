@@ -1,4 +1,25 @@
 export type DetectionConfidence = 'high' | 'medium' | 'low';
+export type CoverageTier = 'low' | 'medium' | 'high' | 'very_high';
+
+export interface CoverageTierInfo {
+  tier: CoverageTier;
+  label: string;
+  rangeLabel: string;
+}
+
+export function getCoverageTierInfo(coveragePercent: number): CoverageTierInfo {
+  const p = Math.max(0, Math.min(100, Math.round(coveragePercent)));
+  if (p <= 10) {
+    return { tier: 'low', label: 'Low', rangeLabel: '0% - 10%' };
+  }
+  if (p <= 40) {
+    return { tier: 'medium', label: 'Medium', rangeLabel: '11% - 40%' };
+  }
+  if (p <= 70) {
+    return { tier: 'high', label: 'High', rangeLabel: '41% - 70%' };
+  }
+  return { tier: 'very_high', label: 'Max', rangeLabel: '71% - 100%' };
+}
 
 export interface ColorDetectionEvidence {
   colorPages: number;
@@ -6,6 +27,9 @@ export interface ColorDetectionEvidence {
   selectedPages: number;
   meteredCoveragePercentage: number;
   colorPercentage: number;
+  coverageTier: CoverageTier;
+  tierLabel: string;
+  tierRangeLabel: string;
   confidence: DetectionConfidence;
 }
 
@@ -52,12 +76,17 @@ export function buildColorDetectionEvidence(
     );
   }
 
+  const tierInfo = getCoverageTierInfo(meteredCoveragePercentage);
+
   return {
     colorPages,
     grayscalePages,
     selectedPages,
     meteredCoveragePercentage,
     colorPercentage: meteredCoveragePercentage,
+    coverageTier: tierInfo.tier,
+    tierLabel: tierInfo.label,
+    tierRangeLabel: tierInfo.rangeLabel,
     confidence: input.analysisConfidence,
   };
 }

@@ -1313,6 +1313,18 @@ export class WirelessSessionService {
         ? confidenceRaw
         : 'medium';
 
+    const blankPages = pages
+      .filter(
+        (p) =>
+          p.isBlank ||
+          p.classification === 'blank' ||
+          (typeof p.coverage === 'number' && p.coverage < 0.001),
+      )
+      .map((p) => p.index);
+    const blankPageCount = blankPages.length;
+    const isEntirelyBlank =
+      pages.length > 0 && blankPageCount === pages.length;
+
     return {
       fileType,
       pageCount: Math.max(0, Math.floor(value.pageCount)),
@@ -1321,6 +1333,9 @@ export class WirelessSessionService {
       bwPages: Math.max(0, Math.floor(value.bwPages)),
       totalPages: Math.max(0, Math.floor(value.totalPages)),
       confidence,
+      isEntirelyBlank,
+      blankPages,
+      blankPageCount,
     };
   }
 

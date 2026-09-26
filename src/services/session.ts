@@ -35,9 +35,10 @@ export interface PageAnalysis {
 }
 
 export function resolveCoverageTier(contentCoverage: number): CoverageTier {
-  if (contentCoverage <= 0.10) return 'low';
-  if (contentCoverage <= 0.40) return 'medium';
-  if (contentCoverage <= 0.70) return 'high';
+  const coverage = contentCoverage > 1 ? contentCoverage / 100 : contentCoverage;
+  if (coverage <= 0.10) return 'low';
+  if (coverage <= 0.40) return 'medium';
+  if (coverage <= 0.70) return 'high';
   return 'very_high';
 }
 
@@ -74,6 +75,9 @@ export interface DocumentAnalysis {
   totalPages: number;
   confidence: 'high' | 'medium' | 'low';
   analyzedAt: Date;
+  isEntirelyBlank?: boolean;
+  blankPages?: number[];
+  blankPageCount?: number;
 }
 
 export interface UploadedDocument {

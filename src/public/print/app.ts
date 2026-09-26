@@ -23,8 +23,32 @@ type UploadedFile = {
   analysis?: {
     pageCount?: number;
     totalPages?: number;
+    isEntirelyBlank?: boolean;
+    blankPages?: number[];
+    blankPageCount?: number;
+    pages?: {
+      index: number;
+      isBlank?: boolean;
+      classification?: string;
+      coverage?: number;
+    }[];
   };
 };
+
+function isFileEntirelyBlank(file: UploadedFile | null | undefined): boolean {
+  if (!file) return false;
+  if (file.analysis?.isEntirelyBlank === true) return true;
+  const pages = file.analysis?.pages;
+  if (Array.isArray(pages) && pages.length > 0) {
+    return pages.every(
+      (p) =>
+        p.isBlank === true ||
+        p.classification === 'blank' ||
+        (typeof p.coverage === 'number' && p.coverage < 0.001),
+    );
+  }
+  return false;
+}
 
 const bootKioskLocalization = (): void => {
   void initKioskLocalization().catch((error: unknown) => {
@@ -464,6 +488,20 @@ function selectFile(file: UploadedFile): void {
     el.setAttribute('aria-selected', String(selected));
   });
 
+  // Check if file is completely blank
+  const isBlank = isFileEntirelyBlank(file);
+  if (isBlank) {
+    if (continueBtn) {
+      continueBtn.disabled = true;
+      continueBtn.setAttribute('aria-disabled', 'true');
+    }
+    if (footerHint) {
+      footerHint.textContent = `"${file.filename}" is a blank document (0% ink). Blank documents cannot be printed.`;
+      footerHint.classList.remove('ready');
+    }
+    return;
+  }
+
   // Enable continue button
   if (continueBtn) {
     continueBtn.disabled = false;
@@ -574,6 +612,11 @@ function addFileToList(file: UploadedFile): void {
     ? `<span class="file-item__limit-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(234,179,8,0.15);color:#eab308;font-size:11px;font-weight:600;margin-left:6px;">Document has ${pageCount} pages (Max ${maxPagesPerSession} pages per print)</span>`
     : '';
 
+  const isBlank = isFileEntirelyBlank(file);
+  const blankBadge = isBlank
+    ? `<span class="file-item__blank-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(239,68,68,0.15);color:#ef4444;font-size:11px;font-weight:600;margin-left:6px;">⚠ Blank</span>`
+    : '';
+
   const li = document.createElement('li');
   li.className = 'file-item';
   li.role = 'option';
@@ -592,6 +635,7 @@ function addFileToList(file: UploadedFile): void {
         ${file.size !== undefined ? `<span>${formatBytes(file.size)}</span>` : ''}
         <span class="file-analysis-status" style="display:none"></span>
         ${pageLimitBadge}
+        ${blankBadge}
       </div>
     </div>
     <div class="file-item__actions">
@@ -1255,6 +1299,14 @@ continueBtn?.addEventListener('click', async () => {
   ) {
     return;
   }
+  if (selectedFileRecord && isFileEntirelyBlank(selectedFileRecord)) {
+    if (footerHint) {
+      footerHint.textContent = `Cannot proceed: "${selectedFileRecord.filename}" is a blank document and cannot be printed.`;
+      footerHint.classList.remove('ready');
+    }
+    setContinueButtonDisabled(true);
+    return;
+  }
   if (footerHint) {
     footerHint.textContent = `Proceeding to print configuration. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
     footerHint.classList.add('ready');
@@ -1277,6 +1329,26 @@ continueBtn?.addEventListener('click', async () => {
       }
       conversionWaitInFlight = false;
       setContinueButtonDisabled(false);
+      return;
+    }
+    const isNowBlank =
+      result.analysis?.isEntirelyBlank === true ||
+      (Array.isArray(result.analysis?.pages) &&
+        result.analysis.pages.length > 0 &&
+        result.analysis.pages.every(
+          (p: any) =>
+            p.isBlank === true ||
+            p.classification === 'blank' ||
+            (typeof p.coverage === 'number' && p.coverage < 0.001),
+        ));
+    if (isNowBlank) {
+      conversionWaitInFlight = false;
+      setContinueButtonDisabled(true);
+      hideConversionDialog();
+      if (footerHint) {
+        footerHint.textContent = `Cannot proceed: "${selectedFilename}" is a blank document and cannot be printed.`;
+        footerHint.classList.remove('ready');
+      }
       return;
     }
     setConversionMessage(

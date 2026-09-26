@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import sharp from 'sharp';
 import { createCanvas } from 'canvas';
 import { isMainThread, workerData, parentPort } from 'node:worker_threads';
@@ -38,9 +39,10 @@ import {
 export const ANALYSIS_ALGORITHM_VERSION = 9;
 
 export function resolveCoverageTier(contentCoverage: number): CoverageTier {
-  if (contentCoverage <= 0.10) return 'low';
-  if (contentCoverage <= 0.40) return 'medium';
-  if (contentCoverage <= 0.70) return 'high';
+  const coverage = contentCoverage > 1 ? contentCoverage / 100 : contentCoverage;
+  if (coverage <= 0.10) return 'low';
+  if (coverage <= 0.40) return 'medium';
+  if (coverage <= 0.70) return 'high';
   return 'very_high';
 }
 
@@ -84,6 +86,9 @@ export interface DocumentAnalysisResult {
    * Compare against ANALYSIS_ALGORITHM_VERSION to detect stale cache entries.
    */
   analysisVersion: number;
+  isEntirelyBlank?: boolean;
+  blankPages?: number[];
+  blankPageCount?: number;
 }
 
 interface AnalyzeDocumentInput {
@@ -240,7 +245,7 @@ async function analyzeImage(
   filePath: string,
   colorDetectionEnabled: boolean = true,
 ): Promise<DocumentAnalysisResult> {
-  const { data, info } = await (sharp as any)(filePath)
+  const { data, info } = await sharp(filePath)
     .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
     .ensureAlpha()
     .raw()
@@ -259,7 +264,7 @@ async function analyzeImage(
       ? 'color'
       : 'bw';
 
-  const page: PageAnalysis = {
+  const page = {
     index: 1,
     isColor,
     coverage: metrics.contentCoverage,
@@ -268,7 +273,10 @@ async function analyzeImage(
     isBlank,
     classification,
     contentCoverage: metrics.contentCoverage,
-  };
+  } satisfies PageAnalysis;
+
+  const blankPages = isBlank ? [1] : [];
+  const blankPageCount = isBlank ? 1 : 0;
 
   return {
     fileType: 'image',
@@ -279,37 +287,83 @@ async function analyzeImage(
     totalPages: 1,
     confidence: 'high',
     analysisVersion: ANALYSIS_ALGORITHM_VERSION,
+    isEntirelyBlank: isBlank,
+    blankPages,
+    blankPageCount,
   };
 }
+
+interface PdfjsRenderParameters {
+  canvasContext: unknown;
+  viewport: unknown;
+  canvas?: unknown;
+}
+
+interface PdfjsRenderTask {
+  promise: Promise<void>;
+}
+
+interface PdfjsPage {
+  getViewport(params: { scale: number }): { width: number; height: number };
+  render(params: PdfjsRenderParameters): PdfjsRenderTask;
+  getOperatorList(): Promise<PdfOperatorList>;
+  cleanup(): void;
+}
+
+interface PdfjsDocument {
+  numPages: number;
+  getPage(pageNumber: number): Promise<PdfjsPage>;
+}
+
+interface PdfjsLoadingTask {
+  promise: Promise<PdfjsDocument>;
+  destroy(): Promise<void>;
+}
+
+interface PdfjsLib {
+  getDocument(params: { data: Uint8Array; verbosity: number }): PdfjsLoadingTask;
+  OPS?: Record<string, number>;
+}
+
+type Canvas2DContext = {
+  getImageData(sx: number, sy: number, sw: number, sh: number): { data: Uint8ClampedArray | Uint8Array };
+};
+
+type CanvasInstance = {
+  getContext(type: '2d'): Canvas2DContext | null;
+  width: number;
+  height: number;
+};
+
+type CanvasFactory = (w: number, h: number) => CanvasInstance;
 
 async function analyzePdfFile(
   pdfPath: string,
   fileType: AnalyzedFileType,
   colorDetectionEnabled: boolean = true,
-  options?: { isOriginalImage?: boolean },
 ): Promise<DocumentAnalysisResult> {
-  let pdfjs: any;
-  let canvasFactory: (w: number, h: number) => any = createCanvas;
+  let pdfjs: PdfjsLib;
+  let canvasFactory: CanvasFactory = (w: number, h: number) => createCanvas(w, h);
   try {
-    const mod = (process as any).getBuiltinModule
-      ? (process as any).getBuiltinModule('node:module')
-      : require('node:module');
-    const nativeRequire = mod.createRequire(
+    const nativeRequire = createRequire(
       typeof __filename !== 'undefined' ? __filename : path.join(process.cwd(), 'index.js'),
     );
-    pdfjs = nativeRequire('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjs = nativeRequire('pdfjs-dist/legacy/build/pdf.mjs') as PdfjsLib;
     try {
       const pdfjsPath = nativeRequire.resolve('pdfjs-dist/legacy/build/pdf.mjs');
-      const pdfjsReq = mod.createRequire(pdfjsPath);
-      const napiCanvas = pdfjsReq('@napi-rs/canvas');
+      const pdfjsReq = createRequire(pdfjsPath);
+      const napiCanvas = pdfjsReq('@napi-rs/canvas') as {
+        createCanvas?: (w: number, h: number) => CanvasInstance;
+      };
       if (napiCanvas && typeof napiCanvas.createCanvas === 'function') {
-        canvasFactory = (w: number, h: number) => napiCanvas.createCanvas(w, h);
+        const factory = napiCanvas.createCanvas;
+        canvasFactory = (w: number, h: number) => factory(w, h);
       }
     } catch {
       // Keep default createCanvas
     }
   } catch {
-    pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjs = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as PdfjsLib;
   }
   const data = new Uint8Array(await fs.promises.readFile(pdfPath));
   const loadingTask = pdfjs.getDocument({ data, verbosity: 0 });
@@ -358,10 +412,13 @@ async function analyzePdfFile(
         const viewport = page.getViewport({ scale: 0.5 });
         const canvas = canvasFactory(Math.ceil(viewport.width), Math.ceil(viewport.height));
         const ctx = canvas.getContext('2d');
-        await (page.render as any)({
-          canvasContext: ctx as any,
+        if (!ctx) {
+          throw new Error('Canvas 2D context is not available');
+        }
+        await page.render({
+          canvasContext: ctx,
           viewport,
-          canvas: canvas as any,
+          canvas,
         }).promise;
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const metrics = computeFrameMetrics({
@@ -440,6 +497,16 @@ async function analyzePdfFile(
   }
 
   const colorPages = pages.filter((page) => page.isColor).length;
+  const blankPages = pages
+    .filter(
+      (page) =>
+        page.isBlank ||
+        page.classification === 'blank' ||
+        (typeof page.coverage === 'number' && page.coverage < 0.001),
+    )
+    .map((page) => page.index);
+  const blankPageCount = blankPages.length;
+  const isEntirelyBlank = totalPages > 0 && blankPageCount === totalPages;
 
   const confidence: AnalysisConfidence =
     fallbackPageCount === 0
@@ -457,6 +524,9 @@ async function analyzePdfFile(
     totalPages,
     confidence,
     analysisVersion: ANALYSIS_ALGORITHM_VERSION,
+    isEntirelyBlank,
+    blankPages,
+    blankPageCount,
   };
 }
 
@@ -798,7 +868,7 @@ async function analyzeDocumentDirect(
   }
   if (
     fileType === 'pdf' ||
-    (fileType === 'image' && path.extname(input.filePath).toLowerCase() === '.pdf')
+    path.extname(input.filePath).toLowerCase() === '.pdf'
   ) {
     return analyzePdfFile(input.filePath, fileType, colorDetectionEnabled);
   }
