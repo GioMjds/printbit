@@ -14,6 +14,7 @@ describe('Dynamic Pricing Engine - End-to-End Flow', () => {
           scanDocument: 5,
         },
         pricingEngine: {
+          duplexEnabled: true,
           paperProfiles: {
             a4: {
               paperCost: 1,

@@ -519,6 +519,7 @@ export class FinancialService {
         config?.highQualitySurcharge ??
         db.data?.settings?.pricing?.highQualitySurcharge ??
         2,
+      duplexEnabled: config?.duplexEnabled ?? false,
       bulkDiscountTiers: config?.bulkDiscountTiers ?? [],
       rounding: config?.rounding ?? 'whole_peso_total_only',
     });
@@ -1694,6 +1695,19 @@ export class FinancialService {
         selectedPages: printQuotePages?.selectedPages ?? 1,
         billableColorPages: printQuotePages?.billableColorPages ?? 0,
         billableBwPages: printQuotePages?.billableBwPages ?? 0,
+        copies: typeof copies === 'number' && Number.isFinite(copies) ? copies : 1,
+        paperSize: paperSize ?? 'A4',
+        quality: quality ?? 'standard',
+        duplex: printOptions?.duplex ?? duplex ?? false,
+        colorMode: printOptions?.colorMode ?? (colorMode === 'colored' ? 'colored' : 'grayscale'),
+        orientation: printOptions?.orientation ?? orientation ?? 'portrait',
+        pageRange:
+          typeof printOptions?.pageRange === 'string'
+            ? printOptions.pageRange
+            : typeof req.body?.pageRange === 'string'
+              ? req.body.pageRange
+              : null,
+        filename: serverFilename ?? null,
       },
     });
 
@@ -2056,6 +2070,8 @@ export class FinancialService {
           mode,
           amount: requiredAmount,
           copies,
+          paperSize: paperSize ?? 'A4',
+          quality: quality ?? 'standard',
           colorMode: printOptions?.colorMode ?? colorMode,
           rotationDeg: printOptions?.rotationDeg ?? rotationDeg,
           duplex: printOptions?.duplex ?? false,

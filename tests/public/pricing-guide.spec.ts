@@ -38,17 +38,26 @@ describe('pricing-guide', () => {
     expect(normalized.paperProfiles.a4.colorPrint.low).toBe(19);
   });
 
-  it('formats pricing table with paper sheet cost, print tiers, and duplex savings note', () => {
-    const pricing = normalizePricingConfig({});
-    const html = formatPricingGuide(pricing);
+  it('formats pricing table with paper sheet cost, print tiers, and duplex savings note when enabled', () => {
+    const pricingDisabled = normalizePricingConfig({ duplexEnabled: false });
+    const htmlDisabled = formatPricingGuide(pricingDisabled);
 
-    expect(html).toContain('<th scope="col">Paper (sheet)</th>');
-    expect(html).toContain('<th scope="col">B&amp;W (Low)</th>');
-    expect(html).toContain('<th scope="col">Color (Photo)</th>');
-    expect(html).toContain(`<td>${formatPeso(pricing.paperProfiles.a4.paperCost)}</td>`);
-    expect(html).toContain(`<td>${formatPeso(pricing.paperProfiles.a4.bwPrint.low)}</td>`);
-    expect(html).toContain(`<td>${formatPeso(pricing.paperProfiles.a4.colorPrint.very_high)}</td>`);
-    expect(html).toContain('Duplex Savings');
+    expect(htmlDisabled).toContain('<th scope="col">Bond Paper (sheet)</th>');
+    expect(htmlDisabled).toContain('<th scope="col">B&amp;W (Low: 0&ndash;10%)</th>');
+    expect(htmlDisabled).toContain('<th scope="col">Color (Max: 70&ndash;100%)</th>');
+    expect(htmlDisabled).toContain('0&ndash;10%');
+    expect(htmlDisabled).toContain('10&ndash;40%');
+    expect(htmlDisabled).toContain('40&ndash;70%');
+    expect(htmlDisabled).toContain('70&ndash;100%');
+    expect(htmlDisabled).toContain(`<td>${formatPeso(pricingDisabled.paperProfiles.a4.paperCost)}</td>`);
+    expect(htmlDisabled).toContain(`<td>${formatPeso(pricingDisabled.paperProfiles.a4.bwPrint.low)}</td>`);
+    expect(htmlDisabled).toContain(`<td>${formatPeso(pricingDisabled.paperProfiles.a4.colorPrint.very_high)}</td>`);
+    // When disabled, no duplex savings note is shown
+    expect(htmlDisabled).not.toContain('Duplex Savings');
+
+    const pricingEnabled = normalizePricingConfig({ duplexEnabled: true });
+    const htmlEnabled = formatPricingGuide(pricingEnabled);
+    expect(htmlEnabled).toContain('Duplex Savings');
   });
 });
 

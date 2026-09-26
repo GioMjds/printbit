@@ -11,6 +11,7 @@ export interface PublicPaperPricingProfile {
 export interface PublicPricingConfig {
   paperProfiles: Record<PaperProfileKey, PublicPaperPricingProfile>;
   highQualitySurcharge: number;
+  duplexEnabled?: boolean;
 }
 
 const DEFAULT_PRICING: PublicPricingConfig = {
@@ -32,6 +33,7 @@ const DEFAULT_PRICING: PublicPricingConfig = {
     },
   },
   highQualitySurcharge: 2,
+  duplexEnabled: false,
 };
 
 const PAPER_LABELS = {
@@ -129,6 +131,10 @@ export function normalizePricingConfig(raw: unknown): PublicPricingConfig {
       candidate?.highQualitySurcharge,
       DEFAULT_PRICING.highQualitySurcharge,
     ),
+    duplexEnabled:
+      typeof candidate?.duplexEnabled === 'boolean'
+        ? candidate.duplexEnabled
+        : DEFAULT_PRICING.duplexEnabled ?? false,
   };
 }
 
@@ -144,7 +150,11 @@ export function formatPricingGuide(pricing: PublicPricingConfig): string {
     })
     .join('');
 
-  return `<table class="pricing-table"><caption>Paper &amp; Print Pricing per Page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">Paper (sheet)</th><th scope="col">B&amp;W (Low)</th><th scope="col">B&amp;W (Photo)</th><th scope="col">Color (Low)</th><th scope="col">Color (Photo)</th></tr></thead><tbody>${rows}</tbody></table><p class="pricing-tier-note"><strong>Print Tiers:</strong> Metered by ink coverage (Low: text &bull; Medium: charts/logos &bull; High: graphics &bull; Max: full photos).</p><p class="pricing-duplex-note"><strong>Duplex Savings:</strong> 2-sided printing uses 1 physical sheet for 2 pages, saving paper cost!</p><p class="pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span>.</p>`;
+  const duplexNote = pricing.duplexEnabled
+    ? `<p class="pricing-duplex-note"><strong>Duplex Savings:</strong> 2-sided printing uses 1 physical sheet for 2 pages, saving paper cost!</p>`
+    : '';
+
+  return `<table class="pricing-table"><caption>Paper &amp; Print Pricing per Page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">Bond Paper (sheet)</th><th scope="col">B&amp;W (Low: 0&ndash;10%)</th><th scope="col">B&amp;W (Max: 70&ndash;100%)</th><th scope="col">Color (Low: 0&ndash;10%)</th><th scope="col">Color (Max: 70&ndash;100%)</th></tr></thead><tbody>${rows}</tbody></table><p class="pricing-paper-note"><strong>Bond Paper Costing:</strong> Paper is billed per physical sheet (${formatPeso(pricing.paperProfiles.a4.paperCost)}/sheet for A4/Short/Long). Printed content is metered separately per page.</p><p class="pricing-tier-note"><strong>Coverage Tiers (Ink / Content Detection):</strong><br>&bull; <strong>Low (0&ndash;10%)</strong>: Plain text, forms, invoices<br>&bull; <strong>Medium (10&ndash;40%)</strong>: Text with diagrams, logos, light graphics<br>&bull; <strong>High (40&ndash;70%)</strong>: Heavy color blocks, charts, slides<br>&bull; <strong>Very High (70&ndash;100%)</strong>: Full photos, edge-to-edge imagery</p>${duplexNote}<p class="pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span>.</p>`;
 }
 
 export const buildPricingTableHtml = formatPricingGuide;

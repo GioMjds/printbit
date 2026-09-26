@@ -1557,6 +1557,7 @@ export class AdminController {
         }[];
         rounding?: 'whole_peso_total_only';
         highQualitySurcharge?: number;
+        duplexEnabled?: boolean;
       };
       printLimits?: {
         maxPagesPerSession?: number;
@@ -2089,6 +2090,7 @@ export class AdminController {
         ),
         rounding: originalSettings.pricingEngine.rounding,
         highQualitySurcharge: nextSettings.pricingEngine.highQualitySurcharge,
+        duplexEnabled: originalSettings.pricingEngine.duplexEnabled ?? false,
       };
 
       const removedPricingEngineFields = [
@@ -2305,6 +2307,15 @@ export class AdminController {
         next.highQualitySurcharge = incoming.highQualitySurcharge;
         nextSettings.pricing.highQualitySurcharge =
           incoming.highQualitySurcharge;
+      }
+
+      if (incoming.duplexEnabled !== undefined) {
+        if (typeof incoming.duplexEnabled !== 'boolean') {
+          return res.status(400).json({
+            error: 'pricingEngine.duplexEnabled must be boolean.',
+          });
+        }
+        next.duplexEnabled = incoming.duplexEnabled;
       }
 
       nextSettings.pricingEngine = next;
@@ -2919,6 +2930,16 @@ export class AdminController {
     chargedAmount: number | null;
     colorPages: number | null;
     bwPages: number | null;
+    printConfiguration: {
+      documentName: string | null;
+      paperSize: string | null;
+      copies: number | null;
+      colorMode: string | null;
+      quality: string | null;
+      duplex: boolean | null;
+      orientation: string | null;
+      pageRange: string | null;
+    } | null;
     status: string | null;
     change: {
       requested: number | null;
@@ -3081,12 +3102,107 @@ export class AdminController {
       missingReasons.push('Some logs are missing transactionId metadata.');
     }
 
+    const printConfig = receiptPayload?.printConfiguration;
+    const documentName =
+      receiptPayload?.documentName ??
+      (typeof recoverySession?.context?.filename === 'string'
+        ? path.basename(recoverySession.context.filename)
+        : null) ??
+      (typeof logs[0]?.meta?.filename === 'string'
+        ? path.basename(logs[0].meta.filename)
+        : null);
+
+    const copies =
+      printConfig?.copies ??
+      (typeof recoverySession?.context?.copies === 'number'
+        ? recoverySession.context.copies
+        : null) ??
+      (typeof logs[0]?.meta?.copies === 'number'
+        ? logs[0].meta.copies
+        : null);
+
+    const paperSize =
+      printConfig?.paperSize ??
+      (typeof recoverySession?.context?.paperSize === 'string'
+        ? recoverySession.context.paperSize
+        : null) ??
+      (typeof logs[0]?.meta?.paperSize === 'string'
+        ? logs[0].meta.paperSize
+        : null);
+
+    const colorMode =
+      printConfig?.colorMode ??
+      (typeof recoverySession?.context?.colorMode === 'string'
+        ? recoverySession.context.colorMode
+        : null) ??
+      (typeof logs[0]?.meta?.colorMode === 'string'
+        ? logs[0].meta.colorMode
+        : null);
+
+    const quality =
+      printConfig?.quality ??
+      (typeof recoverySession?.context?.quality === 'string'
+        ? recoverySession.context.quality
+        : null) ??
+      (typeof logs[0]?.meta?.quality === 'string'
+        ? logs[0].meta.quality
+        : null);
+
+    const duplex =
+      printConfig?.duplex ??
+      (typeof recoverySession?.context?.duplex === 'boolean'
+        ? recoverySession.context.duplex
+        : null) ??
+      (typeof logs[0]?.meta?.duplex === 'boolean'
+        ? logs[0].meta.duplex
+        : null);
+
+    const orientation =
+      printConfig?.orientation ??
+      (typeof recoverySession?.context?.orientation === 'string'
+        ? recoverySession.context.orientation
+        : null) ??
+      (typeof logs[0]?.meta?.orientation === 'string'
+        ? logs[0].meta.orientation
+        : null);
+
+    const pageRange =
+      printConfig?.pageRange ??
+      (typeof recoverySession?.context?.pageRange === 'string'
+        ? recoverySession.context.pageRange
+        : null) ??
+      (typeof logs[0]?.meta?.pageRange === 'string'
+        ? logs[0].meta.pageRange
+        : null);
+
+    const hasPrintConfig =
+      documentName !== null ||
+      paperSize !== null ||
+      copies !== null ||
+      colorMode !== null ||
+      quality !== null ||
+      duplex !== null ||
+      orientation !== null ||
+      pageRange !== null;
+
     return {
       transactionId,
       mode,
       chargedAmount,
       colorPages: receiptPayload?.colorPages ?? null,
       bwPages: receiptPayload?.bwPages ?? null,
+      printConfiguration: hasPrintConfig
+        ? {
+            documentName,
+            paperSize,
+            copies,
+            colorMode,
+            quality,
+            duplex,
+            orientation,
+            pageRange,
+          }
+        : null,
       status,
       change: receiptPayload
         ? {

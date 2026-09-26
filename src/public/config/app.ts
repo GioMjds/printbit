@@ -1654,7 +1654,26 @@ function getSelectedQuality(): PrintQuality {
     : 'standard';
 }
 
+let duplexPrintingEnabled = false;
+
+function applyDuplexAvailability(enabled: boolean): void {
+  duplexPrintingEnabled = enabled;
+  const duplexGroup = document.getElementById('duplexGroup');
+  if (duplexGroup) {
+    duplexGroup.style.display = enabled ? '' : 'none';
+  }
+  if (!enabled) {
+    const simplexRadio = document.querySelector<HTMLInputElement>(
+      'input[name="duplex"][value="simplex"]',
+    );
+    if (simplexRadio) simplexRadio.checked = true;
+    const duplexBadge = document.getElementById('duplexSavingsBadge');
+    if (duplexBadge) duplexBadge.style.display = 'none';
+  }
+}
+
 function getIsDuplex(): boolean {
+  if (!duplexPrintingEnabled) return false;
   return (
     document.querySelector<HTMLInputElement>(
       'input[name="duplex"][value="duplex"]:checked',
@@ -1699,10 +1718,13 @@ window.addEventListener('keydown', (event) => {
 
 void fetchPublicPricing()
   .then((pricing) => {
+    applyDuplexAvailability(Boolean(pricing.duplexEnabled));
     if (pricingGuideContent)
       pricingGuideContent.innerHTML = formatPricingGuide(pricing);
+    void refreshPrintQuote();
   })
   .catch(() => {
+    applyDuplexAvailability(false);
     if (pricingGuideContent)
       pricingGuideContent.textContent =
         'Printing prices are unavailable right now.';

@@ -461,6 +461,12 @@ function applySettings(settings: SettingsResponse): void {
         2,
     );
   }
+  const settingDuplexEnabled = document.getElementById(
+    'settingDuplexEnabled',
+  ) as HTMLInputElement | null;
+  if (settingDuplexEnabled) {
+    settingDuplexEnabled.checked = Boolean(settings.pricingEngine?.duplexEnabled);
+  }
 
   // Admin Alerts (optional)
   if (alertSeverityThreshold)
@@ -767,6 +773,9 @@ settingsForm.addEventListener('submit', (e) => {
         longBond: longBondProfile,
       },
       highQualitySurcharge,
+      duplexEnabled: Boolean(
+        (document.getElementById('settingDuplexEnabled') as HTMLInputElement | null)?.checked,
+      ),
     },
     adminLocalOnly: settingAdminLocalOnly
       ? settingAdminLocalOnly.checked

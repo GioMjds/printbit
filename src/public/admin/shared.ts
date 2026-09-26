@@ -230,6 +230,7 @@ export interface AdminSettings {
     highQualitySurcharge: number;
   };
   pricingEngine: {
+    duplexEnabled?: boolean;
     paperProfiles: {
       a4: PaperPricingProfile;
       shortBond: PaperPricingProfile;

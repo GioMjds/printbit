@@ -143,4 +143,47 @@ describe('Admin Pricing Settings Validation', () => {
     expect(profile?.bwPrint.low).toBe(3);
     expect(profile?.colorPrint.low).toBe(19);
   });
+
+  it('accepts and persists duplexEnabled toggle in pricingEngine', async () => {
+    mockReq = {
+      body: {
+        pricingEngine: {
+          duplexEnabled: true,
+        },
+      },
+    };
+
+    await (controller as any).handleUpdateSettings(mockReq as Request, mockRes as Response);
+
+    expect(responseStatus).toBe(200);
+    expect(db.data?.settings.pricingEngine.duplexEnabled).toBe(true);
+
+    mockReq = {
+      body: {
+        pricingEngine: {
+          duplexEnabled: false,
+        },
+      },
+    };
+
+    await (controller as any).handleUpdateSettings(mockReq as Request, mockRes as Response);
+
+    expect(responseStatus).toBe(200);
+    expect(db.data?.settings.pricingEngine.duplexEnabled).toBe(false);
+  });
+
+  it('rejects non-boolean duplexEnabled with 400', async () => {
+    mockReq = {
+      body: {
+        pricingEngine: {
+          duplexEnabled: 'yes',
+        },
+      },
+    };
+
+    await (controller as any).handleUpdateSettings(mockReq as Request, mockRes as Response);
+
+    expect(responseStatus).toBe(400);
+    expect(responseJson?.error).toContain('pricingEngine.duplexEnabled must be boolean');
+  });
 });

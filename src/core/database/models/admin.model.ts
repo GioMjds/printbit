@@ -49,6 +49,7 @@ export interface PricingEngineSettings {
   bulkDiscountTiers: PricingEngineBulkDiscountTier[];
   rounding: PricingEngineRoundingMode;
   highQualitySurcharge: number;
+  duplexEnabled?: boolean;
 }
 
 export type InkTelemetryUnknownPolicy = 'warn_allow' | 'block';

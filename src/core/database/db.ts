@@ -286,6 +286,7 @@ export const defaultPricingEngine: PricingEngineSettings = {
   bulkDiscountTiers: [],
   rounding: 'whole_peso_total_only',
   highQualitySurcharge: 2,
+  duplexEnabled: false,
 };
 
 const DEFAULT_DATA: Schema = {
@@ -664,6 +665,10 @@ export function normalizePricingEngine(
         defaultPricingEngine.highQualitySurcharge,
       ),
     ),
+    duplexEnabled:
+      typeof candidate.duplexEnabled === 'boolean'
+        ? candidate.duplexEnabled
+        : defaultPricingEngine.duplexEnabled ?? false,
   };
 }
 

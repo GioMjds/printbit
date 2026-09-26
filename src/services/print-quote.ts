@@ -3,7 +3,7 @@ import { adminService } from './admin';
 import { db, type ColorMode, type PrintQuality, defaultPricingEngine } from './db';
 import type { CoverageTier } from '@/core/database/models/admin.model';
 import { resolveCoverageTier } from './document-analysis';
-import type { DocumentAnalysis } from './session';
+import type { DocumentAnalysis, DocumentPageAnalysis } from './session';
 
 type PageRangeSelectionPayload =
   | { type: 'all' }
@@ -322,7 +322,10 @@ export function buildPrintQuote(input: {
     engineCfg?.paperProfiles?.[profileKey] ??
     defaultPricingEngine.paperProfiles[profileKey];
 
-  const duplex = Boolean(input.duplex);
+  const duplexAllowed = Boolean(
+    db.data?.settings?.pricingEngine?.duplexEnabled,
+  );
+  const duplex = duplexAllowed && Boolean(input.duplex);
   const physicalSheetsPerCopy = duplex
     ? Math.ceil(selectedCount / 2)
     : selectedCount;
@@ -349,7 +352,7 @@ export function buildPrintQuote(input: {
   for (const pageNum of selectedPages.selected) {
     const page = pageDetailsMap.get(pageNum);
     const isPageColor = page ? Boolean(page.isColor) : pageNum <= selectedColorPages;
-    const rawCoverage = page?.coverage ?? (page as any)?.contentCoverage ?? 0;
+    const rawCoverage = page?.coverage ?? (page as DocumentPageAnalysis)?.contentCoverage ?? 0;
     const coverage =
       typeof rawCoverage === 'number' && Number.isFinite(rawCoverage)
         ? rawCoverage

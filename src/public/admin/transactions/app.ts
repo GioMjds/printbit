@@ -83,6 +83,11 @@ const dCopyTxIdBtn = document.getElementById(
 const dMode = document.getElementById('dMode');
 const dAmount = document.getElementById('dAmount');
 const dStatus = document.getElementById('dStatus');
+const dDocumentName = document.getElementById('dDocumentName');
+const dPaperSize = document.getElementById('dPaperSize');
+const dCopies = document.getElementById('dCopies');
+const dPrintSides = document.getElementById('dPrintSides');
+const dQuality = document.getElementById('dQuality');
 const dColorPages = document.getElementById('dColorPages');
 const dBwPages = document.getElementById('dBwPages');
 const dPagesPrinted = document.getElementById('dPagesPrinted');
@@ -137,6 +142,16 @@ type TransactionContextPayload = {
   chargedAmount: number | null;
   colorPages: number | null;
   bwPages: number | null;
+  printConfiguration?: {
+    documentName: string | null;
+    paperSize: string | null;
+    copies: number | null;
+    colorMode: string | null;
+    quality: string | null;
+    duplex: boolean | null;
+    orientation: string | null;
+    pageRange: string | null;
+  } | null;
   status: string | null;
   change: {
     requested: number | null;
@@ -796,6 +811,11 @@ function resetDrawerView(): void {
   setField(dMode, '—');
   setField(dAmount, '—');
   setField(dStatus, '—');
+  setField(dDocumentName, '—');
+  setField(dPaperSize, '—');
+  setField(dCopies, '—');
+  setField(dPrintSides, '—');
+  setField(dQuality, '—');
   setField(dColorPages, '—');
   setField(dBwPages, '—');
   setField(dPagesPrinted, '—');
@@ -876,6 +896,30 @@ function renderDrawer(context: TransactionContextPayload): void {
   setField(dMode, formatMode(context.mode));
   setField(dAmount, formatPeso(context.chargedAmount));
   setField(dStatus, formatStatus(context.status));
+  setField(dDocumentName, context.printConfiguration?.documentName ?? '—');
+  setField(dPaperSize, context.printConfiguration?.paperSize ?? '—');
+  setField(
+    dCopies,
+    context.printConfiguration?.copies != null
+      ? String(context.printConfiguration.copies)
+      : '—',
+  );
+  setField(
+    dPrintSides,
+    context.printConfiguration?.duplex != null
+      ? context.printConfiguration.duplex
+        ? '2-Sided (Duplex)'
+        : '1-Sided (Simplex)'
+      : '—',
+  );
+  setField(
+    dQuality,
+    context.printConfiguration?.quality
+      ? context.printConfiguration.quality === 'high'
+        ? 'High Quality'
+        : 'Standard'
+      : '—',
+  );
   setField(
     dColorPages,
     context.colorPages != null ? String(context.colorPages) : '—',

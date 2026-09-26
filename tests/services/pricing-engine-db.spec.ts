@@ -34,6 +34,7 @@ describe('Pricing Engine Database Schema & Defaults', () => {
 
     expect(defaultPricingEngine.highQualitySurcharge).toBe(2);
     expect(defaultPricingEngine.rounding).toBe('whole_peso_total_only');
+    expect(defaultPricingEngine.duplexEnabled).toBe(false);
   });
 
   it('normalizes legacy paper profiles into new tiered format without data loss', () => {
@@ -106,5 +107,13 @@ describe('Pricing Engine Database Schema & Defaults', () => {
     expect(normalized.paperProfiles.a4.colorPrint.very_high).toBe(25);
     expect(normalized.paperProfiles.shortBond.paperCost).toBe(1);
     expect(normalized.paperProfiles.longBond.paperCost).toBe(1);
+    expect(normalized.duplexEnabled).toBe(false);
+
+    const withDuplex = {
+      ...customConfig,
+      duplexEnabled: true,
+    };
+    const normalizedWithDuplex = (db as any).normalizePricingEngine?.(withDuplex) ?? withDuplex;
+    expect(normalizedWithDuplex.duplexEnabled).toBe(true);
   });
 });

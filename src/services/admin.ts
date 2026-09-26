@@ -61,6 +61,7 @@ export class AdminService {
     copies: number,
     paperSize: 'A4' | 'Short' | 'Long' = 'A4',
     quality: PrintQuality = 'standard',
+    duplex?: boolean,
   ): number {
     const safeCopies = Math.max(1, Math.floor(copies));
     const pricing = this.getPricingSettings();
@@ -137,7 +138,10 @@ export class AdminService {
       }
     }
 
-    const paperSubtotalPerCopy = totalPages * profile.paperCost;
+    const duplexAllowed = Boolean(engineCfg?.duplexEnabled);
+    const isDuplex = duplexAllowed && Boolean(duplex);
+    const physicalSheetsPerCopy = isDuplex ? Math.ceil(totalPages / 2) : totalPages;
+    const paperSubtotalPerCopy = physicalSheetsPerCopy * profile.paperCost;
     const surchargePerPg =
       quality === 'high'
         ? (engineCfg?.highQualitySurcharge ??
@@ -169,8 +173,9 @@ export class AdminService {
     copies: number,
     paperSize: 'A4' | 'Short' | 'Long' = 'A4',
     quality: PrintQuality = 'standard',
+    duplex?: boolean,
   ): number {
-    return this.calculateJobAmount(mode, pageCounts, copies, paperSize, quality);
+    return this.calculateJobAmount(mode, pageCounts, copies, paperSize, quality, duplex);
   }
 
   async appendAdminLog(

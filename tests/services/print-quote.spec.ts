@@ -14,6 +14,7 @@ describe('buildPrintQuote - Custom Range', () => {
           scanDocument: 5,
         },
         pricingEngine: {
+          duplexEnabled: true,
           paperProfiles: {
             a4: {
               paperCost: 1,
@@ -256,6 +257,30 @@ describe('buildPrintQuote - Duplex Math, Dynamic Tiers & Quote Integrity', () =>
     expect(result.quote.printSubtotal).toBe(20);
     expect(result.quote.duplexSavings).toBe(5);
     expect(result.quote.requiredAmount).toBe(25);
+  });
+
+  it('forces duplex to false when duplexEnabled is disabled in pricingEngine settings', () => {
+    (db.data!.settings as any).pricingEngine.duplexEnabled = false;
+
+    const result = buildPrintQuote({
+      analysis: tenPageBwAnalysis,
+      copies: 1,
+      duplex: true,
+      colorMode: 'grayscale',
+      paperSize: 'A4',
+      quality: 'standard',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.quote.duplex).toBe(false);
+    expect(result.quote.physicalSheets).toBe(10);
+    expect(result.quote.duplexSavings).toBe(0);
+    expect(result.quote.requiredAmount).toBe(30);
+
+    // Reset back to true for other tests
+    (db.data!.settings as any).pricingEngine.duplexEnabled = true;
   });
 
   it('bills image file containing B&W text at low B&W tier (₱3 simplex), not photo tier (₱10)', () => {
