@@ -42,16 +42,18 @@ describe('pricing-guide', () => {
     const pricingDisabled = normalizePricingConfig({ duplexEnabled: false });
     const htmlDisabled = formatPricingGuide(pricingDisabled);
 
+    expect(htmlDisabled).toContain('<th scope="col">Paper size</th>');
     expect(htmlDisabled).toContain('<th scope="col">Bond Paper (sheet)</th>');
-    expect(htmlDisabled).toContain('<th scope="col">B&amp;W (Low: 0&ndash;10%)</th>');
-    expect(htmlDisabled).toContain('<th scope="col">Color (Max: 70&ndash;100%)</th>');
+    expect(htmlDisabled).toContain('<th scope="col">Print Mode</th>');
+    expect(htmlDisabled).toContain('<th scope="col">Low (0&ndash;10%)</th>');
+    expect(htmlDisabled).toContain('<th scope="col">Max (70&ndash;100%)</th>');
     expect(htmlDisabled).toContain('0&ndash;10%');
     expect(htmlDisabled).toContain('10&ndash;40%');
     expect(htmlDisabled).toContain('40&ndash;70%');
     expect(htmlDisabled).toContain('70&ndash;100%');
-    expect(htmlDisabled).toContain(`<td>${formatPeso(pricingDisabled.paperProfiles.a4.paperCost)}</td>`);
+    expect(htmlDisabled).toContain(`>${formatPeso(pricingDisabled.paperProfiles.a4.paperCost)}<`);
     expect(htmlDisabled).toContain(`<td>${formatPeso(pricingDisabled.paperProfiles.a4.bwPrint.low)}</td>`);
-    expect(htmlDisabled).toContain(`<td>${formatPeso(pricingDisabled.paperProfiles.a4.colorPrint.very_high)}</td>`);
+    expect(htmlDisabled).toContain(`>${formatPeso(pricingDisabled.paperProfiles.a4.colorPrint.very_high)}<`);
     // When disabled, no duplex savings note is shown
     expect(htmlDisabled).not.toContain('Duplex Savings');
 
