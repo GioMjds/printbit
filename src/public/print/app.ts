@@ -1016,11 +1016,23 @@ function setConversionMessage(message: string): void {
   if (conversionMessage) conversionMessage.textContent = message;
 }
 
+function updateConversionStepper(stage: 1 | 2 | 3): void {
+  const step1 = document.getElementById('conversionStep1');
+  const step2 = document.getElementById('conversionStep2');
+  const step3 = document.getElementById('conversionStep3');
+  if (!step1 || !step2 || !step3) return;
+
+  step1.className = `stepper-step ${stage >= 1 ? (stage > 1 ? 'stepper-step--done' : 'stepper-step--active') : ''}`;
+  step2.className = `stepper-step ${stage >= 2 ? (stage > 2 ? 'stepper-step--done' : 'stepper-step--active') : ''}`;
+  step3.className = `stepper-step ${stage === 3 ? 'stepper-step--active' : ''}`;
+}
+
 function showConversionDialog(): void {
   const activeElement = document.activeElement;
   conversionReturnFocus =
     activeElement instanceof HTMLElement ? activeElement : null;
   conversionWaitCancelled = false;
+  updateConversionStepper(2);
   setConversionMessage(`Converting your document to PDF. This can take a moment.`);
   conversionOverlay?.classList.add('is-visible');
   conversionOverlay?.setAttribute('aria-hidden', 'false');
@@ -1109,8 +1121,29 @@ function attachSocket(sid: string): void {
   const socket = ioFactory();
   attachedSessionId = sid;
   socket.emit('joinSession', sid);
-  socket.on('UploadCompleted', () => void checkUploadStatus());
-  socket.on('UploadRemoved', () => void checkUploadStatus());
+  socket.on('UploadStarted', (info: unknown) => {
+    const filename =
+      typeof info === 'string'
+        ? info
+        : typeof info === 'object' &&
+            info !== null &&
+            'filename' in info &&
+            typeof (info as { filename: unknown }).filename === 'string'
+          ? (info as { filename: string }).filename
+          : 'Document';
+    showIncomingUploadSkeleton(filename);
+  });
+  socket.on('UploadCompleted', () => {
+    removeIncomingUploadSkeleton();
+    void checkUploadStatus();
+  });
+  socket.on('UploadFailed', () => {
+    removeIncomingUploadSkeleton();
+  });
+  socket.on('UploadRemoved', () => {
+    removeIncomingUploadSkeleton();
+    void checkUploadStatus();
+  });
   socket.on('systemSettingsChanged', (raw: unknown) => {
     const data = raw as
       | { printLimits?: { maxPagesPerSession?: number } }
@@ -1187,8 +1220,11 @@ function updateFileAnalysisState(
 
   switch (state) {
     case 'analyzing':
-      statusEl.textContent = 'Analyzing…';
-      statusEl.style.display = '';
+      statusEl.innerHTML = `
+        <span class="analysis-spinner-mini" aria-hidden="true"></span>
+        <span class="analysis-label">Preloading pages &amp; analyzing color…</span>
+      `;
+      statusEl.style.display = 'inline-flex';
       break;
     case 'ready':
       statusEl.textContent = '';
@@ -1196,7 +1232,7 @@ function updateFileAnalysisState(
       break;
     case 'failed':
       statusEl.textContent = '⚠ Analysis unavailable';
-      statusEl.style.display = '';
+      statusEl.style.display = 'inline-block';
       break;
   }
 }
@@ -1402,6 +1438,7 @@ continueBtn?.addEventListener('click', async () => {
       }
       return;
     }
+    updateConversionStepper(3);
     setConversionMessage(
       isPdfFilename(selectedFilename)
         ? 'Document ready. Opening print settings…'
