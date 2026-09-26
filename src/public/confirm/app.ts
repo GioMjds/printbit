@@ -23,6 +23,7 @@ import {
   getPrintingStage,
 } from './printing-stage';
 import { presentMaintenanceError } from './maintenance-view';
+import type { PageRange } from '../shared/page-selection';
 import {
   attachPowerSafetyOverlay,
   type PowerSafetyOverlayController,
@@ -106,7 +107,7 @@ let socket: SocketLike | null = null;
 
 type PageRangeSelection =
   | { type: 'all' }
-  | { type: 'custom'; range: string }
+  | { type: 'custom'; range: string; ranges?: PageRange[] }
   | { type: 'single'; page: number };
 type RotationDeg = 0 | 90 | 180 | 270;
 

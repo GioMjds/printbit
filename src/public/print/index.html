@@ -228,55 +228,54 @@
 
           <!-- Waiting state -->
           <div class="files-empty" id="filesEmpty" aria-live="polite">
-            <div class="files-empty__icon" aria-hidden="true">
-              <svg viewBox="0 0 64 64" fill="none">
-                <rect
-                  x="12"
-                  y="8"
-                  width="30"
-                  height="40"
-                  rx="4"
-                  fill="currentColor"
-                  opacity=".12"
-                />
-                <path
-                  d="M12 12a4 4 0 014-4h20l10 10v32a4 4 0 01-4 4H16a4 4 0 01-4-4V12z"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  fill="none"
-                  opacity=".4"
-                />
-                <path
-                  d="M36 8v10h10"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  opacity=".4"
-                />
-                <circle
-                  cx="44"
-                  cy="44"
-                  r="12"
-                  fill="#0e0d1f"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  opacity=".5"
-                />
-                <path
-                  d="M44 39v5l3 3"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  opacity=".5"
-                />
-              </svg>
+            <div class="kiosk-assurance-badge">
+              <span class="assurance-beacon"></span>
+              <span class="assurance-beacon-text">Kiosk Ready &bull; Waiting for Phone Upload</span>
             </div>
+
+            <!-- Anticipated document skeleton preview -->
+            <div class="skeleton-preview-card" aria-hidden="true">
+              <div class="skeleton-preview-header">
+                <div class="skeleton-preview-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                  </svg>
+                </div>
+                <div class="skeleton-preview-lines">
+                  <div class="skeleton-bar skeleton-bar--title"></div>
+                  <div class="skeleton-bar skeleton-bar--meta"></div>
+                </div>
+                <div class="skeleton-preview-pill"></div>
+              </div>
+              <div class="skeleton-preview-body">
+                <div class="skeleton-bar skeleton-bar--line"></div>
+                <div class="skeleton-bar skeleton-bar--line skeleton-bar--short"></div>
+              </div>
+            </div>
+
             <p class="files-empty__title">Waiting for files…</p>
             <p class="files-empty__sub" id="mobileGuideText">
               Join PrintBit Wi-Fi first, then scan the upload QR.
             </p>
+
+            <!-- Customer assurance value props -->
+            <div class="kiosk-assurance-strip" aria-label="Customer assurances">
+              <div class="assurance-pill">
+                <svg class="assurance-pill__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+                </svg>
+                <span><strong>100% Private</strong> &bull; Wiped after print</span>
+              </div>
+              <div class="assurance-pill">
+                <svg class="assurance-pill__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+                </svg>
+                <span><strong>Auto-Preload</strong> &bull; Fast vector render</span>
+              </div>
+            </div>
           </div>
 
           <!-- File list (populated by JS) — starts hidden so files-empty centres correctly -->
@@ -538,11 +537,59 @@
         aria-labelledby="conversionTitle"
         aria-describedby="conversionMessage"
       >
-        <div class="conversion-spinner" aria-hidden="true"></div>
+        <!-- Document Preloading Skeleton -->
+        <div class="conversion-skeleton" aria-hidden="true">
+          <div class="conversion-skeleton__sheet">
+            <div class="conversion-skeleton__fold"></div>
+            <div class="conversion-skeleton__laser"></div>
+            <div class="conversion-skeleton__header">
+              <div class="conversion-skeleton__icon"></div>
+              <div class="conversion-skeleton__title-bar"></div>
+            </div>
+            <div class="conversion-skeleton__lines">
+              <div class="conversion-skeleton__line" style="width: 88%"></div>
+              <div class="conversion-skeleton__line" style="width: 95%"></div>
+              <div class="conversion-skeleton__line" style="width: 72%"></div>
+              <div class="conversion-skeleton__line" style="width: 80%"></div>
+            </div>
+          </div>
+          <div class="conversion-skeleton__badge">
+            <span class="badge-source">DOC</span>
+            <span class="badge-arrow">&rarr;</span>
+            <span class="badge-target">PDF</span>
+          </div>
+        </div>
+
         <h3 class="modal-title" id="conversionTitle">Preparing your file</h3>
         <p class="modal-subtitle" id="conversionMessage" aria-live="polite">
           Converting your document to PDF. This can take a moment.
         </p>
+
+        <!-- 3-stage customer assurance stepper -->
+        <div class="conversion-stepper" aria-label="Preparation progress">
+          <div class="stepper-step stepper-step--done" id="conversionStep1">
+            <span class="step-num">&#10003;</span>
+            <span class="step-label">File Received</span>
+          </div>
+          <div class="stepper-divider"></div>
+          <div class="stepper-step stepper-step--active" id="conversionStep2">
+            <span class="step-num">2</span>
+            <span class="step-label">Preloading Layout</span>
+          </div>
+          <div class="stepper-divider"></div>
+          <div class="stepper-step" id="conversionStep3">
+            <span class="step-num">3</span>
+            <span class="step-label">Ready for Config</span>
+          </div>
+        </div>
+
+        <p class="conversion-assurance-text">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true">
+            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944z" clip-rule="evenodd"/>
+          </svg>
+          Processed locally on kiosk hardware &bull; Original formatting &amp; resolution preserved
+        </p>
+
         <div class="modal-actions">
           <button type="button" class="modal-btn modal-btn--cancel" id="conversionCancel">
             Back to files

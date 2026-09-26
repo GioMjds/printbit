@@ -250,13 +250,22 @@ body {
   outline-offset: 2px;
 }
 
+.pricing-close svg {
+  display: block;
+  pointer-events: none;
+}
+
 .pricing-table-wrap {
   overflow-x: auto;
   border-radius: 18px;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.24);
-  margin-bottom: 20px;
+  border: 1.5px solid rgba(167, 170, 225, 0.18);
+  background: rgba(14, 13, 31, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 32px rgba(0, 0, 0, 0.28);
+  margin-bottom: 22px;
   width: 100%;
+  contain: paint;
   scrollbar-width: thin;
   scrollbar-color: rgba(167, 170, 225, 0.25) transparent;
 }
@@ -272,6 +281,7 @@ body {
   width: 100%;
   table-layout: fixed;
   font-size: 16px;
+  text-rendering: optimizeLegibility;
 }
 .pricing-table caption { display: none; }
 .pricing-table th, .pricing-table td {
@@ -290,8 +300,18 @@ body {
   line-height: 1.3;
   padding: 15px 10px;
 }
+.pricing-th-tier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.pricing-th-tier .pricing-tier-tag__dot {
+  width: 8px;
+  height: 8px;
+}
 .pricing-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.035);
 }
 .pricing-table tbody td {
   font-variant-numeric: tabular-nums;
@@ -318,14 +338,15 @@ body {
 }
 .pricing-sheet-badge {
   display: inline-block;
-  padding: 6px 14px;
+  padding: 5px 14px;
   border-radius: 8px;
-  background: rgba(245, 158, 11, 0.1);
-  color: #fbbf24;
+  background: rgba(245, 211, 196, 0.12);
+  color: #ffdcd0;
   font-weight: 800;
-  font-size: 15.5px;
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  font-size: 15px;
+  border: 1px solid rgba(245, 211, 196, 0.28);
   letter-spacing: 0.02em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
 }
 
 /* Col 3: Print Mode */
@@ -371,7 +392,11 @@ body {
 
 /* Row dividers between paper profiles */
 .pricing-row--first {
-  border-top: 1.5px solid rgba(167, 170, 225, 0.16);
+  border-top: 1.5px solid rgba(167, 170, 225, 0.2);
+}
+.pricing-row--second td {
+  border-bottom: 1.5px solid rgba(167, 170, 225, 0.1);
+  background: rgba(105, 111, 199, 0.025);
 }
 
 .pricing-guide-footer {
@@ -390,25 +415,53 @@ body {
   gap: 8px;
   padding: 9px 14px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
   font-size: 13.5px;
   font-weight: 500;
-  color: var(--lavender);
+  color: #e2e8f0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: border-color 150ms ease, background 150ms ease;
 }
+.pricing-tier-tag--low {
+  background: rgba(52, 211, 153, 0.05);
+  border: 1px solid rgba(52, 211, 153, 0.18);
+}
+.pricing-tier-tag--med {
+  background: rgba(96, 165, 250, 0.05);
+  border: 1px solid rgba(96, 165, 250, 0.18);
+}
+.pricing-tier-tag--high {
+  background: rgba(251, 191, 36, 0.05);
+  border: 1px solid rgba(251, 191, 36, 0.18);
+}
+.pricing-tier-tag--max {
+  background: rgba(248, 113, 113, 0.05);
+  border: 1px solid rgba(248, 113, 113, 0.18);
+}
+
 .pricing-tier-tag__dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.pricing-tier-tag__dot--low { background: #34d399; }
-.pricing-tier-tag__dot--med { background: #60a5fa; }
-.pricing-tier-tag__dot--high { background: #fbbf24; }
-.pricing-tier-tag__dot--max { background: #f87171; }
+.pricing-tier-tag__dot--low {
+  background: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.55);
+}
+.pricing-tier-tag__dot--med {
+  background: #60a5fa;
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.55);
+}
+.pricing-tier-tag__dot--high {
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.55);
+}
+.pricing-tier-tag__dot--max {
+  background: #f87171;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.55);
+}
 
 .pricing-notes-bar {
   display: flex;
@@ -416,10 +469,10 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 10px 18px;
-  border-radius: 10px;
+  padding: 12px 18px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 14.5px;
   line-height: 1.4;
   color: var(--lavender);
@@ -435,6 +488,16 @@ body {
 .pricing-duplex-note {
   color: #34d399;
   font-weight: 600;
+  background: rgba(52, 211, 153, 0.08);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(52, 211, 153, 0.22);
+}
+.pricing-quality-note {
+  background: rgba(167, 170, 225, 0.06);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(167, 170, 225, 0.16);
 }
 .pricing-quality-note__label {
   font-weight: 700;

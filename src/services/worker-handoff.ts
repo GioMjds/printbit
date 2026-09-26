@@ -4,6 +4,7 @@ import {
   DEFAULT_PRINT_SCALING,
   type PrintScaling,
 } from '../shared/print-configuration';
+import type { PageSelection } from '@/public/shared/page-selection';
 
 export type WorkerHandoffErrorCode =
   | 'WORKER_QUEUE_UNAVAILABLE'
@@ -29,6 +30,7 @@ export async function handoffToWorker(input: {
     copies?: number;
     color?: boolean;
     pageRange?: string | null;
+    pageSelection?: PageSelection | null;
     duplex?: boolean;
     orientation?: string | null;
     rotationDeg?: number;
@@ -93,13 +95,14 @@ export async function handoffToWorker(input: {
       copies: input.printSettings?.copies ?? 1,
       color: input.printSettings?.color ?? false,
       pageRange: input.printSettings?.pageRange ?? null,
+      pageSelection: input.printSettings?.pageSelection ?? null,
       duplex: input.printSettings?.duplex ?? false,
       orientation: input.printSettings?.orientation ?? null,
       rotationDeg: input.printSettings?.rotationDeg ?? 0,
       paperSize: input.printSettings?.paperSize ?? 'A4',
       quality: input.printSettings?.quality ?? 'standard',
       scaling: input.printSettings?.scaling ?? DEFAULT_PRINT_SCALING,
-      schemaVersion: 2,
+      schemaVersion: 3,
       transactionId: input.transactionId,
       spoolerCorrelationKey: input.spoolerCorrelationKey,
     };

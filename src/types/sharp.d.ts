@@ -17,6 +17,7 @@ declare module 'sharp' {
     metadata(): Promise<SharpMetadata>;
     png(options?: Record<string, unknown>): SharpPipeline;
     raw(): SharpPipeline;
+    resize(width?: number, height?: number, options?: Record<string, unknown>): SharpPipeline;
     rotate(degrees?: number): SharpPipeline;
     toBuffer(options: { resolveWithObject: true }): Promise<SharpBufferResult>;
     toFile(outputPath: string): Promise<unknown>;

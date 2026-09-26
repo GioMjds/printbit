@@ -30,6 +30,8 @@ import {
   detectPaperSizeFromDimensions,
 } from './geometry-detection';
 import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
+import { CustomRangeBuilder } from './custom-range-builder';
+import type { PageRange } from '../shared/page-selection';
 
 export {};
 
@@ -76,7 +78,7 @@ const HTML_PREVIEW_LOAD_TIMEOUT_MS = 20_000;
 
 type PageRangeSelection =
   | { type: 'all' }
-  | { type: 'custom'; range: string }
+  | { type: 'custom'; range: string; ranges?: PageRange[] }
   | { type: 'single'; page: number };
 
 interface PrintConfig {
@@ -312,6 +314,11 @@ function syncPreviewPageWithRange(): void {
     const page = parseInt(singlePageInput.value, 10);
     if (!isNaN(page)) {
       void preview.goToPage(page);
+    }
+  } else if (pageModeCustom?.checked && customRangeBuilder) {
+    const sel = customRangeBuilder.getSelection();
+    if (sel.ranges.length > 0) {
+      void preview.goToPage(sel.ranges[0].start);
     }
   }
 }
@@ -1070,24 +1077,18 @@ const pageRangeInput = document.getElementById(
 const customRangeDisplay = document.getElementById(
   'customRangeDisplay',
 ) as HTMLElement | null;
-const customRangeStartInput = document.getElementById(
-  'customRangeStartInput',
+const customRangeRowsContainer = document.getElementById(
+  'customRangeRowsContainer',
+) as HTMLElement | null;
+const addCustomRangeRowBtn = document.getElementById(
+  'addCustomRangeRowBtn',
+) as HTMLButtonElement | null;
+const customRangeManualInput = document.getElementById(
+  'customRangeManualInput',
 ) as HTMLInputElement | null;
-const customRangeStartDec = document.getElementById(
-  'customRangeStartDec',
-) as HTMLButtonElement | null;
-const customRangeStartInc = document.getElementById(
-  'customRangeStartInc',
-) as HTMLButtonElement | null;
-const customRangeEndInput = document.getElementById(
-  'customRangeEndInput',
-) as HTMLInputElement | null;
-const customRangeEndDec = document.getElementById(
-  'customRangeEndDec',
-) as HTMLButtonElement | null;
-const customRangeEndInc = document.getElementById(
-  'customRangeEndInc',
-) as HTMLButtonElement | null;
+const customRangeFeedbackCard = document.getElementById(
+  'customRangeFeedbackCard',
+) as HTMLElement | null;
 const singlePageInput = document.getElementById(
   'singlePageInput',
 ) as HTMLInputElement | null;
@@ -1281,95 +1282,50 @@ function getPageRangeMaxPages(): number {
   return Math.max(1, preview.pageCount || 1);
 }
 
-function syncCustomRangeInputs(
-  changed: 'start' | 'end' | 'both' = 'both',
-): void {
-  if (!pageRangeInput) return;
-  const max = getPageRangeMaxPages();
-  let start = parseInt(customRangeStartInput?.value ?? '1', 10) || 1;
-  let end = parseInt(customRangeEndInput?.value ?? '1', 10) || 1;
-
-  start = Math.max(1, Math.min(max, start));
-  end = Math.max(1, Math.min(max, end));
-
-  if (start > end) {
-    if (changed === 'start') end = start;
-    else start = end;
-  }
-
-  if (customRangeStartInput) {
-    customRangeStartInput.min = '1';
-    customRangeStartInput.max = String(max);
-    customRangeStartInput.value = String(start);
-  }
-  if (customRangeEndInput) {
-    customRangeEndInput.min = '1';
-    customRangeEndInput.max = String(max);
-    customRangeEndInput.value = String(end);
-  }
-
-  const normalizedRange = start === end ? String(start) : `${start}-${end}`;
-  pageRangeInput.value = normalizedRange;
-  if (customRangeDisplay) {
-    if (pageModeAll?.checked) {
-      customRangeDisplay.textContent = `All pages (${max === 1 ? '1 page' : `1–${max}`})`;
-    } else {
-      customRangeDisplay.textContent = `Selected: ${normalizedRange}`;
-    }
-  }
-  clampCopiesInput();
-}
-
-function updateCustomRangeWithDelta(
-  target: 'start' | 'end',
-  delta: number,
-): void {
-  if (pageModeAll?.checked) return;
-  const input =
-    target === 'start' ? customRangeStartInput : customRangeEndInput;
-  if (!input) return;
-  const next = (parseInt(input.value || '1', 10) || 1) + delta;
-  input.value = String(next);
-  syncCustomRangeInputs(target);
-  syncCustomRangeValidity();
-  updateSummary();
-  schedulePrintQuoteRefresh();
-}
-
-type CustomRangeStepperControl = {
-  el: HTMLButtonElement | null;
-  target: 'start' | 'end';
-  delta: number;
-}
-
-const customRangeStepperControls = [
-  { el: customRangeStartDec, target: 'start', delta: -1 },
-  { el: customRangeStartInc, target: 'start', delta: 1 },
-  { el: customRangeEndDec, target: 'end', delta: -1 },
-  { el: customRangeEndInc, target: 'end', delta: 1 },
-] satisfies CustomRangeStepperControl[];
-
-customRangeStepperControls.forEach(({ el, target, delta }) => {
-  el?.addEventListener('click', () => {
-    updateCustomRangeWithDelta(target, delta);
+let customRangeBuilder: CustomRangeBuilder | null = null;
+if (
+  customRangeRowsContainer &&
+  addCustomRangeRowBtn &&
+  customRangeManualInput &&
+  customRangeFeedbackCard &&
+  pageRangeInput
+) {
+  customRangeBuilder = new CustomRangeBuilder({
+    container: customRangeRowsContainer,
+    addButton: addCustomRangeRowBtn,
+    manualInput: customRangeManualInput,
+    feedbackCard: customRangeFeedbackCard,
+    hiddenInput: pageRangeInput,
+    getMaxPages: () => getPageRangeMaxPages(),
+    onPagePreviewJump: (page) => {
+      void preview.goToPage(page);
+    },
+    onChange: () => {
+      syncCustomRangeValidity();
+      clampCopiesInput();
+      updateSummary();
+      schedulePrintQuoteRefresh();
+    },
   });
-});
+}
 
-customRangeStartInput?.addEventListener('change', () => {
-  if (pageModeAll?.checked) return;
-  syncCustomRangeInputs('start');
-  syncCustomRangeValidity();
-  updateSummary();
-  schedulePrintQuoteRefresh();
-});
-
-customRangeEndInput?.addEventListener('change', () => {
-  if (pageModeAll?.checked) return;
-  syncCustomRangeInputs('end');
-  syncCustomRangeValidity();
-  updateSummary();
-  schedulePrintQuoteRefresh();
-});
+function syncCustomRangeInputs(): void {
+  if (customRangeBuilder) {
+    const sel = customRangeBuilder.getSelection();
+    if (pageRangeInput) {
+      pageRangeInput.value = sel.canonicalString;
+    }
+    if (customRangeDisplay) {
+      const max = getPageRangeMaxPages();
+      if (pageModeAll?.checked) {
+        customRangeDisplay.textContent = `All pages (${max === 1 ? '1 page' : `1–${max}`})`;
+      } else {
+        customRangeDisplay.textContent = `Selected: ${sel.canonicalString}`;
+      }
+    }
+    clampCopiesInput();
+  }
+}
 
 pageRangeCustomWrap?.addEventListener('click', () => {
   if (pageModeAll?.checked && pageModeCustom) {
@@ -1440,6 +1396,16 @@ function syncCustomRangeValidity(): void {
     return;
   }
 
+  if (customRangeBuilder) {
+    const sel = customRangeBuilder.getSelection();
+    if (sel.totalSelectedPages === 0) {
+      pageRangeInput.setCustomValidity('Please select at least 1 page.');
+      return;
+    }
+    pageRangeInput.setCustomValidity('');
+    return;
+  }
+
   const raw = pageRangeInput.value;
   if (isValidCustomRange(raw)) {
     pageRangeInput.setCustomValidity('');
@@ -1456,6 +1422,14 @@ function getPageRange(): PageRangeSelection {
     return { type: 'all' };
   }
   if (pageModeCustom?.checked) {
+    if (customRangeBuilder) {
+      const sel = customRangeBuilder.getSelection();
+      return {
+        type: 'custom',
+        range: sel.canonicalString,
+        ranges: sel.ranges,
+      };
+    }
     const range = (pageRangeInput?.value ?? '').trim();
     return { type: 'custom', range };
   }
@@ -1486,25 +1460,6 @@ function syncPageRangeUI(): void {
 
   pageRangeCustomWrap?.classList.toggle('hidden', !showCustom);
   pageRangeSingleWrap?.classList.toggle('hidden', !showSingle);
-
-  const customControls = [
-    customRangeStartDec,
-    customRangeStartInput,
-    customRangeStartInc,
-    customRangeEndDec,
-    customRangeEndInput,
-    customRangeEndInc,
-  ];
-  customControls.forEach((el) => {
-    if (el) {
-      el.disabled = !isCustom;
-      if (!isCustom) {
-        el.setAttribute('aria-disabled', 'true');
-      } else {
-        el.removeAttribute('aria-disabled');
-      }
-    }
-  });
 
   const singleControls = [singlePageDec, singlePageInput, singlePageInc];
   singleControls.forEach((el) => {
@@ -1618,6 +1573,7 @@ function syncPageRangeAvailability(): void {
     30;
 
   pageRangeGroup?.classList.toggle('hidden', !visible);
+  customRangeBuilder?.setMaxPages(maxPages);
 
   if (pageModeAll) {
     if (!visible) {
@@ -1627,9 +1583,9 @@ function syncPageRangeAvailability(): void {
       pageModeAll.disabled = true; // Disable "All Pages"
       if (pageModeAll.checked) {
         if (pageModeCustom) pageModeCustom.checked = true; // Auto-select "Page Range"
-        if (customRangeStartInput) customRangeStartInput.value = '1';
-        if (customRangeEndInput)
-          customRangeEndInput.value = String(Math.min(maxAllowed, maxPages));
+        customRangeBuilder?.setFromRanges([
+          { start: 1, end: Math.min(maxAllowed, maxPages) },
+        ]);
       }
     } else {
       pageModeAll.disabled = false;

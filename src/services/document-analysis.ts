@@ -245,7 +245,7 @@ async function analyzeImage(
   filePath: string,
   colorDetectionEnabled: boolean = true,
 ): Promise<DocumentAnalysisResult> {
-  const { data, info } = await sharp(filePath)
+  const { data, info } = await (sharp(filePath) as any)
     .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
     .ensureAlpha()
     .raw()

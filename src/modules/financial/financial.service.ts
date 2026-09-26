@@ -1493,6 +1493,7 @@ export class FinancialService {
           rotationDeg,
           paperSize,
           pageRange: quoteComputation.quote.pageRange ?? undefined,
+          pageSelection: quoteComputation.quote.pageSelection ?? undefined,
           duplex: quoteComputation.quote.duplex,
         },
         quality,

@@ -62,6 +62,7 @@ export function buildPrintJobEnqueuePayload(context: {
       paperSize: context.printOptions.paperSize,
       duplex: context.printOptions.duplex ?? false,
       pageRange: (context.printOptions.pageRange as string | null) ?? null,
+      pageSelection: context.printOptions.pageSelection ?? null,
       serverFilename: context.serverFilename,
       printerName: context.printerName,
       quality: context.printOptions.quality ?? 'standard',

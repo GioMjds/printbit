@@ -173,10 +173,50 @@
                 </p>
               </div>
 
-              <!-- Preparation overlay -->
+              <!-- Preparation overlay: Full Document Skeleton + Customer Assurance Card -->
               <div class="paper-loading" id="paperLoading">
+                <!-- Realistic Full-Page Document Skeleton -->
+                <div class="doc-preview-skeleton" aria-hidden="true">
+                  <div class="doc-skeleton__shimmer"></div>
+                  <!-- Document header mock -->
+                  <div class="doc-skeleton__header">
+                    <div class="doc-skeleton__title-bar"></div>
+                    <div class="doc-skeleton__meta-bar"></div>
+                    <div class="doc-skeleton__rule"></div>
+                  </div>
+                  <!-- Paragraph 1 -->
+                  <div class="doc-skeleton__paragraph">
+                    <div class="doc-skeleton__line" style="width: 96%"></div>
+                    <div class="doc-skeleton__line" style="width: 92%"></div>
+                    <div class="doc-skeleton__line" style="width: 85%"></div>
+                    <div class="doc-skeleton__line" style="width: 60%"></div>
+                  </div>
+                  <!-- Simulated 2-col media / table block -->
+                  <div class="doc-skeleton__media-grid">
+                    <div class="doc-skeleton__media-card">
+                      <div class="doc-skeleton__media-thumb"></div>
+                      <div class="doc-skeleton__line doc-skeleton__line--caption" style="width: 70%"></div>
+                    </div>
+                    <div class="doc-skeleton__media-card">
+                      <div class="doc-skeleton__media-thumb"></div>
+                      <div class="doc-skeleton__line doc-skeleton__line--caption" style="width: 80%"></div>
+                    </div>
+                  </div>
+                  <!-- Paragraph 2 -->
+                  <div class="doc-skeleton__paragraph">
+                    <div class="doc-skeleton__line" style="width: 94%"></div>
+                    <div class="doc-skeleton__line" style="width: 88%"></div>
+                    <div class="doc-skeleton__line" style="width: 52%"></div>
+                  </div>
+                  <!-- Footer mock -->
+                  <div class="doc-skeleton__footer">
+                    <div class="doc-skeleton__footer-pill"></div>
+                  </div>
+                </div>
+
+                <!-- Floating Frosted Customer Assurance Card -->
                 <div
-                  class="config-preparing"
+                  class="config-preparing config-assurance-card"
                   id="configPreparing"
                   role="status"
                   aria-live="polite"
@@ -188,22 +228,13 @@
                     width="120"
                     height="120"
                     aria-hidden="true"
+                    style="display: none"
                   ></canvas>
 
-                  <div class="config-preparing__fallback" aria-hidden="true">
-                    <span
-                      class="config-preparing__pixel config-preparing__pixel--1"
-                    ></span>
-                    <span
-                      class="config-preparing__pixel config-preparing__pixel--2"
-                    ></span>
-                    <span
-                      class="config-preparing__pixel config-preparing__pixel--3"
-                    ></span>
-                    <span class="config-preparing__document">
-                      <span></span>
-                      <span></span>
-                      <span></span>
+                  <div class="assurance-card__header">
+                    <span class="assurance-beacon-chip">
+                      <span class="assurance-beacon-dot"></span>
+                      <span id="assuranceStageBadge">Job Processing &bull; Preloading</span>
                     </span>
                   </div>
 
@@ -216,6 +247,40 @@
                   >
                     Building your print preview…
                   </p>
+
+                  <!-- 3-Step Live Processing Pipeline -->
+                  <div class="config-pipeline" id="configPipeline" aria-label="Document preparation stages">
+                    <div class="pipeline-step pipeline-step--done" id="pipeStep1">
+                      <span class="pipeline-icon">&#10003;</span>
+                      <span class="pipeline-text" id="pipeText1">Document Verified</span>
+                    </div>
+                    <div class="pipeline-step pipeline-step--active" id="pipeStep2">
+                      <span class="pipeline-icon">
+                        <span class="pipeline-pulse-dot"></span>
+                      </span>
+                      <span class="pipeline-text" id="pipeText2">Analyzing Color &amp; Ink</span>
+                    </div>
+                    <div class="pipeline-step" id="pipeStep3">
+                      <span class="pipeline-icon">&bull;</span>
+                      <span class="pipeline-text" id="pipeText3">Calibrating Preview</span>
+                    </div>
+                  </div>
+
+                  <!-- Customer Assurance Guarantee Strip -->
+                  <div class="assurance-card__guarantees">
+                    <div class="guarantee-chip">
+                      <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944z" clip-rule="evenodd"/>
+                      </svg>
+                      <span>100% Confidential On-Device</span>
+                    </div>
+                    <div class="guarantee-chip">
+                      <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                      </svg>
+                      <span>Precise Margin Calibration</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -736,87 +801,40 @@
               </div>
 
               <div id="pageRangeCustomWrap" class="page-range-wrap hidden">
-                <div class="page-range-custom-grid">
-                  <div class="page-range-field">
-                    <span class="page-range-field__label">From</span>
-                    <div class="copies-control">
-                      <button
-                        type="button"
-                        id="customRangeStartDec"
-                        class="copies-btn"
-                        aria-label="Decrease custom range start page"
-                        disabled
-                        aria-disabled="true"
-                      >
-                        -
-                      </button>
-                      <input
-                        id="customRangeStartInput"
-                        type="number"
-                        min="1"
-                        value="1"
-                        class="copies-input"
-                        readonly
-                        tabindex="-1"
-                        inputmode="none"
-                        disabled
-                        aria-disabled="true"
-                        aria-label="Custom range start page"
-                      />
-                      <button
-                        type="button"
-                        id="customRangeStartInc"
-                        class="copies-btn"
-                        aria-label="Increase custom range start page"
-                        disabled
-                        aria-disabled="true"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                  <div class="page-range-field">
-                    <span class="page-range-field__label">To</span>
-                    <div class="copies-control">
-                      <button
-                        type="button"
-                        id="customRangeEndDec"
-                        class="copies-btn"
-                        aria-label="Decrease custom range end page"
-                        disabled
-                        aria-disabled="true"
-                      >
-                        -
-                      </button>
-                      <input
-                        id="customRangeEndInput"
-                        type="number"
-                        min="1"
-                        value="1"
-                        class="copies-input"
-                        readonly
-                        tabindex="-1"
-                        inputmode="none"
-                        disabled
-                        aria-disabled="true"
-                        aria-label="Custom range end page"
-                      />
-                      <button
-                        type="button"
-                        id="customRangeEndInc"
-                        class="copies-btn"
-                        aria-label="Increase custom range end page"
-                        disabled
-                        aria-disabled="true"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
+                <div id="customRangeRowsContainer" class="custom-range-rows"></div>
+
+                <div class="custom-range-actions">
+                  <button
+                    type="button"
+                    id="addCustomRangeRowBtn"
+                    class="add-range-btn"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add page range
+                  </button>
                 </div>
+
+                <details class="custom-range-manual-details">
+                  <summary class="custom-range-manual-summary">Advanced page selection</summary>
+                  <div class="custom-range-manual-wrap">
+                    <input
+                      type="text"
+                      id="customRangeManualInput"
+                      class="custom-range-manual-input"
+                      placeholder="e.g. 1-5, 7-9, 15, 22-25"
+                      aria-label="Enter page ranges manually"
+                    />
+                  </div>
+                </details>
+
+                <div id="customRangeFeedbackCard" class="custom-range-feedback-card" aria-live="polite"></div>
+
                 <p
                   id="customRangeDisplay"
-                  class="page-range-selected"
+                  class="sr-only"
                   aria-live="polite"
                 >
                   All pages
@@ -1089,7 +1107,10 @@
           type="button"
           aria-label="Close printing prices"
         >
-          ×
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
         <p class="pricing-modal__eyebrow">PRINT WITH CONFIDENCE</p>
         <h2 id="pricingTitle">All printing prices</h2>

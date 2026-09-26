@@ -14,7 +14,7 @@ export interface PublicPricingConfig {
   duplexEnabled?: boolean;
 }
 
-const DEFAULT_PRICING: PublicPricingConfig = {
+const DEFAULT_PRICING = {
   paperProfiles: {
     shortBond: {
       paperCost: 1,
@@ -34,7 +34,7 @@ const DEFAULT_PRICING: PublicPricingConfig = {
   },
   highQualitySurcharge: 2,
   duplexEnabled: false,
-};
+} satisfies PublicPricingConfig;
 
 const PAPER_LABELS = {
   shortBond: 'Short Bond Paper',
@@ -154,7 +154,15 @@ export function formatPricingGuide(pricing: PublicPricingConfig): string {
     ? `<span class="pricing-note-pill pricing-duplex-note"><strong>Duplex Savings:</strong> 2-sided printing saves 1 sheet per 2 pages!</span>`
     : '';
 
-  return `<div class="pricing-table-wrap"><table class="pricing-table"><caption>Paper &amp; Print Pricing per Page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">Bond Paper (sheet)</th><th scope="col">Print Mode</th><th scope="col">Low (0% - 10%)</th><th scope="col">Medium (11% - 40%)</th><th scope="col">High (41% - 70%)</th><th scope="col">Max (71% - 100%)</th></tr></thead><tbody>${rows}</tbody></table></div><div class="pricing-guide-footer"><div class="pricing-tier-strip"><span class="pricing-tier-tag"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--low"></span><strong>Low (0% - 10%)</strong>: Text, forms</span><span class="pricing-tier-tag"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--med"></span><strong>Medium (11% - 40%)</strong>: Diagrams</span><span class="pricing-tier-tag"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--high"></span><strong>High (41% - 70%)</strong>: Charts</span><span class="pricing-tier-tag"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--max"></span><strong>Max (71% - 100%)</strong>: Photos</span></div><div class="pricing-notes-bar"><span class="pricing-note-pill pricing-paper-note"><strong>Bond Paper Costing:</strong> ${formatPeso(pricing.paperProfiles.a4.paperCost)}/sheet for all sizes</span>${duplexNote}<span class="pricing-note-pill pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span></span></div></div>`;
+  const p = pricing.paperProfiles;
+  const isUniform =
+    p?.shortBond?.paperCost === p?.a4?.paperCost &&
+    p?.a4?.paperCost === p?.longBond?.paperCost;
+  const paperCostText = isUniform
+    ? `${formatPeso(p?.a4?.paperCost ?? 1)}/sheet for all sizes`
+    : `Short ${formatPeso(p?.shortBond?.paperCost ?? 1)} · A4 ${formatPeso(p?.a4?.paperCost ?? 1)} · Long ${formatPeso(p?.longBond?.paperCost ?? 1)}/sheet`;
+
+  return `<div class="pricing-table-wrap"><table class="pricing-table"><caption>Paper &amp; Print Pricing per Page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">Bond Paper (sheet)</th><th scope="col">Print Mode</th><th scope="col"><span class="pricing-th-tier"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--low" aria-hidden="true"></span>Low (0% - 10%)</span></th><th scope="col"><span class="pricing-th-tier"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--med" aria-hidden="true"></span>Medium (11% - 40%)</span></th><th scope="col"><span class="pricing-th-tier"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--high" aria-hidden="true"></span>High (41% - 70%)</span></th><th scope="col"><span class="pricing-th-tier"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--max" aria-hidden="true"></span>Max (71% - 100%)</span></th></tr></thead><tbody>${rows}</tbody></table></div><div class="pricing-guide-footer"><div class="pricing-tier-strip"><span class="pricing-tier-tag pricing-tier-tag--low"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--low"></span><strong>Low (0% - 10%)</strong>: Text, forms</span><span class="pricing-tier-tag pricing-tier-tag--med"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--med"></span><strong>Medium (11% - 40%)</strong>: Diagrams</span><span class="pricing-tier-tag pricing-tier-tag--high"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--high"></span><strong>High (41% - 70%)</strong>: Charts</span><span class="pricing-tier-tag pricing-tier-tag--max"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--max"></span><strong>Max (71% - 100%)</strong>: Photos</span></div><div class="pricing-notes-bar"><span class="pricing-note-pill pricing-paper-note"><strong>Bond Paper:</strong> ${paperCostText}</span>${duplexNote}<span class="pricing-note-pill pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span></span></div></div>`;
 }
 
 export const buildPricingTableHtml = formatPricingGuide;

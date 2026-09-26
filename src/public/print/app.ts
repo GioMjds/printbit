@@ -453,8 +453,56 @@ function clearSelectedFileState(): void {
   sessionStorage.removeItem('printbit.uploadedDocumentId');
 }
 
+let incomingUploadSkeletonEl: HTMLElement | null = null;
+
+function showIncomingUploadSkeleton(filename: string): void {
+  if (!fileList) return;
+
+  filesEmpty?.classList.add('hidden');
+  fileList.classList.remove('hidden');
+
+  if (!incomingUploadSkeletonEl) {
+    incomingUploadSkeletonEl = document.createElement('li');
+    incomingUploadSkeletonEl.className = 'file-item file-item--skeleton';
+    incomingUploadSkeletonEl.setAttribute('aria-live', 'polite');
+    incomingUploadSkeletonEl.setAttribute('role', 'status');
+  }
+
+  const safeName = escapeHtml(filename || 'Receiving upload…');
+  incomingUploadSkeletonEl.innerHTML = `
+    <div class="file-item__icon file-item__icon--skeleton" aria-hidden="true">
+      <div class="file-skeleton__radar"></div>
+    </div>
+    <div class="file-item__info">
+      <p class="file-item__name file-skeleton__name">${safeName}</p>
+      <div class="file-item__meta file-skeleton__meta">
+        <span class="file-skeleton__badge">Preloading file…</span>
+        <span class="file-skeleton__reassurance">Scanning security &amp; layout</span>
+      </div>
+      <div class="file-skeleton__bar-track" aria-hidden="true">
+        <div class="file-skeleton__bar-fill"></div>
+      </div>
+    </div>
+    <div class="file-item__actions">
+      <div class="file-skeleton__pulse-chip">Transferring…</div>
+    </div>
+  `;
+
+  if (!incomingUploadSkeletonEl.parentNode) {
+    fileList.prepend(incomingUploadSkeletonEl);
+  }
+}
+
+function removeIncomingUploadSkeleton(): void {
+  if (incomingUploadSkeletonEl && incomingUploadSkeletonEl.parentNode) {
+    incomingUploadSkeletonEl.remove();
+    incomingUploadSkeletonEl = null;
+  }
+}
+
 function setWaitingForFilesState(): void {
   clearSelectedFileState();
+  removeIncomingUploadSkeleton();
   knownFiles = new Set<string>();
   lastRenderedFileSignature = '';
   sessionStorage.removeItem('printbit.uploadedFiles');
@@ -679,6 +727,7 @@ function escapeHtml(str: string): string {
 }
 
 function renderFiles(files: UploadedFile[]): void {
+  removeIncomingUploadSkeleton();
   const prevSelected = selectedDocumentId;
   lastRenderedFileSignature = filesSignature(files);
   knownFiles = new Set<string>();

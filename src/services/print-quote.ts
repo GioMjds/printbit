@@ -1,9 +1,20 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { adminService } from './admin';
-import { db, type ColorMode, type PrintQuality, defaultPricingEngine } from './db';
+import {
+  db,
+  type ColorMode,
+  type PrintQuality,
+  defaultPricingEngine,
+} from './db';
 import type { CoverageTier } from '@/core/database/models/admin.model';
 import { resolveCoverageTier } from './document-analysis';
 import type { DocumentAnalysis, DocumentPageAnalysis } from './session';
+import {
+  normalizePageSelection,
+  parsePageRangeString,
+  type PageSelection,
+  type PageSelectionMode,
+} from '@/public/shared/page-selection';
 
 type PageRangeSelectionPayload =
   | { type: 'all' }
@@ -12,6 +23,7 @@ type PageRangeSelectionPayload =
 
 interface ParsedPageRange {
   normalized: string | null;
+  pageSelection?: PageSelection | null;
   error?: string;
 }
 
@@ -56,6 +68,7 @@ export interface PrintQuoteResult {
   billableImagePages: number;
   billableImageBwPages: number;
   pageRange: string | null;
+  pageSelection?: PageSelection | null;
   pricing: {
     printPerPage: number;
     colorSurcharge: number;
@@ -97,25 +110,90 @@ function normalizeRangeString(raw: string): string | null {
 }
 
 function parsePageRange(raw: unknown): ParsedPageRange {
-  if (raw == null) return { normalized: null };
+  if (raw == null) return { normalized: null, pageSelection: null };
 
   if (typeof raw === 'string') {
     const normalized = normalizeRangeString(raw);
     if (!normalized) {
       return { normalized: null, error: 'Invalid page range format' };
     }
-    return { normalized };
+    const ranges = parsePageRangeString(normalized, 999999);
+    return {
+      normalized,
+      pageSelection: { mode: 'custom', ranges },
+    };
   }
 
   if (typeof raw !== 'object') {
     return { normalized: null, error: 'Invalid page range payload' };
   }
 
-  const payload = raw as PageRangeSelectionPayload;
-  if (payload.type === 'all') {
-    return { normalized: null };
+  const anyPayload = raw as Record<string, unknown>;
+
+  if (anyPayload.mode === 'all' || anyPayload.type === 'all') {
+    return { normalized: null, pageSelection: { mode: 'all', ranges: [] } };
   }
 
+  const ranges = Array.isArray(anyPayload.ranges) ? anyPayload.ranges : null;
+  const hasRanges = ranges !== null;
+  const isCustomTypeWithRanges = anyPayload.type === 'custom' && hasRanges;
+  const isStructuredSelection =
+    anyPayload.mode === 'custom' ||
+    anyPayload.mode === 'single' ||
+    hasRanges ||
+    isCustomTypeWithRanges;
+
+  if (isStructuredSelection) {
+    if (ranges) {
+      if (ranges.length === 0) {
+        return { normalized: null, error: 'Invalid custom page range' };
+      }
+      const hasValidRange = ranges.some(
+        (r: any) =>
+          r &&
+          typeof r.start === 'number' &&
+          typeof r.end === 'number' &&
+          Number.isFinite(r.start) &&
+          Number.isFinite(r.end),
+      );
+      if (!hasValidRange) {
+        return { normalized: null, error: 'Invalid custom page range' };
+      }
+    }
+
+    const mode: PageSelectionMode =
+      anyPayload.mode === 'custom' || anyPayload.mode === 'single'
+        ? anyPayload.mode
+        : anyPayload.type === 'single'
+          ? 'single'
+          : 'custom';
+
+    const normalizedSel = normalizePageSelection(
+      {
+        ...anyPayload,
+        mode,
+      },
+      999999,
+    );
+
+    if (normalizedSel.mode === 'all') {
+      return { normalized: null, pageSelection: { mode: 'all', ranges: [] } };
+    }
+
+    const normalized = normalizeRangeString(normalizedSel.canonicalString);
+    if (!normalized) {
+      return { normalized: null, error: 'Invalid custom page range' };
+    }
+    return {
+      normalized,
+      pageSelection: {
+        mode: normalizedSel.mode,
+        ranges: normalizedSel.ranges,
+      },
+    };
+  }
+
+  const payload = raw as PageRangeSelectionPayload;
   if (payload.type === 'single') {
     const pageRaw = payload.page;
     const page =
@@ -125,7 +203,13 @@ function parsePageRange(raw: unknown): ParsedPageRange {
     if (!Number.isInteger(page) || page < 1) {
       return { normalized: null, error: 'Invalid single page selection' };
     }
-    return { normalized: String(page) };
+    return {
+      normalized: String(page),
+      pageSelection: {
+        mode: 'single',
+        ranges: [{ start: page, end: page }],
+      },
+    };
   }
 
   if (payload.type === 'custom') {
@@ -133,7 +217,11 @@ function parsePageRange(raw: unknown): ParsedPageRange {
     if (!normalized) {
       return { normalized: null, error: 'Invalid custom page range' };
     }
-    return { normalized };
+    const ranges = parsePageRangeString(normalized, 999999);
+    return {
+      normalized,
+      pageSelection: { mode: 'custom', ranges },
+    };
   }
 
   return { normalized: null, error: 'Invalid page range payload' };
@@ -355,8 +443,11 @@ export function buildPrintQuote(input: {
 
   for (const pageNum of selectedPages.selected) {
     const page = pageDetailsMap.get(pageNum);
-    const isPageColor = page ? Boolean(page.isColor) : pageNum <= selectedColorPages;
-    const rawCoverage = page?.coverage ?? (page as DocumentPageAnalysis)?.contentCoverage ?? 0;
+    const isPageColor = page
+      ? Boolean(page.isColor)
+      : pageNum <= selectedColorPages;
+    const rawCoverage =
+      page?.coverage ?? (page as DocumentPageAnalysis)?.contentCoverage ?? 0;
     const coverage =
       typeof rawCoverage === 'number' && Number.isFinite(rawCoverage)
         ? rawCoverage
@@ -368,7 +459,11 @@ export function buildPrintQuote(input: {
       ? profile.colorPrint[coverageTier]
       : profile.bwPrint[coverageTier];
 
-    const isBlank = page ? Boolean(page.isBlank || page.classification === 'blank' || coverage < 0.001) : coverage < 0.001;
+    const isBlank = page
+      ? Boolean(
+          page.isBlank || page.classification === 'blank' || coverage < 0.001,
+        )
+      : coverage < 0.001;
     singleCopyPrintCost += pageRate;
     pageBreakdown.push({
       pageNumber: pageNum,
@@ -381,8 +476,8 @@ export function buildPrintQuote(input: {
 
     const isImage = Boolean(
       page?.classification === 'image' ||
-        page?.isImagePage ||
-        (usedFallbackAssumptions && input.analysis.fileType === 'image'),
+      page?.isImagePage ||
+      (usedFallbackAssumptions && input.analysis.fileType === 'image'),
     );
     if (isColorPrint) {
       if (isImage) {
@@ -426,7 +521,10 @@ export function buildPrintQuote(input: {
     pageBreakdown.length > 0
       ? Math.max(
           0,
-          Math.min(100, Math.round((totalCoverage / pageBreakdown.length) * 100)),
+          Math.min(
+            100,
+            Math.round((totalCoverage / pageBreakdown.length) * 100),
+          ),
         )
       : 0;
   const blankPageCount = pageBreakdown.filter((p) => p.isBlank).length;
@@ -466,6 +564,7 @@ export function buildPrintQuote(input: {
       billableImagePages,
       billableImageBwPages,
       pageRange: parsedRange.normalized,
+      pageSelection: parsedRange.pageSelection ?? null,
       pricing: {
         printPerPage: pricing.printPerPage,
         colorSurcharge: pricing.colorSurcharge,
@@ -474,7 +573,8 @@ export function buildPrintQuote(input: {
       analysisConfidence: input.analysis.confidence,
       billingPageDetection,
       analysisFallbackReasonFlags,
-      colorDetectionEnabled: adminService.getPipelineSettings().colorDetectionEnabled,
+      colorDetectionEnabled:
+        adminService.getPipelineSettings().colorDetectionEnabled,
     },
   };
 }

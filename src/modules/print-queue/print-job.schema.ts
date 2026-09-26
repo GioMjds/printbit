@@ -10,6 +10,8 @@
  * Phase 1: Queue platform foundation
  */
 
+import type { PageSelection } from '@/public/shared/page-selection';
+
 /**
  * Payload version for schema migration/compatibility
  * Increment when adding required fields or changing behavior
@@ -63,6 +65,7 @@ export interface PrintJobSettings {
   paperSize?: 'A4' | 'Short' | 'Long';
   duplex?: boolean;
   pageRange?: string | null;
+  pageSelection?: PageSelection | null;
 }
 
 /**
@@ -110,6 +113,7 @@ export interface PrintJobRequest {
    * null means all pages
    */
   pageRange: string | null;
+  pageSelection?: PageSelection | null;
 
   /**
    * Server-side filename for the document

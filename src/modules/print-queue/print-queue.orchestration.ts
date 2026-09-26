@@ -257,6 +257,7 @@ export async function orchestratePrintJob(
         copies: job.data.request.copies,
         color: job.data.request.colorMode === 'colored',
         pageRange: job.data.request.pageRange,
+        pageSelection: job.data.request.pageSelection,
         orientation: job.data.request.orientation,
         rotationDeg: job.data.request.rotationDeg,
         paperSize: job.data.request.paperSize,

@@ -1,8 +1,9 @@
 import { DEFAULT_PRINT_SCALING } from '../../shared/print-configuration';
+import type { PageRange } from '../shared/page-selection';
 
 export type PageRangeSelection =
   | { type: 'all' }
-  | { type: 'custom'; range: string }
+  | { type: 'custom'; range: string; ranges?: PageRange[] }
   | { type: 'single'; page: number };
 
 export interface PhysicalPrintSelection {

@@ -12,6 +12,7 @@ import {
   type PaperSize,
   type Orientation,
 } from '../shared/print-configuration';
+import type { PageSelection } from '@/public/shared/page-selection';
 
 export class PrintDispatchError extends Error {
   readonly result: {
@@ -73,6 +74,7 @@ export interface PrintJobOptions {
   rotationDeg?: RotationDeg;
   paperSize: PaperSize;
   pageRange?: string;
+  pageSelection?: PageSelection | null;
   duplex?: boolean;
   printerName?: string;
   quality?: PrintQuality;
