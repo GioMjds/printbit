@@ -400,21 +400,17 @@ export function buildPrintQuote(input: {
 
   const quoteId = randomUUID();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  const quoteHash = createHash('sha256')
-    .update(
-      JSON.stringify({
-        fileHash: (input.analysis as any).fileHash ?? input.analysis.fileType,
-        paperSize,
-        colorMode: input.colorMode,
-        copies: safeCopies,
-        duplex,
-        pageRange: parsedRange.normalized,
-        quality,
-        requiredAmount,
-        pricingVersion: 9,
-      }),
-    )
-    .digest('hex');
+  const fileHash = (input.analysis as any).fileHash ?? input.analysis.fileType;
+  const quoteHash = computeQuoteHash({
+    fileHash,
+    paperSize,
+    colorMode: input.colorMode,
+    copies: safeCopies,
+    duplex,
+    pageRange: parsedRange.normalized,
+    quality,
+    requiredAmount,
+  });
 
   const pricing = adminService.getPricingSettings();
   return {
@@ -457,4 +453,62 @@ export function buildPrintQuote(input: {
       colorDetectionEnabled: adminService.getPipelineSettings().colorDetectionEnabled,
     },
   };
+}
+
+export function computeQuoteHash(params: {
+  fileHash?: string;
+  paperSize: string;
+  colorMode: string;
+  copies: number;
+  duplex: boolean;
+  pageRange: string | null;
+  quality: string;
+  requiredAmount: number;
+  pricingVersion?: number;
+}): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        fileHash: params.fileHash ?? '',
+        paperSize: params.paperSize,
+        colorMode: params.colorMode,
+        copies: params.copies,
+        duplex: params.duplex,
+        pageRange: params.pageRange,
+        quality: params.quality,
+        requiredAmount: params.requiredAmount,
+        pricingVersion: params.pricingVersion ?? 9,
+      }),
+    )
+    .digest('hex');
+}
+
+export function verifyQuoteHash(
+  quoteHash: string,
+  params: {
+    fileHash?: string;
+    paperSize: string;
+    colorMode: string;
+    copies: number;
+    duplex: boolean;
+    pageRange: string | null;
+    quality: string;
+    requiredAmount: number;
+    expiresAt?: string;
+  },
+): boolean {
+  if (params.expiresAt && Date.now() > new Date(params.expiresAt).getTime()) {
+    return false;
+  }
+  const expected = computeQuoteHash({
+    fileHash: params.fileHash,
+    paperSize: params.paperSize,
+    colorMode: params.colorMode,
+    copies: params.copies,
+    duplex: params.duplex,
+    pageRange: params.pageRange,
+    quality: params.quality,
+    requiredAmount: params.requiredAmount,
+  });
+  return expected === quoteHash;
 }

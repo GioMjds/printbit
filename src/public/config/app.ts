@@ -169,7 +169,7 @@ interface StoredConfigSeed {
   orientation?: Orientation;
   rotationDeg?: number;
   quality?: PrintQuality;
-  paperSize?: PaperSize;
+  paperSize?: PaperSize | string;
 }
 
 // PDF.js types (loaded dynamically from /libs/pdfjs)
