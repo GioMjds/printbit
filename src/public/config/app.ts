@@ -1083,9 +1083,6 @@ const customRangeRowsContainer = document.getElementById(
 const addCustomRangeRowBtn = document.getElementById(
   'addCustomRangeRowBtn',
 ) as HTMLButtonElement | null;
-const customRangeManualInput = document.getElementById(
-  'customRangeManualInput',
-) as HTMLInputElement | null;
 const customRangeFeedbackCard = document.getElementById(
   'customRangeFeedbackCard',
 ) as HTMLElement | null;
@@ -1288,14 +1285,12 @@ let customRangeBuilder: CustomRangeBuilder | null = null;
 if (
   customRangeRowsContainer &&
   addCustomRangeRowBtn &&
-  customRangeManualInput &&
   customRangeFeedbackCard &&
   pageRangeInput
 ) {
   customRangeBuilder = new CustomRangeBuilder({
     container: customRangeRowsContainer,
     addButton: addCustomRangeRowBtn,
-    manualInput: customRangeManualInput,
     feedbackCard: customRangeFeedbackCard,
     hiddenInput: pageRangeInput,
     getMaxPages: () => getPageRangeMaxPages(),

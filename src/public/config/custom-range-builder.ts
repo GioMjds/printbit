@@ -1,10 +1,7 @@
 import {
   type PageRange,
-  type PageSelection,
   type NormalizedPageSelectionResult,
   normalizePageSelection,
-  formatPageRangeString,
-  parsePageRangeString,
 } from '../shared/page-selection';
 
 export interface CustomRangeRow {
@@ -16,7 +13,6 @@ export interface CustomRangeRow {
 export interface CustomRangeBuilderOptions {
   container: HTMLElement;
   addButton: HTMLButtonElement;
-  manualInput: HTMLInputElement;
   feedbackCard: HTMLElement;
   hiddenInput: HTMLInputElement;
   getMaxPages: () => number;
@@ -27,8 +23,6 @@ export interface CustomRangeBuilderOptions {
 export class CustomRangeBuilder {
   private rows: CustomRangeRow[] = [];
   private options: CustomRangeBuilderOptions;
-  private isUpdatingManual = false;
-  private isUpdatingRows = false;
   private idCounter = 0;
 
   constructor(options: CustomRangeBuilderOptions) {
@@ -39,16 +33,6 @@ export class CustomRangeBuilder {
   private init(): void {
     this.options.addButton.addEventListener('click', () => {
       this.addNewRow();
-    });
-
-    this.options.manualInput.addEventListener('input', () => {
-      if (this.isUpdatingManual) return;
-      this.handleManualInputChange();
-    });
-
-    this.options.manualInput.addEventListener('change', () => {
-      if (this.isUpdatingManual) return;
-      this.handleManualInputChange();
     });
 
     // Seed with 1 initial row
@@ -156,39 +140,7 @@ export class CustomRangeBuilder {
     this.notifyChange();
   }
 
-  private handleManualInputChange(): void {
-    if (this.isUpdatingRows) return;
-    this.isUpdatingManual = true;
-
-    try {
-      const max = this.options.getMaxPages();
-      const raw = this.options.manualInput.value.trim();
-      if (!raw) {
-        this.options.feedbackCard.textContent = 'Please enter page numbers or ranges (e.g. 1-5, 7, 10-12).';
-        return;
-      }
-
-      const parsed = parsePageRangeString(raw, max);
-      if (parsed.length > 0) {
-        this.rows = parsed.map((r) => ({
-          id: this.nextId(),
-          start: r.start,
-          end: r.end,
-        }));
-        this.renderRowsOnly();
-        this.notifyChange(false);
-      }
-    } finally {
-      this.isUpdatingManual = false;
-    }
-  }
-
   private render(): void {
-    this.renderRowsOnly();
-    this.syncManualInputFromRows();
-  }
-
-  private renderRowsOnly(): void {
     const container = this.options.container;
     container.innerHTML = '';
     const max = this.options.getMaxPages();
@@ -248,25 +200,8 @@ export class CustomRangeBuilder {
     });
   }
 
-  private syncManualInputFromRows(): void {
-    if (this.isUpdatingManual) return;
-    this.isUpdatingRows = true;
-    try {
-      const ranges: PageRange[] = this.rows.map((r) => ({
-        start: r.start,
-        end: r.end,
-      }));
-      this.options.manualInput.value = formatPageRangeString(ranges);
-    } finally {
-      this.isUpdatingRows = false;
-    }
-  }
-
-  private notifyChange(syncManual = true): void {
+  private notifyChange(): void {
     const result = this.getSelection();
-    if (syncManual) {
-      this.syncManualInputFromRows();
-    }
 
     // Update hidden input for pattern validation
     this.options.hiddenInput.value = result.canonicalString;
