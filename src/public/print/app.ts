@@ -992,7 +992,11 @@ function setContinueButtonDisabled(disabled: boolean): void {
 }
 
 type ConversionWaitResult =
-  | { ready: true }
+  | {
+      ready: true;
+      analysis?: UploadedFile['analysis'];
+      document?: UploadedFile;
+    }
   | { ready: false; message: string };
 
 async function waitForDocumentAnalysis(
@@ -1022,7 +1026,9 @@ async function waitForDocumentAnalysis(
       if (!document) {
         return { ready: false, message: 'The selected file is no longer available.' };
       }
-      if (document.analysisStatus === 'completed') return { ready: true };
+      if (document.analysisStatus === 'completed') {
+        return { ready: true, analysis: document.analysis, document };
+      }
       if (document.analysisStatus === 'failed') {
         return {
           ready: false,
@@ -1056,20 +1062,20 @@ function attachSocket(sid: string): void {
   socket.emit('joinSession', sid);
   socket.on('UploadCompleted', () => void checkUploadStatus());
   socket.on('UploadRemoved', () => void checkUploadStatus());
-  socket.on(
-    'systemSettingsChanged',
-    (data?: { printLimits?: { maxPagesPerSession?: number } }) => {
-      const limit = data?.printLimits?.maxPagesPerSession;
-      if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
-        maxPagesPerSession = limit;
-        sessionStorage.setItem('printbit.maxPagesPerSession', String(limit));
-        updatePrintLimitLabel(limit);
-        if (activeSessionId) {
-          void checkUploadStatus();
-        }
+  socket.on('systemSettingsChanged', (raw: unknown) => {
+    const data = raw as
+      | { printLimits?: { maxPagesPerSession?: number } }
+      | undefined;
+    const limit = data?.printLimits?.maxPagesPerSession;
+    if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
+      maxPagesPerSession = limit;
+      sessionStorage.setItem('printbit.maxPagesPerSession', String(limit));
+      updatePrintLimitLabel(limit);
+      if (activeSessionId) {
+        void checkUploadStatus();
       }
-    },
-  );
+    }
+  });
 
   // Analysis progress events
   socket.on('AnalysisStarted', (info: unknown) => {
@@ -1331,16 +1337,12 @@ continueBtn?.addEventListener('click', async () => {
       setContinueButtonDisabled(false);
       return;
     }
-    const isNowBlank =
-      result.analysis?.isEntirelyBlank === true ||
-      (Array.isArray(result.analysis?.pages) &&
-        result.analysis.pages.length > 0 &&
-        result.analysis.pages.every(
-          (p: any) =>
-            p.isBlank === true ||
-            p.classification === 'blank' ||
-            (typeof p.coverage === 'number' && p.coverage < 0.001),
-        ));
+    const isNowBlank = isFileEntirelyBlank(
+      result.document || {
+        filename: selectedFilename,
+        analysis: result.analysis,
+      },
+    );
     if (isNowBlank) {
       conversionWaitInFlight = false;
       setContinueButtonDisabled(true);
