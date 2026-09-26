@@ -1172,6 +1172,8 @@ function setContinueEnabled(canContinue: boolean): void {
   continueBtn.setAttribute('aria-disabled', canContinue ? 'false' : 'true');
 }
 
+const preview = new PrintPreview();
+
 const preparationLoading = createConfigPreparationLoadingController({
   setContinueEnabled,
 });
@@ -1279,7 +1281,7 @@ function renderColorDetectionEvidence(): void {
 }
 
 function getPageRangeMaxPages(): number {
-  return Math.max(1, preview.pageCount || 1);
+  return Math.max(1, preview?.pageCount || 1);
 }
 
 let customRangeBuilder: CustomRangeBuilder | null = null;
@@ -2096,8 +2098,6 @@ function updateSummary(): void {
   }
   if (footerTotal) footerTotal.textContent = '—';
 }
-
-const preview = new PrintPreview();
 
 function renderRotationValue(): void {
   if (rotationValue) {
