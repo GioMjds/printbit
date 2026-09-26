@@ -126,9 +126,7 @@ const conversionMessage = document.getElementById(
 const conversionCancelBtn = document.getElementById(
   'conversionCancel',
 ) as HTMLButtonElement | null;
-const currentSelectedFile = document.getElementById(
-  'currentSelectedFile',
-) as HTMLButtonElement | null;
+let selectedFileRecord: UploadedFile | null = null;
 const printLimitTipMessage = document.getElementById(
   'printLimitTipMessage',
 ) as HTMLElement | null;
@@ -426,6 +424,7 @@ function filesSignature(files: UploadedFile[]): string {
 function clearSelectedFileState(): void {
   selectedFilename = '';
   selectedDocumentId = '';
+  selectedFileRecord = null;
   sessionStorage.removeItem('printbit.uploadedFile');
   sessionStorage.removeItem('printbit.uploadedDocumentId');
 }
@@ -449,6 +448,7 @@ function setWaitingForFilesState(): void {
 }
 
 function selectFile(file: UploadedFile): void {
+  selectedFileRecord = file;
   const resolvedDocumentId = file.documentId || file.filename;
   selectedFilename = file.filename;
   selectedDocumentId = resolvedDocumentId;
@@ -1259,7 +1259,7 @@ continueBtn?.addEventListener('click', async () => {
     footerHint.textContent = `Proceeding to print configuration. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
     footerHint.classList.add('ready');
   }
-  if (currentSelectedFile?.analysisStatus !== 'completed') {
+  if (selectedFileRecord?.analysisStatus !== 'completed') {
     conversionWaitInFlight = true;
     setContinueButtonDisabled(true);
     showConversionDialog();

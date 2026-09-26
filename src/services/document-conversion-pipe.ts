@@ -26,7 +26,7 @@ export interface ConvertDocumentOptions {
   pipeName?: string;
 }
 
-const DEFAULT_TIMEOUT_SECONDS = 60;
+const DEFAULT_TIMEOUT_SECONDS = 120;
 // Grace period on top of the worker's own conversion timeout so the client
 // doesn't give up a moment before the worker would have responded.
 const CLIENT_TIMEOUT_GRACE_MS = 5_000;
