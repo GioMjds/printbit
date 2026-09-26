@@ -60,11 +60,11 @@
     0 28px 72px rgba(0, 0, 0, 0.65),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   box-sizing: border-box;
-  max-width: min(94vw, 860px);
+  max-width: min(96vw, 1180px);
   width: 100%;
   max-height: 94vh;
   overflow: hidden;
-  padding: 24px 28px 20px;
+  padding: 26px 30px 22px;
   position: relative;
   transform: translateY(16px) scale(0.96);
   transition:
@@ -121,16 +121,18 @@
 }
 
 .pricing-table-wrap {
-  overflow-x: auto;
-  border-radius: 12px;
+  overflow: visible;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25);
   margin-bottom: 12px;
+  width: 100%;
 }
 .pricing-table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 12px;
+  table-layout: fixed;
+  font-size: 13px;
 }
 .pricing-table caption {
   display: none;
@@ -138,15 +140,9 @@
 .pricing-table th,
 .pricing-table td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 8px 6px;
+  padding: 10px 4px;
   text-align: center;
   white-space: nowrap;
-}
-.pricing-table th:first-child,
-.pricing-table td:first-child {
-  text-align: left;
-  padding-left: 12px;
-  font-weight: 600;
 }
 .pricing-table thead {
   color: var(--lavender);
@@ -155,9 +151,57 @@
 }
 .pricing-table th[scope="col"] {
   font-weight: 600;
+  line-height: 1.25;
 }
 .pricing-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.035);
+}
+.pricing-table tbody td {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* Col 1: Paper Size */
+.pricing-table th:nth-child(1),
+.pricing-table td:nth-child(1) {
+  width: 16%;
+  text-align: left;
+  padding-left: 16px;
+  font-weight: 700;
+  color: var(--white);
+}
+
+/* Col 2: Bond Paper (sheet) */
+.pricing-table th:nth-child(2),
+.pricing-table td:nth-child(2) {
+  width: 12%;
+  background: rgba(245, 158, 11, 0.06);
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+/* Cols 3-6: B&W Tiers */
+.pricing-table th:nth-child(n+3):nth-child(-n+6) {
+  width: 9%;
+  color: var(--lavender);
+}
+.pricing-table td:nth-child(n+3):nth-child(-n+6) {
+  width: 9%;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+/* Cols 7-10: Color Tiers */
+.pricing-table th:nth-child(n+7):nth-child(-n+10) {
+  width: 9%;
+  background: rgba(99, 102, 241, 0.05);
+  color: #c7d2fe;
+}
+.pricing-table td:nth-child(n+7):nth-child(-n+10) {
+  width: 9%;
+  background: rgba(99, 102, 241, 0.03);
+  color: #a5b4fc;
+  font-weight: 700;
 }
 
 .pricing-guide-footer {
