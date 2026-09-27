@@ -27,7 +27,6 @@ The authors do not warrant that:
 - The software will operate without interruption or error.
 - Print jobs will complete successfully under all conditions.
 - Coin transactions will be processed without loss or hardware fault.
-- Malware scanning (ClamAV) will detect all threats.
 - The ESP32 captive portal will function on all network configurations.
 
 ---

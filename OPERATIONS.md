@@ -5,6 +5,12 @@
 - Start dev server: `pnpm dev`
 - Build client bundle: `pnpm build`
 - Type-check: `pnpm exec tsc --noEmit --ignoreDeprecations 6.0`
+- Build C# worker: `cd worker && dotnet build`
+- Run C# worker locally (console host): `dotnet run --project .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj`
+- Publish worker Windows service: `dotnet publish .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o C:\Users\printbit\printbit-worker`
+- Query worker service: `sc.exe queryex PrintBitHardware`
+- Start/stop worker service: `sc.exe start PrintBitHardware` / `sc.exe stop PrintBitHardware`
+- Verify worker command pipe IPC: `pnpm run worker-pipe:verify`
 - Run one-time legacy JSON->SQLite import: `pnpm run db:migrate:legacy`
 - Force rerun legacy import (clears import marker): `pnpm run db:migrate:legacy -- --force`
 - Apply controlled updates policy: `pnpm run updates:apply`
@@ -19,14 +25,15 @@
 
 ## Pre-flight checklist (kiosk)
 
-1. Print dispatcher dependencies are available for the configured mode:
-   - `PRINTBIT_PRINT_DISPATCH_MODE=legacy|phased|new-only`
-   - `bin/PDFtoPrinter.exe` (or `PRINTBIT_PDFTOPRINTER_PATH`)
-   - GhostScript (`gswin64c.exe`) via PATH or `PRINTBIT_GHOSTSCRIPT_PATH`
-   - Optional Sumatra fallback (`bin/SumatraPDF.exe` or `PRINTBIT_SUMATRA_PATH`) for phased mode
-2. Printer is installed and has a default printer selected.
-3. Serial coin hardware is connected (if coin mode is used).
-4. Scanner is connected (for copy/scan features).
+1. C# Worker Service & print pipeline:
+   - `PrintBitHardware` Windows service is running (`sc.exe query PrintBitHardware`).
+   - Worker IPC command & event pipes verified: `pnpm run worker-pipe:verify`.
+   - Worker queue directory exists and is writable (`C:\Users\printbit\printbit-worker\queue` or `PRINTBIT_WORKER_QUEUE_DIR`).
+   - `SumatraPDF.exe` exists in `bin/` or `C:\Users\printbit\bin\SumatraPDF.exe`.
+   - Both Windows logical printer queues are configured: `EPSON L5290 Series` (Standard) and `PrintBit - High` (High).
+2. Printer is installed, online, paper is loaded, and USB port mapping is stable (typically `USB001`).
+3. Serial coin hardware is connected (115200 baud).
+4. Scanner is connected (for copy/scan features via NAPS2).
 5. ESP32 bridge is connected and configured (if hotspot/captive flow is enabled).
 6. NAPS2 is installed (`C:\Program Files\NAPS2\NAPS2.Console.exe`) with Epson scanner drivers.
 7. Windows Time (`W32Time`) is running and synced to NTP (`w32tm /query /status`).
@@ -242,11 +249,57 @@ All sections below must pass before closing spooler handoff reliability work.
 - If stale, it restarts the watchdog task automatically.
 - Default stale threshold is 180000ms inside `verify-watchdog.ps1`.
 
+## C# Worker Service operations & diagnostics
+
+The worker service (`PrintBitHardware`) runs as a native Windows Service under `LocalSystem`. It handles the print spooler, SumatraPDF execution, coin acceptor pulse decoding, hopper dispense commands, power safety monitoring, Windows Defender upload scanning, USB mass storage discovery, and NAPS2 scanning.
+
+### Verifying worker status & pipe health
+
+```powershell
+# Check service status (must report STATE: 4 RUNNING)
+sc.exe queryex PrintBitHardware
+
+# Run the automated pipe and identity verification
+pnpm run worker-pipe:verify
+
+# Inspect active process (must be exactly 1 instance)
+Get-Process -Name "PrintBit.HardwareService"
+```
+
+### Investigating worker logs
+
+Worker logs are written via Serilog to:
+`C:\Users\printbit\printbit-worker\logs\printbit-worker-.log` (or within the service directory).
+- Check for `Global\PrintBitHardwareWorker` mutex collision (exit code 2).
+- Check for spooler submission timeouts or SumatraPDF errors.
+- Check for serial port COM connection failures.
+
+### Updating the worker
+
+```powershell
+sc.exe stop PrintBitHardware
+# Wait until: sc.exe query PrintBitHardware reports STATE: 1 STOPPED
+
+dotnet publish .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj `
+  -c Release `
+  -r win-x64 `
+  --self-contained true `
+  -p:PublishSingleFile=true `
+  -o C:\Users\printbit\printbit-worker
+
+sc.exe start PrintBitHardware
+pnpm run worker-pipe:verify
+```
+
 ## Print fails
 
-- Verify print dispatcher mode and binary paths.
-- Confirm uploaded file exists in `uploads/`.
-- Check default Windows printer status.
+- Verify `PrintBitHardware` Windows service is running: `sc.exe queryex PrintBitHardware`.
+- Run `pnpm run worker-pipe:verify` to confirm command and event pipe integrity.
+- Check `C:\Users\printbit\printbit-worker\queue` (or `PRINTBIT_WORKER_QUEUE_DIR`) for accumulating or stalled `.json` sidecars or `.pdf` files.
+- Verify `SumatraPDF.exe` is present and executable (`C:\Users\printbit\bin\SumatraPDF.exe` or `bin/`).
+- Verify the Windows logical queues (`EPSON L5290 Series` and `PrintBit - High`) are online and not in an error/paused state.
+- Inspect the worker log file in `C:\Users\printbit\printbit-worker\logs\`.
+- Check default Windows printer status and restart spooler if needed (`Restart-Service Spooler` or admin action).
 
 ## Print dispatcher phased rollout gate (Issue #112)
 

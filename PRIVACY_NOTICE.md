@@ -247,7 +247,7 @@ The latest version will be made available through the PrintBit kiosk or another 
 
 For questions, privacy requests, or concerns regarding the processing of your personal information, contact:
 
-**PrintBit Privacy Contact**
+### **PrintBit Privacy Contact**
 
 Company: Laguna University
 
@@ -263,6 +263,6 @@ You may also contact the **National Privacy Commission of the Philippines** rega
 
 By proceeding with a PrintBit transaction, you acknowledge that you have been provided access to this Privacy Notice and have been informed about the relevant processing of personal information associated with the service you are using.
 
-**PrintBit - Privacy Notice**
+### **PrintBit - Privacy Notice**
 
 **Effective Date:** September 24, 2026

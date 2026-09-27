@@ -2,175 +2,314 @@
 
 ## Overview
 
-PrintBit is a kiosk-oriented Express application with static frontends and hardware/service integrations.
-The backend serves pages, exposes APIs, and coordinates print/copy/scan/payment state.
+PrintBit is a self-service kiosk system running on Windows, structured as two collaborating processes:
 
-## Runtime layers
+1. **Node.js Core Application (`src/`)**: Express web server and Socket.IO coordinator hosting customer touchscreens, mobile upload portals, document analysis, pricing engine, financial ledger, and administrative APIs.
+2. **C# .NET 10 Windows Service Worker (`worker/`, `PrintBitHardware`)**: Background system daemon running as `LocalSystem` that controls physical hardware (printer spooler, coin acceptor, hopper), Windows platform services (power monitoring, Defender scans, USB drives, NTP time, scanning), and document format conversion.
 
-## 1) HTTP + realtime layer
+Both processes communicate via local filesystem handoff (file queues) and Windows Named Pipes.
 
-- Entry point: `src/server.ts`
-- Express handles API/page routes.
-- Socket.IO broadcasts live machine events:
-  - balance updates,
-  - coin accepted events,
-  - upload status notifications,
-  - serial status.
+---
 
-## 2) Route layer (`src/routes`)
+## System Architecture Diagram
 
-- `financial-routes.ts`: balance, pricing, payment confirm, legacy upload/print.
-- `wireless-session-routes.ts`: mobile upload session lifecycle and previews.
-- `upload-portal-routes.ts`: tokenized upload page rendering and asset serving.
-- `copy-routes.ts`: copy job lifecycle.
-- `scan-routes.ts`: scan and preview job lifecycle.
-- `admin-routes.ts`: protected settings, status, logs, and maintenance endpoints.
-- `page-routes.ts`: HTML page routing.
+```mermaid
+flowchart TB
+    subgraph Clients["Clients"]
+        KioskUI["Kiosk Touchscreen UI (Browser)"]
+        MobileClient["Customer Mobile Device (Upload Portal)"]
+        AdminUI["Admin Dashboard"]
+    end
 
-## 3) Database layer (`src/core/database`)
+    subgraph NodeApp["Node.js Application (Express + Socket.IO)"]
+        Server["HTTP / Socket.IO Server (src/server.ts)"]
+        Routes["API & Portal Routes (src/routes/)"]
+        DocAnalysis["Document Analysis & Coverage (src/services/document-analysis.ts)"]
+        PricingEngine["Pricing Engine & Quotes (src/services/pricing-engine.ts)"]
+        Ledger["Financial Ledger & Settlement (src/services/settlement.ts)"]
+        Projections["Hardware & Spooler State Projections (src/services/)"]
+        SQLite[(SQLite Database: printbit.sqlite)]
+    end
 
-- `db.ts`: shared schema/runtime database facade backed by SQLite `runtime_state` table persistence.
-- `sqlite-storage.ts`: SQLite persistence (`printbit.sqlite`) for operational domains (admin logs, feedback, report issues, receipts + receipt access tokens).
+    subgraph IPC["Inter-Process Communication Boundary"]
+        QueueDir["Queue Directory (worker/queue/)<br/>Atomic .pdf + .json sidecar"]
+        CommandPipe["Pipe: printbit-worker-commands<br/>(Request/Response JSON RPC)"]
+        EventPipe["Pipe: printbit-worker-events<br/>(Telemetry & State Stream)"]
+        ErrorPipe["Pipe: printbit-node-errors<br/>(Error Logging Stream)"]
+        ConvPipe["Pipe: printbit-document-conversion<br/>(Office to PDF)"]
+    end
 
-## 4) Service layer (`src/services`)
+    subgraph DotNetWorker["C# .NET 10 Worker Service (PrintBitHardware)"]
+        HostService["Host & Command Dispatcher (PrintBit.HardwareService)"]
+        QueueWatcher["PrintQueueWatcher & Job Orchestrator"]
+        SpoolerControl["Printer Health Monitor & Spooler Recovery (WinSpool)"]
+        PlatformSvc["Windows Platform Services (Power, Defender, USB, Time, Scan)"]
+        HwOrchestrator["Hardware Orchestrator & Serial Host"]
+        DocConverter["LibreOffice Conversion Service"]
+    end
 
-- `serial.ts`: coin input parsing, balance mutation, and hopper command transport (shared 115200-baud serial line).
-- `hopper.ts`: coin hopper orchestration — dispense with retries, stats tracking, owed-change fallback.
-- `hopper-protocol.ts`: Arduino hopper serial protocol contract (command builders, response parser, error codes).
-- `settlement.ts`: shared payment settlement logic (charge balance + dispense change) used by print and copy flows.
-- `printer.ts` + `print-dispatcher.ts`: mode-based print dispatch orchestration
-  (`legacy`, `phased`, `new-only`) with engine adapters. Customer-selected
-  print quality is carried in `PrintJobOptions`; the deployed C# worker must
-  map it to a Windows printer queue whose driver preferences define Standard
-  or High.
-- `document-analysis.ts`: per-page coverage analysis for PDFs and images (pixel sampling for images, operator-based estimation for PDFs); returns classification (blank/bw/partial/full_color) and coverage (0.0-1.0).
-- `pricing-engine.ts`: PH-localized pricing logic with threshold classification, proportional partial-page pricing, blank-page policy, bulk tier discounts, and whole-peso rounding.
-- `print-quote.ts`: quote builder with optional pricing engine breakdown integration.
-- `session.ts`: in-memory wireless upload session domain.
-- `hotspot.ts`: ESP32 hotspot registration and network integration.
-- `scanner.ts`: scanner adapter integration.
-- `preview.ts`: document preview conversion/HTML generation.
-- `admin.ts`: pricing calculations, logging, stats, reporting helpers.
-- `job-store.ts`: in-memory copy/scan job state machine.
-- `modules/receipt`: receipt domain APIs (token-based customer read + admin transaction-context read), token mint/verify helpers, lifecycle update helpers, and periodic expiry cleanup.
+    subgraph Peripherals["Physical Hardware & Windows OS"]
+        EpsonPrinter["Epson L5290 Printer (Standard & High Spooler Queues)"]
+        ArduinoESP["Arduino / ESP32 Controller (115200 Baud Serial)"]
+        CoinSlot["Coin Acceptor (Pulse Input)"]
+        Hopper["Coin Hopper (1-Peso Dispenser)"]
+        ScannerHw["Document Scanner (NAPS2 / WIA / TWAIN)"]
+        UsbDisks["USB Flash Storage"]
+        WinOS["Windows OS (Power APIs, Windows Defender, System Spooler)"]
+    end
 
-## 4) Frontend layer (`src/public`)
+    %% Client connections
+    KioskUI <-->|HTTP / Socket.IO| Server
+    MobileClient <-->|HTTP Upload Portal| Server
+    AdminUI <-->|HTTP REST| Server
 
-Static page modules for:
+    %% Node internal
+    Server --> Routes
+    Routes --> DocAnalysis
+    Routes --> PricingEngine
+    Routes --> Ledger
+    Routes --> SQLite
+    Projections <-->|Broadcast Events| Server
 
-- print upload/session page
-- upload page
-- print config page
-- confirm page
-- copy page
-- scan page
-- admin pages
+    %% Node to IPC
+    Routes -->|Handoff PDF + Sidecar| QueueDir
+    Routes & Projections <-->|Commands & Responses| CommandPipe
+    Projections <--|Stream Events| EventPipe
+    Server -->|Forward Errors| ErrorPipe
+    DocAnalysis <-->|Convert Files| ConvPipe
 
-Frontend pages use REST APIs + Socket.IO to reflect machine state in near real-time.
+    %% IPC to Worker
+    QueueDir -->|Watch & Consume| QueueWatcher
+    CommandPipe <--> HostService
+    HostService --> PlatformSvc
+    HostService --> SpoolerControl
+    HostService --> HwOrchestrator
+    ErrorPipe --> HostService
+    ConvPipe <--> DocConverter
 
-## Data model
+    %% Worker to Peripherals
+    QueueWatcher -->|SumatraPDF CLI| EpsonPrinter
+    SpoolerControl <-->|Win32 Spooler API| EpsonPrinter
+    HwOrchestrator <-->|Serial COM| ArduinoESP
+    ArduinoESP --> CoinSlot
+    ArduinoESP --> Hopper
+    PlatformSvc <--> ScannerHw
+    PlatformSvc <--> UsbDisks
+    PlatformSvc <--> WinOS
+    HwOrchestrator -.->|Publish Telemetry| EventPipe
+    SpoolerControl -.->|Publish Telemetry| EventPipe
+    PlatformSvc -.->|Publish Telemetry| EventPipe
+```
 
-Persistent (`printbit.sqlite`):
+---
 
-- `balance`
-- `earnings`
-- `settings` (pricing, pricing engine config, admin settings, timeout)
-- `coinStats`
-- `jobStats`
-- `logs`
-- `analysisCache` (per-file hash, coverage/classification results)
+## Runtime Layers
 
-Ephemeral (process memory):
+### 1) Node.js Kiosk Application (`src/`)
 
-- upload sessions (`SessionStore`)
-- copy/scan jobs (`jobStore`)
-- runtime process flags (serial/hotspot state)
+#### A. HTTP + Realtime Layer (`src/server.ts`)
 
-## Main operational flows
+- Express 5 HTTP server hosting APIs, upload portal, and admin views.
+- Socket.IO server emitting realtime balance updates, coin insertion events, upload progress, hopper dispensing status, power safety alerts, and printer state projections.
 
-## A) Print flow (wireless upload)
+#### B. Route Layer (`src/routes/`)
 
-1. Kiosk creates session and QR.
-2. Phone opens upload portal and uploads file.
-3. Kiosk polls/receives upload completion.
-   - Session ownership is single-device (`x-upload-client-id`) to prevent multi-phone collisions.
-   - Session TTL is idle-based; clients receive countdown metadata and show warning before expiry.
-   - On timeout, uploaded files are cleaned and session state is released.
-4. Document analysis computes per-page coverage and classification (blank/bw/partial/full_color).
-5. Quote endpoint returns legacy or enhanced pricing:
-   - `legacy` mode: original pricing logic only.
-   - `shadow` mode: both legacy and pricing engine breakdown (for validation).
-   - `live` mode: pricing engine as billing source.
-6. User selects print settings, including Standard or High quality.
-7. Confirm endpoint validates funds using quote-consistent amounts and queues
-   the print with the selected quality in the worker sidecar.
-8. Settlement: balance zeroed, earnings updated, change dispensed via coin hopper.
-9. Socket.IO emits balance update and change dispense status events.
+- `financial-routes.ts`: balance inquiry, pricing estimates, payment confirmation, legacy print triggers.
+- `wireless-session-routes.ts`: mobile upload session creation, tokenized QR endpoints, document previews.
+- `upload-portal-routes.ts`: tokenized mobile web portal and client assets.
+- `copy-routes.ts`: copy job submission, preview generation, and status polling.
+- `scan-routes.ts`: scan acquisition, preview retrieval, and USB export lifecycles.
+- `admin-routes.ts`: dashboard metrics, transaction contexts, hardware manual actions, and settings.
+- `page-routes.ts`: kiosk touch interface HTML pages.
 
-## B) Document analysis (per-page pricing classification)
+#### C. Service & Domain Layer (`src/services/`)
 
-1. Document analysis service processes PDFs and images to compute per-page coverage.
-2. For images: pixel sampling (bounded by max sample count) computes color pixel ratio (0.0-1.0).
-3. For PDFs: operator-based analysis counts color-related operators as proportion of total operators.
-4. Per-page classification applied:
-   - blank: coverage < 0.05 → apply blankPagePolicy (charge_zero | charge_bw | charge_color).
-   - bw: coverage <= bwMax threshold → base BW price.
-   - partial: coverage between thresholds → proportional pricing (base + coverage × multiplier, capped at full color).
-   - full_color: coverage >= fullColorMin → base color price.
-5. Analysis results cached by file hash to avoid recomputation.
-6. Results persisted in session documents and returned in quote response.
+- `printer.ts` & `worker-handoff.ts`: validates print requests and atomically writes target PDFs and `.json` sidecars to the worker queue.
+- `document-analysis.ts`: analyzes PDF and image coverage/color pixel distributions to classify pages (`blank`, `bw`, `partial`, `full_color`).
+- `pricing-engine.ts` & `print-quote.ts`: localized whole-peso pricing rules, threshold classifications, proportional partial pricing, and bulk tier discounts.
+- `settlement.ts`: payment settlement coordinator; calculates debit against inserted balance, updates financial ledger, and triggers coin change payout.
+- `session.ts`: in-memory wireless upload session state with idle timeouts and single-device locking.
+- `worker-command-pipe.ts` & `platform-worker-client.ts`: duplex IPC client for sending structured JSON commands to the .NET worker.
+- `worker-return-pipe.ts`: streaming IPC client consuming worker events and feeding in-memory state projections.
+- `printer-state-projection.ts`, `hardware-state-projection.ts`, `power-safety.ts`: cached reactive projections reflecting worker hardware states into Express and Socket.IO.
+- `modules/receipt`: tokenized digital receipt generation, validation, and 24-hour retention lifecycle.
 
-## C) Copy flow
+#### D. Database Layer (`src/core/database/`)
 
-1. Kiosk scans preview.
-2. User confirms copy settings.
-3. Copy job endpoint validates preview + funds.
-4. Print dispatch runs asynchronously via job state updates.
-5. Settlement: same as print — balance zeroed, change dispensed via hopper.
+- `db.ts` & `sqlite-storage.ts`: SQLite database (`printbit.sqlite`) managing system settings, financial earnings, coin/job metrics, audit logs, file analysis hash caches, owed-change ledgers, and receipt tokens.
 
-## D) Change dispensing (coin hopper)
+#### E. Frontend Layer (`src/public/`)
 
-1. Settlement logic computes `changeAmount = previousBalance - requiredAmount`.
-2. If `changeAmount > 0`, hopper service requests payout in whole 1-peso coin count (serial `HOPPER DISPENSE ...` or ESP32 HTTP bridge, based on provider mode).
-3. Hopper responses are validated against requested coin count; partial dispense is treated as failure and only the remaining unpaid amount is recorded as owed change.
-4. Protocol defined in `hopper-protocol.ts`; request IDs are 4-char hex for Arduino memory efficiency.
-5. Hopper only dispenses **1-peso coins** — all pricing enforced as whole-peso integers.
-6. Settlement and audit logs track the **actual dispensed amount** (not just requested change).
-7. On dispense failure, owed change is recorded for admin resolution (`owedChanges` in SQLite state).
-8. Retries happen only for retryable error codes (JAM, MOTOR_TIMEOUT, PARTIAL).
+- Client-side static single-page modules for print setup, upload staging, document preview, copy, scan, payment prompt, and admin management.
 
-## E) Admin flow
+---
 
-1. Admin authenticates with PIN.
-2. UI reads summary/status/settings/logs.
-3. Dashboard overview surfaces explicit open owed-change count alongside anomaly counts for faster payout reconciliation triage.
-4. Transaction Logs support flow exposes row actions (`View details`, `Open E-Receipt`, `Copy ID`, `Create report`) and a unified investigation drawer backed by `GET /api/admin/transactions/:transactionId/context`.
-5. Maintenance actions can reset balance, clear storage, update settings, export logs, and resolve owed changes.
+### 2) .NET 10 Windows Service Worker (`worker/`)
 
-## E) E-Receipt flow (v1 scope: print + copy)
+The worker is implemented in C# (.NET 10) and hosted as a Windows Service (`PrintBitHardware`). It enforces single-instance execution via a machine-wide mutex (`Global\PrintBitHardwareWorker`).
 
-1. On settled `POST /api/confirm-payment` for `mode: "print"` or `mode: "copy"`, the backend snapshots receipt data and mints an access token.
-2. Customer receipt access uses `/receipt/t/:token` -> `GET /api/receipts/by-token/:token`.
-3. Admin support uses transaction context (`GET /api/admin/transactions/:transactionId/context`) and receipt lookup (`GET /api/admin/transactions/:transactionId/receipt`) without exposing customer tokens.
-4. Receipt snapshots persist change reconciliation (`requested`, `dispensed`, `remaining`, `state`, `owedChangeId`, `message`) so customer and admin views are deterministic.
-5. Receipt records and access tokens default to 24-hour retention; cleanup runs at startup and then on a 15-minute interval.
+#### A. Host Project (`PrintBit.HardwareService`)
 
-## External dependencies
+- Entry point (`Program.cs`) configuring dependency injection, logging (Serilog to file), Windows Service lifetime, and hosted background services:
+  - `PrintQueueWatcher`: watches queue directory for print job sidecars and documents.
+  - `WorkerCommandPipeHostedService`: multi-client asynchronous named pipe server for `printbit-worker-commands`.
+  - `ErrorPipeHostedService`: named pipe server receiving and logging Node.js error entries.
+  - `DocumentConversionPipeHostedService`: named pipe server executing LibreOffice format conversions.
+  - `PrinterHealthMonitor`: continuous WinSpool polling and health evaluation.
+  - `PowerMonitorService`: Win32 battery/AC power polling.
+  - `UsbDriveMonitor`: removable storage discovery and scan file export.
+  - `SerialHostedService`: serial connection lifecycle management.
 
-- PDFtoPrinter and GhostScript binaries for print dispatch; LibreOffice is owned by the C# conversion worker
-- Optional Sumatra fallback in phased mode
-- Serial device for coin input + coin hopper (shared 115200-baud line via Arduino Uno)
-- ESP32 bridge firmware (`esp32-captive-portal.ino`) using WiFiManager STA-first provisioning with captive-portal fallback and long-press reprovision reset
-- Scanner hardware adapter
+#### B. Application Layer (`PrintBit.Application`)
 
-## Design considerations
+- `HardwareOrchestrator`: routes incoming hardware events and commands.
+- `TransactionStateMachine`: manages transactional state transitions across hardware steps.
+- `HardwareEventQueue`: bounded `Channel<Esp32Message>` decoupling serial ingestion from event handling.
 
-- Prioritizes kiosk availability even when optional hardware is unavailable.
-- Uses strict request validation in most job endpoints.
-- Uses mixed legacy and newer routes; migration toward unified APIs is ongoing.
-- Session-based upload is preferred over direct anonymous upload to preserve per-user isolation, bounded lifetime, and deterministic cleanup between kiosk users.
+#### C. Hardware Abstraction Layer (`PrintBit.Hardware`)
 
-## Dependency context
+- `Devices/CoinAcceptor`: pulse-to-value decoding (`CoinPulseDecoder`) and coin slot control (`ICoinAcceptor`).
+- `Devices/Hopper`: Arduino/ESP32 hopper protocol parser (`HopperProtocolParser`) and payout command dispatcher (`HopperDevice`).
+- `Devices/ESP32`: serial framing, telemetry parsing (`Esp32TelemetryParser`), and command construction.
 
-- Runtime and external software dependency details are documented in [INSTALLATION_AND_DEPENDENCIES.md](./INSTALLATION_AND_DEPENDENCIES.md).
-- Operational installation notes and checks are in [OPERATIONS.md](./OPERATIONS.md).
+#### D. Infrastructure Layer (`PrintBit.Infrastructure`)
+
+- `Services/PrintService`:
+  - `DocumentPrinter`: executes jobs via SumatraPDF CLI (`-print-to "<queue>" -print-settings "<copies>" "<path>"`).
+  - `JobOrchestrator`: serializes print execution using `SemaphoreSlim(1,1)` and manages per-job timeouts.
+  - `PrinterProfileResolver`: maps requested quality (`standard` vs `high`) to dedicated Windows logical queues (`EPSON L5290 Series` vs `PrintBit - High`).
+  - `WinSpoolApi`: P/Invoke Win32 spooler API wrappers for queue status, pause/resume, and job cancellation.
+- `Services/DocumentConversion`:
+  - `LibreOfficeDocumentConversionService`: headless LibreOffice executor converting DOCX/XLSX/PPTX to PDF.
+  - `ImageToPdfConverter`: converts standard image formats into printable PDFs.
+- `Services/DocumentProcessing`:
+  - `DocumentPreprocessor`: page range slicing, custom page selection filtering, and rotation transforms.
+
+#### E. Windows Platform Infrastructure (`PrintBit.Infrastructure.Windows`)
+
+- `PowerMonitoring`: Win32 `GetSystemPowerStatus` abstraction (`NativePowerStatusProvider`) and `PowerSafetyGate` blocking print jobs on low battery or AC failure.
+- `PrinterMonitoring`: `PrinterRecoveryService` and `ServiceControllerSpoolerController` for automatic print spooler service restarts and job flush routines.
+- `Scanning`: `Naps2ScannerService` running NAPS2 CLI to acquire scans via WIA/TWAIN devices.
+- `Security`: `WindowsDefenderScanner` executing `MpCmdRun.exe` signature scans against uploaded user documents before processing.
+- `Storage`: `UsbDriveMonitor` managing removable drive enumeration and secure file export.
+- `Time`: `WindowsTrustedTimeProvider` evaluating NTP synchronization and clock drift to guard financial transaction timestamps.
+- `Networking`: `WindowsKioskNetworkPlatform` managing network adapter states and captive hotspot bindings.
+
+#### F. Shared Layer (`PrintBit.Shared`)
+
+- Strongly typed contracts, DTOs, Enums (`TransactionState`, `PrinterState`, `HardwareState`), and configuration models (`HardwareSettings`, `IpcSettings`, `PowerSettings`, `PrinterRecoverySettings`).
+
+---
+
+## Inter-Process Communication (IPC)
+
+| Channel                      | Transport                                  | Direction     | Purpose                                                                                                | Format                               |
+| ---------------------------- | ------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| **Print Queue**              | Filesystem (`worker/queue/`)               | Node → Worker | Atomic print job submission (`.pdf` + `.json` sidecar)                                                 | PDF binary + JSON metadata           |
+| **Worker Command Pipe**      | Named Pipe: `printbit-worker-commands`     | Node ↔ Worker | Synchronous command/query RPC (spooler recovery, job cancel, coin dispense, scan, Defender, USB, time) | JSON line-delimited (Max 8192 bytes) |
+| **Worker Event Pipe**        | Named Pipe: `printbit-worker-events`       | Worker → Node | Asynchronous event stream (print progress, spooler status, coin events, hopper dispense, power state)  | JSON line-delimited stream           |
+| **Node Error Pipe**          | Named Pipe: `printbit-node-errors`         | Node → Worker | Forwarding unhandled Node errors to worker Serilog logs                                                | JSON line-delimited stream           |
+| **Document Conversion Pipe** | Named Pipe: `printbit-document-conversion` | Node ↔ Worker | Headless document-to-PDF conversion via LibreOffice                                                    | JSON line-delimited RPC              |
+
+### IPC Security & Synchronization
+
+- **Machine Mutex**: Worker acquires `Global\PrintBitHardwareWorker` at startup. If another instance is running, it logs a critical error and immediately exits with code 2.
+- **Pipe Access Control**: Under LocalSystem, pipe ACLs restrict access to SYSTEM and the configured kiosk user identity (`Ipc__WorkerCommandAllowedClientIdentity`).
+
+---
+
+## Data Model & State Storage
+
+### Persistent Storage (`printbit.sqlite`)
+
+- `balance`: current cash inserted into coin acceptor.
+- `earnings`: historical operational revenue.
+- `settings`: pricing parameters, engine classification thresholds, timeout configurations, and admin PIN hashes.
+- `coinStats` & `jobStats`: lifetime coin counter metrics and operational print/copy/scan volumes.
+- `logs`: audit log trail for admin actions, hardware alerts, and financial settlements.
+- `analysisCache`: file hash to document analysis classification map (avoids re-scanning duplicate documents).
+- `owedChanges`: unresolved hopper change deficit ledger for admin settlement.
+- `receipts` & `receiptAccessTokens`: e-receipt snapshots with 24-hour retention.
+
+### Ephemeral State
+
+- **Node Memory**: upload sessions (`session.ts`), copy/scan state machines (`job-store.ts`), hardware and printer state projections (`*-state-projection.ts`).
+- **Worker Memory**: hardware event queue (`Channel<Esp32Message>`), spooler job trackers, active print lock (`SemaphoreSlim`), command handler concurrency slots.
+
+---
+
+## Main Operational Flows
+
+### A) Wireless Print Flow
+
+1. **Session Creation**: Kiosk UI requests a wireless upload session; backend returns session ID and tokenized QR URL.
+2. **Mobile Upload**: User scans QR on smartphone, loads portal, and uploads file. Single-device lock (`x-upload-client-id`) and idle TTL prevent collisions.
+3. **Security Gate**: Worker scans uploaded file using Windows Defender (`ScanFileSecurity` via command pipe). Infected files are quarantined and rejected.
+4. **Document Preprocessing**: Non-PDF formats are converted to PDF via LibreOffice conversion pipe.
+5. **Coverage & Analysis**: Node document analysis service calculates page color ratios, classifying each page (`blank`, `bw`, `partial`, `full_color`).
+6. **Quote & Pricing**: Quote endpoint returns pricing engine breakdown based on detected color distributions, paper size, and bulk tiers.
+7. **User Configuration**: User adjusts copies, page ranges/selection, and print quality (`Standard` vs `High`) on kiosk touchscreen.
+8. **Payment & Settlement**: User inserts coins. Balance updates in realtime via serial pulse decoder. User confirms payment: balance is deducted, earnings recorded, and change dispensed.
+9. **Worker Queue Handoff**: Node writes target PDF and sidecar `.json` containing exact print configuration into `worker/queue/`.
+10. **Print Execution**: Worker's `PrintQueueWatcher` detects JSON sidecar, selects matching logical queue (`EPSON L5290 Series` for Standard, `PrintBit - High` for High), and invokes SumatraPDF.
+11. **Telemetry & Feedback**: Worker streams progress events over `printbit-worker-events`; Node projects events to Socket.IO and updates kiosk UI.
+
+### B) Document Analysis & Pricing Classification
+
+1. **Images**: Pixel sampling counts color vs grayscale pixels to determine color ratio (0.0 to 1.0).
+2. **PDFs**: Operator-based stream scanning detects color space and paint operators per page.
+3. **Classification**:
+   - `blank` (coverage < 0.05): applies configured `blankPagePolicy` (`charge_zero`, `charge_bw`, `charge_color`).
+   - `bw` (coverage ≤ `bwMax` threshold): charges standard B&W rate.
+   - `partial` (coverage between thresholds): charges proportional pricing between base B&W and full color.
+   - `full_color` (coverage ≥ `fullColorMin` threshold): charges full color rate.
+4. **Pricing Engine**: Applies bulk discounts, enforces whole-peso rounding, and caches results by file hash.
+
+### C) Copy Flow
+
+1. Kiosk scanner acquires document preview via worker command pipe (`StartScan`).
+2. User selects copy settings (copies, color mode, page range).
+3. Copy job validates preview file, checks funds, and queues print job through worker queue handoff.
+4. Settlement zero-outs balance and dispenses change.
+
+### D) Scan Flow (Kiosk & USB Export)
+
+1. Worker triggers flatbed/ADF scan via NAPS2 CLI integration.
+2. Scanned image/PDF is returned to Node staging.
+3. Customer selects delivery destination:
+   - Mobile transfer via wireless session QR code.
+   - USB flash drive export: worker enumerates removable drives (`ListUsbDrives`) and writes the file (`ExportScanToUsb`).
+
+### E) Coin Acceptance & Change Dispensing
+
+1. **Coin Ingestion**: Microcontroller sends pulse events over serial line. Worker decodes pulses to 1, 5, 10, or 20 peso values and notifies Node over the event pipe.
+2. **Payout**: During settlement, Node requests change payout via `DispenseCoins` command pipe call.
+3. **Hopper Protocol**: Worker transmits `HOPPER DISPENSE <count>` to Arduino/ESP32. Payout uses whole 1-peso coins.
+4. **Deficit Handling**: If hopper runs empty or jams, worker reports actual dispensed count. Remaining unpaid balance is recorded as an `owedChange` record in SQLite for admin refunding.
+
+### F) Power Safety & Spooler Health Monitoring
+
+1. Worker polls Windows battery and AC power status. If AC is lost and battery drops below threshold, `PowerSafetyGate` engages, worker emits `PowerStatusChanged`, and Node disables new paid jobs.
+2. Worker monitors Windows print spooler via `WinSpoolApi`. If jobs get stuck in error/offline states, worker can automatically invoke spooler cleanup or execute an explicit `RestartPrintSpooler` command.
+
+### G) E-Receipts & Admin Management
+
+1. Upon successful settlement, Node creates an immutable receipt snapshot and generates a secure lookup token.
+2. Customer scans on-screen QR code pointing to `/receipt/t/:token` to view or save digital receipt.
+3. Admin dashboard exposes authenticated endpoints to review transaction logs, inspect owed changes, manage printer spooler recovery, test coin hopper dispensing, and adjust pricing.
+
+---
+
+## External Dependencies & Platform Requirements
+
+- **Operating System**: Windows 10/11 64-bit (Professional or Enterprise recommended for Assigned Access / Kiosk Mode).
+- **Physical Printer**: EPSON L5290 Series (or compatible multi-function printer) configured with two logical printer queues:
+  - Default: `EPSON L5290 Series` (Printing Defaults configured for Standard quality).
+  - High Quality: `PrintBit - High` (Printing Defaults configured for High quality).
+- **Print Engine**: SumatraPDF CLI on system `PATH` or working directory.
+- **Hardware Controller**: Arduino Uno or ESP32 connected via USB Serial (115200 baud).
+- **Scanner Driver**: NAPS2 CLI installed and configured for WIA/TWAIN scanner hardware.
+- **Office Conversion**: LibreOffice installed in standard program files location for headless PDF conversion.
+- **Antivirus**: Windows Defender (`MpCmdRun.exe`) enabled for file quarantine validation.
+- **Node.js**: v22.5.0 or higher.
+- **.NET Runtime**: .NET 10 Runtime (or self-contained win-x64 build).

@@ -2,33 +2,37 @@
 
 > Brief for AI coding assistants and new developers. Treat this as a **living document**.
 > Update in the same PR that changes the architecture it describes.
-> Last updated: 2026-07-01
+> Last updated: 2026-09-27
 
 PrintBit is a **Windows-only**, coin-operated self-service printing kiosk for campus environments.
 Users upload files via a phone-to-kiosk QR flow; the kiosk accepts coins, dispatches print jobs,
 dispenses change from a coin hopper, and emits tokenized E-Receipts. Hardware coin flow, payment
 safety, and coin idempotency are first-class concerns — they shape the whole architecture.
 
-This repo is the **Node.js / Express backend + static frontend**. A companion Windows Service in
-`../printbit-worker/` (a separate `pnpm` workspace) handles the printer spooler bridge over named
-pipes; it shares `printbit.sqlite` state and never opens HTTP.
+This repo contains the **Node.js / Express backend + static frontend** (`src/`) and the integrated
+**C# .NET 10 Windows Service Worker** (`worker/`, `PrintBitHardware`). The worker runs as a background
+Windows Service (`LocalSystem`) handling printer spooler dispatch, hardware control (coin acceptor, hopper),
+platform services (power safety, Defender scanning, USB drives, NTP time, scanner), and document
+format conversion over named pipes and filesystem queues; it never opens HTTP ports.
 
 ---
 
 ## 1. Project overview
 
-| Concern          | Value                                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------------------- |
-| Domain           | Self-service printing kiosk (print, copy, scan, E-Receipt, admin)                                             |
-| Backend          | Node.js ≥ 22.5, Express 5, Socket.IO 4, TypeScript 6 (strict mode)                                            |
-| Storage          | SQLite via `node:sqlite` (`DatabaseSync`), repository pattern, no ORM                                         |
-| Frontend         | Static HTML/CSS + esbuild bundles under `src/public/**` (no React, no SPA)                                    |
-| Hardware bridges | `serialport` (coin acceptor + coin hopper on shared 115200 baud line), ESP32 HTTP bridge                      |
-| Print dispatch   | Pluggable engines — PDFtoPrinter / GhostScript (+ optional Sumatra fallback), mode-gated by env |
-| Scanner          | NAPS2 (`.Console.exe`) integration                                                                            |
-| Package manager  | `pnpm` 10.x (this repo is the `printbit` package inside a `pnpm-workspace.yaml`)                              |
-| OS               | Windows 11 only — hardware, COM ports, WMI, scheduled tasks, PowerShell scripts                               |
-| Runtime node     | `tsx watch src/server.ts` (dev) / `node dist/server.js` (built)                                               |
+| Concern          | Value                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| Domain           | Self-service printing kiosk (print, copy, scan, E-Receipt, admin)                                 |
+| Architecture     | Dual-process: Node.js Kiosk App/API + C# .NET 10 (`PrintBitHardware` Windows Service)             |
+| Backend          | Node.js ≥ 22.5, Express 5, Socket.IO 4, TypeScript 6 (strict mode)                                |
+| Worker Service   | C# .NET 10, Windows Service (`LocalSystem`), Named Pipes IPC, Queue directory, WinSpool, SumatraPDF |
+| Storage          | SQLite via `node:sqlite` (`DatabaseSync`), repository pattern, no ORM                             |
+| Frontend         | Static HTML/CSS + esbuild bundles under `src/public/**` (no React, no SPA)                        |
+| Hardware bridges | Named pipes to worker / `serialport` (coin acceptor + coin hopper on shared 115200 baud COM line) |
+| Print dispatch   | Worker-managed spooler via SumatraPDF CLI, mode-gated profiles (`Standard` vs `High`)             |
+| Scanner          | NAPS2 (`.Console.exe`) integration via worker service                                             |
+| Package manager  | `pnpm` 10.x (Node app) & .NET CLI / MSBuild (Worker)                                              |
+| OS               | Windows 11 / 10 only — hardware, COM ports, WMI, scheduled tasks, PowerShell scripts              |
+| Runtime node     | `tsx watch src/server.ts` (dev) / `node dist/server.js` (built)                                   |
 
 ---
 
@@ -87,9 +91,21 @@ printbit/
 │   ├── guards/                     # Client-side TS guards (printer-guard.ts)
 │   ├── runtime/                    # API-aware Express app builder (for tests / alt entrypoints)
 │   └── utils/                      # Misc helpers (network, formatters, lockout, …)
+├── worker/                         # C# .NET 10 Windows Service (PrintBitHardware)
+│   ├── src/
+│   │   ├── PrintBit.HardwareService/     # Worker service host (Program.cs, background services)
+│   │   ├── PrintBit.Application/         # Hardware orchestration, state machine, event queue
+│   │   ├── PrintBit.Hardware/            # Device protocols (CoinAcceptor, Hopper, ESP32)
+│   │   ├── PrintBit.Infrastructure/      # SumatraPDF dispatch, WinSpool API, LibreOffice conversion
+│   │   ├── PrintBit.Infrastructure.Windows/ # Win32 power, Defender scan, USB, trusted time, NAPS2
+│   │   └── PrintBit.Shared/              # DTOs, Enums, hardware and IPC configs
+│   ├── tests/
+│   │   └── PrintBit.Tests/               # Worker xUnit / unit tests
+│   ├── printbit-worker.slnx              # .NET Solution file
+│   └── README.md                         # Worker service documentation & runbook
 ├── tests/                          # Jest specs (mostly document-analysis + bug-repro)
 ├── scripts/                        # PowerShell ops scripts (startup, lockdown, watchdog, …)
-├── bin/                            # External executables (PDFtoPrinter.exe, SumatraPDF.exe, …)
+├── bin/                            # External executables (SumatraPDF.exe, …)
 ├── esp32-captive-portal.ino        # ESP32 firmware (STA + WiFiManager, captive portal)
 ├── printbit.sqlite                 # Runtime persisted state (DO NOT hand-edit)
 ├── uploads/                        # Runtime uploaded files (transient, deleted after job)
@@ -97,6 +113,7 @@ printbit/
 ├── agent_docs/                     # Topic briefs (in_progress, hardware, print dispatch, doc sync)
 ├── API_DOCUMENTATION.md            # Full HTTP API surface
 ├── ARCHITECTURE.md                 # Layer narrative + data flow diagrams
+├── CONTRIBUTING.md                 # Contribution workflow across Node.js & C# worker
 ├── OPERATIONS.md                   # Runbook (start/stop, pre-flight, pricing engine rollout)
 └── AGENTS.md                       # Project rules file (overrides default behavior)
 ```
@@ -336,6 +353,10 @@ These rules are non-obvious and load-bearing. Violating them is the most common 
 | Kiosk lockdown apply/verify/revert | `pnpm run lockdown:apply` / `:verify` / `:revert`                                     |
 | Controlled updates policy          | `pnpm run updates:apply` / `:verify` / `:revert`                                      |
 | Verify printer driver version      | `pnpm run driver:verify`                                                              |
+| Build C# worker service            | `cd worker && dotnet build`                                                           |
+| Run C# worker locally (dev)        | `dotnet run --project worker/src/PrintBit.HardwareService/PrintBit.HardwareService.csproj` |
+| Publish worker Windows Service     | `dotnet publish worker/src/PrintBit.HardwareService/PrintBit.HardwareService.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o worker/publish` |
+| Verify worker command pipe IPC     | `pnpm run worker-pipe:verify`                                                         |
 
 > **`@/*` path alias** points to `./src/*` (set in `tsconfig.json`). Use it in all imports.
 > Do not introduce a different alias.
@@ -409,14 +430,19 @@ Defaults shown in `[]`. `PRINTBIT_` prefix is the canonical form; a few keys als
 
 ### Worker (named-pipe bridge to the .NET Hardware Service)
 
-| Var                                 | Default                  | Purpose                                            |
-| ----------------------------------- | ------------------------ | -------------------------------------------------- |
-| `PRINTBIT_WORKER_QUEUE_DIR`         | (unset)                  | Override worker queue directory                    |
-| `PRINTBIT_WORKER_FAILED_DIR`        | (unset)                  | Override worker failed-jobs directory              |
-| `PRINTBIT_WORKER_PIPE_NAME`         | `printbit-node-errors`   | Inbound named pipe from the worker                 |
-| `PRINTBIT_WORKER_RETURN_PIPE_NAME`  | `printbit-worker-events` | Outbound named pipe to the worker                  |
-| `PRINTBIT_WORKER_RETURN_MAX_BYTES`  | `8192` (min 256)         | Max message size on the return pipe                |
-| `PRINTBIT_WORKER_PRECHECKS_ENABLED` | `true`                   | Toggle pre-dispatch checks (set `false` to bypass) |
+| Var                                    | Default                    | Purpose                                            |
+| -------------------------------------- | -------------------------- | -------------------------------------------------- |
+| `PRINTBIT_WORKER_QUEUE_DIR`            | `worker/queue` (or unset)  | Override worker queue directory                    |
+| `PRINTBIT_WORKER_FAILED_DIR`           | (unset)                    | Override worker failed-jobs directory              |
+| `PRINTBIT_WORKER_PIPE_NAME`            | `printbit-node-errors`     | Inbound named pipe to the worker for error logging |
+| `PRINTBIT_WORKER_RETURN_PIPE_NAME`     | `printbit-worker-events`   | Outbound named pipe from worker (telemetry/events) |
+| `PRINTBIT_WORKER_COMMAND_PIPE_NAME`    | `printbit-worker-commands` | Duplex command pipe for RPC calls to worker        |
+| `PRINTBIT_WORKER_RETURN_MAX_BYTES`     | `8192` (min 256)           | Max message size on the return pipe                |
+| `PRINTBIT_WORKER_PRECHECKS_ENABLED`    | `true`                     | Toggle pre-dispatch checks (set `false` to bypass) |
+| `PRINTBIT_WORKER_DEFENDER_ENABLED`     | `true`                     | Toggle Defender file security scans via worker     |
+| `PRINTBIT_WORKER_USB_ENABLED`          | `true`                     | Toggle USB drive listing/export via worker         |
+| `PRINTBIT_WORKER_TRUSTED_TIME_ENABLED` | `true`                     | Toggle trusted NTP time queries via worker         |
+| `PRINTBIT_WORKER_NETWORKING_ENABLED`   | `true`                     | Toggle network platform prep via worker            |
 
 > **Production note:** `printbit-coin-bridge-key` is a predictable example value. Before deployment,
 > generate a unique `PRINTBIT_ESP32_COIN_API_KEY` and set the same value in ESP32 firmware
@@ -454,7 +480,7 @@ These are real, intentional constraints. Do not "fix" them by adding infrastruct
 | **Platform**           | Windows-only. No Linux/macOS support planned — `edge-js`, WMI, COM ports, and PowerShell scripts tie it to Windows.                                                              |
 | **TLS**                | No HTTPS configured by default. Kiosks are deployed on isolated LANs; a reverse proxy is the documented path.                                                                    |
 | **Auth**               | Admin auth is PIN + Argon2id + httpOnly cookie + local-network gate + 5-tap gesture + lockout. No SSO.                                                                           |
-| **Print workers**      | A companion `printbit-worker` .NET Windows Service exists separately (not in this repo's `src/`) and shares `printbit.sqlite` via named pipes. Do not move its code into `src/`. |
+| **Print workers**      | The C# .NET 10 Windows Service worker (`PrintBitHardware`) is located in `worker/` in this repo. It runs as an independent Windows Service (`LocalSystem`) and coordinates strictly via named pipes and the queue folder. Do not move C# code into `src/`. |
 | **Coin support**       | Only 1-peso coins are dispensed by the hopper. All prices are whole-peso integers by design.                                                                                     |
 | **Idempotency**        | `x-coin-event-id` is required on `/coin` and enforced on both ESP32 (suppress retransmit) and the kiosk (dedupe). **Never remove either check.**                                 |
 | **Print dispatcher**   | Mode is environmental (`legacy` / `phased` / `new-only`). Switching modes is an admin action and should be tested with a canary first.                                           |
@@ -472,17 +498,19 @@ These are real, intentional constraints. Do not "fix" them by adding infrastruct
 
 ---
 
-## 10. Companion workspace: `printbit-worker/`
+## 10. Integrated C# Worker Service: `worker/`
 
-`../printbit-worker/` is a sibling `pnpm` workspace — a .NET 10 Windows Service that:
+The `worker/` directory hosts the **PrintBit Hardware Service** (`PrintBitHardware`), a .NET 10 Windows Service that runs as `LocalSystem` alongside the Node.js application:
 
-- Watches the Windows print queue and dispatches jobs through the spooler.
-- Listens on a named pipe for Node.js error payloads and prints them.
-- Emits print lifecycle events back to PrintBit on a separate named pipe.
+- **Queue Directory Watcher (`worker/queue/`)**: Picks up atomic `.pdf` files paired with `.json` sidecars (copies, color, pageRange, pageSelection, quality profile, scaling, orientation, rotation), and invokes SumatraPDF CLI against mapped logical queues (`EPSON L5290 Series` for Standard, `PrintBit - High` for High).
+- **Command Pipe Server (`printbit-worker-commands`)**: Duplex IPC processing spooler health/recovery commands, job pause/resume/cancel, coin hopper payouts (`DispenseCoins`), coin slot locking, NAPS2 scanner commands, Windows Defender signature checks (`ScanFileSecurity`), USB removable drive queries/exports, trusted NTP time drift checks, and network hotspot prep.
+- **Event Pipe Client (`printbit-worker-events`)**: Streams asynchronous real-time events to Node (print progress, spooler online/offline, hardware coin pulses, hopper payouts, Win32 battery/AC power events).
+- **Error Pipe Server (`printbit-node-errors`)**: Ingests and logs unhandled Node.js errors via Serilog to file.
+- **Document Conversion Pipe**: Headless LibreOffice integration for converting Office documents to PDF.
+- **Microcontroller Communication**: Serial line interface for Arduino Uno / ESP32 pulse decoding and hopper dispensing.
+- **Singleton Mutex**: Enforces machine-wide single-instance execution via `Global\PrintBitHardwareWorker`.
 
-It is **not** an HTTP service. Treat it as a separate repo: its own `AGENTS.md` is authoritative for
-changes inside it. Only the IPC contracts (pipe names, message shapes, idempotency keys) are
-shared. The `PRINTBIT_WORKER_*` env vars above are the contract surface from PrintBit's side.
+It is **not** an HTTP service. All inter-process communication is bounded by named pipes and filesystem handoff. Follow `worker/README.md` for build, installation (`sc.exe create`), and troubleshooting details.
 
 ---
 
