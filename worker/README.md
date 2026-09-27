@@ -6,7 +6,7 @@ A .NET 10 Windows Service Worker focused on the printer spooler and print queue 
 
 ## Architecture
 
-```
+```folder
 PrintBit.HardwareService    ← Worker Service host (entry point)
 ├── PrintBit.Application    ← State machine, orchestration, event handlers
 ├── PrintBit.Hardware       ← ESP32 device abstraction, message parsing
@@ -16,7 +16,7 @@ PrintBit.HardwareService    ← Worker Service host (entry point)
 
 ### Request Flow
 
-```
+```text
 Print queue → PrintQueueWatcherService → PrintService (SumatraPDF + spooler verify)
 Node.js errors → ErrorPipeHostedService (named pipe) → ILogger
 ```
@@ -26,45 +26,50 @@ Node.js errors → ErrorPipeHostedService (named pipe) → ILogger
 ## Projects
 
 ### `PrintBit.HardwareService`
+
 Worker Service host. Runs printer-only background services.
 
-| Service | Role |
-|---|---|
-| `PrintQueueWatcherService` | Watches the queue directory and submits print jobs |
-| `ErrorPipeHostedService` | Reads Node.js error messages from a named pipe and logs them |
-| `PrinterMonitorService` | Logs printer status and job state from Windows spooler |
+| Service                    | Role                                                         |
+| -------------------------- | ------------------------------------------------------------ |
+| `PrintQueueWatcherService` | Watches the queue directory and submits print jobs           |
+| `ErrorPipeHostedService`   | Reads Node.js error messages from a named pipe and logs them |
+| `PrinterMonitorService`    | Logs printer status and job state from Windows spooler       |
 
 ### `PrintBit.Application`
+
 Business logic layer (present but not wired in the printer-only runtime). No direct I/O dependencies.
 
-| Class | Role |
-|---|---|
+| Class                     | Role                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `TransactionStateMachine` | Tracks `TransactionState` (Idle → WaitingForCoins → ReadyToPrint → Printing → Completed) and `CurrentBalance` |
-| `HardwareOrchestrator` | Routes `Esp32Message` types to the correct handler |
-| `CoinInsertedHandler` | Delegates coin events to `TransactionStateMachine.InsertCoin()` |
-| `StartPrintHandler` | Drives state machine through print lifecycle; calls `IPrintService` |
-| `HardwareEventQueue` | Bounded `Channel<Esp32Message>` (1024 capacity, single-reader) |
+| `HardwareOrchestrator`    | Routes `Esp32Message` types to the correct handler                                                            |
+| `CoinInsertedHandler`     | Delegates coin events to `TransactionStateMachine.InsertCoin()`                                               |
+| `StartPrintHandler`       | Drives state machine through print lifecycle; calls `IPrintService`                                           |
+| `HardwareEventQueue`      | Bounded `Channel<Esp32Message>` (1024 capacity, single-reader)                                                |
 
 ### `PrintBit.Hardware`
+
 Hardware abstraction layer (not wired in the printer-only runtime).
 
-| Class | Role |
-|---|---|
-| `Esp32Device` | Wraps `ISerialConnection`; parses raw serial strings into typed `Esp32Message` |
-| `Esp32Message` | Typed message: `Type`, `Value`, `Raw`, `TimestampUtc` |
-| `Esp32MessageType` | `CoinInserted`, `HopperCompleted`, `Heartbeat`, `Unknown`, etc. |
-| `Esp32Command` | Static command strings sent back to ESP32 (`HOPPER_DISPENSE`, `PONG`, etc.) |
+| Class              | Role                                                                           |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `Esp32Device`      | Wraps `ISerialConnection`; parses raw serial strings into typed `Esp32Message` |
+| `Esp32Message`     | Typed message: `Type`, `Value`, `Raw`, `TimestampUtc`                          |
+| `Esp32MessageType` | `CoinInserted`, `HopperCompleted`, `Heartbeat`, `Unknown`, etc.                |
+| `Esp32Command`     | Static command strings sent back to ESP32 (`HOPPER_DISPENSE`, `PONG`, etc.)    |
 
 ### `PrintBit.Infrastructure`
+
 I/O services (print process, printer monitoring, IPC helpers).
 
-| Class | Role |
-|---|---|
-| `SerialConnection` | Wraps `System.IO.Ports.SerialPort`; exposes `DataReceived` event |
-| `PrintService` | Spawns `SumatraPDF.exe` process with `-print-to`; uses `SemaphoreSlim(1,1)` to serialize jobs; 2-minute timeout |
-| `WatchdogService` | Heartbeat logger (wired for future hardware health checks) |
+| Class              | Role                                                                                                            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `SerialConnection` | Wraps `System.IO.Ports.SerialPort`; exposes `DataReceived` event                                                |
+| `PrintService`     | Spawns `SumatraPDF.exe` process with `-print-to`; uses `SemaphoreSlim(1,1)` to serialize jobs; 2-minute timeout |
+| `WatchdogService`  | Heartbeat logger (wired for future hardware health checks)                                                      |
 
 ### `PrintBit.Shared`
+
 Cross-cutting types with no dependencies.
 
 - `HardwareSettings` — printer configuration bound from `appsettings.json`
@@ -99,20 +104,20 @@ Cross-cutting types with no dependencies.
 }
 ```
 
-| Key | Default | Description |
-|---|---|---|
-| `PrintTimeoutSeconds` | `120` | Print timeout in seconds |
-| `PrinterName` | `EPSON L5290 Series` | Physical printer identity used for health monitoring |
-| `PrinterProfiles.Standard` | `EPSON L5290 Series` | Logical queue for Standard jobs; falls back to `PrinterName` when omitted |
-| `PrinterProfiles.High` | `PrintBit - High` | Logical queue with system-wide Epson Printing Defaults saved as High; required for High jobs |
-| `PrintQueueDirectory` | `C:\\Users\\printbit\\printbit-worker\\queue` | Directory watched for PDFs |
-| `IpcSettings.PipeName` | `printbit-node-errors` | Named pipe for Node error messages |
-| `IpcSettings.MaxMessageBytes` | `8192` | Max bytes per error line |
-| `IpcSettings.WorkerReturnPipeName` | `printbit-worker-events` | Named pipe for worker return events |
-| `IpcSettings.WorkerCommandPipeName` | `printbit-worker-commands` | Node-to-worker command pipe |
-| `IpcSettings.WorkerCommandMaxConcurrency` | `4` | Maximum active command handlers |
-| `IpcSettings.WorkerCommandAllowedClientIdentity` | empty | Optional exact account name or SID granted read/write access |
-| `IpcSettings.WorkerInstanceLockName` | `Global\\PrintBitHardwareWorker` | Machine-wide duplicate-worker lock |
+| Key                                              | Default                                       | Description                                                                                  |
+| ------------------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `PrintTimeoutSeconds`                            | `120`                                         | Print timeout in seconds                                                                     |
+| `PrinterName`                                    | `EPSON L5290 Series`                          | Physical printer identity used for health monitoring                                         |
+| `PrinterProfiles.Standard`                       | `EPSON L5290 Series`                          | Logical queue for Standard jobs; falls back to `PrinterName` when omitted                    |
+| `PrinterProfiles.High`                           | `PrintBit - High`                             | Logical queue with system-wide Epson Printing Defaults saved as High; required for High jobs |
+| `PrintQueueDirectory`                            | `C:\\Users\\printbit\\printbit-worker\\queue` | Directory watched for PDFs                                                                   |
+| `IpcSettings.PipeName`                           | `printbit-node-errors`                        | Named pipe for Node error messages                                                           |
+| `IpcSettings.MaxMessageBytes`                    | `8192`                                        | Max bytes per error line                                                                     |
+| `IpcSettings.WorkerReturnPipeName`               | `printbit-worker-events`                      | Named pipe for worker return events                                                          |
+| `IpcSettings.WorkerCommandPipeName`              | `printbit-worker-commands`                    | Node-to-worker command pipe                                                                  |
+| `IpcSettings.WorkerCommandMaxConcurrency`        | `4`                                           | Maximum active command handlers                                                              |
+| `IpcSettings.WorkerCommandAllowedClientIdentity` | empty                                         | Optional exact account name or SID granted read/write access                                 |
+| `IpcSettings.WorkerInstanceLockName`             | `Global\\PrintBitHardwareWorker`              | Machine-wide duplicate-worker lock                                                           |
 
 ---
 
@@ -121,7 +126,7 @@ Cross-cutting types with no dependencies.
 `PrintService` resolves the job's `quality` (`standard` or `high`) to a fixed
 Windows logical queue, then dispatches to `SumatraPDF.exe`:
 
-```
+```text
 SumatraPDF.exe -print-to "<resolved profile queue>" -print-settings "<copies>" "<filePath>"
 ```
 
@@ -182,7 +187,7 @@ dotnet publish .\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj `
   -r win-x64 `
   --self-contained true `
   -p:PublishSingleFile=true `
-  -o .\publish  
+  -o .\publish
 
 $workerExe = (Resolve-Path '.\publish\PrintBit.HardwareService.exe').Path
 $workerBinPath = '"' + $workerExe + '"'
@@ -248,15 +253,15 @@ sc.exe queryex PrintBitHardware
 
 Common failures:
 
-| Error | Cause | Action |
-|---|---|---|
-| `NU1301` | NuGet is unreachable | Check internet, proxy, firewall, and NuGet source access. |
-| `NETSDK1194` | The solution was published into one output directory | Publish the worker `.csproj` with the command above. |
-| `OpenSCManager FAILED 5` | PowerShell is not elevated | Reopen PowerShell with Run as administrator. |
-| `FAILED 1060` | The service does not exist | Run the create command using the exact name `PrintBitHardware`. |
-| `FAILED 1073` | The service already exists | Use the update procedure instead. |
-| Start error `1069` | A stale per-user service credential remains configured | Run `sc.exe config PrintBitHardware obj= LocalSystem password= ""`, then start the service again. |
-| Start error `1053` or `1067` | The worker exited during startup | Check the Application and System logs in Event Viewer. |
+| Error                        | Cause                                                  | Action                                                                                            |
+| ---------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `NU1301`                     | NuGet is unreachable                                   | Check internet, proxy, firewall, and NuGet source access.                                         |
+| `NETSDK1194`                 | The solution was published into one output directory   | Publish the worker `.csproj` with the command above.                                              |
+| `OpenSCManager FAILED 5`     | PowerShell is not elevated                             | Reopen PowerShell with Run as administrator.                                                      |
+| `FAILED 1060`                | The service does not exist                             | Run the create command using the exact name `PrintBitHardware`.                                   |
+| `FAILED 1073`                | The service already exists                             | Use the update procedure instead.                                                                 |
+| Start error `1069`           | A stale per-user service credential remains configured | Run `sc.exe config PrintBitHardware obj= LocalSystem password= ""`, then start the service again. |
+| Start error `1053` or `1067` | The worker exited during startup                       | Check the Application and System logs in Event Viewer.                                            |
 
 References: [Microsoft .NET Windows Service installation](https://learn.microsoft.com/en-us/dotnet/core/extensions/windows-service),
 [`sc.exe create` syntax](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/sc-create),
@@ -277,35 +282,35 @@ automatically handles Windows Service Control Manager lifecycle signals.
 
 ## Known Gaps / In Progress
 
-| Area | Status |
-|---|---|
-| `HopperDevice` / `IHopper` | Stub — dispense logic not implemented (not wired in printer-only runtime) |
-| `EpsonPrinterDevice` / `IPrinterDevice` | Stub — direct WIA/ESC-P integration not implemented |
-| `CoinAcceptorDevice` / `ICoinAcceptor` | Stub — direct Arduino path not implemented (not wired) |
-| `HardwareStateMachine` / `PrintJobStateMachine` | Stubs — merged into `TransactionStateMachine` for now (not wired) |
-| `TransactionService` | Stub — persistence not wired |
-| `NamedPipeServer` / `SocketServer` / `MessageDispatcher` | Stubs — legacy IPC server unused; error pipe uses `ErrorPipeHostedService` |
-| Shared DTOs (`TransactionDto`, `HardwareStatusDto`, etc.) | Empty — not yet used |
-| `HopperDispenseHandler` / `PrintCompletedHandler` | Stubs — post-print change flow not wired |
+| Area                                                      | Status                                                                     |
+| --------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `HopperDevice` / `IHopper`                                | Stub — dispense logic not implemented (not wired in printer-only runtime)  |
+| `EpsonPrinterDevice` / `IPrinterDevice`                   | Stub — direct WIA/ESC-P integration not implemented                        |
+| `CoinAcceptorDevice` / `ICoinAcceptor`                    | Stub — direct Arduino path not implemented (not wired)                     |
+| `HardwareStateMachine` / `PrintJobStateMachine`           | Stubs — merged into `TransactionStateMachine` for now (not wired)          |
+| `TransactionService`                                      | Stub — persistence not wired                                               |
+| `NamedPipeServer` / `SocketServer` / `MessageDispatcher`  | Stubs — legacy IPC server unused; error pipe uses `ErrorPipeHostedService` |
+| Shared DTOs (`TransactionDto`, `HardwareStatusDto`, etc.) | Empty — not yet used                                                       |
+| `HopperDispenseHandler` / `PrintCompletedHandler`         | Stubs — post-print change flow not wired                                   |
 
 ---
 
 ## Dependencies
 
-| Package | Version | Used In |
-|---|---|---|
-| `Microsoft.Extensions.Hosting` | 10.0.8 | HardwareService |
-| `Microsoft.Extensions.Hosting.WindowsServices` | 10.0.8 | HardwareService |
-| `Microsoft.Extensions.Logging` | 10.0.8 | Application, Hardware, Infrastructure |
-| `System.IO.Ports` | 10.0.8 | Infrastructure, Hardware |
-| `System.Text.Json` | 10.0.8 | HardwareService |
-| `Serilog` + `Serilog.Sinks.File` | 4.3.1 / 7.0.0 | HardwareService |
+| Package                                        | Version       | Used In                               |
+| ---------------------------------------------- | ------------- | ------------------------------------- |
+| `Microsoft.Extensions.Hosting`                 | 10.0.8        | HardwareService                       |
+| `Microsoft.Extensions.Hosting.WindowsServices` | 10.0.8        | HardwareService                       |
+| `Microsoft.Extensions.Logging`                 | 10.0.8        | Application, Hardware, Infrastructure |
+| `System.IO.Ports`                              | 10.0.8        | Infrastructure, Hardware              |
+| `System.Text.Json`                             | 10.0.8        | HardwareService                       |
+| `Serilog` + `Serilog.Sinks.File`               | 4.3.1 / 7.0.0 | HardwareService                       |
 
 ---
 
 ## Project Structure
 
-```
+```folder
 src/
 ├── PrintBit.Application/
 │   ├── Events/              # CoinInsertedEvent, StartPrintEvent
