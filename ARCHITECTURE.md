@@ -74,7 +74,7 @@ flowchart TB
     %% Node to IPC
     Routes -->|Handoff PDF + Sidecar| QueueDir
     Routes & Projections <-->|Commands & Responses| CommandPipe
-    Projections <--|Stream Events| EventPipe
+    EventPipe -->|Stream Events| Projections
     Server -->|Forward Errors| ErrorPipe
     DocAnalysis <-->|Convert Files| ConvPipe
 

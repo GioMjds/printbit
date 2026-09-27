@@ -1,6 +1,6 @@
 {
   "name": "PrintBit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A self-service printing kiosk application built with Node.js, Express.js, and C# Worker Service. It provides a user-friendly interface for printing documents, managing print jobs, and handling payments. The application is designed to run on Windows and supports various printer models.",
   "main": "index.js",
   "engines": {
@@ -15,6 +15,7 @@
     "dev": "node scripts/dev-server.js",
     "dev:tsx": "tsx watch src/server.ts",
     "build": "node scripts/build-client.js && node scripts/build-server.js",
+    "package": "powershell -ExecutionPolicy Bypass -File .\\scripts\\package-release.ps1",
     "start": "node dist/server.js",
     "db:reset": "node ./scripts/reset-db.js",
     "kiosk": "node ./scripts/launch-kiosk.js",
