@@ -1,20 +1,21 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import { Router, Request, Response } from 'express';
-import type { Server as SocketIOServer } from 'socket.io';
+import { WORKER_QUEUE_DIR } from '@/config';
+import {
+  ADMIN_TEST_PAGE_USAGE_SOURCE,
+  consumablesStore,
+  feedbackStore,
+  getSqliteDb,
+  reportIssueStore,
+  writeRuntimeState,
+} from '@/core/database/sqlite-storage';
+import { handoffToWorker } from '@/infrastructure/worker';
 import {
   requireAdminLocalAccess,
   requireAdminPin,
 } from '@/middleware/admin-auth';
 import { createRateLimit } from '@/middleware/rate-limit';
-import {
-  AdminService,
-  type EarningsAnalyticsView,
-  type TransactionLogFilters,
-  type TransactionLogMode,
-  type TransactionLogStatus,
-} from './admin.service';
+import type { AdminQueueView } from '@/modules/anomaly/anomaly.schema';
+import { anomalyService } from '@/modules/anomaly/anomaly.service';
+import { ReceiptService, type ReceiptPayload } from '@/modules/receipt';
 import {
   db,
   defaultPricingEngine,
@@ -30,66 +31,67 @@ import {
   dismissPendingRefund,
   processPendingRefund,
 } from '@/services/pending-refund';
-import { anomalyService } from '@/modules/anomaly/anomaly.service';
-import { generateTestPagePdf } from '@/services/test-page';
-import {
-  listInstalledPrinters,
-  runInkTelemetryDiagnostics,
-  getPrinterTelemetry,
-  refreshPrinterTelemetry,
-} from '@/services/printer-state-projection';
-import { getExternalWatchdogState } from '@/services/watchdog-health';
 import { detectDefaultPrinter } from '@/services/printer';
-import { handoffToWorker } from '@/infrastructure/worker';
-import { WORKER_QUEUE_DIR } from '@/config';
-import { getScannerStatus } from '@/services/scanner';
 import {
-  getTrustedTimeStatus,
-  verifyTrustedClockSync,
-} from '@/services/time-source';
+  getPrinterTelemetry,
+  listInstalledPrinters,
+  refreshPrinterTelemetry,
+  runInkTelemetryDiagnostics,
+} from '@/services/printer-state-projection';
 import {
   checkpointRecoverySession,
   getRecoveryStatusSnapshot,
   getSpoolerLifecycleRecord,
 } from '@/services/recovery';
 import {
+  DEFAULT_SCAN_FILENAME_FORMAT,
+  validateScanFilenameFormatSettings,
+} from '@/services/scan-filename';
+import { getScannerStatus } from '@/services/scanner';
+import { generateTestPagePdf } from '@/services/test-page';
+import {
+  getTrustedTimeStatus,
+  verifyTrustedClockSync,
+} from '@/services/time-source';
+import { getExternalWatchdogState } from '@/services/watchdog-health';
+import {
+  requestWindowsRestart,
+  requestWindowsShutdown,
+} from '@/services/windows-power';
+import { sendWorkerRequest } from '@/services/worker-command-pipe';
+import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
+import { hashPassword, verifyPassword } from '@/utils/hash';
+import {
+  MAX_ATTEMPTS,
   checkLockout,
   clearLockout,
   formatRemainingTime,
   recordFailedAttempt,
-  MAX_ATTEMPTS,
 } from '@/utils/lockout';
-import { hashPassword, verifyPassword } from '@/utils/hash';
-import {
-  DEFAULT_SCAN_FILENAME_FORMAT,
-  validateScanFilenameFormatSettings,
-} from '@/services/scan-filename';
-import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
+import { Request, Response, Router } from 'express';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Server as SocketIOServer } from 'socket.io';
 import type {
   AlertSettings,
   PipelineSettings,
-  ScannerDpiSettings,
-  DeveloperModeSettings,
+  ScannerDpiSettings
 } from './admin.schema';
+import {
+  AdminService,
+  type EarningsAnalyticsView,
+  type TransactionLogFilters,
+  type TransactionLogMode,
+  type TransactionLogStatus,
+} from './admin.service';
+import { ConsumablesService } from './consumables.service';
 
 export const DEFAULT_PIPELINE_SETTINGS = {
   malwareScanningEnabled: true,
   documentConversionEnabled: true,
   colorDetectionEnabled: true,
 } satisfies PipelineSettings;
-import type { AdminQueueView } from '@/modules/anomaly/anomaly.schema';
-import { ConsumablesService } from './consumables.service';
-import { ReceiptService, type ReceiptPayload } from '@/modules/receipt';
-import {
-  ADMIN_TEST_PAGE_USAGE_SOURCE,
-  consumablesStore,
-  feedbackStore,
-  reportIssueStore,
-  getSqliteDb,
-  writeRuntimeState,
-} from '@/core/database/sqlite-storage';
-import { requestWindowsRestart, requestWindowsShutdown } from '@/services/windows-power';
-import { sendWorkerRequest } from '@/services/worker-command-pipe';
 
 export interface AdminControllerDeps {
   io: SocketIOServer;
@@ -947,7 +949,9 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ? AND timestamp >= ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE, startIso) as Record<string, unknown> | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE, startIso) as
+        | Record<string, unknown>
+        | undefined;
       const totalRow = sqlite
         .prepare(
           `SELECT
@@ -956,7 +960,9 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as Record<string, unknown> | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as
+        | Record<string, unknown>
+        | undefined;
 
       const baseline = db.data!.inkRefillBaseline;
       const todayAdminTestPages = consumablesStore.sumUsagePagesBySource(
@@ -968,7 +974,8 @@ export class AdminController {
       );
       const totalColor =
         Number(totalRow?.colorSum ?? 0) + totalAdminTestPages.colorPages;
-      const totalBw = Number(totalRow?.bwSum ?? 0) + totalAdminTestPages.bwPages;
+      const totalBw =
+        Number(totalRow?.bwSum ?? 0) + totalAdminTestPages.bwPages;
 
       const pageCounts = {
         todayColorPages:
@@ -1238,7 +1245,8 @@ export class AdminController {
   private handleRestartSpooler = async (req: Request, res: Response) => {
     const requestId = randomUUID();
     const printerName =
-      typeof req.body?.printerName === 'string' && req.body.printerName.trim().length > 0
+      typeof req.body?.printerName === 'string' &&
+      req.body.printerName.trim().length > 0
         ? req.body.printerName.trim()
         : undefined;
 
@@ -1247,7 +1255,11 @@ export class AdminController {
       type?: string;
       outcome?: string;
       action?: string | null;
-      spoolerState?: { isRunning: boolean; status: string; errorMessage?: string | null } | null;
+      spoolerState?: {
+        isRunning: boolean;
+        status: string;
+        errorMessage?: string | null;
+      } | null;
       printerState?: string | null;
       issueKind?: string | null;
       message?: string | null;
@@ -1279,7 +1291,8 @@ export class AdminController {
       );
       return res.status(503).json({
         ok: false,
-        error: 'Worker did not respond. The C# hardware service may be offline.',
+        error:
+          'Worker did not respond. The C# hardware service may be offline.',
       });
     }
 
@@ -1287,7 +1300,9 @@ export class AdminController {
     const succeeded = outcome === 'recovered' || outcome === 'healthy';
 
     void this.adminService.appendAdminLog(
-      succeeded ? 'admin_printer_spooler_restart_ok' : 'admin_printer_spooler_restart_failed',
+      succeeded
+        ? 'admin_printer_spooler_restart_ok'
+        : 'admin_printer_spooler_restart_failed',
       `Printer spooler restart: outcome=${outcome}. ${workerResult.message ?? ''}`.trim(),
       {
         requestId,
@@ -1303,7 +1318,9 @@ export class AdminController {
       return res.status(409).json({
         ok: false,
         outcome,
-        error: workerResult.message ?? 'Worker is busy with an active print job. Try again shortly.',
+        error:
+          workerResult.message ??
+          'Worker is busy with an active print job. Try again shortly.',
       });
     }
 
@@ -1311,7 +1328,9 @@ export class AdminController {
       return res.status(422).json({
         ok: false,
         outcome,
-        message: workerResult.message ?? 'Physical printer fault detected. Manual intervention required.',
+        message:
+          workerResult.message ??
+          'Physical printer fault detected. Manual intervention required.',
         printerState: workerResult.printerState,
         issueKind: workerResult.issueKind,
       });
@@ -1546,9 +1565,24 @@ export class AdminController {
       scanFilenameFormat?: unknown;
       pricingEngine?: {
         paperProfiles?: {
-          a4?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number; baseImageBwPrice?: number };
-          shortBond?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number; baseImageBwPrice?: number };
-          longBond?: { baseBwPrice?: number; baseColorPrice?: number; baseImagePrice?: number; baseImageBwPrice?: number };
+          a4?: {
+            baseBwPrice?: number;
+            baseColorPrice?: number;
+            baseImagePrice?: number;
+            baseImageBwPrice?: number;
+          };
+          shortBond?: {
+            baseBwPrice?: number;
+            baseColorPrice?: number;
+            baseImagePrice?: number;
+            baseImageBwPrice?: number;
+          };
+          longBond?: {
+            baseBwPrice?: number;
+            baseColorPrice?: number;
+            baseImagePrice?: number;
+            baseImageBwPrice?: number;
+          };
         };
         bulkDiscountTiers?: {
           minPages?: number;
@@ -1666,7 +1700,8 @@ export class AdminController {
       inkMonitoring: { ...originalSettings.inkMonitoring },
       consumablesForecasting: { ...originalSettings.consumablesForecasting },
       scanFilenameFormat: {
-        ...(originalSettings.scanFilenameFormat || DEFAULT_SCAN_FILENAME_FORMAT),
+        ...(originalSettings.scanFilenameFormat ||
+          DEFAULT_SCAN_FILENAME_FORMAT),
       },
       pricingEngine: {
         paperProfiles: {
@@ -2461,7 +2496,8 @@ export class AdminController {
 
     const isUiBlockingModified =
       uiBlockingModified ||
-      nextSettings.uiBlocking.enabled !== originalSettings.uiBlocking?.enabled ||
+      nextSettings.uiBlocking.enabled !==
+        originalSettings.uiBlocking?.enabled ||
       nextSettings.uiBlocking.mode !== originalSettings.uiBlocking?.mode ||
       nextSettings.uiBlocking.customMessage !==
         originalSettings.uiBlocking?.customMessage;
@@ -2618,8 +2654,7 @@ export class AdminController {
       const pdfBuffer = generateTestPagePdf(new Date());
       fs.writeFileSync(tmpAbsPath, pdfBuffer);
 
-      const queueDir =
-        WORKER_QUEUE_DIR || path.resolve('../printbit-worker/queue');
+      const queueDir = WORKER_QUEUE_DIR || path.resolve('./worker/queue');
       const transactionId = randomUUID();
       const spoolerCorrelationKey = randomUUID();
 
@@ -3117,9 +3152,7 @@ export class AdminController {
       (typeof recoverySession?.context?.copies === 'number'
         ? recoverySession.context.copies
         : null) ??
-      (typeof logs[0]?.meta?.copies === 'number'
-        ? logs[0].meta.copies
-        : null);
+      (typeof logs[0]?.meta?.copies === 'number' ? logs[0].meta.copies : null);
 
     const paperSize =
       printConfig?.paperSize ??
@@ -3153,9 +3186,7 @@ export class AdminController {
       (typeof recoverySession?.context?.duplex === 'boolean'
         ? recoverySession.context.duplex
         : null) ??
-      (typeof logs[0]?.meta?.duplex === 'boolean'
-        ? logs[0].meta.duplex
-        : null);
+      (typeof logs[0]?.meta?.duplex === 'boolean' ? logs[0].meta.duplex : null);
 
     const orientation =
       printConfig?.orientation ??
@@ -3393,7 +3424,9 @@ export class AdminController {
            FROM consumable_usage_events
            WHERE mode IN ('print','copy') AND source <> ?`,
         )
-        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as Record<string, unknown> | undefined;
+        .get(ADMIN_TEST_PAGE_USAGE_SOURCE) as
+        | Record<string, unknown>
+        | undefined;
 
       const adminTestPages = consumablesStore.sumUsagePagesBySource(
         ADMIN_TEST_PAGE_USAGE_SOURCE,

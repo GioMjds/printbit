@@ -1,18 +1,18 @@
-import { randomUUID } from 'node:crypto';
-import path from 'node:path';
-import fs from 'node:fs';
 import { WORKER_QUEUE_DIR } from '@/config';
-import { handoffToWorker } from './worker-handoff';
-import { printerStateProjection } from './printer-state-projection';
-import type { RotationDeg } from './document-rotation';
 import type { PrintQuality } from '@/core/database/shared.schema';
+import type { PageSelection } from '@/public/shared/page-selection';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   DEFAULT_PRINT_SCALING,
-  type PrintScaling,
-  type PaperSize,
   type Orientation,
+  type PaperSize,
+  type PrintScaling,
 } from '../shared/print-configuration';
-import type { PageSelection } from '@/public/shared/page-selection';
+import type { RotationDeg } from './document-rotation';
+import { printerStateProjection } from './printer-state-projection';
+import { handoffToWorker } from './worker-handoff';
 
 export class PrintDispatchError extends Error {
   readonly result: {
@@ -151,8 +151,7 @@ export class PrinterService {
 
     const spoolerCorrelationKey = context.spoolerCorrelationKey || randomUUID();
     const transactionId = context.transactionId || randomUUID();
-    const queueDir =
-      WORKER_QUEUE_DIR || path.resolve('../printbit-worker/queue');
+    const queueDir = WORKER_QUEUE_DIR || path.resolve('./worker/queue');
 
     const handoffResult = await handoffToWorker({
       sourcePath: filePath,
