@@ -76,7 +76,7 @@ import type { Server as SocketIOServer } from 'socket.io';
 import type {
   AlertSettings,
   PipelineSettings,
-  ScannerDpiSettings
+  ScannerDpiSettings,
 } from './admin.schema';
 import {
   AdminService,
@@ -131,7 +131,7 @@ function isWholePeso(value: number): boolean {
 
 function normalizeTargetPrinterName(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const sanitized = value.replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  const sanitized = value.replace(/\p{Cc}/gu, '').trim();
   return sanitized ? sanitized : null;
 }
 
@@ -837,7 +837,7 @@ export class AdminController {
         .json({ valid: false, error: 'Settings not initialized' });
     }
 
-    let valid = false;
+    let valid: boolean;
     try {
       valid = await verifyPassword(storedPin, pin);
     } catch {
@@ -2148,7 +2148,12 @@ export class AdminController {
       const paperProfileKeys = ['a4', 'shortBond', 'longBond'] as const;
       if (incoming.paperProfiles) {
         for (const key of paperProfileKeys) {
-          const prof = incoming.paperProfiles[key] as any;
+          const prof = incoming.paperProfiles[key] as
+            | (Partial<(typeof next.paperProfiles)[typeof key]> & {
+                baseBwPrice?: number;
+                baseColorPrice?: number;
+              })
+            | undefined;
           if (!prof) continue;
 
           // Legacy format check: prof has baseBwPrice but no bwPrint

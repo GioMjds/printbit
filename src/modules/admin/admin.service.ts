@@ -8,7 +8,10 @@ import {
   type PrintMode,
   type PricingSettings,
 } from '@/modules/admin/admin.schema';
-import { type PrintQuality, type TrustedTimestampMeta } from '@/core/database/shared.schema';
+import {
+  type PrintQuality,
+  type TrustedTimestampMeta,
+} from '@/core/database/shared.schema';
 import type { CoverageTier } from '@/core/database/models/admin.model';
 import { db, defaultPricingEngine } from '@/services/db';
 import { getTrustedTimestamp } from '@/services/time-source';
@@ -179,10 +182,11 @@ export class AdminService {
       return pricing.scanDocument;
     }
 
+    const paperSizeName = paperSize as string;
     const profileKey =
-      paperSize === 'Long' || (paperSize as any) === 'Legal'
+      paperSizeName === 'Long' || paperSizeName === 'Legal'
         ? 'longBond'
-        : paperSize === 'Short' || (paperSize as any) === 'Letter'
+        : paperSizeName === 'Short' || paperSizeName === 'Letter'
           ? 'shortBond'
           : 'a4';
     const profile =
@@ -203,12 +207,16 @@ export class AdminService {
     const safeBwPages = Math.max(0, Math.floor(counts.bwPages ?? 0));
     const safeImagePages = Math.max(
       0,
-      Math.floor('imagePages' in counts && counts.imagePages ? counts.imagePages : 0),
+      Math.floor(
+        'imagePages' in counts && counts.imagePages ? counts.imagePages : 0,
+      ),
     );
     const safeImageBwPages = Math.max(
       0,
       Math.floor(
-        'imageBwPages' in counts && counts.imageBwPages ? counts.imageBwPages : 0,
+        'imageBwPages' in counts && counts.imageBwPages
+          ? counts.imageBwPages
+          : 0,
       ),
     );
 
@@ -628,7 +636,12 @@ export class AdminService {
     const failedTxIds = new Set<string>();
 
     for (const log of adminLogStore.listByTypesSince(
-      ['payment_confirmed', 'copy_job_enqueued', 'copy_job_completed', 'copy_job_failed'],
+      [
+        'payment_confirmed',
+        'copy_job_enqueued',
+        'copy_job_completed',
+        'copy_job_failed',
+      ],
       weekTimestamp,
     )) {
       const txId =
