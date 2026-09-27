@@ -14,8 +14,6 @@
  *    (`acceptingTransactions === true`).
  */
 
-import { Socket } from "socket.io";
-
 export type PowerOperationalState =
   | 'Operational'
   | 'PowerEmergency'
@@ -38,12 +36,20 @@ export interface WorkerPowerEventPayload {
   timestampUtc?: string;
 }
 
+export interface PowerSafetySocketLike {
+  on(event: string, callback: (...args: unknown[]) => void): void;
+  off?(event: string, callback: (...args: unknown[]) => void): void;
+}
+
 export interface PowerSafetyOverlayOptions {
   /**
    * Existing Socket.IO instance or getter function returning socket.
-   * If omitted, falls back to `(window as any).io?.()`.
+   * If omitted, falls back to `window.io?.()`.
    */
-  socket?: Socket;
+  socket?:
+    | PowerSafetySocketLike
+    | (() => PowerSafetySocketLike | null | undefined)
+    | null;
 
   /**
    * Predicate indicating whether a paid print job is currently in-flight.
@@ -473,7 +479,8 @@ export function attachPowerSafetyOverlay(
       if (overlayEl) {
         if (statusTextEl) {
           if (operationalState === 'Recovering') {
-            statusTextEl.textContent = 'Power restored. Stabilizing hardware...';
+            statusTextEl.textContent =
+              'Power restored. Stabilizing hardware...';
           } else if (operationalState === 'PowerEmergency') {
             statusTextEl.textContent = 'Operating on emergency battery power';
           } else {
@@ -497,21 +504,22 @@ export function attachPowerSafetyOverlay(
     }
   }
 
-  function handlePowerEvent(evt: WorkerPowerEventPayload): void {
-    if (!evt) return;
+  function handlePowerEvent(evt: unknown): void {
+    if (!evt || typeof evt !== 'object') return;
+    const payload = evt as WorkerPowerEventPayload;
 
-    if (typeof evt.acceptingTransactions === 'boolean') {
-      acceptingTransactions = evt.acceptingTransactions;
+    if (typeof payload.acceptingTransactions === 'boolean') {
+      acceptingTransactions = payload.acceptingTransactions;
     } else {
-      acceptingTransactions = evt.operationalState === 'Operational';
+      acceptingTransactions = payload.operationalState === 'Operational';
     }
 
-    if (evt.operationalState) {
-      operationalState = evt.operationalState;
+    if (payload.operationalState) {
+      operationalState = payload.operationalState;
     }
 
-    if (evt.transactionId) {
-      transactionReferenceId = evt.transactionId;
+    if (payload.transactionId) {
+      transactionReferenceId = payload.transactionId;
     }
 
     options.onStateChange?.({ operationalState, acceptingTransactions });
@@ -519,9 +527,12 @@ export function attachPowerSafetyOverlay(
   }
 
   // Socket subscription helper
-  let attachedSocket: Socket | null = null;
-  const attachToSocket = (sock: Socket) => {
-    if (!sock || attachedSocket === sock || typeof sock.on !== 'function') return;
+  let attachedSocket: PowerSafetySocketLike | null = null;
+  const attachToSocket = (
+    sock: PowerSafetySocketLike | null | undefined,
+  ): void => {
+    if (!sock || attachedSocket === sock || typeof sock.on !== 'function')
+      return;
     attachedSocket = sock;
     sock.on('workerPowerStatusChanged', handlePowerEvent);
   };
@@ -540,7 +551,9 @@ export function attachPowerSafetyOverlay(
   }
 
   if (!attachedSocket && typeof window !== 'undefined') {
-    const ioFactory = (window as unknown as { io?: () => Socket }).io;
+    const ioFactory = (
+      window as unknown as { io?: () => PowerSafetySocketLike }
+    ).io;
     if (typeof ioFactory === 'function') {
       try {
         attachToSocket(ioFactory());
@@ -607,9 +620,10 @@ export function attachPowerSafetyOverlay(
       }
       overlayEl?.remove();
       bannerEl?.remove();
-      const styleEl = typeof document !== 'undefined'
-        ? document.getElementById(STYLE_ELEMENT_ID)
-        : null;
+      const styleEl =
+        typeof document !== 'undefined'
+          ? document.getElementById(STYLE_ELEMENT_ID)
+          : null;
       styleEl?.remove();
     },
   };

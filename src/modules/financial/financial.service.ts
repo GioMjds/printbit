@@ -1446,11 +1446,16 @@ export class FinancialService {
         analysisConfidence: quoteComputation.quote.analysisConfidence,
       };
 
-      let printSourcePath = target.convertedPdfPath ?? target.filePath;
-      if (
-        path.extname(target.filePath).toLowerCase() !== '.pdf' &&
-        !target.convertedPdfPath
-      ) {
+      let printSourcePath =
+        target.convertedPdfPath && fs.existsSync(target.convertedPdfPath)
+          ? target.convertedPdfPath
+          : target.filePath;
+      const isNonPdf = path.extname(target.filePath).toLowerCase() !== '.pdf';
+      const needsConversion =
+        isNonPdf &&
+        (!target.convertedPdfPath || !fs.existsSync(target.convertedPdfPath));
+
+      if (needsConversion) {
         // Attempt deferred conversion gate before print spooling
         try {
           const sourcePath = path.resolve(target.filePath);
@@ -1475,12 +1480,20 @@ export class FinancialService {
           printSourcePath = artifactPath;
         } catch (convErr) {
           console.error('[payment] Pre-print PDF conversion failed:', convErr);
-          sendResponse(409, buildAnalysisUnavailablePayload(target));
+          sendResponse(409, {
+            code: 'CONVERSION_FAILED',
+            error:
+              'Document conversion to PDF failed before printing. Please retry or re-upload as PDF.',
+          });
           return;
         }
       }
       if (!fs.existsSync(printSourcePath)) {
-        sendResponse(409, buildAnalysisUnavailablePayload(target));
+        sendResponse(409, {
+          code: 'FILE_NOT_FOUND',
+          error:
+            'The document file is missing from storage. Please re-upload your document.',
+        });
         return;
       }
       serverFilename = path.basename(printSourcePath);

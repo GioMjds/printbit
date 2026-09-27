@@ -105,6 +105,6 @@ export class PrinterController {
   };
 }
 
-function isValidCorrelationKey(key: any): key is string {
+function isValidCorrelationKey(key: string): key is string {
   return typeof key === 'string' && key.length <= 255 && /^[a-zA-Z0-9-_]+$/.test(key);
 }

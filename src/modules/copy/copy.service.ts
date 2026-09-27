@@ -44,10 +44,7 @@ import { evaluateConsumablesForecastAlerts } from '@/modules/admin/consumables.s
 import { ReceiptService } from '@/modules/receipt/receipt.service';
 import { estimateInkUsageByJob } from '@/services/consumable-estimator';
 import { analyzeDocument } from '@/services/document-analysis';
-import {
-  buildPrintQuote,
-  type PrintQuoteResult,
-} from '@/services/print-quote';
+import { buildPrintQuote, type PrintQuoteResult } from '@/services/print-quote';
 import {
   buildPrintJobEnqueuePayload,
   getJobProcessor,
@@ -179,8 +176,7 @@ export class CopyService {
     pageRange?: unknown;
     duplex: boolean;
   }): Promise<
-    | { ok: true; quote: PrintQuoteResult }
-    | { ok: false; error: string }
+    { ok: true; quote: PrintQuoteResult } | { ok: false; error: string }
   > {
     try {
       const analysis = await analyzeDocument({
@@ -446,7 +442,9 @@ export class CopyService {
           transactionId: job.id,
           spoolerCorrelationKey: null,
           printerName: telemetry.name ?? null,
-          reason: inkPreflight.reason ?? 'Printer ink state is not ready for printing.',
+          reason:
+            inkPreflight.reason ??
+            'Printer ink state is not ready for printing.',
         },
         {
           requiredAmount,
@@ -457,7 +455,8 @@ export class CopyService {
         transactionId: job.id,
         status: 'failed',
         phase: 'copy_ink_not_ready',
-        reason: inkPreflight.reason ?? 'Printer ink state is not ready for printing.',
+        reason:
+          inkPreflight.reason ?? 'Printer ink state is not ready for printing.',
       });
       return {
         statusCode: 409,
@@ -511,8 +510,7 @@ export class CopyService {
         statusCode: 409,
         body: {
           error:
-            settlement.error ??
-            'Balance drained before charge could complete.',
+            settlement.error ?? 'Balance drained before charge could complete.',
         },
         cacheIdempotencyResponse: false,
       };
@@ -597,8 +595,7 @@ export class CopyService {
       });
     }
 
-    const correlationKey =
-      normalized.spoolerCorrelationKey ?? randomUUID();
+    const correlationKey = normalized.spoolerCorrelationKey ?? randomUUID();
     const enqueueIdempotencyKey =
       idempotencyKey.trim().length > 0 ? idempotencyKey.trim() : randomUUID();
 
@@ -625,13 +622,19 @@ export class CopyService {
         },
       });
     } catch (checkpointError) {
-      console.error('[COPY] checkpointRecoverySession failed after settlement:', {
-        error: checkpointError instanceof Error ? checkpointError.message : String(checkpointError),
-        jobId: job.id,
-        correlationKey,
-        settledAt,
-        previewFilename,
-      });
+      console.error(
+        '[COPY] checkpointRecoverySession failed after settlement:',
+        {
+          error:
+            checkpointError instanceof Error
+              ? checkpointError.message
+              : String(checkpointError),
+          jobId: job.id,
+          correlationKey,
+          settledAt,
+          previewFilename,
+        },
+      );
     }
 
     try {
@@ -799,6 +802,8 @@ export class CopyService {
       };
     }
 
+    const paperSizeName = input.paperSize as string;
+
     const quoteComputation = await this.buildCopyQuote({
       previewAbsPath,
       previewFilename,
@@ -806,9 +811,9 @@ export class CopyService {
       colorMode: input.colorMode ?? 'grayscale',
       quality: input.quality === 'high' ? 'high' : 'standard',
       paperSize:
-        input.paperSize === 'Long' || (input.paperSize as any) === 'Legal'
+        input.paperSize === 'Long' || paperSizeName === 'Legal'
           ? 'Long'
-          : input.paperSize === 'Short' || (input.paperSize as any) === 'Letter'
+          : input.paperSize === 'Short' || paperSizeName === 'Letter'
             ? 'Short'
             : 'A4',
       pageRange: input.pageRange ?? { type: 'all' },
@@ -1204,7 +1209,10 @@ export class CopyService {
               selectedPages: quote.selectedPages,
               billableColorPages: quote.billableColorPages,
               billableBwPages: quote.billableBwPages,
-              estimatedSheetsUsed: Math.max(1, quote.selectedPages * quote.copies),
+              estimatedSheetsUsed: Math.max(
+                1,
+                quote.selectedPages * quote.copies,
+              ),
               estimatedInkUnits: estimateInkUsageByJob({
                 selectedColorPages: quote.billableColorPages,
                 selectedBwPages: quote.billableBwPages,

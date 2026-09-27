@@ -103,8 +103,6 @@ interface WorkerJobPayload {
   totalPages?: number;
 }
 
-let socket: SocketLike | null = null;
-
 type PageRangeSelection =
   | { type: 'all' }
   | { type: 'custom'; range: string; ranges?: PageRange[] }
@@ -274,7 +272,6 @@ const confirmBtn = document.getElementById('confirmBtn') as HTMLButtonElement;
 
 // Summary Table DOM Refs
 const fileValue = document.getElementById('fileValue');
-const mainSummaryFileRow = document.getElementById('mainSummaryFileRow');
 const pagesCard = document.getElementById('pagesCard');
 const pagesRangeValue = document.getElementById('pagesRangeValue');
 const pagesTotalCount = document.getElementById('pagesTotalCount');
@@ -588,8 +585,7 @@ function recordConfirmationTerminalSuccess(
 // ioFactory block) so that socket is non-null when the overlay first tries to attach
 // its workerPowerStatusChanged listener. All usage sites (notifyPrintCompleted, etc.)
 // are inside socket event handlers and therefore always execute after initialization.
-// eslint-disable-next-line prefer-const
-let powerSafetyOverlay!: PowerSafetyOverlayController;
+let powerSafetyOverlay: PowerSafetyOverlayController;
 
 const DEFAULT_COIN_INSERT_GUIDANCE_MESSAGE =
   'Tip: Insert one coin at a time. Rapid insertion may not be detected by the kiosk.';
@@ -622,15 +618,35 @@ function renderPrinterError(err: PrintError): void {
   }
 
   if (errorTitle) {
-    errorTitle.textContent = requiresMaintenance
-      ? maintenanceGuidance.title
-      : 'Printer Error';
+    if (requiresMaintenance) {
+      errorTitle.textContent = maintenanceGuidance.title;
+    } else if (
+      err.code === 'CONVERSION_FAILED' ||
+      err.code === 'FILE_NOT_FOUND' ||
+      err.code.startsWith('ANALYSIS_') ||
+      err.code.startsWith('HTTP_')
+    ) {
+      errorTitle.textContent = 'Document / Payment Error';
+    } else {
+      errorTitle.textContent = 'Printer Error';
+    }
   }
   if (errorSubtitle) {
-    errorSubtitle.textContent = requiresMaintenance
-      ? (maintenanceGuidance.subtitle ||
-        'The printer encountered an issue and requires attention.')
-      : 'Please check the printer to continue.';
+    if (requiresMaintenance) {
+      errorSubtitle.textContent =
+        maintenanceGuidance.subtitle ||
+        'The printer encountered an issue and requires attention.';
+    } else if (
+      err.code === 'CONVERSION_FAILED' ||
+      err.code === 'FILE_NOT_FOUND' ||
+      err.code.startsWith('ANALYSIS_') ||
+      err.code.startsWith('HTTP_')
+    ) {
+      errorSubtitle.textContent =
+        'Could not prepare or confirm this document for printing.';
+    } else {
+      errorSubtitle.textContent = 'Please check the printer to continue.';
+    }
   }
   if (errorMessage) {
     if (requiresMaintenance) {
@@ -676,7 +692,7 @@ function renderPrinterError(err: PrintError): void {
       : severityLabels[err.severity] ?? err.severity;
   }
 
-  if (err.severity === 'warning' && !requiresMaintenance) {
+  if ((err.severity === 'warning' || err.canDismiss) && !requiresMaintenance) {
     if (errorCloseBtn) errorCloseBtn.removeAttribute('hidden');
   } else {
     if (errorCloseBtn) errorCloseBtn.setAttribute('hidden', '');
@@ -790,11 +806,9 @@ let pricingLoaded = false;
 let pricingError: string | null = null;
 let currentBalance = 0;
 let currentPrintQuote: PrintQuote | null = null;
-let coinSlotIsLocked: boolean = false;
 let printerReady = false;
 let paymentLeaseId: string | null = null;
 let paymentLeaseIdForFinalization: string | null = null;
-let paymentLeaseExpiresAt = 0;
 let paymentArmInFlight = false;
 let paymentHeartbeatTimer: number | null = null;
 let paymentLeaseGeneration = 0;
@@ -1183,8 +1197,6 @@ populateJobSummary(config);
 if (priceValue) priceValue.textContent = 'Loading...';
 
 function applyLockState(locked: boolean): void {
-  coinSlotIsLocked = locked;
-
   const paymentColEl = document.querySelector<HTMLElement>('.payment-col');
   const coinIcon = document.getElementById('coinIcon');
   const padlockIcon = document.getElementById('padlockIcon');
@@ -1270,7 +1282,6 @@ async function armPaymentLease(): Promise<void> {
 
     paymentLeaseIdForFinalization = null;
     paymentLeaseId = lease.leaseId;
-    paymentLeaseExpiresAt = lease.expiresAt;
     paymentHeartbeatTimer = window.setInterval(() => {
       void sendPaymentHeartbeat();
     }, 3_000);
@@ -1278,7 +1289,6 @@ async function armPaymentLease(): Promise<void> {
   } catch {
     stopPaymentHeartbeat();
     paymentLeaseId = null;
-    paymentLeaseExpiresAt = 0;
     applyLockState(true);
   } finally {
     paymentArmInFlight = false;
@@ -1299,14 +1309,10 @@ async function sendPaymentHeartbeat(): Promise<void> {
     if (!response.ok || typeof payload.expiresAt !== 'number') {
       throw new Error('Payment lease heartbeat failed.');
     }
-    if (paymentLeaseId === leaseId) {
-      paymentLeaseExpiresAt = payload.expiresAt;
-    }
   } catch {
     if (paymentLeaseId !== leaseId) return;
     stopPaymentHeartbeat();
     paymentLeaseId = null;
-    paymentLeaseExpiresAt = 0;
     applyLockState(true);
   }
 }
@@ -1324,7 +1330,6 @@ async function releasePaymentLease(
   paymentLeaseGeneration += 1;
   stopPaymentHeartbeat();
   paymentLeaseId = null;
-  paymentLeaseExpiresAt = 0;
   applyLockState(true);
   if (!leaseId) return;
 
@@ -2572,19 +2577,26 @@ modalConfirmBtn?.addEventListener('click', async () => {
         } catch {
           // Response is non-JSON (e.g. HTML or raw string)
         }
-        if (errData.printError) {
-          renderPrinterError(errData.printError as PrintError);
-          throw new Error(
-            (errData.printError as PrintError).userMessage || 'Copy job failed',
-          );
-        }
-        const errorMsg =
-          (typeof errData.error === 'string' && errData.error.trim()) ||
-          (errText && !errText.startsWith('<')
-            ? errText.slice(0, 150)
-            : null) ||
-          `Copy job failed (${response.status} ${response.statusText || 'Error'})`;
-        throw new Error(errorMsg);
+        const errPayload: PrintError = errData.printError
+          ? (errData.printError as PrintError)
+          : {
+              code:
+                typeof errData.code === 'string' && errData.code.trim()
+                  ? errData.code
+                  : `HTTP_${response.status}`,
+              severity: 'recoverable',
+              userMessage:
+                (typeof errData.error === 'string' && errData.error.trim()) ||
+                (errText && !errText.startsWith('<')
+                  ? errText.slice(0, 150)
+                  : null) ||
+                `Copy job failed (${response.status} ${response.statusText || 'Error'})`,
+              hint: 'Please ask kiosk staff for assistance or retry the copy.',
+              canDismiss: true,
+              spoolerCorrelationKey,
+            };
+        renderPrinterError(errPayload);
+        throw new Error(errPayload.userMessage);
       }
 
       const payload = (await response.json()) as ReceiptLinkPayload & {
@@ -2637,19 +2649,26 @@ modalConfirmBtn?.addEventListener('click', async () => {
         } catch {
           // Response is non-JSON (e.g. HTML or raw string)
         }
-        if (errData.printError) {
-          renderPrinterError(errData.printError as PrintError);
-          throw new Error(
-            (errData.printError as PrintError).userMessage || 'Payment failed',
-          );
-        }
-        const errorMsg =
-          (typeof errData.error === 'string' && errData.error.trim()) ||
-          (errText && !errText.startsWith('<')
-            ? errText.slice(0, 150)
-            : null) ||
-          `Payment failed (${response.status} ${response.statusText || 'Error'})`;
-        throw new Error(errorMsg);
+        const errPayload: PrintError = errData.printError
+          ? (errData.printError as PrintError)
+          : {
+              code:
+                typeof errData.code === 'string' && errData.code.trim()
+                  ? errData.code
+                  : `HTTP_${response.status}`,
+              severity: 'recoverable',
+              userMessage:
+                (typeof errData.error === 'string' && errData.error.trim()) ||
+                (errText && !errText.startsWith('<')
+                  ? errText.slice(0, 150)
+                  : null) ||
+                `Payment failed (${response.status} ${response.statusText || 'Error'})`,
+              hint: 'Please ask kiosk staff for assistance or re-upload your document.',
+              canDismiss: true,
+              spoolerCorrelationKey,
+            };
+        renderPrinterError(errPayload);
+        throw new Error(errPayload.userMessage);
       }
 
       const payload = (await response.json()) as ReceiptLinkPayload & {
@@ -2716,7 +2735,6 @@ if (typeof ioFactory !== 'function') {
   attachUiBlockingOverlay();
 } else {
   const connectedSocket = ioFactory() as SocketLike;
-  socket = connectedSocket;
 
   // Attach the power safety overlay now that socket is initialized.
   // Passing the live socket instance (not a getter) avoids the fallback

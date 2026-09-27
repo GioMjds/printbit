@@ -554,7 +554,9 @@ if ('${username}' -and '${password}') {
     return value
       .replace(/'/g, "''")
       .replace(/[\r\n]/g, ' ')
-      .replace(/[\x00-\x1f]/g, '');
+      .split('')
+      .filter((character) => character.charCodeAt(0) >= 0x20)
+      .join('');
   }
 
   private sanitizeEmailError(error: unknown, recipients: string[]): string {
