@@ -270,6 +270,7 @@ Get-Process -Name "PrintBit.HardwareService"
 
 Worker logs are written via Serilog to:
 `C:\Users\printbit\printbit-worker\logs\printbit-worker-.log` (or within the service directory).
+
 - Check for `Global\PrintBitHardwareWorker` mutex collision (exit code 2).
 - Check for spooler submission timeouts or SumatraPDF errors.
 - Check for serial port COM connection failures.

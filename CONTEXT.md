@@ -19,20 +19,20 @@ format conversion over named pipes and filesystem queues; it never opens HTTP po
 
 ## 1. Project overview
 
-| Concern          | Value                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------- |
-| Domain           | Self-service printing kiosk (print, copy, scan, E-Receipt, admin)                                 |
-| Architecture     | Dual-process: Node.js Kiosk App/API + C# .NET 10 (`PrintBitHardware` Windows Service)             |
-| Backend          | Node.js ≥ 22.5, Express 5, Socket.IO 4, TypeScript 6 (strict mode)                                |
+| Concern          | Value                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| Domain           | Self-service printing kiosk (print, copy, scan, E-Receipt, admin)                                   |
+| Architecture     | Dual-process: Node.js Kiosk App/API + C# .NET 10 (`PrintBitHardware` Windows Service)               |
+| Backend          | Node.js ≥ 22.5, Express 5, Socket.IO 4, TypeScript 6 (strict mode)                                  |
 | Worker Service   | C# .NET 10, Windows Service (`LocalSystem`), Named Pipes IPC, Queue directory, WinSpool, SumatraPDF |
-| Storage          | SQLite via `node:sqlite` (`DatabaseSync`), repository pattern, no ORM                             |
-| Frontend         | Static HTML/CSS + esbuild bundles under `src/public/**` (no React, no SPA)                        |
-| Hardware bridges | Named pipes to worker / `serialport` (coin acceptor + coin hopper on shared 115200 baud COM line) |
-| Print dispatch   | Worker-managed spooler via SumatraPDF CLI, mode-gated profiles (`Standard` vs `High`)             |
-| Scanner          | NAPS2 (`.Console.exe`) integration via worker service                                             |
-| Package manager  | `pnpm` 10.x (Node app) & .NET CLI / MSBuild (Worker)                                              |
-| OS               | Windows 11 / 10 only — hardware, COM ports, WMI, scheduled tasks, PowerShell scripts              |
-| Runtime node     | `tsx watch src/server.ts` (dev) / `node dist/server.js` (built)                                   |
+| Storage          | SQLite via `node:sqlite` (`DatabaseSync`), repository pattern, no ORM                               |
+| Frontend         | Static HTML/CSS + esbuild bundles under `src/public/**` (no React, no SPA)                          |
+| Hardware bridges | Named pipes to worker / `serialport` (coin acceptor + coin hopper on shared 115200 baud COM line)   |
+| Print dispatch   | Worker-managed spooler via SumatraPDF CLI, mode-gated profiles (`Standard` vs `High`)               |
+| Scanner          | NAPS2 (`.Console.exe`) integration via worker service                                               |
+| Package manager  | `pnpm` 10.x (Node app) & .NET CLI / MSBuild (Worker)                                                |
+| OS               | Windows 11 / 10 only — hardware, COM ports, WMI, scheduled tasks, PowerShell scripts                |
+| Runtime node     | `tsx watch src/server.ts` (dev) / `node dist/server.js` (built)                                     |
 
 ---
 
@@ -335,28 +335,28 @@ These rules are non-obvious and load-bearing. Violating them is the most common 
 
 ## 6. Build, run, and test commands
 
-| Action                             | Command                                                                               |
-| ---------------------------------- | ------------------------------------------------------------------------------------- |
-| Install dependencies               | `pnpm install`                                                                        |
-| Dev server (auto-restart)          | `pnpm dev` → `tsx watch src/server.ts` on `http://0.0.0.0:3000`                       |
-| Build client + server bundles      | `pnpm run build` → `node scripts/build-client.js` then `node scripts/build-server.js` |
-| Start built server                 | `pnpm start` → `node dist/server.js`                                                  |
-| Type-check                         | `pnpm exec tsc --noEmit --ignoreDeprecations 6.0` (required after any `.ts` change)   |
-| Lint                               | `pnpm run lint` / `pnpm run lint:fix`                                                 |
-| Test                               | `pnpm test` (Jest; `*.spec.ts`, `*.int.ts`, `*.e2e.ts`)                               |
-| Reset database (dev)               | `pnpm run db:reset`                                                                   |
-| One-time legacy import             | `pnpm run db:migrate:legacy` (use `-- --force` to rerun)                              |
-| Launch in kiosk mode (Windows)     | `pnpm run kiosk`                                                                      |
-| Ensure ESP32 network on boot       | `pnpm run ensure-network` (PowerShell)                                                |
-| Install/uninstall startup task     | `pnpm run install-startup` / `pnpm run uninstall-startup`                             |
-| Watchdog install/verify/uninstall  | `pnpm run watchdog:install` / `:verify` / `:uninstall`                                |
-| Kiosk lockdown apply/verify/revert | `pnpm run lockdown:apply` / `:verify` / `:revert`                                     |
-| Controlled updates policy          | `pnpm run updates:apply` / `:verify` / `:revert`                                      |
-| Verify printer driver version      | `pnpm run driver:verify`                                                              |
-| Build C# worker service            | `cd worker && dotnet build`                                                           |
-| Run C# worker locally (dev)        | `dotnet run --project worker/src/PrintBit.HardwareService/PrintBit.HardwareService.csproj` |
+| Action                             | Command                                                                                                                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install dependencies               | `pnpm install`                                                                                                                                                               |
+| Dev server (auto-restart)          | `pnpm dev` → `tsx watch src/server.ts` on `http://0.0.0.0:3000`                                                                                                              |
+| Build client + server bundles      | `pnpm run build` → `node scripts/build-client.js` then `node scripts/build-server.js`                                                                                        |
+| Start built server                 | `pnpm start` → `node dist/server.js`                                                                                                                                         |
+| Type-check                         | `pnpm exec tsc --noEmit --ignoreDeprecations 6.0` (required after any `.ts` change)                                                                                          |
+| Lint                               | `pnpm run lint` / `pnpm run lint:fix`                                                                                                                                        |
+| Test                               | `pnpm test` (Jest; `*.spec.ts`, `*.int.ts`, `*.e2e.ts`)                                                                                                                      |
+| Reset database (dev)               | `pnpm run db:reset`                                                                                                                                                          |
+| One-time legacy import             | `pnpm run db:migrate:legacy` (use `-- --force` to rerun)                                                                                                                     |
+| Launch in kiosk mode (Windows)     | `pnpm run kiosk`                                                                                                                                                             |
+| Ensure ESP32 network on boot       | `pnpm run ensure-network` (PowerShell)                                                                                                                                       |
+| Install/uninstall startup task     | `pnpm run install-startup` / `pnpm run uninstall-startup`                                                                                                                    |
+| Watchdog install/verify/uninstall  | `pnpm run watchdog:install` / `:verify` / `:uninstall`                                                                                                                       |
+| Kiosk lockdown apply/verify/revert | `pnpm run lockdown:apply` / `:verify` / `:revert`                                                                                                                            |
+| Controlled updates policy          | `pnpm run updates:apply` / `:verify` / `:revert`                                                                                                                             |
+| Verify printer driver version      | `pnpm run driver:verify`                                                                                                                                                     |
+| Build C# worker service            | `cd worker && dotnet build`                                                                                                                                                  |
+| Run C# worker locally (dev)        | `dotnet run --project worker/src/PrintBit.HardwareService/PrintBit.HardwareService.csproj`                                                                                   |
 | Publish worker Windows Service     | `dotnet publish worker/src/PrintBit.HardwareService/PrintBit.HardwareService.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o worker/publish` |
-| Verify worker command pipe IPC     | `pnpm run worker-pipe:verify`                                                         |
+| Verify worker command pipe IPC     | `pnpm run worker-pipe:verify`                                                                                                                                                |
 
 > **`@/*` path alias** points to `./src/*` (set in `tsconfig.json`). Use it in all imports.
 > Do not introduce a different alias.
@@ -475,26 +475,26 @@ Defaults shown in `[]`. `PRINTBIT_` prefix is the canonical form; a few keys als
 
 These are real, intentional constraints. Do not "fix" them by adding infrastructure that wasn't requested.
 
-| Area                   | Gap / constraint                                                                                                                                                                 |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Platform**           | Windows-only. No Linux/macOS support planned — `edge-js`, WMI, COM ports, and PowerShell scripts tie it to Windows.                                                              |
-| **TLS**                | No HTTPS configured by default. Kiosks are deployed on isolated LANs; a reverse proxy is the documented path.                                                                    |
-| **Auth**               | Admin auth is PIN + Argon2id + httpOnly cookie + local-network gate + 5-tap gesture + lockout. No SSO.                                                                           |
+| Area                   | Gap / constraint                                                                                                                                                                                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Platform**           | Windows-only. No Linux/macOS support planned — `edge-js`, WMI, COM ports, and PowerShell scripts tie it to Windows.                                                                                                                                        |
+| **TLS**                | No HTTPS configured by default. Kiosks are deployed on isolated LANs; a reverse proxy is the documented path.                                                                                                                                              |
+| **Auth**               | Admin auth is PIN + Argon2id + httpOnly cookie + local-network gate + 5-tap gesture + lockout. No SSO.                                                                                                                                                     |
 | **Print workers**      | The C# .NET 10 Windows Service worker (`PrintBitHardware`) is located in `worker/` in this repo. It runs as an independent Windows Service (`LocalSystem`) and coordinates strictly via named pipes and the queue folder. Do not move C# code into `src/`. |
-| **Coin support**       | Only 1-peso coins are dispensed by the hopper. All prices are whole-peso integers by design.                                                                                     |
-| **Idempotency**        | `x-coin-event-id` is required on `/coin` and enforced on both ESP32 (suppress retransmit) and the kiosk (dedupe). **Never remove either check.**                                 |
-| **Print dispatcher**   | Mode is environmental (`legacy` / `phased` / `new-only`). Switching modes is an admin action and should be tested with a canary first.                                           |
-| **Pricing engine**     | `enabledMode` defaults to `legacy`. Switch to `live` only after running `shadow` for ≥24h with deltas audited.                                                                   |
-| **E-Receipts**         | v1 scope is `print` + `copy` only. Scan receipts are not implemented.                                                                                                            |
-| **USB export**         | Disabled by default in kiosk lockdown mode. `/api/scanner/wired/drives` and `/export` return `423 USB_EXPORT_DISABLED`.                                                          |
-| **Session ownership**  | Single-device per session via `x-upload-client-id`. Clients must generate a UUID v4 per device. Concurrent phones get `409 SESSION_OWNED`.                                       |
-| **i18n**               | `en` and `fil` only. `i18n.config.ts` is intentionally not exported.                                                                                                             |
-| **Frontend**           | No framework — static HTML + esbuild bundles. Pages subscribe to Socket.IO directly.                                                                                             |
-| **Database**           | Local SQLite only. Not suitable for high-concurrency or multi-kiosk deployments (per `SECURITY.md`).                                                                             |
-| **Test runner**        | Active but limited coverage — most tests target pricing engine and bug-repros, not full integration flows.                                                                       |
-| **Migrations**         | No formal migration tool. Schema changes are applied via `migrate()` functions in each `*SqliteStore` class.                                                                     |
-| **NTP**                | Optional. `PRINTBIT_TRUSTED_TIME_ENFORCE=false` by default. When `true`, financial ops are blocked if NTP is unreachable.                                                        |
-| **Active in-progress** | See `agent_docs/in_progress.md`: session lifecycle, ESP32 bridge, print dispatch, lockdown/watchdog, security hardening — avoid broad refactors in these areas.                  |
+| **Coin support**       | Only 1-peso coins are dispensed by the hopper. All prices are whole-peso integers by design.                                                                                                                                                               |
+| **Idempotency**        | `x-coin-event-id` is required on `/coin` and enforced on both ESP32 (suppress retransmit) and the kiosk (dedupe). **Never remove either check.**                                                                                                           |
+| **Print dispatcher**   | Mode is environmental (`legacy` / `phased` / `new-only`). Switching modes is an admin action and should be tested with a canary first.                                                                                                                     |
+| **Pricing engine**     | `enabledMode` defaults to `legacy`. Switch to `live` only after running `shadow` for ≥24h with deltas audited.                                                                                                                                             |
+| **E-Receipts**         | v1 scope is `print` + `copy` only. Scan receipts are not implemented.                                                                                                                                                                                      |
+| **USB export**         | Disabled by default in kiosk lockdown mode. `/api/scanner/wired/drives` and `/export` return `423 USB_EXPORT_DISABLED`.                                                                                                                                    |
+| **Session ownership**  | Single-device per session via `x-upload-client-id`. Clients must generate a UUID v4 per device. Concurrent phones get `409 SESSION_OWNED`.                                                                                                                 |
+| **i18n**               | `en` and `fil` only. `i18n.config.ts` is intentionally not exported.                                                                                                                                                                                       |
+| **Frontend**           | No framework — static HTML + esbuild bundles. Pages subscribe to Socket.IO directly.                                                                                                                                                                       |
+| **Database**           | Local SQLite only. Not suitable for high-concurrency or multi-kiosk deployments (per `SECURITY.md`).                                                                                                                                                       |
+| **Test runner**        | Active but limited coverage — most tests target pricing engine and bug-repros, not full integration flows.                                                                                                                                                 |
+| **Migrations**         | No formal migration tool. Schema changes are applied via `migrate()` functions in each `*SqliteStore` class.                                                                                                                                               |
+| **NTP**                | Optional. `PRINTBIT_TRUSTED_TIME_ENFORCE=false` by default. When `true`, financial ops are blocked if NTP is unreachable.                                                                                                                                  |
+| **Active in-progress** | See `agent_docs/in_progress.md`: session lifecycle, ESP32 bridge, print dispatch, lockdown/watchdog, security hardening — avoid broad refactors in these areas.                                                                                            |
 
 ---
 
