@@ -5,9 +5,13 @@
 #include <Preferences.h>
 #include <esp_wifi.h>
 #include <esp_netif.h>
+#include <esp_system.h>
+#include <ESPmDNS.h>
+#include <time.h>
+#include <sys/time.h>
 
 #define coinAcceptorPin 4
-#define hopperSensorPin 19
+#define hopperSensorPin 22
 #define relayPin 27
 #define bootButtonPin 0
 
@@ -24,6 +28,7 @@ bool apPasswordEnabled = false;
 String adminUsername = "";
 String adminPassword = "";
 String adminSessionToken = "";
+String protectedAdminMac = "";
 const IPAddress apIp(192, 168, 4, 1);
 
 const char* fallbackKioskIp = "192.168.4.2";
@@ -41,6 +46,7 @@ uint16_t kioskPort = fallbackKioskPort;
 String kioskPortalPath = fallbackKioskPortalPath;
 String kioskPortalUrl = "";
 String tabletServer = "";
+String kioskMac = "";
 bool hasKioskRegistration = false;
 
 // COIN ACCEPTOR
@@ -50,7 +56,7 @@ volatile unsigned long lastPulseMillis = 0;
 volatile uint16_t glitchPulseCount = 0;
 
 const unsigned long debounceMicros = 100000;
-const unsigned long coinTimeout = 700;
+const unsigned long coinTimeout = 730;
 const int maxCoinSendAttempts = 3;
 const int maxDispenseCoins = 50;
 const uint16_t pulseCountCap = 200;
@@ -61,7 +67,7 @@ volatile int coinDispensed = 0;
 volatile int targetCoins = 0;
 
 volatile unsigned long lastCoinTime = 0;
-const unsigned long hopperDebounce = 150000;
+const unsigned long hopperDebounce = 620000;
 
 bool dispensing = false;
 bool hopperManualOn = false;
@@ -89,6 +95,78 @@ const uint32_t lowHeapWarnThreshold = 20000;
 unsigned long lastHeapCheckAt = 0;
 uint32_t minFreeHeapSeen = UINT32_MAX;
 
+// ADMIN DIAGNOSTICS / MAINTENANCE
+bool coinTestMode = false;
+unsigned long coinTestStartedAt = 0;
+unsigned long lastCoinDetectedAt = 0;
+int lastCoinValue = 0;
+uint16_t lastCoinPulseCount = 0;
+uint16_t lastCoinPulseGlitchCount = 0;
+unsigned long lastCoinPulseDurationMs = 0;
+unsigned long coinAcceptedCount = 0;
+unsigned long coinInvalidCount = 0;
+unsigned long coinTestCount = 0;
+String lastSystemError = "";
+String lastAdminAction = "";
+
+// ADMIN CLOCK
+bool adminClockSynced = false;
+
+// DEVICE ACCESS CONTROL
+bool blockOtherDevices = false;
+unsigned long blockOtherDevicesUntil = 0;
+const int maxAdminLogEntries = 30;
+String adminEventLog[maxAdminLogEntries];
+int adminEventLogCount = 0;
+const int maxAdminErrorEntries = 20;
+String adminErrorLog[maxAdminErrorEntries];
+int adminErrorLogCount = 0;
+
+String adminTimestamp() {
+  time_t now = time(nullptr);
+  if (adminClockSynced && now > 1000000000) {
+    struct tm localTm;
+    localtime_r(&now, &localTm);
+    char buffer[24];
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &localTm);
+    return String(buffer);
+  }
+
+  unsigned long total = millis() / 1000UL;
+  unsigned long h = total / 3600UL;
+  unsigned long m = (total % 3600UL) / 60UL;
+  unsigned long sec = total % 60UL;
+  char buffer[24];
+  snprintf(buffer, sizeof(buffer), "BOOT+%02lu:%02lu:%02lu", h, m, sec);
+  return String(buffer);
+}
+
+void addAdminEvent(const String& message);
+
+void addAdminError(const String& message) {
+  lastSystemError = message;
+  String entry = adminTimestamp() + " | ERROR | " + message;
+  if (adminErrorLogCount < maxAdminErrorEntries) {
+    adminErrorLog[adminErrorLogCount++] = entry;
+  } else {
+    for (int i = 1; i < maxAdminErrorEntries; i++) adminErrorLog[i - 1] = adminErrorLog[i];
+    adminErrorLog[maxAdminErrorEntries - 1] = entry;
+  }
+  addAdminEvent(String("ERROR: ") + message);
+}
+
+void addAdminEvent(const String& message) {
+  String entry = adminTimestamp() + " | INFO | " + message;
+  if (adminEventLogCount < maxAdminLogEntries) {
+    adminEventLog[adminEventLogCount++] = entry;
+  } else {
+    for (int i = 1; i < maxAdminLogEntries; i++) adminEventLog[i - 1] = adminEventLog[i];
+    adminEventLog[maxAdminLogEntries - 1] = entry;
+  }
+  Serial.print("admin_event:");
+  Serial.println(message);
+}
+
 bool startDispense(
   int coins,
   const String& requestId,
@@ -97,6 +175,10 @@ void handleAdminWifiSave(NetworkClient& client, const String& body);
 void handleAdminCredentials(NetworkClient& client, const String& body);
 void handleAdminDisconnectDevice(NetworkClient& client, const String& body);
 void handleAdminDisconnectAllDevices(NetworkClient& client);
+String stationMacToString(const uint8_t* mac);
+bool getStationMacByIp(const IPAddress& ip, String& macText);
+bool getStationIpByMac(const uint8_t* mac, IPAddress& stationIp);
+
 void handleAdminHopperDispense(NetworkClient& client, const String& body);
 void handleAdminHopperDispenseAll(NetworkClient& client);
 void handleAdminHopperOn(NetworkClient& client);
@@ -104,6 +186,11 @@ void handleAdminHopperStop(NetworkClient& client);
 void replyPlain(NetworkClient& client, int statusCode, const String& statusText, const String& message);
 bool saveApCredentials(const String& newSsid, const String& newPassword, bool passwordEnabled);
 void loadApCredentials();
+void handleAdminCoinTestStart(NetworkClient& client);
+void handleAdminCoinTestStop(NetworkClient& client);
+void handleAdminExportConfig(NetworkClient& client);
+void handleAdminDeviceAccess(NetworkClient& client, const String& body);
+void handleAdminTimeSync(NetworkClient& client, const String& body);
 
 String decodeUrlComponent(const String& value) {
   String decoded = "";
@@ -214,11 +301,17 @@ void replyAdminUnauthorized(NetworkClient& client) {
 }
 
 void replyAdminJson(NetworkClient& client, const String& json, int statusCode = 200, const String& statusText = "OK") {
-  client.print("HTTP/1.1 "); client.print(statusCode); client.print(" "); client.println(statusText);
+  client.print("HTTP/1.1 ");
+  client.print(statusCode);
+  client.print(" ");
+  client.println(statusText);
   client.println("Content-Type: application/json; charset=utf-8");
   client.println("Cache-Control: no-store");
-  client.print("Content-Length: "); client.println(json.length());
-  client.println("Connection: close"); client.println(); client.print(json);
+  client.print("Content-Length: ");
+  client.println(json.length());
+  client.println("Connection: close");
+  client.println();
+  client.print(json);
 }
 
 void loadAdminCredentials() {
@@ -254,15 +347,37 @@ bool saveAdminCredentials(const String& newUsername, const String& newPassword) 
 void handleAdminLogin(NetworkClient& client, const String& body) {
   String username = getFormValue(body, "username");
   String password = getFormValue(body, "password");
-  username.trim(); password.trim();
+  username.trim();
+  password.trim();
   if (username != adminUsername || password != adminPassword) {
     Serial.print("admin_login_failed:invalid_credentials:username=");
     Serial.println(username.length() > 0 ? "provided" : "missing");
     replyAdminJson(client, "{\"ok\":false,\"error\":\"Invalid username or password\"}", 401, "Unauthorized");
     return;
   }
+  wifi_sta_list_t stationList;
+  memset(&stationList, 0, sizeof(stationList));
+  String loginAdminMac = "";
+  if (esp_wifi_ap_get_sta_list(&stationList) == ESP_OK) {
+    for (int i = 0; i < stationList.num; i++) {
+      IPAddress stationIp;
+      if (getStationIpByMac(stationList.sta[i].mac, stationIp) && stationIp == client.remoteIP()) {
+        loginAdminMac = stationMacToString(stationList.sta[i].mac);
+        break;
+      }
+    }
+  }
+  if (loginAdminMac.length() == 0) {
+    Serial.println("admin_login_failed:device_identity_not_found");
+    replyAdminJson(client, "{\"ok\":false,\"error\":\"Could not identify this connected device\"}", 409, "Conflict");
+    return;
+  }
+
   adminSessionToken = makeAdminSessionToken();
-  Serial.println("admin_login_success:session_created");
+  protectedAdminMac = loginAdminMac;
+  Serial.print("admin_login_success:session_created:admin_mac=");
+  Serial.println(protectedAdminMac);
+  addAdminEvent(String("Admin device logged in: ") + protectedAdminMac);
   replyAdminJson(client, "{\"ok\":true,\"token\":\"" + adminSessionToken + "\"}");
 }
 
@@ -297,7 +412,22 @@ bool getStationIpByMac(const uint8_t* mac, IPAddress& stationIp) {
   return true;
 }
 
-String buildConnectedDevicesJson(const IPAddress& adminIp) {
+bool getStationMacByIp(const IPAddress& ip, String& macText) {
+  wifi_sta_list_t stationList;
+  memset(&stationList, 0, sizeof(stationList));
+  if (esp_wifi_ap_get_sta_list(&stationList) != ESP_OK) return false;
+
+  for (int i = 0; i < stationList.num; i++) {
+    IPAddress stationIp;
+    if (getStationIpByMac(stationList.sta[i].mac, stationIp) && stationIp == ip) {
+      macText = stationMacToString(stationList.sta[i].mac);
+      return true;
+    }
+  }
+  return false;
+}
+
+String buildConnectedDevicesJson() {
   wifi_sta_list_t stationList;
   memset(&stationList, 0, sizeof(stationList));
 
@@ -307,14 +437,13 @@ String buildConnectedDevicesJson(const IPAddress& adminIp) {
     for (int i = 0; i < stationList.num; i++) {
       IPAddress stationIp;
       bool ipKnown = getStationIpByMac(stationList.sta[i].mac, stationIp);
-      bool isAdmin = ipKnown && stationIp == adminIp;
+      String currentMac = stationMacToString(stationList.sta[i].mac);
+      bool isAdmin = currentMac == protectedAdminMac;
 
       if (!first) json += ",";
       first = false;
 
-      json += "{\"mac\":\"" + stationMacToString(stationList.sta[i].mac) +
-              "\",\"rssi\":" + String(stationList.sta[i].rssi) +
-              ",\"ip\":\"";
+      json += "{\"mac\":\"" + stationMacToString(stationList.sta[i].mac) + "\",\"rssi\":" + String(stationList.sta[i].rssi) + ",\"ip\":\"";
       json += ipKnown ? stationIp.toString() : "";
       json += "\",\"isAdmin\":" + String(isAdmin ? "true" : "false") + "}";
     }
@@ -325,64 +454,85 @@ String buildConnectedDevicesJson(const IPAddress& adminIp) {
 
 String disconnectErrorCode = "";
 
-bool disconnectAllStationsExcept(const IPAddress& adminIp, int& disconnectedCount, bool& adminExcluded) {
-  disconnectedCount = 0;
-  adminExcluded = false;
+// TEMPORARY DISCONNECT BLOCK
+// Some phones/tablets immediately reconnect after deauthentication. Keep a
+// short block window so a Disconnect action is visible and reliable.
+const int maxDisconnectBlocks = 10;
+String disconnectBlockedMac[maxDisconnectBlocks];
+unsigned long disconnectBlockedUntil[maxDisconnectBlocks] = { 0 };
 
-  wifi_sta_list_t stationList;
-  memset(&stationList, 0, sizeof(stationList));
-  esp_err_t listResult = esp_wifi_ap_get_sta_list(&stationList);
-  if (listResult != ESP_OK) {
-    disconnectErrorCode = "STA_LIST_FAILED";
-    Serial.print("admin_device_clear_all:failed:sta_list:error=");
-    Serial.println((int)listResult);
-    return false;
-  }
-
-  bool adminIdentified = false;
-  for (int i = 0; i < stationList.num; i++) {
-    IPAddress stationIp;
-    if (getStationIpByMac(stationList.sta[i].mac, stationIp) && stationIp == adminIp) {
-      adminIdentified = true;
-      adminExcluded = true;
+void blockStationTemporarily(const String& macText, unsigned long durationMs = 5000UL) {
+  String mac = macText;
+  mac.trim();
+  mac.toUpperCase();
+  int slot = -1;
+  for (int i = 0; i < maxDisconnectBlocks; i++) {
+    if (disconnectBlockedMac[i] == mac) {
+      slot = i;
       break;
     }
+    if (slot < 0 && disconnectBlockedMac[i].length() == 0) slot = i;
   }
+  if (slot < 0) slot = 0;
+  disconnectBlockedMac[slot] = mac;
+  disconnectBlockedUntil[slot] = millis() + durationMs;
+}
 
-  if (!adminIdentified) {
-    disconnectErrorCode = "ADMIN_DEVICE_NOT_IDENTIFIED";
-    Serial.println("admin_device_clear_all:failed:admin_device_not_identified");
-    return false;
-  }
+void enforceTemporaryDisconnectBlocks() {
+  unsigned long now = millis();
+  wifi_sta_list_t stationList;
+  memset(&stationList, 0, sizeof(stationList));
+  if (esp_wifi_ap_get_sta_list(&stationList) != ESP_OK) return;
 
-  for (int i = 0; i < stationList.num; i++) {
-    IPAddress stationIp;
-    bool isAdmin = getStationIpByMac(stationList.sta[i].mac, stationIp) && stationIp == adminIp;
-    if (isAdmin) continue;
-
-    uint16_t aid = 0;
-    esp_err_t aidResult = esp_wifi_ap_get_sta_aid(stationList.sta[i].mac, &aid);
-    if (aidResult != ESP_OK || aid == 0) {
-      Serial.print("admin_device_clear_all:skip:aid_lookup_failed:mac=");
-      Serial.println(stationMacToString(stationList.sta[i].mac));
+  for (int b = 0; b < maxDisconnectBlocks; b++) {
+    if (disconnectBlockedMac[b].length() == 0) continue;
+    if ((long)(now - disconnectBlockedUntil[b]) >= 0) {
+      disconnectBlockedMac[b] = "";
+      disconnectBlockedUntil[b] = 0;
       continue;
     }
 
-    esp_err_t result = esp_wifi_deauth_sta(aid);
-    if (result == ESP_OK) {
-      disconnectedCount++;
-      Serial.print("admin_device_clear_all:success:mac=");
-      Serial.println(stationMacToString(stationList.sta[i].mac));
-    } else {
-      Serial.print("admin_device_clear_all:skip:deauth_failed:mac=");
-      Serial.print(stationMacToString(stationList.sta[i].mac));
-      Serial.print(":error=");
-      Serial.println((int)result);
+    for (int i = 0; i < stationList.num; i++) {
+      String current = stationMacToString(stationList.sta[i].mac);
+      if (current != disconnectBlockedMac[b]) continue;
+      uint16_t aid = 0;
+      if (esp_wifi_ap_get_sta_aid(stationList.sta[i].mac, &aid) == ESP_OK && aid != 0) {
+        esp_wifi_deauth_sta(aid);
+      }
     }
   }
-
-  return true;
 }
+
+
+void enforceDeviceAccessPolicy() {
+  if (!blockOtherDevices) return;
+
+  unsigned long now = millis();
+  if (blockOtherDevicesUntil != 0 && (long)(now - blockOtherDevicesUntil) >= 0) {
+    blockOtherDevices = false;
+    blockOtherDevicesUntil = 0;
+    addAdminEvent("Other device access block expired");
+    lastAdminAction = "Other device access block expired";
+    return;
+  }
+
+  if (protectedAdminMac.length() == 0) return;
+
+  wifi_sta_list_t stationList;
+  memset(&stationList, 0, sizeof(stationList));
+  if (esp_wifi_ap_get_sta_list(&stationList) != ESP_OK) return;
+
+  for (int i = 0; i < stationList.num; i++) {
+    String currentMac = stationMacToString(stationList.sta[i].mac);
+    if (currentMac == protectedAdminMac) continue;
+
+    uint16_t aid = 0;
+    if (esp_wifi_ap_get_sta_aid(stationList.sta[i].mac, &aid) == ESP_OK && aid != 0) {
+      esp_wifi_deauth_sta(aid);
+    }
+  }
+}
+
 
 bool disconnectStationByMac(const String& macText) {
   disconnectErrorCode = "";
@@ -427,6 +577,7 @@ bool disconnectStationByMac(const String& macText) {
 
     esp_err_t result = esp_wifi_deauth_sta(aid);
     if (result == ESP_OK) {
+      blockStationTemporarily(wanted);
       Serial.print("admin_device_disconnect:success:mac=");
       Serial.print(wanted);
       Serial.print(":aid=");
@@ -450,15 +601,41 @@ bool disconnectStationByMac(const String& macText) {
   return false;
 }
 
+const char* resetReasonText() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: return "Power on";
+    case ESP_RST_EXT: return "External reset";
+    case ESP_RST_SW: return "Software reset";
+    case ESP_RST_PANIC: return "Panic";
+    case ESP_RST_INT_WDT: return "Interrupt watchdog";
+    case ESP_RST_TASK_WDT: return "Task watchdog";
+    case ESP_RST_WDT: return "Other watchdog";
+    case ESP_RST_DEEPSLEEP: return "Deep sleep";
+    case ESP_RST_BROWNOUT: return "Brownout";
+    case ESP_RST_SDIO: return "SDIO reset";
+    default: return "Unknown";
+  }
+}
+
 void replyAdminDashboardPage(NetworkClient& client) {
-  String html = R"HTML(<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>PrintBit Admin</title><style>:root{--bg:#f5f7fa;--card:#fff;--text:#17202a;--muted:#697586;--line:#e7ebef;--primary:#17202a;--soft:#eef2f5;--success:#197a4b;--success-bg:#eaf7f0;--danger:#b42318;--danger-bg:#fff0ee;--shadow:0 8px 28px rgba(16,24,40,.06)}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:var(--text)}button,input{font:inherit}.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 44px}.top{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:28px}.brand{font-size:12px;font-weight:800;letter-spacing:1.8px;color:var(--muted);text-transform:uppercase}.top h1{margin:5px 0 3px;font-size:30px;letter-spacing:-.5px}.muted{color:var(--muted);font-size:14px}.section{margin-top:24px}.section-title{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px}.section-title h2{margin:0;font-size:17px}.section-title span{font-size:13px;color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.card{grid-column:span 6;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow)}.wide{grid-column:span 12}.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.card h3{margin:0;font-size:16px}.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700;background:var(--soft);color:var(--muted)}.badge:before{content:"";width:7px;height:7px;border-radius:50%;background:#98a2b3}.badge.success{background:var(--success-bg);color:var(--success)}.badge.success:before{background:var(--success)}.rows{border-top:1px solid var(--line)}.row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}.label{color:var(--muted);font-size:14px}.value{font-size:14px;font-weight:700;text-align:right;word-break:break-word}.hint{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.5}.field{margin-top:14px}.field:first-of-type{margin-top:0}.field label{display:block;margin-bottom:6px;font-size:13px;font-weight:700}.field input{width:100%;padding:11px 12px;border:1px solid #cfd6de;border-radius:10px;background:#fff;color:var(--text);outline:none}.field input:focus{border-color:#7b8794;box-shadow:0 0 0 3px rgba(123,135,148,.12)}.check{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:14px;font-weight:700}.check input{width:16px;height:16px}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.btn{border:0;border-radius:10px;padding:10px 14px;background:var(--primary);color:#fff;font-size:14px;font-weight:700;cursor:pointer}.btn:hover{filter:brightness(.94)}.btn:disabled{opacity:.55;cursor:not-allowed}.btn.secondary{background:var(--soft);color:var(--text)}.btn.danger{background:var(--danger);color:#fff}.top .btn{margin:0}.device-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}.device-list{border-top:1px solid var(--line)}.device{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}.device:last-child{border-bottom:0}.device-main{min-width:0}.device-name{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:14px;font-weight:800}.device-meta{margin-top:4px;color:var(--muted);font-size:12px}.device-badge{display:inline-flex;margin-left:8px;padding:3px 7px;border-radius:999px;background:var(--success-bg);color:var(--success);font-size:10px;font-weight:800}.device-actions{display:flex;gap:8px;align-items:center}.hopper-controls{display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:16px;align-items:end}.hopper-actions{display:grid;grid-template-columns:repeat(4,minmax(110px,1fr));gap:9px}.hopper-actions .btn{width:100%;margin:0}.device .btn{padding:8px 11px;font-size:12px;white-space:nowrap}.empty{padding:12px 0;color:var(--muted);font-size:14px}.notice{margin-top:14px;padding:11px 12px;border-radius:10px;background:#f8fafb;color:#596675;font-size:13px;line-height:1.5}.danger-zone{border-color:#f1d5d2}.error{display:none;margin-bottom:18px;padding:12px 14px;border:1px solid #f0c7c3;border-radius:10px;background:var(--danger-bg);color:var(--danger);font-size:13px}.toast{position:fixed;right:20px;bottom:20px;max-width:360px;padding:12px 14px;border-radius:10px;background:var(--primary);color:#fff;box-shadow:var(--shadow);font-size:13px;display:none}.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:900px){.hopper-controls{grid-template-columns:1fr}.hopper-actions{grid-template-columns:repeat(2,minmax(120px,1fr))}}@media(max-width:760px){.wrap{padding:20px 14px 34px}.top{align-items:flex-start;flex-direction:column}.top .btn{width:100%}.card,.wide{grid-column:span 12}.device{align-items:flex-start}.device .btn{margin-top:2px}}@media(max-width:460px){.device{flex-direction:column}.device-actions{width:100%}.device-actions .btn{flex:1}.actions .btn{width:100%}.hopper-actions{grid-template-columns:1fr}.top h1{font-size:26px}}</style></head><body><div class="wrap"><header class="top"><div><div class="brand">PrintBit</div><h1>Admin Dashboard</h1><div class="muted">Manage this kiosk locally</div></div><button id="logout" class="btn secondary" type="button">Log out</button></header><div id="error" class="error"></div><section class="section"><div class="section-title"><h2>Overview</h2><span>Live kiosk information</span></div><div class="grid"><section class="card"><div class="card-head"><h3>Network status</h3><span id="networkBadge" class="badge">Loading</span></div><div class="rows"><div class="row"><span class="label">Wi-Fi network</span><span id="ssid" class="value">Loading...</span></div><div class="row"><span class="label">AP address</span><span class="value">192.168.4.1</span></div><div class="row"><span class="label">Connected devices</span><span id="stations" class="value">Loading...</span></div></div></section><section class="card"><div class="card-head"><h3>Kiosk status</h3><span id="registrationBadge" class="badge">Loading</span></div><div class="rows"><div class="row"><span class="label">Registration</span><span id="registration" class="value">Loading...</span></div><div class="row"><span class="label">Free memory</span><span id="heap" class="value">Loading...</span></div><div class="row"><span class="label">Admin account</span><span id="adminUser" class="value">Loading...</span></div></div></section></div></section><section class="section"><div class="section-title"><h2>Devices</h2><span>Currently connected to PrintBit</span></div><div class="grid"><section class="card wide"><div class="card-head"><h3>Connected devices</h3><span id="deviceCount" class="badge">0 devices</span></div><p class="hint">Disconnect removes one device. Clear Other Devices disconnects every client except the device currently using this admin session.</p><div class="device-toolbar"><span class="muted">Admin device is protected during Clear Other Devices.</span><button id="clearOtherDevices" class="btn danger" type="button">Clear Other Devices</button></div><div id="devices" class="device-list"><div class="empty">Loading devices...</div></div></section></div></section><section class="section"><div class="section-title"><h2>Network</h2><span>Access point configuration</span></div><div class="grid"><section class="card"><div class="card-head"><h3>Wi-Fi settings</h3></div><p class="hint">Choose the network name and whether the PrintBit access point requires a password.</p><form id="wifi"><div class="field"><label for="newSsid">SSID</label><input id="newSsid" maxlength="32" required></div><label class="check"><input id="passwordEnabled" type="checkbox"> Enable Wi-Fi password</label><div class="field"><label for="newPassword">Password</label><input id="newPassword" type="password" minlength="8" maxlength="63" placeholder="8-63 characters"></div><div class="notice">Disabling the password creates an open Wi-Fi network. Saving changes restarts the ESP32.</div><div class="actions"><button class="btn" type="submit">Save &amp; Restart</button></div></form></section><section class="card"><div class="card-head"><h3>Admin account</h3></div><p class="hint">Update the username and password used to access this dashboard.</p><form id="credentials"><div class="field"><label for="newUsername">Username</label><input id="newUsername" maxlength="32" autocomplete="username" required></div><div class="field"><label for="newAdminPassword">New password</label><input id="newAdminPassword" type="password" minlength="8" maxlength="63" autocomplete="new-password" required></div><div class="notice">Changing credentials immediately ends the current admin session.</div><div class="actions"><button class="btn" type="submit">Save Account</button></div></form></section></div></section><section class="section"><div class="section-title"><h2>Hopper</h2><span>Manual coin dispensing</span></div><div class="grid"><section class="card wide"><div class="card-head"><h3>Hopper Control</h3><span id="hopperBadge" class="badge">Loading</span></div><p class="hint">Test the coin hopper from the admin page. Normal dispensing counts coins using the hopper sensor. Dispense All runs the motor until you stop it or the safety timeout is reached.</p><div class="hopper-controls"><div class="field"><label for="hopperCoins">Coins to dispense</label><input id="hopperCoins" type="number" min="1" max="50" value="10" inputmode="numeric"></div><div class="hopper-actions"><button id="hopperDispense" class="btn" type="button">Dispense</button><button id="hopperOn" class="btn secondary" type="button">Motor ON</button><button id="hopperAll" class="btn secondary" type="button">Dispense All</button><button id="hopperStop" class="btn danger" type="button" disabled>Stop</button></div></div><div class="rows" style="margin-top:16px"><div class="row"><span class="label">Progress</span><span id="hopperProgress" class="value">0 / 0</span></div><div class="row"><span class="label">Last result</span><span id="hopperResult" class="value">Idle</span></div></div><div class="notice">Safety limit: the hopper motor automatically stops after 30 seconds if the requested count is not reached. Dispense All is intentionally limited by the same timeout.</div></section></div></section><section class="section"><div class="section-title"><h2>System</h2><span>Recovery and maintenance</span></div><div class="grid"><section class="card wide danger-zone"><div class="card-head"><h3>System actions</h3></div><p class="hint">Use these actions only when needed. Restart temporarily disconnects all clients.</p><div class="actions"><button id="resetWifi" class="btn danger" type="button">Reset Wi-Fi</button><button id="restartEsp" class="btn secondary" type="button">Restart ESP32</button></div><div class="notice">Reset Wi-Fi restores <b>PrintBit</b> with no Wi-Fi password. The admin account is not reset.</div></section></div></section></div><div id="toast" class="toast"></div><script>const token=sessionStorage.getItem('printbit_admin_token');if(!token){location='/admin/login';}const auth={'Authorization':'Bearer '+token};const $=id=>document.getElementById(id);const api=async(url,opts={})=>{opts.headers=Object.assign({},auth,opts.headers||{});const r=await fetch(url,opts);if(r.status===401){sessionStorage.removeItem('printbit_admin_token');location='/admin/login';throw Error('Admin authorization expired.');}return r;};const showError=m=>{const x=$('error');x.textContent=m;x.style.display='block';};const clearError=()=>{$('error').style.display='none';};const toast=m=>{const x=$('toast');x.textContent=m;x.style.display='block';clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>x.style.display='none',2400);};const setBadge=(el,text,success)=>{el.textContent=text;el.className='badge'+(success?' success':'');};const renderDevices=list=>{const box=$('devices');const count=list?list.length:0;$('deviceCount').textContent=count+' device'+(count===1?'':'s');if(!list||count===0){box.innerHTML='<div class="empty">No devices are currently connected.</div>';return;}box.innerHTML=list.map(d=>'<div class="device"><div class="device-main"><div class="device-name">'+d.mac+(d.isAdmin?'<span class="device-badge">THIS ADMIN DEVICE</span>':'')+'</div><div class="device-meta">Signal '+d.rssi+' dBm'+(d.ip?' · '+d.ip:'')+'</div></div><div class="device-actions">'+(d.isAdmin?'<span class="muted">Protected</span>':'<button class="btn danger device-disconnect" type="button" data-device-mac="'+d.mac+'">Disconnect</button>')+'</div></div>').join('');};const load=async silent=>{try{if(!silent)clearError();const r=await api('/admin/api/status');const d=await r.json();$('ssid').textContent=d.ssid;$('stations').textContent=d.stations;$('registration').textContent=d.registration;$('heap').textContent=d.freeHeap+' bytes';$('adminUser').textContent=d.adminUsername;$('newSsid').value=d.ssid;$('passwordEnabled').checked=!!d.passwordEnabled;$('newPassword').disabled=!d.passwordEnabled;setBadge($('networkBadge'),d.passwordEnabled?'Password protected':'Open network',true);const registered=!!d.registration&&d.registration.indexOf('Registered')===0;setBadge($('registrationBadge'),registered?'Registered':'Waiting',registered);renderDevices(d.devices);updateHopper(d);}catch(e){if(!silent)showError(e.message);}};const updateHopper=d=>{const running=!!d.dispensing||!!d.manualOn;const all=!!d.dispenseAllMode;setBadge($('hopperBadge'),running?(all?'Dispensing all':'Dispensing'):'Ready',running);$('hopperProgress').textContent=(d.dispensedCoins||0)+' / '+(all?'∞':(d.targetCoins||0));$('hopperResult').textContent=running?(all?'Running until stopped':'Dispensing'):((d.lastOutcome||'idle').replace('_',' '));$('hopperDispense').disabled=running;$('hopperOn').disabled=running;$('hopperAll').disabled=running;$('hopperStop').disabled=!running;};
-const hopperAction=async(url,body='')=>{const r=await api(url,{method:'POST',headers:body?{'Content-Type':'application/x-www-form-urlencoded'}:{},body});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw Error(d.error||'Hopper command failed');toast(d.message||'Hopper command accepted');await load(true);};
-$('hopperDispense').addEventListener('click',async()=>{const n=Number($('hopperCoins').value);if(!Number.isInteger(n)||n<1||n>50){showError('Enter a coin count from 1 to 50.');return;}if(!confirm('Dispense '+n+' coins?'))return;try{clearError();await hopperAction('/admin/api/hopper/dispense','coins='+encodeURIComponent(String(n)));}catch(e){showError(e.message);}});
-$('hopperOn').addEventListener('click',async()=>{if(!confirm('Turn the hopper motor on? It will stop automatically after 30 seconds or when you press Stop.'))return;try{clearError();await hopperAction('/admin/api/hopper/on');}catch(e){showError(e.message);}});
-$('hopperAll').addEventListener('click',async()=>{if(!confirm('Start Dispense All? The hopper will run until you press Stop or the 30-second safety timeout is reached.'))return;try{clearError();await hopperAction('/admin/api/hopper/dispense-all');}catch(e){showError(e.message);}});
-$('hopperStop').addEventListener('click',async()=>{if(!confirm('Stop the hopper now?'))return;try{clearError();await hopperAction('/admin/api/hopper/stop');}catch(e){showError(e.message);}});
-$('clearOtherDevices').addEventListener('click',async()=>{if(!confirm('Disconnect all other devices from the PrintBit AP? This admin device will be kept connected.'))return;const btn=$('clearOtherDevices');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Clearing';try{clearError();const r=await api('/admin/api/disconnect-all',{method:'POST'});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw Error((d.error||'Clear Other Devices failed')+(d.errorCode?' ['+d.errorCode+']':''));toast(d.message||'Other devices disconnected');setTimeout(()=>load(true),180);}catch(e){showError(e.message);}finally{btn.disabled=false;btn.textContent='Clear Other Devices';}});
-$('passwordEnabled').addEventListener('change',()=>{$('newPassword').disabled=!$('passwordEnabled').checked;if(!$('passwordEnabled').checked)$('newPassword').value='';});$('devices').addEventListener('click',async e=>{const btn=e.target.closest('.device-disconnect');if(!btn)return;const mac=btn.dataset.deviceMac;if(!confirm('Disconnect '+mac+' from the PrintBit AP?'))return;btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Disconnecting';try{const r=await api('/admin/api/disconnect',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'mac='+encodeURIComponent(mac)});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw Error((d.error||'Disconnect failed')+(d.errorCode?' ['+d.errorCode+']':''));toast('Device disconnected');setTimeout(()=>load(true),180);}catch(e){showError(e.message);btn.disabled=false;btn.textContent='Disconnect';}});$('wifi').addEventListener('submit',async e=>{e.preventDefault();if(!confirm('Save the new Wi-Fi settings and restart the ESP32?'))return;try{const r=await api('/admin/api/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'ssid='+encodeURIComponent($('newSsid').value)+'&password='+encodeURIComponent($('newPassword').value)+'&passwordEnabled='+($('passwordEnabled').checked?'1':'0')});toast(await r.text());}catch(e){showError(e.message);}});$('credentials').addEventListener('submit',async e=>{e.preventDefault();if(!confirm('Change the admin username and password? You will be logged out.'))return;try{const r=await api('/admin/api/credentials',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'username='+encodeURIComponent($('newUsername').value)+'&password='+encodeURIComponent($('newAdminPassword').value)});sessionStorage.removeItem('printbit_admin_token');alert(await r.text());location='/admin/login';}catch(e){showError(e.message);}});$('resetWifi').addEventListener('click',async()=>{if(!confirm('Reset Wi-Fi to PrintBit defaults and restart the ESP32?'))return;try{alert(await(await api('/admin/api/reset-wifi',{method:'POST'})).text());}catch(e){showError(e.message);}});$('restartEsp').addEventListener('click',async()=>{if(!confirm('Restart the ESP32 now?'))return;try{alert(await(await api('/admin/api/restart',{method:'POST'})).text());}catch(e){showError(e.message);}});$('logout').addEventListener('click',()=>{sessionStorage.removeItem('printbit_admin_token');location='/admin/login';});load(false);setInterval(()=>load(true),5000);</script></body></html>)HTML";
+  String html = R"HTML(<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>PrintBit Admin Control Center</title><style>
+:root{--bg:#f4f6f8;--card:#fff;--text:#17202a;--muted:#66717d;--line:#e3e8ed;--primary:#17202a;--soft:#eef2f5;--ok:#197a4b;--okbg:#eaf7f0;--warn:#9a6700;--warnbg:#fff7df;--danger:#b42318;--dangerbg:#fff0ee;--shadow:0 7px 24px rgba(16,24,40,.06)}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:var(--text)}button,input{font:inherit}.wrap{max-width:1180px;margin:auto;padding:26px 18px 50px}.top{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:22px}.brand{font-size:12px;font-weight:800;letter-spacing:1.8px;color:var(--muted);text-transform:uppercase}.top h1{margin:5px 0;font-size:29px}.muted{color:var(--muted);font-size:13px}.section{margin-top:25px}.section-title{display:flex;justify-content:space-between;align-items:end;margin-bottom:10px}.section-title h2{margin:0;font-size:17px}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}.card{grid-column:span 6;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px;box-shadow:var(--shadow)}.wide{grid-column:span 12}.third{grid-column:span 4}.card h3{margin:0;font-size:15px}.head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;background:var(--soft);color:var(--muted)}.badge:before{content:"";width:7px;height:7px;border-radius:50%;background:#98a2b3}.badge.ok{background:var(--okbg);color:var(--ok)}.badge.ok:before{background:var(--ok)}.badge.warn{background:var(--warnbg);color:var(--warn)}.badge.warn:before{background:#d89b00}.badge.danger{background:var(--dangerbg);color:var(--danger)}.badge.danger:before{background:var(--danger)}.rows{border-top:1px solid var(--line)}.row{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}.label{font-size:13px;color:var(--muted)}.value{font-size:13px;font-weight:700;text-align:right;word-break:break-word}.hint{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 14px}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:9px;padding:9px 12px;background:var(--primary);color:#fff;font-weight:700;font-size:13px;cursor:pointer}.btn.secondary{background:var(--soft);color:var(--text)}.btn.danger{background:var(--danger)}.btn.warn{background:#b77900}.btn:disabled{opacity:.5;cursor:not-allowed}.field{margin-bottom:11px}.field label{display:block;font-size:12px;font-weight:700;margin-bottom:5px}.field input{width:100%;padding:10px;border:1px solid #cbd3db;border-radius:9px}.notice{margin-top:12px;padding:10px 11px;background:#f8fafb;border-radius:9px;color:#596675;font-size:12px;line-height:1.5}.alert{padding:12px;border-radius:10px;background:var(--warnbg);color:var(--warn);font-size:13px;display:none}.danger-zone{border-color:#f0cbc7}.device{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}.device-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.device-controls{display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:12px;align-items:end}.control-buttons{display:flex;gap:8px;flex-wrap:wrap}.control-status{margin-top:8px}.device:last-child{border-bottom:0}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.log{max-height:250px;overflow:auto;border-top:1px solid var(--line)}.logline{padding:8px 0;border-bottom:1px solid var(--line);font-size:12px}@media(max-width:850px){.card,.wide,.third{grid-column:span 12}}@media(max-width:650px){.device-controls{grid-template-columns:1fr}.control-buttons .btn{flex:1 1 100%}.device{align-items:flex-start;flex-direction:column}.device-actions{width:100%;justify-content:flex-start}}@media(max-width:500px){.wrap{padding:18px 12px 35px}.top{align-items:flex-start;flex-direction:column}.top .btn{width:100%}}
+</style></head><body><div class="wrap"><header class="top"><div><div class="brand">PrintBit</div><h1>Admin Control Center</h1><div class="muted">Physical kiosk control, diagnostics and maintenance</div></div><button id="logout" class="btn secondary">Log out</button></header><div id="alert" class="alert"></div>
+<section class="section"><div class="section-title"><h2>1. System Overview</h2><span class="muted">Live controller state</span></div><div class="grid"><section class="card"><div class="head"><h3>Controller</h3><span id="systemBadge" class="badge">Loading</span></div><div class="rows"><div class="row"><span class="label">ESP32</span><span id="esp" class="value">Online</span></div><div class="row"><span class="label">Firmware</span><span id="firmware" class="value">-</span></div><div class="row"><span class="label">Reset reason</span><span id="resetReason" class="value">-</span></div><div class="row"><span class="label">Uptime</span><span id="uptime" class="value">-</span></div><div class="row"><span class="label">Free heap</span><span id="heap" class="value">-</span></div><div class="row"><span class="label">Minimum heap seen</span><span id="minHeap" class="value">-</span></div></div></section><section class="card"><div class="head"><h3>Network</h3><span id="networkBadge" class="badge">Loading</span></div><div class="rows"><div class="row"><span class="label">SSID</span><span id="ssid" class="value">-</span></div><div class="row"><span class="label">AP address</span><span class="value">192.168.4.1</span></div><div class="row"><span class="label">Tablet / Kiosk</span><span id="kioskRegistration" class="value">-</span></div><div class="row"><span class="label">Tablet IP</span><span id="kioskIp" class="value">-</span></div><div class="row"><span class="label">Tablet portal</span><span id="kioskPortal" class="value">-</span></div><div class="row"><span class="label">Connected devices</span><span id="stations" class="value">-</span></div></div></section></div></section>
+<section class="section"><div class="section-title"><h2>2. Connected Devices</h2><span class="muted">Clients currently connected to PrintBit</span></div><div class="grid"><section class="card wide"><div class="head"><h3>Device Management</h3><span id="deviceAccessBadge" class="badge">Allowing devices</span></div><div class="device-controls"><div class="field"><label>Block duration</label><select id="deviceBlockDuration"><option value="0">Until turned off</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div><div class="control-buttons"><button id="deviceAccessToggle" class="btn warn">Block Other Devices</button><button id="disconnectAll" class="btn danger">Disconnect All Other Devices</button></div></div><div id="deviceAccessRemaining" class="muted control-status"></div><div id="devices">Loading...</div><div class="notice">When blocking is enabled, devices other than this admin device are disconnected and prevented from reconnecting until the selected time expires or blocking is turned off. The admin device remains protected.</div></section></div></section>
+<section class="section"><div class="section-title"><h2>3. Coin System</h2><span class="muted">Coin acceptor diagnostics</span></div><div class="grid"><section class="card"><div class="head"><h3>Coin Acceptor</h3><span id="coinBadge" class="badge">Ready</span></div><div class="rows"><div class="row"><span class="label">Last coin</span><span id="lastCoin" class="value">None</span></div><div class="row"><span class="label">Pulse count</span><span id="pulseCount" class="value">0</span></div><div class="row"><span class="label">Pulse glitches</span><span id="pulseGlitches" class="value">0</span></div><div class="row"><span class="label">Last pulse timing</span><span id="pulseTiming" class="value">0 ms</span></div><div class="row"><span class="label">Last detected</span><span id="lastCoinTime" class="value">Never</span></div><div class="row"><span class="label">Accepted coins</span><span id="coinAccepted" class="value">0</span></div><div class="row"><span class="label">Invalid pulse trains</span><span id="coinInvalid" class="value">0</span></div><div class="row"><span class="label">Test coins</span><span id="coinTests" class="value">0</span></div></div><div class="actions" style="margin-top:14px"><button id="coinToggle" class="btn">Start Coin Acceptor Test</button></div><div class="notice">During the test, insert a coin and watch the pulse count and detected value. Test coins are recorded locally and are not forwarded to the tablet. The test automatically stops after 5 minutes.</div></section><section class="card"><div class="head"><h3>Coin Mapping</h3><span class="muted">Current firmware mapping</span></div><div class="rows"><div class="row"><span class="label">1 pulse</span><span class="value">₱1</span></div><div class="row"><span class="label">3 pulses</span><span class="value">₱5</span></div><div class="row"><span class="label">5 pulses</span><span class="value">₱10</span></div><div class="row"><span class="label">7 pulses</span><span class="value">₱20</span></div></div><div class="notice">Pulse count is the number of valid input pulses received for the last coin. Glitches are pulses rejected by the debounce/safety logic.</div></section></div></section>
+<section class="section"><div class="section-title"><h2>4. Hopper</h2><span class="muted">Physical coin dispenser</span></div><div class="grid"><section class="card wide"><div class="head"><h3>Hopper Control</h3><span id="hopperBadge" class="badge">Loading</span></div><div class="field"><label>Coins to dispense</label><input id="hopperCoins" type="number" min="1" max="50" value="10"></div><div class="actions"><button id="hopperDispense" class="btn">Dispense Coins</button><button id="hopperMotor" class="btn secondary">Turn Hopper Motor On</button><button id="hopperAll" class="btn secondary">Dispense All Coins</button><button id="hopperStop" class="btn danger">Stop Hopper</button></div><div class="rows" style="margin-top:14px"><div class="row"><span class="label">Progress</span><span id="hopperProgress" class="value">0 / 0</span></div><div class="row"><span class="label">Last result</span><span id="hopperResult" class="value">Idle</span></div></div><div class="notice">Motor safety timeout is 30 seconds. Stop Hopper immediately turns the relay off.</div></section></div></section>
+<section class="section"><div class="section-title"><h2>5. Hardware Diagnostics</h2><span class="muted">Live hardware states</span></div><div class="grid"><section class="card third"><div class="head"><h3>Coin Input</h3><span class="badge ok">GPIO 4</span></div><div class="row"><span class="label">Current state</span><span id="coinGpio" class="value">-</span></div></section><section class="card third"><div class="head"><h3>Hopper Sensor</h3><span class="badge ok">GPIO 19</span></div><div class="row"><span class="label">Current state</span><span id="sensorGpio" class="value">-</span></div></section><section class="card third"><div class="head"><h3>Relay</h3><span class="badge">GPIO 27</span></div><div class="row"><span class="label">State</span><span id="relayState" class="value">-</span></div></section></div></section>
+<section class="section"><div class="section-title"><h2>6. Logs & Activity</h2><span class="muted">Local diagnostics since boot</span></div><div class="grid"><section class="card wide"><div class="head"><h3>Event & Admin Activity</h3></div><div id="logs" class="log">No events yet.</div></section><section class="card wide"><div class="head"><h3>Error History</h3></div><div id="errors" class="log">No errors recorded.</div></section></div></section>
+<section class="section"><div class="section-title"><h2>7. Network & System</h2><span class="muted">Configuration and recovery</span></div><div class="grid"><section class="card"><div class="head"><h3>Wi-Fi Settings</h3></div><div class="field"><label>SSID</label><input id="newSsid" maxlength="32"></div><label style="font-size:12px;font-weight:700"><input id="passwordEnabled" type="checkbox"> Enable Wi-Fi password</label><div class="field" style="margin-top:10px"><label>Password</label><input id="newPassword" type="password" minlength="8" maxlength="63"></div><button id="saveWifi" class="btn">Save & Restart</button><div class="notice">Open Wi-Fi is allowed when password is disabled.</div></section><section class="card"><div class="head"><h3>Admin Account</h3></div><div class="field"><label>Username</label><input id="newUsername" maxlength="32"></div><div class="field"><label>New password</label><input id="newAdminPassword" type="password" minlength="8" maxlength="63"></div><button id="saveAccount" class="btn">Save Account</button></section><section class="card"><div class="head"><h3>Recovery</h3></div><div class="actions"><button id="exportConfig" class="btn secondary">Export Configuration (TXT)</button><button id="resetWifi" class="btn danger">Reset Wi-Fi</button><button id="restart" class="btn secondary">Restart ESP32</button></div><div class="notice">Wi-Fi reset restores PrintBit with no password. The admin account remains unchanged.</div></section></div></section></div><script>
+const token=sessionStorage.getItem('printbit_admin_token');if(!token){location='/admin/login';}const auth={'Authorization':'Bearer '+token};const $=id=>document.getElementById(id);const api=async(url,opts={})=>{opts.headers=Object.assign({},auth,opts.headers||{});const r=await fetch(url,opts);if(r.status===401){sessionStorage.removeItem('printbit_admin_token');location='/admin/login';throw Error('Admin authorization expired');}return r};const showError=m=>{$('alert').textContent=m;$('alert').style.display='block'};const clearError=()=>{$('alert').style.display='none'};const badge=(id,text,type='')=>{$(id).textContent=text;$(id).className='badge '+type};const fmtUptime=ms=>{let s=Math.floor(ms/1000),d=Math.floor(s/86400);s%=86400;let h=Math.floor(s/3600);s%=3600;let m=Math.floor(s/60);s%=60;return(d?d+'d ':'')+h+'h '+m+'m '+s+'s'};const fmtAgo=t=>{if(!t)return'Never';let sec=Math.max(0,Math.floor((Date.now()/1000)-(t/1000)));return sec+'s ago'};
+async function syncClock(){try{await api('/admin/api/time-sync',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'epoch='+Math.floor(Date.now()/1000)})}catch(e){}}
+function renderDevices(list){$('devices').innerHTML=!list||!list.length?'<div class="muted">No devices connected.</div>':list.map(d=>'<div class="device"><div><b class="mono">'+d.mac+'</b>'+(d.isAdmin?' <span class="badge ok">ADMIN DEVICE</span>':'')+'<div class="muted">IP '+(d.ip||'unknown')+' · RSSI '+d.rssi+' dBm</div></div><div class="device-actions">'+(d.isAdmin?'<span class="muted">Protected</span>':'<button class="btn danger dc" data-mac="'+d.mac+'">Disconnect Device</button>')+'</div></div>').join('')}
+function renderLogs(events){$('logs').innerHTML=!events||!events.length?'<div class="muted">No events yet.</div>':events.slice().reverse().map(x=>'<div class="logline">'+x+'</div>').join('')}
+function updateHopper(d){let running=!!d.dispensing||!!d.manualOn;badge('hopperBadge',running?(d.dispenseAllMode?'Dispensing all':'Running'):'Ready',running?'ok':'');$('hopperProgress').textContent=(d.dispensedCoins||0)+' / '+(d.dispenseAllMode?'∞':(d.targetCoins||0));$('hopperResult').textContent=running?'Running':((d.lastOutcome||'idle').replaceAll('_',' '));$('hopperStop').disabled=!running;$('hopperMotor').textContent=d.manualOn?'Turn Hopper Motor Off':'Turn Hopper Motor On'}
+async function load(){try{clearError();let r=await api('/admin/api/status');let d=await r.json();$('firmware').textContent=d.firmware;$('resetReason').textContent=d.resetReason;$('kioskRegistration').textContent=d.registration==='Registered'?'Registered':'Waiting for registration';$('kioskIp').textContent=d.registration==='Registered'?(d.kioskIp||'-'):'-';$('kioskPortal').textContent=d.registration==='Registered'?(d.kioskPortalUrl||'-'):'-';$('stations').textContent=d.stations;$('heap').textContent=d.freeHeap+' bytes';$('minHeap').textContent=d.minFreeHeap+' bytes';$('uptime').textContent=fmtUptime(d.uptimeMs);$('coinAccepted').textContent=d.coinAcceptedCount;$('coinInvalid').textContent=d.coinInvalidCount;$('coinTests').textContent=d.coinTestCount;$('lastCoin').textContent=d.lastCoinValue?'₱'+d.lastCoinValue:'None';$('pulseCount').textContent=d.lastCoinPulseCount;$('pulseGlitches').textContent=d.lastCoinPulseGlitchCount;$('pulseTiming').textContent=d.lastCoinPulseDurationMs+' ms';$('coinGpio').textContent=d.coinInputState;$('sensorGpio').textContent=d.hopperSensorState;$('relayState').textContent=d.relayState;$('lastCoinTime').textContent=d.lastCoinDetectedAt?fmtAgo(d.lastCoinDetectedAt):'Never';$('newSsid').value=d.ssid;$('passwordEnabled').checked=!!d.passwordEnabled;$('newPassword').disabled=!d.passwordEnabled;$('newUsername').value=d.adminUsername;badge('systemBadge',d.freeHeap<20000?'Attention':'Online',d.freeHeap<20000?'warn':'ok');badge('networkBadge',d.passwordEnabled?'Protected':'Open','ok');badge('coinBadge',d.coinTestMode?'TEST MODE':'Monitoring',d.coinTestMode?'warn':'ok');$('coinToggle').textContent=d.coinTestMode?'Stop Coin Acceptor Test':'Start Coin Acceptor Test';badge('deviceAccessBadge',d.blockOtherDevices?'Blocking other devices':'Allowing devices',d.blockOtherDevices?'warn':'ok');$('deviceAccessToggle').textContent=d.blockOtherDevices?'Allow Other Devices':'Block Other Devices';$('deviceBlockDuration').disabled=d.blockOtherDevices;let rem=d.blockOtherDevicesRemainingMs||0;$('deviceAccessRemaining').textContent=d.blockOtherDevices?(rem?'Remaining: '+fmtUptime(rem):'Until turned off'):'No block active';renderDevices(d.devices);renderLogs(d.events);$('errors').innerHTML=!d.errors||!d.errors.length?'<div class="muted">No errors recorded.</div>':d.errors.slice().reverse().map(x=>'<div class="logline">'+x+'</div>').join('');;updateHopper(d)}catch(e){showError(e.message)}}
+async function post(url,body=''){let r=await api(url,{method:'POST',headers:body?{'Content-Type':'application/x-www-form-urlencoded'}:{},body});let d=await r.json().catch(()=>({}));if(!r.ok||d.ok===false)throw Error(d.error||'Request failed');return d}
+$('disconnectAll').onclick=async()=>{if(!confirm('Disconnect all other connected devices? They will be allowed to reconnect normally afterward.'))return;try{await post('/admin/api/disconnect-all');await load()}catch(e){showError(e.message)}};$('logout').onclick=()=>{sessionStorage.removeItem('printbit_admin_token');location='/admin/login'};$('coinToggle').onclick=async()=>{try{let enabled=$('coinBadge').textContent==='TEST MODE';await post(enabled?'/admin/api/coin-test/stop':'/admin/api/coin-test/start');await load()}catch(e){showError(e.message)}};$('deviceAccessToggle').onclick=async()=>{try{let enabled=$('deviceAccessToggle').textContent==='Allow Other Devices';if(!enabled){let duration=Number($('deviceBlockDuration').value);let label=duration===0?'until turned off':duration+' minute'+(duration===1?'':'s');if(!confirm('Block all other devices '+label+'? They will be disconnected and prevented from reconnecting.'))return;await post('/admin/api/device-access','enabled=1&duration='+duration)}else{if(!confirm('Allow other devices to connect again?'))return;await post('/admin/api/device-access','enabled=0')}await load()}catch(e){showError(e.message)}};$('devices').onclick=async e=>{let b=e.target.closest('.dc');if(!b)return;if(!confirm('Disconnect device '+b.dataset.mac+'?'))return;try{await post('/admin/api/disconnect','mac='+encodeURIComponent(b.dataset.mac));await load()}catch(x){showError(x.message)}};$('hopperDispense').onclick=async()=>{let n=Number($('hopperCoins').value);if(!Number.isInteger(n)||n<1||n>50){showError('Enter 1-50 coins');return}if(!confirm('Dispense '+n+' coins?'))return;try{await post('/admin/api/hopper/dispense','coins='+n);await load()}catch(e){showError(e.message)}};$('hopperMotor').onclick=async()=>{try{let active=$('hopperMotor').textContent==='Turn Hopper Motor Off';await post(active?'/admin/api/hopper/stop':'/admin/api/hopper/on');await load()}catch(e){showError(e.message)}};$('hopperAll').onclick=async()=>{if(!confirm('Dispense all coins? Safety timeout remains 30 seconds.'))return;try{await post('/admin/api/hopper/dispense-all');await load()}catch(e){showError(e.message)}};$('hopperStop').onclick=async()=>{try{await post('/admin/api/hopper/stop');await load()}catch(e){showError(e.message)}};$('passwordEnabled').onchange=()=>{$('newPassword').disabled=!$('passwordEnabled').checked};$('saveWifi').onclick=async()=>{if(!confirm('Save Wi-Fi settings and restart ESP32?'))return;try{await api('/admin/api/wifi',{method:'POST',headers:{...auth,'Content-Type':'application/x-www-form-urlencoded'},body:'ssid='+encodeURIComponent($('newSsid').value)+'&password='+encodeURIComponent($('newPassword').value)+'&passwordEnabled='+($('passwordEnabled').checked?'1':'0')})}catch(e){showError(e.message)}};$('saveAccount').onclick=async()=>{if(!confirm('Change admin credentials and log out?'))return;try{await api('/admin/api/credentials',{method:'POST',headers:{...auth,'Content-Type':'application/x-www-form-urlencoded'},body:'username='+encodeURIComponent($('newUsername').value)+'&password='+encodeURIComponent($('newAdminPassword').value)});sessionStorage.removeItem('printbit_admin_token');location='/admin/login'}catch(e){showError(e.message)}};$('exportConfig').onclick=async()=>{try{let r=await api('/admin/api/config-export');let text=await r.text();let blob=new Blob([text],{type:'text/plain'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='printbit-config.txt';a.click();URL.revokeObjectURL(a.href);await load()}catch(e){showError(e.message)}};$('resetWifi').onclick=async()=>{if(!confirm('Reset Wi-Fi to PrintBit defaults and restart?'))return;try{await api('/admin/api/reset-wifi',{method:'POST'})}catch(e){showError(e.message)}};$('restart').onclick=async()=>{if(!confirm('Restart ESP32 now?'))return;try{await api('/admin/api/restart',{method:'POST'})}catch(e){showError(e.message)}};syncClock().then(load);setInterval(load,5000);setInterval(syncClock,30000);</script></body></html>)HTML";
   replyAdminHtml(client, html);
 }
 
@@ -470,20 +647,22 @@ void handleAdminStatus(NetworkClient& client) {
   interrupts();
 
   String json =
-    "{\"ssid\":\"" + htmlEscape(apSsid) +
-    "\",\"passwordEnabled\":" + String(apPasswordEnabled ? "true" : "false") +
-    ",\"stations\":" + String(WiFi.softAPgetStationNum()) +
-    ",\"registration\":\"" + registration +
-    "\",\"freeHeap\":" + String(ESP.getFreeHeap()) +
-    ",\"adminUsername\":\"" + htmlEscape(adminUsername) +
-    "\",\"devices\":" + buildConnectedDevicesJson(client.remoteIP()) +
-    ",\"dispensing\":" + String((dispensing || hopperManualOn) ? "true" : "false") +
-    ",\"manualOn\":" + String(hopperManualOn ? "true" : "false") +
-    ",\"dispenseAllMode\":" + String(dispenseAllMode ? "true" : "false") +
-    ",\"targetCoins\":" + String(targetCoins) +
-    ",\"dispensedCoins\":" + String(dispensedSnapshot) +
-    ",\"lastOutcome\":\"" + lastDispenseOutcome +
-    "\",\"lastError\":\"" + lastDispenseError + "\"}";
+    "{\"ssid\":\"" + htmlEscape(apSsid) + "\",\"passwordEnabled\":" + String(apPasswordEnabled ? "true" : "false") + ",\"stations\":" + String(WiFi.softAPgetStationNum()) + ",\"registration\":\"" + registration + "\",\"freeHeap\":" + String(ESP.getFreeHeap()) + ",\"adminUsername\":\"" + htmlEscape(adminUsername) + "\",\"devices\":" + buildConnectedDevicesJson() + ",\"dispensing\":" + String((dispensing || hopperManualOn) ? "true" : "false") + ",\"manualOn\":" + String(hopperManualOn ? "true" : "false") + ",\"dispenseAllMode\":" + String(dispenseAllMode ? "true" : "false") + ",\"targetCoins\":" + String(targetCoins) + ",\"dispensedCoins\":" + String(dispensedSnapshot) + ",\"lastOutcome\":\"" + lastDispenseOutcome + "\",\"lastError\":\"" + lastDispenseError + "\",\"uptimeMs\":" + String(millis()) + ",\"minFreeHeap\":" + String(minFreeHeapSeen == UINT32_MAX ? ESP.getFreeHeap() : minFreeHeapSeen) + ",\"coinTestMode\":" + String(coinTestMode ? "true" : "false") + ",\"lastCoinValue\":" + String(lastCoinValue) + ",\"lastCoinPulseCount\":" + String(lastCoinPulseCount) + ",\"lastCoinPulseGlitchCount\":" + String(lastCoinPulseGlitchCount) + ",\"lastCoinPulseDurationMs\":" + String(lastCoinPulseDurationMs) + ",\"lastCoinDetectedAt\":" + String(lastCoinDetectedAt) + ",\"coinAcceptedCount\":" + String(coinAcceptedCount) + ",\"coinInvalidCount\":" + String(coinInvalidCount) + ",\"coinTestCount\":" + String(coinTestCount) + ",\"lastSystemError\":\"" + htmlEscape(lastSystemError) + "\",\"lastAdminAction\":\"" + htmlEscape(lastAdminAction) + "\",\"firmware\":\"PrintBit ESP32 Controller 1.0.0\"" + ",\"resetReason\":\"" + String(resetReasonText()) + "\"" + ",\"kioskIp\":\"" + htmlEscape(kioskIp) + "\"" + ",\"kioskPort\":" + String(kioskPort) + ",\"kioskPortalUrl\":\"" + htmlEscape(kioskPortalUrl) + "\"" + ",\"coinInputState\":\"" + String(digitalRead(coinAcceptorPin) == LOW ? "LOW" : "HIGH") + "\"" + ",\"hopperSensorState\":\"" + String(digitalRead(hopperSensorPin) == LOW ? "LOW" : "HIGH") + "\"" + ",\"relayState\":\"" + String(digitalRead(relayPin) == HIGH ? "ON" : "OFF") + "\"" + ",\"blockOtherDevices\":" + String(blockOtherDevices ? "true" : "false") + ",\"blockOtherDevicesUntil\":" + String(blockOtherDevicesUntil) + ",\"blockOtherDevicesRemainingMs\":" + String((blockOtherDevices && blockOtherDevicesUntil != 0 && (long)(millis() - blockOtherDevicesUntil) < 0) ? (blockOtherDevicesUntil - millis()) : 0) + ",\"clockSynced\":" + String(adminClockSynced ? "true" : "false") + ",\"currentTime\":\"" + htmlEscape(adminTimestamp()) + "\"}";
+  String events = "[";
+  for (int i = 0; i < adminEventLogCount; i++) {
+    if (i > 0) events += ",";
+    events += "\"" + htmlEscape(adminEventLog[i]) + "\"";
+  }
+  events += "]";
+  json.remove(json.length() - 1);
+  json += ",\"events\":" + events;
+  String errors = "[";
+  for (int i = 0; i < adminErrorLogCount; i++) {
+    if (i > 0) errors += ",";
+    errors += "\"" + htmlEscape(adminErrorLog[i]) + "\"";
+  }
+  errors += "]";
+  json += ",\"errors\":" + errors + "}";
   replyAdminJson(client, json);
 }
 
@@ -513,7 +692,10 @@ void handleAdminWifiSave(NetworkClient& client, const String& body) {
     return;
   }
 
-  Serial.print("wifi_settings_saved:ssid="); Serial.println(newSsid);
+  addAdminEvent(String("Wi-Fi settings changed: ") + newSsid);
+  lastAdminAction = "Wi-Fi settings changed";
+  Serial.print("wifi_settings_saved:ssid=");
+  Serial.println(newSsid);
   replyPlain(client, 200, "OK", "AP settings saved. Restarting with the new SSID and password...");
   delay(500);
   ESP.restart();
@@ -542,6 +724,9 @@ void handleAdminCredentials(NetworkClient& client, const String& body) {
   }
 
   adminSessionToken = makeAdminSessionToken();
+  protectedAdminMac = "";
+  addAdminEvent("Admin credentials changed");
+  lastAdminAction = "Admin credentials changed";
   Serial.print("admin_credentials_saved:username=");
   Serial.println(newUsername);
   replyPlain(client, 200, "OK", "Admin credentials saved. Current session invalidated.");
@@ -550,9 +735,18 @@ void handleAdminCredentials(NetworkClient& client, const String& body) {
 void handleAdminDisconnectDevice(NetworkClient& client, const String& body) {
   String mac = getFormValue(body, "mac");
   mac.trim();
+  mac.toUpperCase();
+  Serial.print("admin_device_disconnect:request:mac=");
+  Serial.println(mac);
   if (mac.length() != 17) {
     Serial.println("admin_device_disconnect:failed:invalid_mac");
     replyAdminJson(client, "{\"ok\":false,\"errorCode\":\"INVALID_MAC\",\"error\":\"Invalid device MAC address\"}", 400, "Bad Request");
+    return;
+  }
+
+  if (protectedAdminMac.length() > 0 && mac == protectedAdminMac) {
+    Serial.println("admin_device_disconnect:failed:admin_device_protected");
+    replyAdminJson(client, "{\"ok\":false,\"errorCode\":\"ADMIN_DEVICE_PROTECTED\",\"error\":\"The current admin device cannot be disconnected\"}", 409, "Conflict");
     return;
   }
 
@@ -565,31 +759,40 @@ void handleAdminDisconnectDevice(NetworkClient& client, const String& body) {
     return;
   }
 
+  addAdminEvent(String("Device disconnected: ") + mac);
+  lastAdminAction = "Device disconnected";
   replyAdminJson(client, "{\"ok\":true,\"errorCode\":null,\"message\":\"Device disconnected\"}");
 }
 
-void handleAdminDisconnectAllDevices(NetworkClient& client) {
-  int disconnectedCount = 0;
-  bool adminExcluded = false;
 
-  if (!disconnectAllStationsExcept(client.remoteIP(), disconnectedCount, adminExcluded)) {
-    String code = disconnectErrorCode.length() > 0 ? disconnectErrorCode : "CLEAR_ALL_FAILED";
-    replyAdminJson(
-      client,
-      "{\"ok\":false,\"errorCode\":\"" + code +
-      "\",\"error\":\"Clear All was not performed because the admin device could not be safely identified.\"}",
-      409,
-      "Conflict"
-    );
+void handleAdminDisconnectAllDevices(NetworkClient& client) {
+  if (protectedAdminMac.length() == 0) {
+    replyAdminJson(client, "{\"ok\":false,\"error\":\"Admin device is not identified\"}", 409, "Conflict");
     return;
   }
 
-  String json =
-    "{\"ok\":true,\"adminExcluded\":" + String(adminExcluded ? "true" : "false") +
-    ",\"disconnected\":" + String(disconnectedCount) +
-    ",\"message\":\"Disconnected " + String(disconnectedCount) +
-    " device" + String(disconnectedCount == 1 ? "" : "s") + ". The admin device was kept connected.\"}";
-  replyAdminJson(client, json);
+  wifi_sta_list_t stationList;
+  memset(&stationList, 0, sizeof(stationList));
+  if (esp_wifi_ap_get_sta_list(&stationList) != ESP_OK) {
+    replyAdminJson(client, "{\"ok\":false,\"error\":\"Could not read connected devices\"}", 500, "Internal Server Error");
+    return;
+  }
+
+  int disconnected = 0;
+  for (int i = 0; i < stationList.num; i++) {
+    String mac = stationMacToString(stationList.sta[i].mac);
+    if (mac == protectedAdminMac) continue;
+
+    uint16_t aid = 0;
+    if (esp_wifi_ap_get_sta_aid(stationList.sta[i].mac, &aid) == ESP_OK && aid != 0) {
+      if (esp_wifi_deauth_sta(aid) == ESP_OK) disconnected++;
+    }
+  }
+
+  // This is intentionally NOT a block. Devices may reconnect normally afterward.
+  addAdminEvent(String("Disconnected all other devices: ") + String(disconnected));
+  lastAdminAction = "Disconnected all other devices";
+  replyAdminJson(client, String("{\"ok\":true,\"disconnected\":") + String(disconnected) + "}");
 }
 
 void handleAdminHopperDispense(NetworkClient& client, const String& body) {
@@ -682,12 +885,163 @@ void handleAdminHopperStop(NetworkClient& client) {
   }
   hopperManualOn = false;
   replyAdminJson(client, wasRunning
-    ? "{\"ok\":true,\"message\":\"Hopper stopped\"}"
-    : "{\"ok\":true,\"message\":\"Hopper is already off\"}");
+                           ? "{\"ok\":true,\"message\":\"Hopper stopped\"}"
+                           : "{\"ok\":true,\"message\":\"Hopper is already off\"}");
+}
+
+
+void handleAdminCoinTestStart(NetworkClient& client) {
+  if (dispensing || hopperManualOn) {
+    replyAdminJson(client, "{\"ok\":false,\"error\":\"Stop the hopper before starting coin test\"}", 409, "Conflict");
+    return;
+  }
+  coinTestMode = true;
+  coinTestStartedAt = millis();
+  lastCoinValue = 0;
+  lastCoinPulseCount = 0;
+  lastCoinPulseGlitchCount = 0;
+  lastCoinPulseDurationMs = 0;
+  coinTestCount = 0;
+  addAdminEvent("Coin test started");
+  lastAdminAction = "Coin test started";
+  replyAdminJson(client, "{\"ok\":true,\"message\":\"Coin test mode started. Insert a coin.\"}");
+}
+
+void handleAdminCoinTestStop(NetworkClient& client) {
+  coinTestMode = false;
+  addAdminEvent("Coin test stopped");
+  lastAdminAction = "Coin test stopped";
+  replyAdminJson(client, "{\"ok\":true,\"message\":\"Coin test mode stopped\"}");
+}
+
+void handleAdminExportConfig(NetworkClient& client) {
+  String text;
+  text += "PRINTBIT CONFIGURATION\r\n";
+  text += "======================\r\n\r\n";
+  text += "SYSTEM\r\n";
+  text += "Firmware: PrintBit ESP32 Controller 1.0.0\r\n";
+  text += "Reset Reason: " + String(resetReasonText()) + "\r\n";
+  text += "Uptime: " + String(millis() / 1000UL) + " seconds\r\n";
+  text += "Current Time: " + adminTimestamp() + "\r\n\r\n";
+  text += "WIFI ACCESS POINT\r\n";
+  text += "SSID: " + apSsid + "\r\n";
+  text += "Password Enabled: " + String(apPasswordEnabled ? "Yes" : "No") + "\r\n";
+  text += "AP Address: " + WiFi.softAPIP().toString() + "\r\n\r\n";
+  text += "ADMIN\r\n";
+  text += "Username: " + adminUsername + "\r\n\r\n";
+  text += "KIOSK / TABLET\r\n";
+  text += "Registered: " + String(hasKioskRegistration ? "Yes" : "No") + "\r\n";
+  text += "IP Address: " + kioskIp + "\r\n";
+  text += "Port: " + String(kioskPort) + "\r\n";
+  text += "Portal: " + kioskPortalPath + "\r\n\r\n";
+  text += "COIN ACCEPTOR\r\n";
+  text += "GPIO: 4\r\n";
+  text += "1 pulse = P1\r\n";
+  text += "3 pulses = P5\r\n";
+  text += "5 pulses = P10\r\n";
+  text += "7 pulses = P20\r\n\r\n";
+  text += "HOPPER\r\n";
+  text += "Sensor GPIO: 19\r\n";
+  text += "Relay GPIO: 27\r\n";
+  text += "Maximum Run Time: 30 seconds\r\n\r\n";
+  text += "DEVICE ACCESS\r\n";
+  text += "Other Devices: " + String(blockOtherDevices ? "Blocked" : "Allowed") + "\r\n";
+  text += "\r\nNOTE: Passwords, session tokens, API keys, and other secrets are intentionally excluded.\r\n";
+  addAdminEvent("Configuration exported without secrets");
+  lastAdminAction = "Configuration exported";
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/plain; charset=utf-8");
+  client.println("Content-Disposition: attachment; filename=printbit-config.txt");
+  client.println("Cache-Control: no-store");
+  client.println("Connection: close");
+  client.println();
+  client.print(text);
+}
+
+void handleAdminTimeSync(NetworkClient& client, const String& body) {
+  String value = getFormValue(body, "epoch");
+  value.trim();
+  uint64_t epoch = strtoull(value.c_str(), nullptr, 10);
+  if (epoch < 1600000000ULL || epoch > 2200000000ULL) {
+    replyAdminJson(client, "{\"ok\":false,\"error\":\"Invalid time value\"}", 400, "Bad Request");
+    return;
+  }
+  struct timeval tv;
+  tv.tv_sec = (time_t)epoch;
+  tv.tv_usec = 0;
+  settimeofday(&tv, nullptr);
+  setenv("TZ", "PHT-8", 1);
+  tzset();
+  adminClockSynced = true;
+  replyAdminJson(client, "{\"ok\":true,\"time\":\"" + htmlEscape(adminTimestamp()) + "\"}");
+}
+
+void handleAdminDeviceAccess(NetworkClient& client, const String& body) {
+  String enabledValue = getFormValue(body, "enabled");
+  String durationValue = getFormValue(body, "duration");
+  enabledValue.trim();
+  durationValue.trim();
+  bool enabled = enabledValue == "1";
+  int durationMinutes = durationValue.length() ? durationValue.toInt() : 0;
+  if (durationMinutes != 0 && durationMinutes != 5 && durationMinutes != 15 && durationMinutes != 30 && durationMinutes != 60) {
+    replyAdminJson(client, "{\"ok\":false,\"error\":\"Duration must be 0, 5, 15, 30, or 60 minutes\"}", 400, "Bad Request");
+    return;
+  }
+
+  // The device that successfully logged in owns the admin role. Its MAC is used
+  // instead of its IP, so DHCP/IP changes do not change the admin identity.
+  wifi_sta_list_t stationList;
+  memset(&stationList, 0, sizeof(stationList));
+  if (esp_wifi_ap_get_sta_list(&stationList) != ESP_OK) {
+    replyAdminJson(client, "{\"ok\":false,\"error\":\"Could not read connected devices\"}", 500, "Internal Server Error");
+    return;
+  }
+  if (protectedAdminMac.length() == 0) {
+    for (int i = 0; i < stationList.num; i++) {
+      IPAddress stationIp;
+      if (getStationIpByMac(stationList.sta[i].mac, stationIp) && stationIp == client.remoteIP()) {
+        protectedAdminMac = stationMacToString(stationList.sta[i].mac);
+        break;
+      }
+    }
+  }
+
+  if (!enabled) {
+    blockOtherDevices = false;
+    blockOtherDevicesUntil = 0;
+    addAdminEvent("Other device access allowed");
+    lastAdminAction = "Other device access allowed";
+    replyAdminJson(client, "{\"ok\":true,\"blocked\":false}");
+    return;
+  }
+
+  if (protectedAdminMac.length() == 0) {
+    replyAdminJson(client, "{\"ok\":false,\"error\":\"Admin device could not be identified safely\"}", 409, "Conflict");
+    return;
+  }
+
+  blockOtherDevices = true;
+  blockOtherDevicesUntil = durationMinutes == 0 ? 0 : millis() + (unsigned long)durationMinutes * 60000UL;
+
+  // Immediately disconnect every non-admin station. The loop continues enforcing the block.
+  for (int i = 0; i < stationList.num; i++) {
+    String mac = stationMacToString(stationList.sta[i].mac);
+    if (mac == protectedAdminMac) continue;
+    uint16_t aid = 0;
+    if (esp_wifi_ap_get_sta_aid(stationList.sta[i].mac, &aid) == ESP_OK && aid != 0) {
+      esp_wifi_deauth_sta(aid);
+    }
+  }
+
+  addAdminEvent(String("Other device access blocked: ") + (durationMinutes == 0 ? "until turned off" : String(durationMinutes) + " minutes"));
+  lastAdminAction = "Other device access blocked";
+  replyAdminJson(client, String("{\"ok\":true,\"blocked\":true,\"durationMinutes\":") + String(durationMinutes) + "}");
 }
 
 void handleAdminResetWifi(NetworkClient& client) {
   resetApCredentials();
+  addAdminEvent("Wi-Fi reset to defaults");
+  lastAdminAction = "Wi-Fi reset";
   Serial.println("admin_wifi_reset:credentials_cleared:restoring_defaults");
   replyPlain(client, 200, "OK", "Wi-Fi credentials reset to defaults. Restarting...");
   delay(500);
@@ -695,6 +1049,8 @@ void handleAdminResetWifi(NetworkClient& client) {
 }
 
 void handleAdminRestart(NetworkClient& client) {
+  addAdminEvent("ESP32 restart requested");
+  lastAdminAction = "ESP32 restart requested";
   Serial.println("admin_restart:requested_from_dashboard");
   replyPlain(client, 200, "OK", "Restarting ESP32...");
   delay(500);
@@ -1001,9 +1357,19 @@ void handleRegisterRequest(NetworkClient& client, const String& body) {
     Serial.println("kiosk_register_failed:unauthorized");
     return;
   }
-  if (postedIp.length() == 0 || !isValidIpv4Address(postedIp)) {
-    replyPlain(client, 400, "Bad Request", "Missing or invalid ip");
-    Serial.println("kiosk_register_failed:invalid_ip");
+  // The tablet's IP is the actual source IP of this registration request.
+  // Do not trust or require a client-supplied IP because DHCP may change it.
+  IPAddress registrationIp = client.remoteIP();
+  if (registrationIp == IPAddress(0, 0, 0, 0)) {
+    replyPlain(client, 400, "Bad Request", "Could not identify tablet IP");
+    Serial.println("kiosk_register_failed:source_ip_unavailable");
+    return;
+  }
+
+  String registrationMac;
+  if (!getStationMacByIp(registrationIp, registrationMac)) {
+    replyPlain(client, 409, "Conflict", "Could not identify tablet device");
+    Serial.println("kiosk_register_failed:device_identity_not_found");
     return;
   }
 
@@ -1012,11 +1378,13 @@ void handleRegisterRequest(NetworkClient& client, const String& body) {
     parsedPort = fallbackKioskPort;
   }
 
-  kioskIp = postedIp;
+  kioskIp = registrationIp.toString();
+  kioskMac = registrationMac;
   kioskPort = uint16_t(parsedPort);
   kioskPortalPath = normalizedPath(postedPath);
   hasKioskRegistration = true;
   refreshTargets();
+  addAdminEvent(String("Kiosk registered: ") + kioskIp + ":" + String(kioskPort));
 
   Serial.print("kiosk_registered:coin_target=");
   Serial.println(tabletServer);
@@ -1087,48 +1455,165 @@ void handleWifiRequest(NetworkClient& client) {
   }
 
   if (routePath == "/admin/login") {
-    if (method == "GET") { replyAdminLoginPage(client); client.stop(); return; }
+    if (method == "GET") {
+      replyAdminLoginPage(client);
+      client.stop();
+      return;
+    }
     if (method == "POST") {
-      if (contentLength <= 0 || contentLength > 256) { Serial.println("admin_login_failed:invalid_payload_size"); replyPlain(client,413,"Payload Too Large","Invalid login payload size"); client.stop(); return; }
-      handleAdminLogin(client, body); client.stop(); return;
+      if (contentLength <= 0 || contentLength > 256) {
+        Serial.println("admin_login_failed:invalid_payload_size");
+        replyPlain(client, 413, "Payload Too Large", "Invalid login payload size");
+        client.stop();
+        return;
+      }
+      handleAdminLogin(client, body);
+      client.stop();
+      return;
     }
   }
 
   if (routePath == "/admin") {
-    if (method == "GET") { replyAdminDashboardPage(client); client.stop(); return; }
+    if (method == "GET") {
+      replyAdminDashboardPage(client);
+      client.stop();
+      return;
+    }
   }
 
   if (routePath.startsWith("/admin/api/")) {
     if (!hasAdminAuthorization(authorizationHeader)) {
-      Serial.print("admin_auth_failed:path="); Serial.print(routePath); Serial.print(":reason=");
+      Serial.print("admin_auth_failed:path=");
+      Serial.print(routePath);
+      Serial.print(":reason=");
       Serial.println(authorizationHeader.length() == 0 ? "missing_authorization_header" : "invalid_bearer_token");
-      replyAdminUnauthorized(client); client.stop(); return;
+      addAdminError("Admin authorization failed");
+      replyAdminUnauthorized(client);
+      client.stop();
+      return;
     }
-    if (method == "GET" && routePath == "/admin/api/status") { handleAdminStatus(client); client.stop(); return; }
-    if (method == "GET" && routePath == "/admin/api/hopper/status") { handleAdminStatus(client); client.stop(); return; }
+    if (method == "GET" && routePath == "/admin/api/status") {
+      handleAdminStatus(client);
+      client.stop();
+      return;
+    }
+    if (method == "GET" && routePath == "/admin/api/hopper/status") {
+      handleAdminStatus(client);
+      client.stop();
+      return;
+    }
+    if (method == "GET" && routePath == "/admin/api/events") {
+      handleAdminStatus(client);
+      client.stop();
+      return;
+    }
+    if (method == "POST" && routePath == "/admin/api/coin-test/start") {
+      handleAdminCoinTestStart(client);
+      client.stop();
+      return;
+    }
+    if (method == "POST" && routePath == "/admin/api/coin-test/stop") {
+      handleAdminCoinTestStop(client);
+      client.stop();
+      return;
+    }
+    if (method == "POST" && routePath == "/admin/api/device-access") {
+      if (contentLength <= 0 || contentLength > 64) {
+        replyAdminJson(client, "{\"ok\":false,\"error\":\"Invalid device access payload\"}", 413, "Payload Too Large");
+        client.stop();
+        return;
+      }
+      handleAdminDeviceAccess(client, body);
+      client.stop();
+      return;
+    }
+    if (method == "POST" && routePath == "/admin/api/time-sync") {
+      if (contentLength <= 0 || contentLength > 64) {
+        replyAdminJson(client, "{\"ok\":false,\"error\":\"Invalid time payload\"}", 413, "Payload Too Large");
+        client.stop();
+        return;
+      }
+      handleAdminTimeSync(client, body);
+      client.stop();
+      return;
+    }
+    if (method == "GET" && routePath == "/admin/api/config-export") {
+      handleAdminExportConfig(client);
+      client.stop();
+      return;
+    }
     if (method == "POST" && routePath == "/admin/api/wifi") {
-      if (contentLength <= 0 || contentLength > 256) { Serial.println("wifi_settings_failed:invalid_payload_size"); replyPlain(client,413,"Payload Too Large","Invalid Wi-Fi payload size"); client.stop(); return; }
-      handleAdminWifiSave(client, body); client.stop(); return;
+      if (contentLength <= 0 || contentLength > 256) {
+        Serial.println("wifi_settings_failed:invalid_payload_size");
+        replyPlain(client, 413, "Payload Too Large", "Invalid Wi-Fi payload size");
+        client.stop();
+        return;
+      }
+      handleAdminWifiSave(client, body);
+      client.stop();
+      return;
     }
     if (method == "POST" && routePath == "/admin/api/hopper/dispense") {
-      if (contentLength <= 0 || contentLength > 64) { replyAdminJson(client, "{\"ok\":false,\"error\":\"Invalid hopper payload size\"}", 413, "Payload Too Large"); client.stop(); return; }
-      handleAdminHopperDispense(client, body); client.stop(); return;
+      if (contentLength <= 0 || contentLength > 64) {
+        replyAdminJson(client, "{\"ok\":false,\"error\":\"Invalid hopper payload size\"}", 413, "Payload Too Large");
+        client.stop();
+        return;
+      }
+      handleAdminHopperDispense(client, body);
+      client.stop();
+      return;
     }
-    if (method == "POST" && routePath == "/admin/api/hopper/dispense-all") { handleAdminHopperDispenseAll(client); client.stop(); return; }
-    if (method == "POST" && routePath == "/admin/api/hopper/on") { handleAdminHopperOn(client); client.stop(); return; }
-    if (method == "POST" && routePath == "/admin/api/hopper/stop") { handleAdminHopperStop(client); client.stop(); return; }
-    if (method == "POST" && routePath == "/admin/api/reset-wifi") { handleAdminResetWifi(client); client.stop(); return; }
-    if (method == "POST" && routePath == "/admin/api/restart") { handleAdminRestart(client); client.stop(); return; }
+    if (method == "POST" && routePath == "/admin/api/hopper/dispense-all") {
+      handleAdminHopperDispenseAll(client);
+      client.stop();
+      return;
+    }
+    if (method == "POST" && routePath == "/admin/api/hopper/on") {
+      handleAdminHopperOn(client);
+      client.stop();
+      return;
+    }
+    if (method == "POST" && routePath == "/admin/api/hopper/stop") {
+      handleAdminHopperStop(client);
+      client.stop();
+      return;
+    }
+    if (method == "POST" && routePath == "/admin/api/reset-wifi") {
+      handleAdminResetWifi(client);
+      client.stop();
+      return;
+    }
+    if (method == "POST" && routePath == "/admin/api/restart") {
+      handleAdminRestart(client);
+      client.stop();
+      return;
+    }
     if (method == "POST" && routePath == "/admin/api/credentials") {
-      if (contentLength <= 0 || contentLength > 160) { Serial.println("admin_credentials_failed:invalid_payload_size"); replyPlain(client,413,"Payload Too Large","Invalid admin credentials payload size"); client.stop(); return; }
-      handleAdminCredentials(client, body); client.stop(); return;
+      if (contentLength <= 0 || contentLength > 160) {
+        Serial.println("admin_credentials_failed:invalid_payload_size");
+        replyPlain(client, 413, "Payload Too Large", "Invalid admin credentials payload size");
+        client.stop();
+        return;
+      }
+      handleAdminCredentials(client, body);
+      client.stop();
+      return;
     }
     if (method == "POST" && routePath == "/admin/api/disconnect") {
-      if (contentLength <= 0 || contentLength > 64) { Serial.println("admin_device_disconnect:failed:invalid_payload_size"); replyPlain(client,413,"Payload Too Large","Invalid disconnect payload size"); client.stop(); return; }
-      handleAdminDisconnectDevice(client, body); client.stop(); return;
+      if (contentLength <= 0 || contentLength > 64) {
+        Serial.println("admin_device_disconnect:failed:invalid_payload_size");
+        replyPlain(client, 413, "Payload Too Large", "Invalid disconnect payload size");
+        client.stop();
+        return;
+      }
+      handleAdminDisconnectDevice(client, body);
+      client.stop();
+      return;
     }
     if (method == "POST" && routePath == "/admin/api/disconnect-all") {
-      handleAdminDisconnectAllDevices(client); client.stop(); return;
+      handleAdminDisconnectAllDevices(client);
+      client.stop();
+      return;
     }
   }
 
@@ -1147,7 +1632,7 @@ void handleWifiRequest(NetworkClient& client) {
     if (hasKioskRegistration && kioskPortalUrl.length() > 0) {
       replyRedirect(client, kioskPortalUrl);
     } else {
-      replyRedirect(client, "http://192.168.4.1/admin/login");
+      replyRedirect(client, "http://printbit.local/admin/login");
     }
     client.stop();
     return;
@@ -1414,6 +1899,8 @@ void setup() {
   digitalWrite(relayPin, LOW);
 
   Serial.begin(115200);
+  setenv("TZ", "PHT-8", 1);
+  tzset();
 
   checkPhysicalCredentialRecovery();
 
@@ -1427,6 +1914,29 @@ void setup() {
       Serial.println("wifi_ap_event:station_connected");
     } else if (event == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
       Serial.println("wifi_ap_event:station_disconnected");
+      // A registered tablet is only considered registered while that same
+      // device remains connected to the PrintBit AP.
+      if (hasKioskRegistration && kioskMac.length() > 0) {
+        wifi_sta_list_t stationList;
+        memset(&stationList, 0, sizeof(stationList));
+        bool stillConnected = false;
+        if (esp_wifi_ap_get_sta_list(&stationList) == ESP_OK) {
+          for (int i = 0; i < stationList.num; i++) {
+            if (stationMacToString(stationList.sta[i].mac) == kioskMac) {
+              stillConnected = true;
+              break;
+            }
+          }
+        }
+        if (!stillConnected) {
+          hasKioskRegistration = false;
+          kioskMac = "";
+          kioskIp = "";
+          kioskPortalUrl = "";
+          tabletServer = "";
+          addAdminEvent("Tablet disconnected; registration cleared");
+        }
+      }
     }
   });
 
@@ -1439,19 +1949,26 @@ void setup() {
   }
 
   Serial.println("AP Started");
+
+  if (MDNS.begin("printbit")) {
+    MDNS.addService("http", "tcp", 80);
+    Serial.println("MDNS:http://printbit.local");
+  } else {
+    Serial.println("mdns_error:start_failed");
+  }
+
   Serial.print("AP_SSID:");
   Serial.println(apSsid);
   Serial.print("AP_PASSWORD:");
   Serial.println(apPasswordEnabled ? "enabled" : "disabled");
   Serial.print("AP_IP:");
   Serial.println(WiFi.softAPIP());
-  Serial.print("coin_target:");
-  Serial.println(tabletServer);
-  Serial.print("portal_target:");
-  Serial.println(kioskPortalUrl);
+  Serial.println("tablet_target:waiting_for_registration");
+  Serial.println("portal_target:waiting_for_registration");
 
   adminSessionToken = makeAdminSessionToken();
   server.begin();
+  addAdminEvent("ESP32 controller booted");
 
   Serial.println("ADMIN:http://192.168.4.1/admin");
   Serial.print("ADMIN_USERNAME:");
@@ -1474,6 +1991,11 @@ void loop() {
   tempGlitchCount = glitchPulseCount;
   interrupts();
 
+  if (coinTestMode && millis() - coinTestStartedAt > 300000UL) {
+    coinTestMode = false;
+    addAdminEvent("Coin test auto-stopped after 5 minutes");
+  }
+
   if (tempCount > 0 && millis() - tempLastPulse > coinTimeout) {
     int value = 0;
     if (tempCount == 1) value = 1;
@@ -1481,16 +2003,32 @@ void loop() {
     else if (tempCount == 5) value = 10;
     else if (tempCount == 7) value = 20;
 
+    unsigned long pulseDurationMs = tempLastPulse > 0 ? (millis() - tempLastPulse) : 0;
+    lastCoinDetectedAt = millis();
+    lastCoinPulseCount = tempCount;
+    lastCoinPulseGlitchCount = tempGlitchCount;
+    lastCoinPulseDurationMs = pulseDurationMs;
     if (value > 0) {
+      lastCoinValue = value;
+      coinAcceptedCount++;
       Serial.print("coin_pulse:");
       Serial.println(value);
-      sendCoinToTablet(value);
+      if (coinTestMode) {
+        coinTestCount++;
+        addAdminEvent(String("Coin test detected: P") + String(value));
+      } else {
+        sendCoinToTablet(value);
+      }
     } else if (tempCount >= pulseCountCap || tempGlitchCount > 0) {
+      coinInvalidCount++;
+      addAdminError("Coin pulse train saturated");
       Serial.print("coin_pulse_error:pulse_train_saturated:count=");
       Serial.print(tempCount);
       Serial.print(":overflow=");
       Serial.println(tempGlitchCount);
     } else {
+      coinInvalidCount++;
+      addAdminError("Unrecognized coin pulse count");
       Serial.print("coin_pulse_error:unrecognized_pulse_count:");
       Serial.println(tempCount);
     }
@@ -1516,6 +2054,10 @@ void loop() {
       Serial.println("serial_command_error:line_too_long_truncated");
     }
   }
+
+  // Enforce short disconnect windows so auto-reconnecting clients are kicked again.
+  enforceTemporaryDisconnectBlocks();
+  enforceDeviceAccessPolicy();
 
   // WIFI REQUEST
   NetworkClient client = server.accept();
@@ -1549,6 +2091,7 @@ void loop() {
     dispenseTimedOut = false;
     lastDispenseOutcome = "failed";
     lastDispenseError = "MOTOR_TIMEOUT";
+    addAdminError("Hopper motor timeout");
     lastDispenseFinishedAt = millis();
     emitHopperError(activeDispenseRequestId, "MOTOR_TIMEOUT", "timeout");
     Serial.print("hopper_done:requestId=");
@@ -1582,7 +2125,7 @@ void loop() {
   if (millis() - lastHeapCheckAt > heapCheckIntervalMs) {
     lastHeapCheckAt = millis();
     uint32_t freeHeap = ESP.getFreeHeap();
-    if (freeHeap < minFreeHeapSeen) minFreeHeapSeen = freeHeap; 
+    if (freeHeap < minFreeHeapSeen) minFreeHeapSeen = freeHeap;
     if (freeHeap < lowHeapWarnThreshold) {
       Serial.print("system_warning:low_heap:free=");
       Serial.print(freeHeap);
