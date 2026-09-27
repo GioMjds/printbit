@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PrintBit.Infrastructure.Windows/PrintBit.Infrastructure.Windows.csproj" Id="04ab7948-750b-4af6-b62e-ba372aa0b162" />
+    <Project Path="src/PrintBit.Application/PrintBit.Application.csproj" />
+    <Project Path="src/PrintBit.Hardware/PrintBit.Hardware.csproj" />
+    <Project Path="src/PrintBit.HardwareService/PrintBit.HardwareService.csproj" />
+    <Project Path="src/PrintBit.Infrastructure/PrintBit.Infrastructure.csproj" />
+    <Project Path="src/PrintBit.Shared/PrintBit.Shared.csproj" />
+  </Folder>
+</Solution>
