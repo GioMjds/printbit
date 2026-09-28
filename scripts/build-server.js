@@ -4,11 +4,18 @@ const { execSync } = require('node:child_process');
 const esbuildCmd = process.platform === 'win32' ? 'esbuild.cmd' : 'esbuild';
 const esbuildPath = path.resolve(__dirname, '..', 'node_modules', '.bin', esbuildCmd);
 
+const nativePackages = [
+  'sharp',
+  'canvas',
+  'argon2',
+];
+
 const args = [
   'src/server.ts',
   '--bundle',
   '--platform=node',
   '--format=cjs',
+  ...(nativePackages.map((pkg) => `--external:${pkg}`)),
   '--packages=external',
   '--target=node22',
   '--outfile=dist/server.js',
