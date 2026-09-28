@@ -31,6 +31,7 @@ import {
 } from './geometry-detection';
 import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 import { CustomRangeBuilder } from './custom-range-builder';
+import { PagePickerModal } from './page-picker-modal';
 import type { PageRange } from '../shared/page-selection';
 
 export {};
@@ -297,25 +298,16 @@ async function fetchWithTimeout(
 }
 
 // Update Page Range when Preview navigates
-function onPreviewPageChange(pageNum: number): void {
+function onPreviewPageChange(_pageNum: number): void {
   if (pageModeSingle?.checked) {
-    if (singlePageInput) {
-      singlePageInput.value = String(pageNum);
-      clampSinglePage();
-      updateSummary();
-      schedulePrintQuoteRefresh();
-    }
+    updateSummary();
+    schedulePrintQuoteRefresh();
   }
 }
 
 // Sync Preview when Range Mode changes
 function syncPreviewPageWithRange(): void {
-  if (pageModeSingle?.checked && singlePageInput) {
-    const page = parseInt(singlePageInput.value, 10);
-    if (!isNaN(page)) {
-      void preview.goToPage(page);
-    }
-  } else if (pageModeCustom?.checked && customRangeBuilder) {
+  if (pageModeCustom?.checked && customRangeBuilder) {
     const sel = customRangeBuilder.getSelection();
     if (sel.ranges.length > 0) {
       void preview.goToPage(sel.ranges[0].start);
@@ -344,6 +336,7 @@ class PrintPreview {
   private pagerLabel: HTMLElement;
   private pagePrev: HTMLButtonElement;
   private pageNext: HTMLButtonElement;
+  private pagePicker: PagePickerModal | null = null;
 
   private naturalW = 794; // natural paper width in px (A4 portrait @ 96dpi)
   private naturalH = 1123; // natural paper height in px
@@ -438,6 +431,21 @@ class PrintPreview {
     this.pageNext.addEventListener('click', () =>
       this.goToPage(this.currentPage + 1),
     );
+
+    const pickerDialog = document.getElementById(
+      'pagePickerDialog',
+    ) as HTMLDialogElement | null;
+    if (pickerDialog) {
+      this.pagePicker = new PagePickerModal({
+        dialog: pickerDialog,
+        onSelectPage: (page) => {
+          void this.goToPage(page);
+        },
+      });
+    }
+
+    this.pagerLabel.addEventListener('click', () => this.openPagePicker());
+    this.initTouchGestures();
 
     const zoomInBtn = document.getElementById(
       'zoomIn',
@@ -801,9 +809,26 @@ class PrintPreview {
     this.pagePrev.hidden = !multi;
     this.pageNext.hidden = !multi;
     this.pagerLabel.hidden = !multi;
-    this.pagerLabel.textContent = `${this.currentPage} / ${this.totalPages}`;
+
+    const labelText = document.getElementById('pagerLabelText');
+    if (labelText) {
+      labelText.textContent = `${this.currentPage} / ${this.totalPages}`;
+    } else {
+      this.pagerLabel.textContent = `${this.currentPage} / ${this.totalPages}`;
+    }
+
+    this.pagerLabel.setAttribute(
+      'aria-label',
+      `Select page. Current page ${this.currentPage} of ${this.totalPages}`,
+    );
     this.pagePrev.disabled = this.currentPage <= 1;
     this.pageNext.disabled = this.currentPage >= this.totalPages;
+  }
+
+  openPagePicker(): void {
+    if (this.totalPages > 1 && this.pagePicker) {
+      this.pagePicker.open(this.currentPage, this.totalPages);
+    }
   }
 
   private loadHtml(html: string): Promise<void> {
@@ -942,6 +967,86 @@ class PrintPreview {
   private updateZoomDisplay(): void {
     const el = document.getElementById('zoomLevel');
     if (el) el.textContent = `${Math.round(this.zoomScale * 100)}%`;
+    this.viewport.style.touchAction = this.zoomScale > 1.0 ? 'pan-x pan-y' : 'pan-y';
+  }
+
+  private initTouchGestures(): void {
+    let startX = 0;
+    let startY = 0;
+    let startTime = 0;
+    let isTracking = false;
+
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+    let scrollStartX = 0;
+    let scrollStartY = 0;
+
+    this.viewport.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startX = e.clientX;
+      startY = e.clientY;
+      startTime = Date.now();
+      isTracking = true;
+
+      if (this.zoomScale > 1.0) {
+        isPanning = true;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        scrollStartX = this.viewport.scrollLeft;
+        scrollStartY = this.viewport.scrollTop;
+        try {
+          this.viewport.setPointerCapture(e.pointerId);
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    this.viewport.addEventListener('pointermove', (e: PointerEvent) => {
+      if (!isTracking) return;
+      if (isPanning && this.zoomScale > 1.0) {
+        const dx = e.clientX - panStartX;
+        const dy = e.clientY - panStartY;
+        this.viewport.scrollLeft = scrollStartX - dx;
+        this.viewport.scrollTop = scrollStartY - dy;
+      }
+    });
+
+    const endTracking = (e: PointerEvent) => {
+      if (!isTracking) return;
+      isTracking = false;
+
+      if (isPanning) {
+        isPanning = false;
+        try {
+          if (this.viewport.hasPointerCapture(e.pointerId)) {
+            this.viewport.releasePointerCapture(e.pointerId);
+          }
+        } catch {
+          // ignore
+        }
+        return;
+      }
+
+      // Swipe navigation when at 100% zoom and multi-page
+      if (this.zoomScale <= 1.0 && this.totalPages > 1) {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        const dt = Date.now() - startTime;
+
+        if (Math.abs(dx) >= 45 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 800) {
+          if (dx < 0 && this.currentPage < this.totalPages) {
+            void this.goToPage(this.currentPage + 1);
+          } else if (dx > 0 && this.currentPage > 1) {
+            void this.goToPage(this.currentPage - 1);
+          }
+        }
+      }
+    };
+
+    this.viewport.addEventListener('pointerup', endTracking);
+    this.viewport.addEventListener('pointercancel', endTracking);
   }
 
   /** Load from a raw ArrayBuffer (used by copy preview) */
@@ -1068,9 +1173,6 @@ const pageRangeGroup = document.getElementById(
 const pageRangeCustomWrap = document.getElementById(
   'pageRangeCustomWrap',
 ) as HTMLElement | null;
-const pageRangeSingleWrap = document.getElementById(
-  'pageRangeSingleWrap',
-) as HTMLElement | null;
 const pageRangeInput = document.getElementById(
   'pageRangeInput',
 ) as HTMLInputElement | null;
@@ -1086,15 +1188,6 @@ const addCustomRangeRowBtn = document.getElementById(
 const customRangeFeedbackCard = document.getElementById(
   'customRangeFeedbackCard',
 ) as HTMLElement | null;
-const singlePageInput = document.getElementById(
-  'singlePageInput',
-) as HTMLInputElement | null;
-const singlePageDec = document.getElementById(
-  'singlePageDec',
-) as HTMLButtonElement | null;
-const singlePageInc = document.getElementById(
-  'singlePageInc',
-) as HTMLButtonElement | null;
 const colorModeGroup = document.getElementById(
   'colorModeGroup',
 ) as HTMLElement | null;
@@ -1331,52 +1424,10 @@ pageRangeCustomWrap?.addEventListener('click', () => {
   }
 });
 
-singlePageDec?.addEventListener('click', () => {
-  if (pageModeAll?.checked) return;
-  if (!singlePageInput) return;
-  const next = Math.max(1, clampSinglePage() - 1);
-  singlePageInput.value = String(next);
-  clampSinglePage();
-  void preview.goToPage(next);
-  updateSummary();
-  schedulePrintQuoteRefresh();
-});
-
-singlePageInc?.addEventListener('click', () => {
-  if (pageModeAll?.checked) return;
-  if (!singlePageInput) return;
-  const next = Math.min(getPageRangeMaxPages(), clampSinglePage() + 1);
-  singlePageInput.value = String(next);
-  clampSinglePage();
-  void preview.goToPage(next);
-  updateSummary();
-  schedulePrintQuoteRefresh();
-});
-
-singlePageInput?.addEventListener('change', () => {
-  if (pageModeAll?.checked) return;
-  const page = clampSinglePage();
-  void preview.goToPage(page);
-  updateSummary();
-  schedulePrintQuoteRefresh();
-});
-
-pageRangeSingleWrap?.addEventListener('click', () => {
-  if (pageModeAll?.checked && pageModeSingle) {
-    pageModeSingle.checked = true;
-    pageModeSingle.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-});
-
 function clampSinglePage(): number {
   const max = getPageRangeMaxPages();
-  const raw = parseInt(singlePageInput?.value ?? '1', 10) || 1;
-  const next = Math.max(1, Math.min(max, raw));
-  if (singlePageInput) {
-    singlePageInput.max = String(max);
-    singlePageInput.value = String(next);
-  }
-  return next;
+  const current = preview?.currentPageNumber || 1;
+  return Math.max(1, Math.min(max, current));
 }
 
 function isValidCustomRange(raw: string): boolean {
@@ -1449,26 +1500,11 @@ function syncPageRangeUI(): void {
     : true;
   const isAll = Boolean(pageModeAll?.checked);
   const isCustom = Boolean(pageModeCustom?.checked);
-  const isSingle = Boolean(pageModeSingle?.checked);
 
-  // If "All Pages" is selected, hide the extra options in Custom Range and Single Page
+  // If "All Pages" is selected, hide the extra options in Custom Range
   const showCustom = rangeVisible && isCustom && !isAll;
-  const showSingle = rangeVisible && isSingle && !isAll;
 
   pageRangeCustomWrap?.classList.toggle('hidden', !showCustom);
-  pageRangeSingleWrap?.classList.toggle('hidden', !showSingle);
-
-  const singleControls = [singlePageDec, singlePageInput, singlePageInc];
-  singleControls.forEach((el) => {
-    if (el) {
-      el.disabled = !isSingle;
-      if (!isSingle) {
-        el.setAttribute('aria-disabled', 'true');
-      } else {
-        el.removeAttribute('aria-disabled');
-      }
-    }
-  });
 }
 
 function hasMultiplePages(): boolean {
