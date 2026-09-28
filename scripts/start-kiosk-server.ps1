@@ -101,7 +101,7 @@ if ((Get-NetworkProvider) -eq "esp32") {
 
 Ensure-ServerBundle
 
-$nodeCandidates = Get-NodeExecutableCandidates
+$nodeCandidates = @(Get-NodeExecutableCandidates)
 if ($nodeCandidates.Count -eq 0) {
     $message = "[PrintBit] Node.js executable not found for this account. Install Node.js for all users."
     Write-StartupLog $message
