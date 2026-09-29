@@ -178,14 +178,6 @@ public sealed class DocumentPrinter : IDocumentPrinter
 
         printSettings.Add(NormalizePaperSetting(settings.PaperSize));
 
-        if (string.Equals(settings.Orientation, "landscape", StringComparison.OrdinalIgnoreCase))
-        {
-            printSettings.Add("landscape");
-        }
-        else
-        {
-            printSettings.Add("portrait");
-        }
 
         printSettings.Add(string.Equals(settings.Scaling, "actual", StringComparison.OrdinalIgnoreCase)
             ? "noscale" : "fit");

@@ -3,37 +3,37 @@ import {
   calculatePrintLayout,
   DEFAULT_PRINT_SCALING,
   PAPER_POINTS,
-  type PrintScaling,
-  type PaperSize,
   type Orientation,
+  type PaperSize,
+  type PrintScaling,
 } from '../../shared/print-configuration';
 import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
-import { createConfigPreparationLoadingController } from './loading-state';
-import { shouldPreparePreviewInBackground } from './office-preview';
-import { getPreviewRequestTimeoutMs } from './preview-timeout';
 import {
-  fetchPublicPricing,
-  formatPricingGuide,
-} from '../shared/pricing-guide';
+  formatLargePrintDisclaimer,
+  isLargePrintDocument,
+} from '../shared/large-print-warning';
+import type { PageRange } from '../shared/page-selection';
 import {
   destroyPdfLoadingTask,
   type PdfLoadingTask,
 } from '../shared/pdfjs-loading-task-cleanup';
 import {
-  formatLargePrintDisclaimer,
-  isLargePrintDocument,
-} from '../shared/large-print-warning';
+  fetchPublicPricing,
+  formatPricingGuide,
+} from '../shared/pricing-guide';
+import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
+import { CustomRangeBuilder } from './custom-range-builder';
 import { buildColorDetectionEvidence } from './detection-evidence';
 import {
   detectOrientationFromDimensions,
   detectPaperSizeFromDimensions,
 } from './geometry-detection';
-import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
-import { CustomRangeBuilder } from './custom-range-builder';
-import type { PageRange } from '../shared/page-selection';
+import { createConfigPreparationLoadingController } from './loading-state';
+import { shouldPreparePreviewInBackground } from './office-preview';
+import { getPreviewRequestTimeoutMs } from './preview-timeout';
 
-export {};
+export { };
 
 void initKioskLocalization();
 attachUiBlockingOverlay();
@@ -1704,13 +1704,13 @@ function setPrintContinueState(): void {
   const hasCopiesError = Boolean(copiesInput?.validationMessage);
   const isBlankJob = Boolean(
     currentPrintQuote?.isEntirelyBlank ||
-      (currentPrintQuote &&
-        currentPrintQuote.selectedPages > 0 &&
-        currentPrintQuote.pageBreakdown &&
-        currentPrintQuote.pageBreakdown.length > 0 &&
-        currentPrintQuote.pageBreakdown.every(
-          (p) => p.coverage === 0 || p.isBlank === true,
-        )),
+    (currentPrintQuote &&
+      currentPrintQuote.selectedPages > 0 &&
+      currentPrintQuote.pageBreakdown &&
+      currentPrintQuote.pageBreakdown.length > 0 &&
+      currentPrintQuote.pageBreakdown.every(
+        (p) => p.coverage === 0 || p.isBlank === true,
+      )),
   );
   const canContinue =
     Boolean(currentPrintQuote) &&
@@ -1974,12 +1974,12 @@ function updateSummary(): void {
   if (currentPrintQuote) {
     const isBlankJob = Boolean(
       currentPrintQuote.isEntirelyBlank ||
-        (currentPrintQuote.selectedPages > 0 &&
-          currentPrintQuote.pageBreakdown &&
-          currentPrintQuote.pageBreakdown.length > 0 &&
-          currentPrintQuote.pageBreakdown.every(
-            (p) => p.coverage === 0 || p.isBlank === true,
-          )),
+      (currentPrintQuote.selectedPages > 0 &&
+        currentPrintQuote.pageBreakdown &&
+        currentPrintQuote.pageBreakdown.length > 0 &&
+        currentPrintQuote.pageBreakdown.every(
+          (p) => p.coverage === 0 || p.isBlank === true,
+        )),
     );
     if (isBlankJob) {
       footerSummary.classList.remove('ready');
@@ -2000,17 +2000,13 @@ function updateSummary(): void {
         currentPrintQuote.billableImagePages &&
         currentPrintQuote.billableImagePages > 0
       ) {
-        parts.push(
-          `${currentPrintQuote.billableImagePages} photo (Color)`,
-        );
+        parts.push(`${currentPrintQuote.billableImagePages} photo (Color)`);
       }
       if (
         currentPrintQuote.billableImageBwPages &&
         currentPrintQuote.billableImageBwPages > 0
       ) {
-        parts.push(
-          `${currentPrintQuote.billableImageBwPages} photo (B&W)`,
-        );
+        parts.push(`${currentPrintQuote.billableImageBwPages} photo (B&W)`);
       }
       if (currentPrintQuote.billableColorPages > 0) {
         parts.push(`${currentPrintQuote.billableColorPages} color`);
@@ -2121,10 +2117,12 @@ let suppressPaperSizeAutoTracking = false;
 document
   .querySelectorAll<HTMLInputElement>('input[name="orientation"]')
   .forEach((el) => {
-    el.addEventListener('change', () => {
+    const markManual = () => {
       if (suppressOrientationAutoTracking) return;
       userManuallyAdjustedOrientation = true;
-    });
+    };
+    el.addEventListener('change', markManual);
+    el.addEventListener('click', markManual);
   });
 
 document
