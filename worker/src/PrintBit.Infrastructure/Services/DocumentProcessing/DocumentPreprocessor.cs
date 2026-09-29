@@ -122,48 +122,62 @@ public sealed class DocumentPreprocessor : IDocumentPreprocessor
                 }
             }
 
-            using (form)
-            using (var output = new PdfDocument())
+            try
             {
-                output.Info.Title = Path.GetFileName(outputPath);
-                var plan = PrintPlanBuilder.Build(form.PageCount, settings);
-                foreach (var pageNumber in plan.SelectedPages)
+                using (form)
+                using (var output = new PdfDocument())
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    form.PageNumber = pageNumber;
-
-                    var page = output.AddPage();
-                    SetPaperGeometry(page, settings.PaperSize, settings.Orientation);
-
-                    var sourcePage = form.Page ?? throw new InvalidDataException("PDF page is missing");
-                    var originalMediaBox = sourcePage.MediaBox;
-                    var pageNativeRotation = sourcePage.Rotate;
-                    var totalRotation = NormalizeRotation(pageNativeRotation + settings.RotationDeg);
-                    try
+                    output.Info.Title = Path.GetFileName(outputPath);
+                    var plan = PrintPlanBuilder.Build(form.PageCount, settings);
+                    foreach (var pageNumber in plan.SelectedPages)
                     {
-                        // PDFsharp imports /Rotate and uses MediaBox as the form's clipping
-                        // box. Normalize both so the visible page matches PDF.js and rotation
-                        // is applied exactly once by our outer layout transform.
-                        sourcePage.Rotate = 0;
-                        sourcePage.MediaBox = VisibleBox(originalMediaBox, sourcePage.CropBox);
-                        RenderFormToPage(XGraphics.FromPdfPage(page), form, page, totalRotation, settings);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        form.PageNumber = pageNumber;
+
+                        var page = output.AddPage();
+                        SetPaperGeometry(page, settings.PaperSize, settings.Orientation);
+
+                        var sourcePage = form.Page ?? throw new InvalidDataException("PDF page is missing");
+                        var originalMediaBox = sourcePage.MediaBox;
+                        var pageNativeRotation = sourcePage.Rotate;
+                        var totalRotation = NormalizeRotation(pageNativeRotation + settings.RotationDeg);
+                        try
+                        {
+                            // PDFsharp imports /Rotate and uses MediaBox as the form's clipping
+                            // box. Normalize both so the visible page matches PDF.js and rotation
+                            // is applied exactly once by our outer layout transform.
+                            sourcePage.Rotate = 0;
+                            sourcePage.MediaBox = VisibleBox(originalMediaBox, sourcePage.CropBox);
+                            RenderFormToPage(XGraphics.FromPdfPage(page), form, page, totalRotation, settings);
+                        }
+                        finally
+                        {
+                            sourcePage.MediaBox = originalMediaBox;
+                            sourcePage.Rotate = pageNativeRotation;
+                        }
                     }
-                    finally
+
+                    if (settings.Duplex && output.PageCount % 2 == 1)
                     {
-                        sourcePage.MediaBox = originalMediaBox;
-                        sourcePage.Rotate = pageNativeRotation;
+                        var blank = output.AddPage();
+                        SetPaperGeometry(blank, settings.PaperSize, settings.Orientation);
                     }
-                }
 
-                if (settings.Duplex && output.PageCount % 2 == 1)
-                {
-                    var blank = output.AddPage();
-                    SetPaperGeometry(blank, settings.PaperSize, settings.Orientation);
+                    var outputPageCount = output.PageCount;
+                    output.Save(outputPath);
+                    return outputPageCount;
                 }
-
-                var outputPageCount = output.PageCount;
-                output.Save(outputPath);
-                return outputPageCount;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // ponytail: pass-through original file if PDFsharp rendering or saving fails
+                // on complex Canva/Skia elements. SumatraPDF/MuPDF prints them natively.
+                File.Copy(sourcePath, outputPath, true);
+                return PdfPageCounter.Count(sourcePath, _qpdfPath) ?? 1;
             }
         }
         finally

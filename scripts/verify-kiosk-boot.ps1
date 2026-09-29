@@ -157,7 +157,7 @@ if (Test-Path $LogPath) {
     }
 }
 
-$failCount = ($checks | Where-Object { -not $_.Passed }).Count
+$failCount = @($checks | Where-Object { -not $_.Passed }).Count
 Write-Host ''
 if ($failCount -eq 0) {
     Write-Host '[PrintBit] [OK] All boot configuration checks passed.' -ForegroundColor Green

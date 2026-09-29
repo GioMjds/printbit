@@ -1,3 +1,4 @@
+#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Registers PrintBit as a Windows Scheduled Task for kiosk startup.
@@ -6,7 +7,7 @@
     Creates a scheduled task "PrintBit Kiosk" that:
     - Triggers at user logon or machine startup
     - Runs with highest privileges
-    - Launches start-kiosk.bat from the scripts\ directory
+    - Launches start-kiosk.ps1 from the scripts\ directory
     - Supports SYSTEM principal for cross-account kiosk deployments
     - Supports explicit kiosk-user startup task registration
     - Targets the kiosk account for Assigned Access Edge scenarios (server-only startup)
@@ -30,7 +31,7 @@ param(
 
 $TaskName = "PrintBit Kiosk"
 $ScriptsDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$BatPath = Join-Path $ScriptsDir "start-kiosk.bat"
+$KioskStartupScript = Join-Path $ScriptsDir "start-kiosk.ps1"
 $ServerStartupScript = Join-Path $ScriptsDir "start-kiosk-server.ps1"
 $ProjectDir = Split-Path -Parent $ScriptsDir
 $WorkerClientIdentityEnvironmentVariable = "Ipc__WorkerCommandAllowedClientIdentity"
@@ -93,13 +94,18 @@ if (-not [string]::IsNullOrWhiteSpace($KioskUser) -and ($AtStartup -or $RunAsSys
     throw "[PrintBit] -KioskUser cannot be combined with -AtStartup or -RunAsSystem."
 }
 
-if (-not (Test-Path $BatPath)) {
-    Write-Error "[PrintBit] start-kiosk.bat not found at: $BatPath"
-    return
-}
-if (-not (Test-Path $ServerStartupScript)) {
-    Write-Error "[PrintBit] start-kiosk-server.ps1 not found at: $ServerStartupScript"
-    return
+$isServerStartup = $AtStartup -or (-not [string]::IsNullOrWhiteSpace($KioskUser))
+
+if ($isServerStartup) {
+    if (-not (Test-Path $ServerStartupScript)) {
+        Write-Error "[PrintBit] start-kiosk-server.ps1 not found at: $ServerStartupScript"
+        return
+    }
+} else {
+    if (-not (Test-Path $KioskStartupScript)) {
+        Write-Error "[PrintBit] start-kiosk.ps1 not found at: $KioskStartupScript"
+        return
+    }
 }
 
 $ServerBundlePath = Join-Path $ProjectDir "dist\server.js"
@@ -134,9 +140,9 @@ $Action = if ($AtStartup -or $kioskUserNormalized) {
         -WorkingDirectory $ProjectDir
 } else {
     New-ScheduledTaskAction `
-        -Execute "cmd.exe" `
-        -Argument ("/c `"" + $BatPath + "`"") `
-        -WorkingDirectory (Split-Path $BatPath)
+        -Execute "powershell.exe" `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$KioskStartupScript`"" `
+        -WorkingDirectory $ProjectDir
 }
 
 $Trigger = if ($kioskUserNormalized) {

@@ -234,6 +234,43 @@ body {
   border-color: rgba(167, 170, 225, 0.4);
 }
 
+/* ── Cloud notice tip banner ─────────────────────────────────── */
+.cloud-notice-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(165, 180, 252, 0.22);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--lavender);
+}
+
+.cloud-notice-tip__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--pink);
+}
+
+.cloud-notice-tip__text {
+  margin: 0;
+}
+
+.cloud-notice-tip__text strong {
+  color: var(--white);
+}
+
+.cloud-notice-tip__text em {
+  font-style: normal;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .retry-btn:active {
   transform: scale(0.96);
 }

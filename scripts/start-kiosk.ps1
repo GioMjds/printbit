@@ -5,8 +5,8 @@
     and launches Microsoft Edge in fullscreen kiosk mode.
 
 .DESCRIPTION
-    Drop this in your scripts\ folder alongside start-kiosk.bat.
-    Double-click run.bat (or this file) — no manual "Run as Admin" needed.
+    Starts the PrintBit server and launches Microsoft Edge in fullscreen kiosk mode.
+    Double-click run.bat (or run this file) — no manual "Run as Admin" needed.
 
 .EXAMPLE
     Double-click run.bat   ← easiest
