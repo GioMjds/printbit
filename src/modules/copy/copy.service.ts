@@ -43,8 +43,12 @@ import { consumablesStore } from '@/core/database/sqlite-storage';
 import { evaluateConsumablesForecastAlerts } from '@/modules/admin/consumables.service';
 import { ReceiptService } from '@/modules/receipt/receipt.service';
 import { estimateInkUsageByJob } from '@/services/consumable-estimator';
-import { analyzeDocument } from '@/services/document-analysis';
-import { buildPrintQuote, type PrintQuoteResult } from '@/services/print-quote';
+import { PDFDocument } from 'pdf-lib';
+import {
+  computeQuoteHash,
+  type PrintPageQuoteBreakdown,
+  type PrintQuoteResult,
+} from '@/services/print-quote';
 import {
   buildPrintJobEnqueuePayload,
   getJobProcessor,
@@ -179,25 +183,112 @@ export class CopyService {
     { ok: true; quote: PrintQuoteResult } | { ok: false; error: string }
   > {
     try {
-      const analysis = await analyzeDocument({
-        filePath: input.previewAbsPath,
-        filename: input.previewFilename,
-        contentType: 'application/pdf',
+      let totalPages = 1;
+      try {
+        if (fs.existsSync(input.previewAbsPath)) {
+          const bytes = await fs.promises.readFile(input.previewAbsPath);
+          const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+          totalPages = Math.max(1, pdf.getPageCount());
+        }
+      } catch {
+        totalPages = 1;
+      }
+
+      const pricing = adminService.getPricingSettings();
+      const copyBwRate = pricing.copyBwPerPage ?? pricing.copyPerPage ?? 3;
+      const copyColorRate = pricing.copyColorPerPage ?? 5;
+      const isColor = input.colorMode === 'colored';
+      const ratePerPage = isColor ? copyColorRate : copyBwRate;
+
+      const safeCopies = Math.max(1, Math.floor(input.copies));
+      const selectedPages = totalPages;
+      const duplex = Boolean(input.duplex);
+      const physicalSheetsPerCopy = duplex
+        ? Math.ceil(selectedPages / 2)
+        : selectedPages;
+      const totalPhysicalSheets = physicalSheetsPerCopy * safeCopies;
+
+      const quality = input.quality ?? 'standard';
+      const qualitySurchargePerSide =
+        quality === 'high'
+          ? (db.data?.settings?.pricingEngine?.highQualitySurcharge ??
+            pricing.highQualitySurcharge ??
+            2)
+          : 0;
+      const qualitySubtotal =
+        qualitySurchargePerSide * selectedPages * safeCopies;
+      const printSubtotal = ratePerPage * selectedPages * safeCopies;
+      const requiredAmount = printSubtotal + qualitySubtotal;
+
+      const pageBreakdown: PrintPageQuoteBreakdown[] = [];
+      for (let p = 1; p <= selectedPages; p++) {
+        pageBreakdown.push({
+          pageNumber: p,
+          isColor,
+          coverage: isColor ? 0.2 : 0.05,
+          coverageTier: 'low',
+          printCost: ratePerPage,
+          isBlank: false,
+        });
+      }
+
+      const quoteId = randomUUID();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const quoteHash = computeQuoteHash({
+        fileHash: input.previewFilename,
+        paperSize: input.paperSize,
+        colorMode: input.colorMode,
+        copies: safeCopies,
+        duplex,
+        pageRange: null,
+        quality,
+        requiredAmount,
       });
 
-      return buildPrintQuote({
-        analysis: {
-          ...analysis,
-          analyzedAt: new Date(),
-          confidence: 'high',
+      return {
+        ok: true,
+        quote: {
+          requiredAmount,
+          copies: safeCopies,
+          duplex,
+          paperSize: input.paperSize,
+          selectedPages,
+          totalPages,
+          physicalSheets: totalPhysicalSheets,
+          paperCostPerSheet: 0,
+          paperSubtotal: 0,
+          printSubtotal,
+          qualitySubtotal,
+          duplexSavings: 0,
+          requestedColorMode: input.colorMode,
+          effectiveColorMode: input.colorMode,
+          quality,
+          pageBreakdown,
+          meteredCoveragePercentage: isColor ? 20 : 5,
+          isEntirelyBlank: false,
+          blankPageCount: 0,
+          quoteId,
+          quoteHash,
+          expiresAt,
+          selectedColorPages: isColor ? selectedPages : 0,
+          selectedBwPages: isColor ? 0 : selectedPages,
+          billableColorPages: isColor ? selectedPages : 0,
+          billableBwPages: isColor ? 0 : selectedPages,
+          billableImagePages: 0,
+          billableImageBwPages: 0,
+          pageRange: null,
+          pageSelection: null,
+          pricing: {
+            printPerPage: copyBwRate,
+            colorSurcharge: Math.max(0, copyColorRate - copyBwRate),
+            highQualitySurcharge: pricing.highQualitySurcharge,
+          },
+          analysisConfidence: 'high',
+          billingPageDetection: 'high-confidence-page-detection',
+          analysisFallbackReasonFlags: [],
+          colorDetectionEnabled: false,
         },
-        copies: input.copies,
-        colorMode: input.colorMode,
-        quality: input.quality ?? 'standard',
-        paperSize: input.paperSize,
-        pageRange: input.pageRange ?? { type: 'all' },
-        duplex: input.duplex,
-      });
+      };
     } catch (error) {
       console.error('[COPY] Quote calculation failed:', error);
       return { ok: false, error: 'Failed to calculate price.' };

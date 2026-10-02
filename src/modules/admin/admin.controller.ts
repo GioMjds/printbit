@@ -1514,6 +1514,8 @@ export class AdminController {
       pricing?: {
         printPerPage?: number;
         copyPerPage?: number;
+        copyBwPerPage?: number;
+        copyColorPerPage?: number;
         scanDocument?: number;
         colorSurcharge?: number;
         highQualitySurcharge?: number;
@@ -1614,13 +1616,18 @@ export class AdminController {
 
     const printPerPage = body.pricing?.printPerPage;
     const copyPerPage = body.pricing?.copyPerPage;
+    const copyBwPerPage =
+      body.pricing?.copyBwPerPage !== undefined
+        ? body.pricing?.copyBwPerPage
+        : copyPerPage;
+    const copyColorPerPage = body.pricing?.copyColorPerPage;
     const scanDocument = body.pricing?.scanDocument;
     const colorSurcharge = body.pricing?.colorSurcharge;
     const highQualitySurcharge = body.pricing?.highQualitySurcharge;
 
     if (
       printPerPage !== undefined &&
-      (!isFiniteNumber(printPerPage) || !isWholePeso(printPerPage))
+      (!isFiniteNumber(printPerPage) || !isWholePeso(printPerPage) || printPerPage < 0)
     ) {
       return res.status(400).json({
         error: 'printPerPage must be a whole peso value (no decimals).',
@@ -1628,10 +1635,26 @@ export class AdminController {
     }
     if (
       copyPerPage !== undefined &&
-      (!isFiniteNumber(copyPerPage) || !isWholePeso(copyPerPage))
+      (!isFiniteNumber(copyPerPage) || !isWholePeso(copyPerPage) || copyPerPage < 0)
     ) {
       return res.status(400).json({
         error: 'copyPerPage must be a whole peso value (no decimals).',
+      });
+    }
+    if (
+      copyBwPerPage !== undefined &&
+      (!isFiniteNumber(copyBwPerPage) || !isWholePeso(copyBwPerPage) || copyBwPerPage < 0)
+    ) {
+      return res.status(400).json({
+        error: 'copyBwPerPage must be a whole peso value (no decimals).',
+      });
+    }
+    if (
+      copyColorPerPage !== undefined &&
+      (!isFiniteNumber(copyColorPerPage) || !isWholePeso(copyColorPerPage) || copyColorPerPage < 0)
+    ) {
+      return res.status(400).json({
+        error: 'copyColorPerPage must be a whole peso value (no decimals).',
       });
     }
     if (
@@ -1755,6 +1778,12 @@ export class AdminController {
         nextSettings.pricing.printPerPage = printPerPage;
       if (copyPerPage !== undefined)
         nextSettings.pricing.copyPerPage = copyPerPage;
+      if (copyBwPerPage !== undefined) {
+        nextSettings.pricing.copyBwPerPage = copyBwPerPage;
+        nextSettings.pricing.copyPerPage = copyBwPerPage;
+      }
+      if (copyColorPerPage !== undefined)
+        nextSettings.pricing.copyColorPerPage = copyColorPerPage;
       if (scanDocument !== undefined)
         nextSettings.pricing.scanDocument = scanDocument;
       if (colorSurcharge !== undefined)

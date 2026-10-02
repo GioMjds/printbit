@@ -73,6 +73,12 @@ const settingLongBondColorLow = document.getElementById('settingLongBondColorLow
 const settingLongBondColorMedium = document.getElementById('settingLongBondColorMedium') as HTMLInputElement | null;
 const settingLongBondColorHigh = document.getElementById('settingLongBondColorHigh') as HTMLInputElement | null;
 const settingLongBondColorVeryHigh = document.getElementById('settingLongBondColorVeryHigh') as HTMLInputElement | null;
+const settingCopyBwPerPage = document.getElementById(
+  'settingCopyBwPerPage',
+) as HTMLInputElement | null;
+const settingCopyColorPerPage = document.getElementById(
+  'settingCopyColorPerPage',
+) as HTMLInputElement | null;
 const settingScanDocument = document.getElementById(
   'settingScanDocument',
 ) as HTMLInputElement | null;
@@ -451,6 +457,16 @@ function applySettings(settings: SettingsResponse): void {
   populateProfile('A4', 'a4');
   populateProfile('ShortBond', 'shortBond');
   populateProfile('LongBond', 'longBond');
+  if (settingCopyBwPerPage) {
+    settingCopyBwPerPage.value = String(
+      settings.pricing.copyBwPerPage ?? settings.pricing.copyPerPage ?? 3,
+    );
+  }
+  if (settingCopyColorPerPage) {
+    settingCopyColorPerPage.value = String(
+      settings.pricing.copyColorPerPage ?? 5,
+    );
+  }
   if (settingScanDocument) {
     settingScanDocument.value = String(settings.pricing.scanDocument);
   }
@@ -745,14 +761,27 @@ settingsForm.addEventListener('submit', (e) => {
   const longBondProfile = validateProfile('LongBond', 'Long Bond');
   if (!longBondProfile) return;
 
+  const copyBwPrice = Number(settingCopyBwPerPage?.value ?? 0);
+  const copyColorPrice = Number(settingCopyColorPerPage?.value ?? 0);
   const scanDocumentPrice = Number(settingScanDocument?.value ?? 0);
   const highQualitySurcharge = Number(settingHighQualitySurcharge?.value ?? 0);
 
-  if (settingScanDocument && !isWholePeso(scanDocumentPrice)) {
+  if (settingCopyBwPerPage && (!isWholePeso(copyBwPrice) || copyBwPrice < 0)) {
+    setMessage('Copy B&W rate must be a whole peso value (no decimals).');
+    return;
+  }
+  if (
+    settingCopyColorPerPage &&
+    (!isWholePeso(copyColorPrice) || copyColorPrice < 0)
+  ) {
+    setMessage('Copy Color rate must be a whole peso value (no decimals).');
+    return;
+  }
+  if (settingScanDocument && (!isWholePeso(scanDocumentPrice) || scanDocumentPrice < 0)) {
     setMessage('Scan document rate must be a whole peso value (no decimals).');
     return;
   }
-  if (settingHighQualitySurcharge && !isWholePeso(highQualitySurcharge)) {
+  if (settingHighQualitySurcharge && (!isWholePeso(highQualitySurcharge) || highQualitySurcharge < 0)) {
     setMessage(
       'High quality surcharge must be a whole peso value (no decimals).',
     );
@@ -762,6 +791,9 @@ settingsForm.addEventListener('submit', (e) => {
   const payload: Record<string, unknown> = {
     pricing: {
       printPerPage: shortBondProfile.bwPrint.low,
+      copyPerPage: copyBwPrice,
+      copyBwPerPage: copyBwPrice,
+      copyColorPerPage: copyColorPrice,
       scanDocument: scanDocumentPrice,
       colorSurcharge: shortBondProfile.colorPrint.low - shortBondProfile.bwPrint.low,
       highQualitySurcharge,

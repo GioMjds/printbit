@@ -2328,38 +2328,16 @@ async function loadPreview(): Promise<void> {
 
     const url = `/api/scan/preview/${encodeURIComponent(copyPreview)}`;
 
-    const analysisPromise = (async () => {
-      try {
-        const analysisResp = await fetch(
-          `/api/scan/color-analysis/${encodeURIComponent(copyPreview)}`,
-        );
-        if (analysisResp.ok) {
-          const { isGrayscale } = (await analysisResp.json()) as {
-            isGrayscale: boolean;
-          };
-          if (isGrayscale) {
-            resetColorLock(); // ensure clean state
-            lockColorMode();
-          }
-        }
-      } catch {
-        // non-fatal
-      }
-    })();
-
-    const previewPromise = (async () => {
-      try {
-        const resp = await fetch(url);
-        if (!resp.ok) return;
+    try {
+      const resp = await fetch(url);
+      if (resp.ok) {
         const buf = await resp.arrayBuffer();
         await preview.loadFromBuffer(buf, 'application/pdf');
         await applyDocumentAutoDetection();
-      } catch {
-        // Preview not critical for copy mode
       }
-    })();
-
-    await Promise.all([analysisPromise, previewPromise]);
+    } catch {
+      // Preview not critical for copy mode
+    }
 
     if (footerSummary)
       footerSummary.textContent =
@@ -2457,35 +2435,6 @@ function restoreContinueAfterPreparation(): void {
   setContinueEnabled(scanFilename.length > 0);
 }
 
-function lockColorMode(): void {
-  const grayRadio = document.querySelector<HTMLInputElement>(
-    'input[name="colorMode"][value="grayscale"]',
-  );
-  if (grayRadio) {
-    grayRadio.checked = true;
-    grayRadio.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  document
-    .querySelectorAll<HTMLInputElement>('input[name="colorMode"]')
-    .forEach((radio) => {
-      radio.disabled = true;
-      radio
-        .closest<HTMLElement>('.option-card')
-        ?.setAttribute('data-locked', 'true');
-    });
-
-  const colorGroup = document.querySelector<HTMLElement>(
-    '.option-group:has(input[name="colorMode"])',
-  );
-  if (colorGroup && !colorGroup.querySelector('.color-lock-notice')) {
-    const notice = document.createElement('p');
-    notice.className = 'color-lock-notice';
-    notice.textContent =
-      'Color printing is unavailable — this document contains only grayscale content.';
-    colorGroup.appendChild(notice);
-  }
-}
 
 function resetColorLock(): void {
   document

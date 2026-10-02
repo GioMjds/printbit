@@ -300,6 +300,8 @@ const DEFAULT_DATA: Schema = {
     pricing: {
       printPerPage: 5,
       copyPerPage: 3,
+      copyBwPerPage: 3,
+      copyColorPerPage: 5,
       scanDocument: 5,
       colorSurcharge: 2,
       highQualitySurcharge: 2,
@@ -1257,7 +1259,20 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
         copyPerPage: wholePeso(
           finiteOr(
             pricing?.copyPerPage,
-            DEFAULT_DATA.settings.pricing.copyPerPage,
+            pricing?.copyBwPerPage ?? DEFAULT_DATA.settings.pricing.copyPerPage,
+          ),
+        ),
+        copyBwPerPage: wholePeso(
+          finiteOr(
+            pricing?.copyBwPerPage,
+            pricing?.copyPerPage ??
+              (DEFAULT_DATA.settings.pricing.copyBwPerPage ?? 3),
+          ),
+        ),
+        copyColorPerPage: wholePeso(
+          finiteOr(
+            pricing?.copyColorPerPage,
+            DEFAULT_DATA.settings.pricing.copyColorPerPage ?? 5,
           ),
         ),
         scanDocument: wholePeso(

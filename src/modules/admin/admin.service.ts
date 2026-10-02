@@ -182,6 +182,31 @@ export class AdminService {
       return pricing.scanDocument;
     }
 
+    if (mode === 'copy') {
+      const counts =
+        typeof colorOrPageCounts === 'string'
+          ? {
+              colorPages: colorOrPageCounts === 'colored' ? 1 : 0,
+              bwPages: colorOrPageCounts === 'colored' ? 0 : 1,
+            }
+          : colorOrPageCounts;
+      const colorPages = Math.max(0, Math.floor(counts.colorPages ?? 0));
+      const bwPages = Math.max(0, Math.floor(counts.bwPages ?? 0));
+      const totalPages = Math.max(1, colorPages + bwPages);
+      const isColor =
+        typeof colorOrPageCounts === 'string'
+          ? colorOrPageCounts === 'colored'
+          : colorPages > 0;
+      const copyBwRate = pricing.copyBwPerPage ?? pricing.copyPerPage ?? 3;
+      const copyColorRate = pricing.copyColorPerPage ?? 5;
+      const ratePerPage = isColor ? copyColorRate : copyBwRate;
+      const qualitySurcharge =
+        quality === 'high'
+          ? (engineCfg?.highQualitySurcharge ?? pricing.highQualitySurcharge ?? 2)
+          : 0;
+      return (ratePerPage + qualitySurcharge) * totalPages * safeCopies;
+    }
+
     const paperSizeName = paperSize as string;
     const profileKey =
       paperSizeName === 'Long' || paperSizeName === 'Legal'

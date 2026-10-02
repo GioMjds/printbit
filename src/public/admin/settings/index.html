@@ -595,8 +595,46 @@
                   </table>
                 </div>
 
-                <!-- Additional Pricing Rules (Scan, Quality Surcharge) -->
+                <!-- Additional Pricing Rules (Copy, Scan, Quality Surcharge) -->
                 <div class="pricing-additional-grid">
+                  <div class="field">
+                    <label class="field__lbl" for="settingCopyBwPerPage"
+                      >Copy — Black &amp; White (Flat rate per page)</label
+                    >
+                    <div class="field__wrap field__wrap--pre">
+                      <span class="field__affix">₱</span>
+                      <input
+                        id="settingCopyBwPerPage"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="field__input"
+                        placeholder="Whole pesos"
+                        required
+                      />
+                    </div>
+                    <p class="field__hint">Flat charge per page for B&amp;W copies</p>
+                  </div>
+
+                  <div class="field">
+                    <label class="field__lbl" for="settingCopyColorPerPage"
+                      >Copy — Color (Flat rate per page)</label
+                    >
+                    <div class="field__wrap field__wrap--pre">
+                      <span class="field__affix">₱</span>
+                      <input
+                        id="settingCopyColorPerPage"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="field__input"
+                        placeholder="Whole pesos"
+                        required
+                      />
+                    </div>
+                    <p class="field__hint">Flat charge per page for Color copies</p>
+                  </div>
+
                   <div class="field">
                     <label class="field__lbl" for="settingScanDocument"
                       >Scan Document (Flat rate)</label

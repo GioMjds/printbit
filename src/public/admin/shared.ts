@@ -225,6 +225,8 @@ export interface AdminSettings {
   pricing: {
     printPerPage: number;
     copyPerPage: number;
+    copyBwPerPage?: number;
+    copyColorPerPage?: number;
     scanDocument: number;
     colorSurcharge: number;
     highQualitySurcharge: number;
