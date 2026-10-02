@@ -8,6 +8,10 @@ import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import { attachPowerSafetyOverlay } from '../shared/power-safety-overlay';
 import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 import { resolveWifiTroubleshootingDetails } from '../shared/wifi-troubleshooting';
+import {
+  mountLoadingAnimation,
+  type LoadingAnimationController,
+} from '../shared/loading-animation';
 
 attachPowerSafetyOverlay();
 attachUiBlockingOverlay();
@@ -144,12 +148,40 @@ const mobileGuideTextEl = document.getElementById(
 const conversionOverlay = document.getElementById(
   'conversionOverlay',
 ) as HTMLElement | null;
+const conversionTitle = document.getElementById(
+  'conversionTitle',
+) as HTMLElement | null;
 const conversionMessage = document.getElementById(
   'conversionMessage',
 ) as HTMLElement | null;
 const conversionCancelBtn = document.getElementById(
   'conversionCancel',
 ) as HTMLButtonElement | null;
+const preloadLoadingAnimation = document.getElementById(
+  'preloadLoadingAnimation',
+) as HTMLElement | null;
+const preloadLoadingCanvas = document.getElementById(
+  'preloadLoadingCanvas',
+) as HTMLCanvasElement | null;
+const preloadFileName = document.getElementById(
+  'preloadFileName',
+) as HTMLElement | null;
+const preloadFileType = document.getElementById(
+  'preloadFileType',
+) as HTMLElement | null;
+const preloadFileIcon = document.getElementById(
+  'preloadFileIcon',
+) as SVGElement | null;
+
+const preloadLoadingController: LoadingAnimationController | null =
+  preloadLoadingAnimation && preloadLoadingCanvas
+    ? mountLoadingAnimation({
+        root: preloadLoadingAnimation,
+        canvas: preloadLoadingCanvas,
+        mode: 'print',
+        active: false,
+      })
+    : null;
 let selectedFileRecord: UploadedFile | null = null;
 const printLimitTipMessage = document.getElementById(
   'printLimitTipMessage',
@@ -476,8 +508,8 @@ function showIncomingUploadSkeleton(filename: string): void {
     <div class="file-item__info">
       <p class="file-item__name file-skeleton__name">${safeName}</p>
       <div class="file-item__meta file-skeleton__meta">
-        <span class="file-skeleton__badge">Preloading file…</span>
-        <span class="file-skeleton__reassurance">Scanning security &amp; layout</span>
+        <span class="file-skeleton__badge">Receiving file…</span>
+        <span class="file-skeleton__reassurance">Checking file security</span>
       </div>
       <div class="file-skeleton__bar-track" aria-hidden="true">
         <div class="file-skeleton__bar-fill"></div>
@@ -1012,34 +1044,59 @@ function isPdfFilename(filename: string): boolean {
   return filename.trim().toLowerCase().endsWith('.pdf');
 }
 
-function setConversionMessage(message: string): void {
+function getFriendlyFileType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'pdf') return 'PDF Document';
+  if (ext === 'doc' || ext === 'docx') return 'Word Document';
+  if (ext === 'xls' || ext === 'xlsx') return 'Spreadsheet';
+  if (ext === 'ppt' || ext === 'pptx') return 'Presentation';
+  if (['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'].includes(ext)) {
+    return 'Image File';
+  }
+  return 'Document';
+}
+
+function setConversionStatus(title: string, message: string): void {
+  if (conversionTitle) conversionTitle.textContent = title;
   if (conversionMessage) conversionMessage.textContent = message;
 }
 
-function updateConversionStepper(stage: 1 | 2 | 3): void {
-  const step1 = document.getElementById('conversionStep1');
-  const step2 = document.getElementById('conversionStep2');
-  const step3 = document.getElementById('conversionStep3');
-  if (!step1 || !step2 || !step3) return;
-
-  step1.className = `stepper-step ${stage >= 1 ? (stage > 1 ? 'stepper-step--done' : 'stepper-step--active') : ''}`;
-  step2.className = `stepper-step ${stage >= 2 ? (stage > 2 ? 'stepper-step--done' : 'stepper-step--active') : ''}`;
-  step3.className = `stepper-step ${stage === 3 ? 'stepper-step--active' : ''}`;
-}
-
-function showConversionDialog(): void {
+function showConversionDialog(file?: UploadedFile | null): void {
   const activeElement = document.activeElement;
   conversionReturnFocus =
     activeElement instanceof HTMLElement ? activeElement : null;
   conversionWaitCancelled = false;
-  updateConversionStepper(2);
-  setConversionMessage(`Converting your document to PDF. This can take a moment.`);
+
+  const targetFile = file ?? selectedFileRecord;
+  const filename = targetFile?.filename || selectedFilename || 'Document';
+  const isPdf = isPdfFilename(filename);
+
+  if (preloadFileName) preloadFileName.textContent = filename;
+  if (preloadFileType) preloadFileType.textContent = getFriendlyFileType(filename);
+  if (preloadFileIcon) {
+    preloadFileIcon.innerHTML = `<use href="#${iconIdForFile(filename)}"/>`;
+  }
+
+  if (isPdf) {
+    setConversionStatus(
+      'Preparing your document',
+      'Checking pages and print quality…',
+    );
+  } else {
+    setConversionStatus(
+      'Preparing your document',
+      'Formatting file for crisp, high-quality printing…',
+    );
+  }
+
+  preloadLoadingController?.setActive(true);
   conversionOverlay?.classList.add('is-visible');
   conversionOverlay?.setAttribute('aria-hidden', 'false');
   conversionCancelBtn?.focus();
 }
 
 function hideConversionDialog(): void {
+  preloadLoadingController?.setActive(false);
   conversionOverlay?.classList.remove('is-visible');
   conversionOverlay?.setAttribute('aria-hidden', 'true');
   conversionReturnFocus?.focus();
@@ -1095,7 +1152,7 @@ async function waitForDocumentAnalysis(
           ready: false,
           message:
             document.analysisError ||
-            'PDF conversion could not be completed. Choose another file or try again later.',
+            'Document could not be prepared. Choose another file or try again.',
         };
       }
     } catch {
@@ -1222,7 +1279,7 @@ function updateFileAnalysisState(
     case 'analyzing':
       statusEl.innerHTML = `
         <span class="analysis-spinner-mini" aria-hidden="true"></span>
-        <span class="analysis-label">Preloading pages &amp; analyzing color…</span>
+        <span class="analysis-label">Preparing pages…</span>
       `;
       statusEl.style.display = 'inline-flex';
       break;
@@ -1405,17 +1462,17 @@ continueBtn?.addEventListener('click', async () => {
   if (selectedFileRecord?.analysisStatus !== 'completed') {
     conversionWaitInFlight = true;
     setContinueButtonDisabled(true);
-    showConversionDialog();
-    if (isPdfFilename(selectedFilename)) {
-      setConversionMessage('Preparing your document. This can take a moment.');
-    }
+    showConversionDialog(selectedFileRecord);
     const result = await waitForDocumentAnalysis(
       activeSessionId,
       selectedDocumentId,
     );
     if (!result.ready) {
       if (!conversionWaitCancelled) {
-        setConversionMessage(result.message);
+        setConversionStatus(
+          'Unable to prepare document',
+          result.message || 'Please try another file or re-upload.',
+        );
         conversionCancelBtn?.focus();
       }
       conversionWaitInFlight = false;
@@ -1438,11 +1495,9 @@ continueBtn?.addEventListener('click', async () => {
       }
       return;
     }
-    updateConversionStepper(3);
-    setConversionMessage(
-      isPdfFilename(selectedFilename)
-        ? 'Document ready. Opening print settings…'
-        : 'PDF ready. Opening print settings…',
+    setConversionStatus(
+      'Document ready!',
+      'Opening print configuration…',
     );
   }
   const destination =

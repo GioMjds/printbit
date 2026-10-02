@@ -35,14 +35,18 @@ import {
  *   7 — sample embedded images for color, exclude grayscale/monochrome icons from color, and restrict image tier to converted image uploads
  *   8 — include constructPath and rawFillPath in pathDrawingOps to recognize vector shapes and colored boxes
  *   9 — uniform low-DPI canvas coverage metering for PDF pages and images; coverage tiers (low, medium, high, very_high)
+ *   10 — lower color coverage threshold to 0.0005 and add RGB spread guard to recognize small logos, stamps, and seals
+ *   11 — fix missing min variable in isColorPixel
+ *   12 — near-black noise guard in isColorPixel and cache bump
  */
-export const ANALYSIS_ALGORITHM_VERSION = 9;
+export const ANALYSIS_ALGORITHM_VERSION = 12;
 
 export function resolveCoverageTier(contentCoverage: number): CoverageTier {
-  const coverage = contentCoverage > 1 ? contentCoverage / 100 : contentCoverage;
-  if (coverage <= 0.10) return 'low';
-  if (coverage <= 0.40) return 'medium';
-  if (coverage <= 0.70) return 'high';
+  const coverage =
+    contentCoverage > 1 ? contentCoverage / 100 : contentCoverage;
+  if (coverage <= 0.1) return 'low';
+  if (coverage <= 0.4) return 'medium';
+  if (coverage <= 0.7) return 'high';
   return 'very_high';
 }
 
@@ -60,9 +64,9 @@ export type AnalyzedFileType =
 export interface PageAnalysis {
   index: number;
   isColor: boolean;
-  coverage: number;             // contentCoverage (0.0 to 1.0)
-  colorCoverage: number;        // colorCoverage (0.0 to 1.0)
-  coverageTier: CoverageTier;   // 'low' | 'medium' | 'high' | 'very_high'
+  coverage: number; // contentCoverage (0.0 to 1.0)
+  colorCoverage: number; // colorCoverage (0.0 to 1.0)
+  coverageTier: CoverageTier; // 'low' | 'medium' | 'high' | 'very_high'
   isBlank: boolean;
   classification: 'blank' | 'bw' | 'color';
   fallbackReasonFlags?: string[];
@@ -189,9 +193,12 @@ export function resolveFileType(
 }
 
 function isColorPixel(r: number, g: number, b: number): boolean {
+  if (Math.max(r, g, b) < 25) return false;
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  if (spread <= 10) return false;
   const max = Math.max(r, g, b) / 255;
-  const min = Math.min(r, g, b) / 255;
   if (max === 0) return false;
+  const min = Math.min(r, g, b) / 255;
   const saturation = (max - min) / max;
   return saturation > COLOR_SATURATION_THRESHOLD;
 }
@@ -245,7 +252,7 @@ async function analyzeImage(
   filePath: string,
   colorDetectionEnabled: boolean = true,
 ): Promise<DocumentAnalysisResult> {
-  const { data, info } = await (sharp(filePath) as any)
+  const { data, info } = await sharp(filePath)
     .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
     .ensureAlpha()
     .raw()
@@ -256,7 +263,8 @@ async function analyzeImage(
     height: info.height,
   });
   const isBlank = metrics.contentCoverage < 0.001;
-  const isColor = colorDetectionEnabled && !isBlank && metrics.colorCoverage > 0.02;
+  const isColor =
+    colorDetectionEnabled && !isBlank && metrics.colorCoverage > 0.0005;
   const coverageTier = resolveCoverageTier(metrics.contentCoverage);
   const classification: 'blank' | 'bw' | 'color' = isBlank
     ? 'blank'
@@ -321,12 +329,20 @@ interface PdfjsLoadingTask {
 }
 
 interface PdfjsLib {
-  getDocument(params: { data: Uint8Array; verbosity: number }): PdfjsLoadingTask;
+  getDocument(params: {
+    data: Uint8Array;
+    verbosity: number;
+  }): PdfjsLoadingTask;
   OPS?: Record<string, number>;
 }
 
 type Canvas2DContext = {
-  getImageData(sx: number, sy: number, sw: number, sh: number): { data: Uint8ClampedArray | Uint8Array };
+  getImageData(
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+  ): { data: Uint8ClampedArray | Uint8Array };
 };
 
 type CanvasInstance = {
@@ -343,14 +359,19 @@ async function analyzePdfFile(
   colorDetectionEnabled: boolean = true,
 ): Promise<DocumentAnalysisResult> {
   let pdfjs: PdfjsLib;
-  let canvasFactory: CanvasFactory = (w: number, h: number) => createCanvas(w, h);
+  let canvasFactory: CanvasFactory = (w: number, h: number) =>
+    createCanvas(w, h);
   try {
     const nativeRequire = createRequire(
-      typeof __filename !== 'undefined' ? __filename : path.join(process.cwd(), 'index.js'),
+      typeof __filename !== 'undefined'
+        ? __filename
+        : path.join(process.cwd(), 'index.js'),
     );
     pdfjs = nativeRequire('pdfjs-dist/legacy/build/pdf.mjs') as PdfjsLib;
     try {
-      const pdfjsPath = nativeRequire.resolve('pdfjs-dist/legacy/build/pdf.mjs');
+      const pdfjsPath = nativeRequire.resolve(
+        'pdfjs-dist/legacy/build/pdf.mjs',
+      );
       const pdfjsReq = createRequire(pdfjsPath);
       const napiCanvas = pdfjsReq('@napi-rs/canvas') as {
         createCanvas?: (w: number, h: number) => CanvasInstance;
@@ -363,7 +384,8 @@ async function analyzePdfFile(
       // Keep default createCanvas
     }
   } catch {
-    pdfjs = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as PdfjsLib;
+    pdfjs =
+      (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as PdfjsLib;
   }
   const data = new Uint8Array(await fs.promises.readFile(pdfPath));
   const loadingTask = pdfjs.getDocument({ data, verbosity: 0 });
@@ -410,7 +432,10 @@ async function analyzePdfFile(
 
       try {
         const viewport = page.getViewport({ scale: 0.5 });
-        const canvas = canvasFactory(Math.ceil(viewport.width), Math.ceil(viewport.height));
+        const canvas = canvasFactory(
+          Math.ceil(viewport.width),
+          Math.ceil(viewport.height),
+        );
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           throw new Error('Canvas 2D context is not available');
@@ -428,7 +453,8 @@ async function analyzePdfFile(
         });
 
         isBlank = metrics.contentCoverage < 0.001;
-        isColor = colorDetectionEnabled && !isBlank && metrics.colorCoverage > 0.02;
+        isColor =
+          colorDetectionEnabled && !isBlank && metrics.colorCoverage > 0.0005;
         coverageTier = resolveCoverageTier(metrics.contentCoverage);
         classification = isBlank ? 'blank' : isColor ? 'color' : 'bw';
         coverage = metrics.contentCoverage;
@@ -780,9 +806,7 @@ async function analyzePageOperatorList(
         hasImages = true;
         const args = opList.argsArray[i];
         const imageName =
-          Array.isArray(args) && typeof args[0] === 'string'
-            ? args[0]
-            : null;
+          Array.isArray(args) && typeof args[0] === 'string' ? args[0] : null;
         if (imageName && options?.page) {
           const imageObj = await resolveImageObject(options.page, imageName);
           if (imageObj && getImageColorStats(imageObj).isColor) {
@@ -813,8 +837,7 @@ async function analyzePageOperatorList(
 
   const pageWidth = options?.pageWidth ?? 0;
   const pageHeight = options?.pageHeight ?? 0;
-  const pageArea =
-    pageWidth > 0 && pageHeight > 0 ? pageWidth * pageHeight : 0;
+  const pageArea = pageWidth > 0 && pageHeight > 0 ? pageWidth * pageHeight : 0;
   const rawImageCoverage =
     pageArea > 0
       ? Math.min(1.0, totalImageArea / pageArea)
@@ -860,10 +883,14 @@ async function analyzeDocumentDirect(
 ): Promise<DocumentAnalysisResult> {
   const contentType = (input.contentType ?? '').toLowerCase();
   const filename = input.filename ?? path.basename(input.filePath);
-  const fileType = input.originalFileType ?? resolveFileType(contentType, filename);
+  const fileType =
+    input.originalFileType ?? resolveFileType(contentType, filename);
   const colorDetectionEnabled = input.colorDetectionEnabled !== false;
 
-  if (fileType === 'image' && path.extname(input.filePath).toLowerCase() !== '.pdf') {
+  if (
+    fileType === 'image' &&
+    path.extname(input.filePath).toLowerCase() !== '.pdf'
+  ) {
     return analyzeImage(input.filePath, colorDetectionEnabled);
   }
   if (

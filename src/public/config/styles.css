@@ -1441,15 +1441,16 @@ body {
 .detection-evidence {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr auto;
   grid-template-areas:
     "eyebrow counts"
-    "summary counts"
-    "meter confidence"
+    "summary summary"
+    "meter meter"
+    "confidence confidence"
     "details details";
-  gap: 3px 12px;
+  gap: 5px 12px;
   margin: 0;
-  padding: 9px 12px 7px;
+  padding: 10px 14px 8px;
   border: 1px solid rgba(167, 170, 225, 0.2);
   border-radius: 10px;
   background: rgba(167, 170, 225, 0.06);
@@ -1464,6 +1465,7 @@ body {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  align-self: center;
 }
 
 .detection-evidence__summary {
@@ -1471,13 +1473,13 @@ body {
   color: var(--white);
   font-size: 12px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .detection-evidence__meter {
   grid-area: meter;
   height: 6px;
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(167, 170, 225, 0.2);
@@ -1495,13 +1497,13 @@ body {
 .detection-evidence__counts,
 .detection-evidence__confidence {
   font-size: 11px;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .detection-evidence__counts {
   grid-area: counts;
   align-self: center;
-  color: rgba(255, 255, 255, 0.84);
+  color: rgba(255, 255, 255, 0.88);
   font-weight: 700;
   text-align: right;
   white-space: nowrap;
@@ -1509,11 +1511,9 @@ body {
 
 .detection-evidence__confidence {
   grid-area: confidence;
-  align-self: center;
   margin: 0;
   color: var(--lavender);
-  text-align: right;
-  white-space: nowrap;
+  text-align: left;
 }
 
 .detection-evidence__details {

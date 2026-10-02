@@ -470,13 +470,16 @@ class PrintPreview {
     this.resizeObserver.observe(this.viewport);
   }
 
-  /** Scale the paper sheet to fill the viewport while keeping aspect ratio. */
+  /** Scale the paper sheet to fill the viewport while keeping aspect ratio and realistic relative sizes. */
   private resizeSheet(): void {
     const pad = 40;
     const vpW = this.viewport.clientWidth - pad;
     const vpH = this.viewport.clientHeight - pad;
     if (vpW <= 0 || vpH <= 0) return;
-    const fitScale = Math.min(vpW / this.naturalW, vpH / this.naturalH);
+    // Scale against Long bond (the largest supported size) so Short and Long share
+    // the exact same physical width (8.5in), and Long visibly extends longer in height.
+    const [refW, refH] = paperPx('Long', this.printConfig.orientation);
+    const fitScale = Math.min(vpW / refW, vpH / refH);
     const finalScale = fitScale * this.zoomScale;
     // Preserve fractional CSS pixels so the visual paper boundary and the
     // PDF.js canvas share the same geometry at every zoom level.

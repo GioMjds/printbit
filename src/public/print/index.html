@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="/globals.css" />
     <link rel="stylesheet" href="/shared/kiosk-transition.css" />
+    <link rel="stylesheet" href="/shared/loading-animation.css" />
     <title>Print · PrintBit</title>
     <link rel="stylesheet" href="/print/styles.css" />
   </head>
@@ -273,7 +274,7 @@
                 <svg class="assurance-pill__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
                 </svg>
-                <span><strong>Auto-Preload</strong> &bull; Fast vector render</span>
+                <span><strong>Instant Preview</strong> &bull; Fast vector render</span>
               </div>
             </div>
           </div>
@@ -524,7 +525,7 @@
       </div>
     </div>
 
-    <!-- Non-PDF conversion gate -->
+    <!-- Document preloading & preparation modal -->
     <div
       class="modal-overlay conversion-overlay"
       id="conversionOverlay"
@@ -537,62 +538,66 @@
         aria-labelledby="conversionTitle"
         aria-describedby="conversionMessage"
       >
-        <!-- Document Preloading Skeleton -->
-        <div class="conversion-skeleton" aria-hidden="true">
-          <div class="conversion-skeleton__sheet">
-            <div class="conversion-skeleton__fold"></div>
-            <div class="conversion-skeleton__laser"></div>
-            <div class="conversion-skeleton__header">
-              <div class="conversion-skeleton__icon"></div>
-              <div class="conversion-skeleton__title-bar"></div>
-            </div>
-            <div class="conversion-skeleton__lines">
-              <div class="conversion-skeleton__line" style="width: 88%"></div>
-              <div class="conversion-skeleton__line" style="width: 95%"></div>
-              <div class="conversion-skeleton__line" style="width: 72%"></div>
-              <div class="conversion-skeleton__line" style="width: 80%"></div>
+        <!-- Interactive Preload Stage -->
+        <div class="preload-stage" id="preloadStage">
+          <div
+            class="preload-animation lottie-loading"
+            id="preloadLoadingAnimation"
+            aria-hidden="true"
+          >
+            <canvas
+              class="lottie-loading__canvas"
+              id="preloadLoadingCanvas"
+              width="220"
+              height="220"
+            ></canvas>
+            <div class="preload-fallback lottie-loading__fallback">
+              <div class="preload-fallback__ring" aria-hidden="true"></div>
+              <div class="preload-fallback__core" aria-hidden="true">
+                <svg class="preload-fallback__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+              </div>
             </div>
           </div>
-          <div class="conversion-skeleton__badge">
-            <span class="badge-source">DOC</span>
-            <span class="badge-arrow">&rarr;</span>
-            <span class="badge-target">PDF</span>
+
+          <!-- Document info pill -->
+          <div class="preload-file-pill" id="preloadFilePill">
+            <div class="preload-file-pill__icon-wrap" aria-hidden="true">
+              <svg class="preload-file-pill__icon" id="preloadFileIcon">
+                <use href="#icon-pdf" />
+              </svg>
+            </div>
+            <div class="preload-file-pill__text">
+              <span class="preload-file-pill__name" id="preloadFileName">Document</span>
+              <span class="preload-file-pill__type" id="preloadFileType">PDF Document</span>
+            </div>
+          </div>
+
+          <!-- Progress track -->
+          <div class="preload-progress-track" aria-hidden="true">
+            <div class="preload-progress-bar"></div>
           </div>
         </div>
 
-        <h3 class="modal-title" id="conversionTitle">Preparing your file</h3>
+        <h3 class="modal-title" id="conversionTitle">Preparing your document</h3>
         <p class="modal-subtitle" id="conversionMessage" aria-live="polite">
-          Converting your document to PDF. This can take a moment.
+          Checking pages and print quality…
         </p>
 
-        <!-- 3-stage customer assurance stepper -->
-        <div class="conversion-stepper" aria-label="Preparation progress">
-          <div class="stepper-step stepper-step--done" id="conversionStep1">
-            <span class="step-num">&#10003;</span>
-            <span class="step-label">File Received</span>
-          </div>
-          <div class="stepper-divider"></div>
-          <div class="stepper-step stepper-step--active" id="conversionStep2">
-            <span class="step-num">2</span>
-            <span class="step-label">Preloading Layout</span>
-          </div>
-          <div class="stepper-divider"></div>
-          <div class="stepper-step" id="conversionStep3">
-            <span class="step-num">3</span>
-            <span class="step-label">Ready for Config</span>
-          </div>
-        </div>
-
-        <p class="conversion-assurance-text">
+        <p class="preload-assurance-text">
           <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true">
             <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944z" clip-rule="evenodd"/>
           </svg>
-          Processed locally on kiosk hardware &bull; Original formatting &amp; resolution preserved
+          Processed securely on kiosk &bull; Never stored after print
         </p>
 
         <div class="modal-actions">
           <button type="button" class="modal-btn modal-btn--cancel" id="conversionCancel">
-            Back to files
+            Cancel
           </button>
         </div>
       </div>
