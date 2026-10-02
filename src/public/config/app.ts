@@ -1126,6 +1126,25 @@ const initialQuality: PrintQuality =
 let rotationDeg: RotationDeg =
   normalizeRotationDeg(storedConfig?.rotationDeg) ?? 0;
 
+if (sessionId && mode === 'print') {
+  const touchSession = async () => {
+    try {
+      const tokenParam = sessionToken ? `?token=${encodeURIComponent(sessionToken)}` : '';
+      await fetch(
+        `/api/wireless/sessions/${encodeURIComponent(sessionId)}/touch${tokenParam}`,
+        { method: 'POST' },
+      );
+    } catch {
+      // Best-effort keep-alive
+    }
+  };
+  void touchSession();
+  const sessionKeepAliveInterval = window.setInterval(touchSession, 25_000);
+  window.addEventListener('beforeunload', () =>
+    window.clearInterval(sessionKeepAliveInterval),
+  );
+}
+
 const backLink = document.getElementById(
   'backLink',
 ) as HTMLAnchorElement | null;
@@ -2504,10 +2523,7 @@ continueBtn?.addEventListener('click', () => {
     copyPreviewPath: mode === 'copy' ? copyPreviewPath : null,
     copyPreviewReleaseToken: mode === 'copy' ? copyPreviewReleaseToken : null,
     detectedColorMode: mode === 'print' ? detectedColorMode : null,
-    colorMode:
-      mode === 'print' && currentPrintQuote?.effectiveColorMode
-        ? currentPrintQuote.effectiveColorMode
-        : cfg.colorMode,
+    colorMode: cfg.colorMode,
     quality: getSelectedQuality(),
     duplex: getIsDuplex(),
     copies: mode === 'scan' ? 1 : getCopies(),
@@ -2532,6 +2548,14 @@ continueBtn?.addEventListener('click', () => {
     sessionStorage.setItem('printbit.uploadedDocumentId', selectedDocumentId);
   else sessionStorage.removeItem('printbit.uploadedDocumentId');
   sessionStorage.setItem('printbit.config', JSON.stringify(config));
+
+  if (sessionId && mode === 'print') {
+    const tokenParam = sessionToken ? `?token=${encodeURIComponent(sessionToken)}` : '';
+    void fetch(
+      `/api/wireless/sessions/${encodeURIComponent(sessionId)}/touch${tokenParam}`,
+      { method: 'POST' },
+    ).catch(() => {});
+  }
 
   navigateWithKioskMotion('/confirm');
 });

@@ -9,6 +9,7 @@ import {
   ESP32_KIOSK_IP,
   ESP32_AP_BASE_URL,
   PORT,
+  SESSION_TTL_MS,
 } from '@/config/http.config';
 import { getLocalIPv4 } from '@/utils/network';
 import { detectEsp32KioskIp } from './hotspot';
@@ -193,7 +194,6 @@ const MAX_BYTES = 25 * 1024 * 1024; // 25MB
 
 // Session limits
 const DEFAULT_SESSION_EXPIRY_ENABLED = false;
-const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const SESSION_WARNING_SECONDS = 60;
 const MAX_FILES_PER_SESSION = 10;
 const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024; // 50MB total per session

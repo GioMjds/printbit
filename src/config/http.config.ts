@@ -137,6 +137,10 @@ export const SESSION_EXPIRY_ENABLED =
     ? true
     : !SESSION_EXPIRY_DISABLED_TOKENS.has(rawSessionExpiryEnabled);
 
+/** Session TTL in milliseconds (defaults to 30 minutes, preventing premature silent expiry on kiosk). */
+export const SESSION_TTL_MS =
+  readPositiveIntEnv('PRINTBIT_SESSION_TTL_MS') ?? 30 * 60 * 1000;
+
 export type PrintDispatchMode = 'legacy' | 'phased' | 'new-only';
 
 function readPathEnv(...keys: string[]): string | undefined {

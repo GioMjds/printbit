@@ -427,12 +427,9 @@ export function buildPrintQuote(input: {
   const duplexSavings =
     (selectedCount * safeCopies - totalPhysicalSheets) * paperCostPerSheet;
 
-  // If the user requested 'colored' mode, but none of the selected pages actually contain color,
-  // downgrade the effectiveColorMode to 'grayscale' so downstream UI and printer driver use grayscale (no color ink).
-  const effectiveColorMode: ColorMode =
-    input.colorMode === 'colored' && selectedColorPages === 0
-      ? 'grayscale'
-      : input.colorMode;
+  // Respect the customer's requested colorMode. Do not silently downgrade 'colored' to 'grayscale'
+  // even if selectedColorPages is 0 (e.g. subtle seals/stamps missed by analyzer or customer forced color).
+  const effectiveColorMode: ColorMode = input.colorMode;
 
   const pageBreakdown: PrintPageQuoteBreakdown[] = [];
   let singleCopyPrintCost = 0;
@@ -454,7 +451,9 @@ export function buildPrintQuote(input: {
         : 0;
     const coverageTier: CoverageTier =
       page?.coverageTier ?? resolveCoverageTier(coverage);
-    const isColorPrint = effectiveColorMode === 'colored' && isPageColor;
+    const isColorPrint =
+      effectiveColorMode === 'colored' &&
+      (isPageColor || selectedColorPages === 0);
     const pageRate = isColorPrint
       ? profile.colorPrint[coverageTier]
       : profile.bwPrint[coverageTier];

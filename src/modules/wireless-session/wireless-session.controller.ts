@@ -79,6 +79,11 @@ export class WirelessSessionController {
       this.wirelessSessionService.getSessionById,
     );
     this.router.post(
+      '/api/wireless/sessions/:sessionId/touch',
+      this.wirelessSessionService.verifyKioskOrOwnedUploadTarget,
+      this.wirelessSessionService.touchSession,
+    );
+    this.router.post(
       '/api/wireless/sessions/:sessionId/upload',
       wirelessUploadRateLimit,
       this.wirelessSessionService.verifyKioskOrOwnedUploadTarget,

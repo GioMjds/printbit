@@ -868,6 +868,29 @@ const currentPaymentFingerprint = JSON.stringify({
   quotedAmount: currentPrintQuote?.requiredAmount ?? null,
 });
 
+if (config.mode === 'print' && config.sessionId) {
+  const activeSessionId = config.sessionId;
+  const activeSessionToken = sessionStorage.getItem('printbit.sessionToken');
+  const touchSession = async () => {
+    try {
+      const tokenParam = activeSessionToken
+        ? `?token=${encodeURIComponent(activeSessionToken)}`
+        : '';
+      await fetch(
+        `/api/wireless/sessions/${encodeURIComponent(activeSessionId)}/touch${tokenParam}`,
+        { method: 'POST' },
+      );
+    } catch {
+      // Best-effort keep-alive
+    }
+  };
+  void touchSession();
+  const sessionKeepAliveInterval = window.setInterval(touchSession, 25_000);
+  window.addEventListener('beforeunload', () =>
+    window.clearInterval(sessionKeepAliveInterval),
+  );
+}
+
 const backLink = document.getElementById(
   'backLink',
 ) as HTMLAnchorElement | null;

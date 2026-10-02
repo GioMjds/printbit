@@ -673,6 +673,16 @@ export class WirelessSessionService {
     res.json(session);
   };
 
+  touchSession: RequestHandler<{ sessionId: string }> = (req, res) => {
+    const { sessionId } = req.params;
+    const ok = this.deps.sessionStore.touchSession(sessionId);
+    if (!ok) {
+      res.status(404).json({ error: 'Session not found or expired.' });
+      return;
+    }
+    res.json({ ok: true });
+  };
+
   uploadToSession: RequestHandler<{ sessionId: string }> = async (req, res) => {
     const { sessionId } = req.params;
     const token = this.extractUploadToken(req);
