@@ -10,7 +10,8 @@ void initKioskLocalization();
 declare global {
   interface Window {
     uploadToken?: string;
-    documentConversionEnabled?: boolean;
+    documentConversionEnabled?: boolean | string;
+    malwareScanningEnabled?: boolean | string;
     io?: (
       namespace: string,
       options: {
@@ -41,6 +42,7 @@ interface SessionResponse {
   warningThresholdSeconds?: number;
   ttlSeconds?: number;
   documentConversionEnabled?: boolean;
+  malwareScanningEnabled?: boolean;
 }
 
 interface UploadErrorResponse {
@@ -117,10 +119,23 @@ let countdownSyncedAtMs: number | null = null;
 let countdownHandle: number | null = null;
 let isSessionUnavailable = false;
 let largePrintWarningShown = false;
-let documentConversionEnabled =
-  typeof window.documentConversionEnabled === 'boolean'
-    ? window.documentConversionEnabled
-    : true;
+function parseBooleanSetting(val: unknown, fallback = true): boolean {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') {
+    if (val === 'true') return true;
+    if (val === 'false') return false;
+  }
+  return fallback;
+}
+
+let documentConversionEnabled = parseBooleanSetting(
+  window.documentConversionEnabled,
+  true,
+);
+let malwareScanningEnabled = parseBooleanSetting(
+  window.malwareScanningEnabled,
+  true,
+);
 
 function getOrCreateUploadClientId(): string {
   const generated =
@@ -310,12 +325,37 @@ async function sha256File(file: File): Promise<string | undefined> {
   ).join('');
 }
 
+const SECURITY_CHECK_FAILED_MESSAGE =
+  'Security check failed: Suspicious or disguised file detected.';
+
+function isSecurityCheckFailure(r: UploadErrorResponse): boolean {
+  if (r.code === 'FILE_INFECTED' || r.code === 'DISGUISED_EXECUTABLE') {
+    return true;
+  }
+  if (
+    malwareScanningEnabled &&
+    (r.error === 'File content does not match its declared type.' ||
+      r.error === SECURITY_CHECK_FAILED_MESSAGE)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function mapError(r: UploadErrorResponse): string {
+  if (isSecurityCheckFailure(r)) {
+    return SECURITY_CHECK_FAILED_MESSAGE;
+  }
+
   switch (r.code) {
     case 'DUPLICATE_FILE':
       return 'This file was already sent in this session.';
     case 'INVALID_TOKEN':
       return 'Invalid token. Scan a fresh kiosk QR or reopen the upload link from the kiosk.';
+    case 'DISGUISED_EXECUTABLE':
+      return r.error ?? 'Files with executable extension patterns are not allowed.';
+    case 'FILE_INFECTED':
+      return r.error ?? 'File was identified as containing potential malware.';
     case 'UNSUPPORTED_TYPE':
       return r.error ?? 'Unsupported file type.';
     case 'UNSUPPORTED_FILE_TYPE':
@@ -483,6 +523,9 @@ async function refreshSessionLease(): Promise<void> {
     }
     if (typeof session.documentConversionEnabled === 'boolean') {
       setDocumentConversionEnabled(session.documentConversionEnabled);
+    }
+    if (typeof session.malwareScanningEnabled === 'boolean') {
+      malwareScanningEnabled = session.malwareScanningEnabled;
     }
   } catch {
     // Keep current UI state on transient network errors.
@@ -704,6 +747,9 @@ async function initSession(): Promise<void> {
     if (typeof session.documentConversionEnabled === 'boolean') {
       setDocumentConversionEnabled(session.documentConversionEnabled);
     }
+    if (typeof session.malwareScanningEnabled === 'boolean') {
+      malwareScanningEnabled = session.malwareScanningEnabled;
+    }
 
     attachSocket(sessionId);
     setAppState('session-ready');
@@ -810,6 +856,7 @@ async function uploadPendingFiles(): Promise<void> {
 
   let doneCount = 0;
   let errorCount = 0;
+  let securityErrorCount = 0;
 
   for (const qf of pending) {
     if (isSessionUnavailable) break;
@@ -855,12 +902,19 @@ async function uploadPendingFiles(): Promise<void> {
               const errBody = JSON.parse(
                 xhr.responseText,
               ) as UploadErrorResponse;
-              updateItemStatus(qf, 'error', mapError(errBody));
+              const mappedErr = mapError(errBody);
+              updateItemStatus(qf, 'error', mappedErr);
+              if (
+                mappedErr === SECURITY_CHECK_FAILED_MESSAGE ||
+                isSecurityCheckFailure(errBody)
+              ) {
+                securityErrorCount++;
+              }
               if (
                 errBody.code === 'SESSION_EXPIRED' ||
                 errBody.code === 'SESSION_OWNED'
               ) {
-                setSessionUnavailable(mapError(errBody));
+                setSessionUnavailable(mappedErr);
               }
             } catch {
               updateItemStatus(qf, 'error', 'Upload failed');
@@ -897,14 +951,18 @@ async function uploadPendingFiles(): Promise<void> {
     setAppState('all-done');
   } else if (doneCount > 0 && errorCount > 0) {
     setStatus(
-      `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} failed. You can retry failed items.`,
+      securityErrorCount > 0
+        ? `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} rejected by security check. Please remove suspicious files.`
+        : `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} failed. You can retry failed items.`,
       'info',
     );
     setAppState('session-ready');
     refreshUploadBtn();
   } else {
     setStatus(
-      'All uploads failed. Please check your network/internet connection and try again.',
+      securityErrorCount > 0
+        ? 'Upload rejected by security check. Please remove suspicious files and try again.'
+        : 'All uploads failed. Please check your network/internet connection and try again.',
       'error',
     );
     setAppState('session-ready');

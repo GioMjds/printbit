@@ -59,15 +59,23 @@ export class UploadPortalService {
     // Inject token into the placeholder used by app.ts
     template = template.replace('{{token}}', token.replace(/"/g, '&quot;'));
 
-    // Inject documentConversionEnabled flag
+    // Inject documentConversionEnabled and malwareScanningEnabled flags
     const pipelineSettings = adminService.getPipelineSettings();
     const documentConversionEnabled =
       typeof pipelineSettings?.documentConversionEnabled === 'boolean'
         ? pipelineSettings.documentConversionEnabled
         : true;
+    const malwareScanningEnabled =
+      typeof pipelineSettings?.malwareScanningEnabled === 'boolean'
+        ? pipelineSettings.malwareScanningEnabled
+        : true;
     template = template.replace(
       '{{documentConversionEnabled}}',
       JSON.stringify(documentConversionEnabled),
+    );
+    template = template.replace(
+      '{{malwareScanningEnabled}}',
+      JSON.stringify(malwareScanningEnabled),
     );
 
     return template;

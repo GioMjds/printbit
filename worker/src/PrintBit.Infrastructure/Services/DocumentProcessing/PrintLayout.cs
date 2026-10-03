@@ -5,7 +5,8 @@ namespace PrintBit.Infrastructure.Services.DocumentProcessing;
 /// <summary>PDF-point layout contract shared with Node's print-configuration.ts.</summary>
 internal readonly record struct PrintLayout(double Width, double Height, double Scale)
 {
-    public const double MarginPoints = 14.4;
+    // Must equal PRINT_MARGIN_POINTS in src/shared/print-configuration.ts, or print != preview.
+    public const double MarginPoints = 0;
 
     public static (double Width, double Height) PaperGeometry(string? paperSize, string? orientation)
     {

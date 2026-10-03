@@ -620,9 +620,14 @@ async function validateStagedMagicBytesWithPolicy(
         context: meta,
       });
 
+      const pipeline = adminService.getPipelineSettings();
+      const errorMessage = pipeline.malwareScanningEnabled
+        ? 'Security check failed: Suspicious or disguised file detected.'
+        : 'File content does not match its declared type.';
+
       res.status(422).json({
         code: 'UNSUPPORTED_TYPE',
-        error: 'File content does not match its declared type.',
+        error: errorMessage,
       });
       return;
     }

@@ -179,8 +179,11 @@ public sealed class DocumentPrinter : IDocumentPrinter
         printSettings.Add(NormalizePaperSetting(settings.PaperSize));
 
 
-        printSettings.Add(string.Equals(settings.Scaling, "actual", StringComparison.OrdinalIgnoreCase)
-            ? "noscale" : "fit");
+        // The prepared PDF is already paper-sized with the customer's fit/actual layout baked in
+        // (DocumentPreprocessor). Sumatra "fit" would shrink it again into the printer's printable
+        // area, so output would no longer match the preview.
+        // ponytail: pass-through fallback PDFs (PDFsharp failure) are printed unscaled too.
+        printSettings.Add("noscale");
         printSettings.Add("ignore-pdf-print-settings");
         printSettings.Add("collate");
 

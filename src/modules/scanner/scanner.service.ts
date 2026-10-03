@@ -66,10 +66,18 @@ function normalizeScannerPaperSize(paperSize: string): ScannerPaperSize {
   return 'A4';
 }
 
-const toCopyPreviewSource = (
-  paperSize: ScannerPaperSize,
-): 'adf' | 'flatbed' =>
+const toCopyPreviewSource = (paperSize: ScannerPaperSize): 'adf' | 'flatbed' =>
   paperSize === 'Long' ? 'adf' : 'flatbed';
+
+// The worker's stub scanner names its output `stub-scan-*` and writes plain
+// text, so flag it instead of letting it pass as a real scan.
+const warnIfStubScan = (filename: string): void => {
+  if (filename.startsWith('stub-scan-')) {
+    console.warn(
+      `[SCAN] ${filename} is a STUB scan (no real scanner) - not a real image/PDF.`,
+    );
+  }
+};
 
 export interface ScannerStatusResponse {
   connected: boolean;
@@ -404,6 +412,7 @@ export class ScannerService {
 
     const result = await getAdapter().scan(settings, 'uploads/scans');
     const filename = path.basename(result.outputPath);
+    warnIfStubScan(filename);
     this.clearSoftCopyPaid(filename);
 
     // Pre-warm analysis in background while customer views scan result
@@ -636,11 +645,14 @@ export class ScannerService {
         { orientation, rotationDeg },
       );
     } catch (linkError) {
-      console.error('[SCAN] Failed to generate download link for scan charge.', {
-        error:
-          linkError instanceof Error ? linkError.message : String(linkError),
-        filename,
-      });
+      console.error(
+        '[SCAN] Failed to generate download link for scan charge.',
+        {
+          error:
+            linkError instanceof Error ? linkError.message : String(linkError),
+          filename,
+        },
+      );
     }
 
     return {
@@ -730,7 +742,6 @@ export class ScannerService {
     if (
       input.dpi === undefined ||
       input.dpi === null ||
-      (input.dpi as any) === '' ||
       (typeof input.dpi === 'string' &&
         (input.dpi as string).trim().toLowerCase() === 'default')
     ) {
@@ -797,7 +808,10 @@ export class ScannerService {
     void (async () => {
       jobStore.updateJobState(job.id, 'running');
       try {
-        const result = await getAdapter().scan(resolvedSettings, 'uploads/scans');
+        const result = await getAdapter().scan(
+          resolvedSettings,
+          'uploads/scans',
+        );
         jobStore.updateJobState(job.id, 'succeeded', {
           resultPath: result.outputPath,
         });
@@ -869,6 +883,7 @@ export class ScannerService {
       );
 
       const filename = path.basename(result.outputPath);
+      warnIfStubScan(filename);
       this.clearSoftCopyPaid(filename);
 
       return {
