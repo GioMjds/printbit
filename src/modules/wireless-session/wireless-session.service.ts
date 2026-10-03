@@ -398,10 +398,15 @@ export class WirelessSessionService {
       typeof pipelineSettings?.documentConversionEnabled === 'boolean'
         ? pipelineSettings.documentConversionEnabled
         : true;
+    const malwareScanningEnabled =
+      typeof pipelineSettings?.malwareScanningEnabled === 'boolean'
+        ? pipelineSettings.malwareScanningEnabled
+        : true;
 
     res.json({
       ...session,
       documentConversionEnabled,
+      malwareScanningEnabled,
     });
   };
 

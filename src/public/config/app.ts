@@ -1355,7 +1355,7 @@ function renderColorDetectionEvidence(): void {
 
   const quote = currentPrintQuote;
   const shouldShow =
-    mode !== 'scan' && Boolean(quote) && !quoteLoading && !quoteError;
+    mode === 'print' && Boolean(quote) && !quoteLoading && !quoteError;
   colorDetectionEvidence.hidden = !shouldShow;
   if (!shouldShow || !quote) return;
 
