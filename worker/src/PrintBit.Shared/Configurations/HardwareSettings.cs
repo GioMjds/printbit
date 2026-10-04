@@ -29,8 +29,8 @@ public class HardwareSettings
 
     public string SumatraPath { get; set; } = @"C:\Users\printbit\bin\SumatraPDF.exe";
 
-    // "sumatra" (default) or "native" (Windows.Data.Pdf + PrintDocument, no external exe).
-    public string PdfPrintEngine { get; set; } = "native";
+    // "native" (default; Windows.Data.Pdf + PrintDocument, no external exe) or "sumatra".
+    public string PdfPrintEngine { get; set; } = "sumatra";
 
     public string QpdfPath { get; set; } = @"C:\Users\printbit\bin\qpdf.exe";
 

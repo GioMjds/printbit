@@ -62,12 +62,10 @@ Target framework: `net10.0-windows10.0.19041.0` so the WinRT PDF APIs are availa
 
 ### 4.4 Configuration
 
-- `PrintEngine:Pdf` = `sumatra` | `native` (default `sumatra`)
-- `PrintEngine:Image` = `sumatra` | `native` (default `sumatra`)
-- `PrintEngine:FallbackEnabled` = true | false
-- `PrintEngine:CircuitBreakerThreshold` = 3 consecutive native failures
+- `HardwareSettings:PdfPrintEngine` = `sumatra` (default) | `native`
 
-Flags are per file type so images can ship before PDFs.
+> [!NOTE]
+> `PdfPrintEngine` is implemented in `HardwareSettings` and defaults to `sumatra` until Phase 2 pass criteria on real hardware are met. Per-file-type image flags, automatic `FallbackEnabled`, and `CircuitBreakerThreshold` are specification proposals that are not yet implemented in `DocumentPrinter`.
 
 ## 5. Native Engine Requirements
 
@@ -127,7 +125,12 @@ Flags are per file type so images can ship before PDFs.
 - **Removal criterion:** zero fallbacks over a fixed window (2 weeks or N jobs, whichever is larger) with a representative file-type mix.
 - Then delete `SumatraEngine`, the bundled exe, and the 120s external timeout.
 
-## 7. Fallback Behavior
+## 7. Fallback Behavior *(Specification / Not Yet Implemented)*
+
+> [!WARNING]
+> Automatic fallback and circuit-breaker behavior are currently **not yet implemented** in `DocumentPrinter`. When `PdfPrintEngine` is set to `native`, failures in `NativePdfPrinter` return immediately with `PrintFailureStage.ProcessStart` without automatic retry in Sumatra or circuit-breaker counters. Fallback to Sumatra is currently done manually by setting `HardwareSettings:PdfPrintEngine` to `sumatra`.
+
+The proposed design for automated fallback once implemented:
 
 The native engine is attempted first; on failure the same job may be retried with Sumatra.
 

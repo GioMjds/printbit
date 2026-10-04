@@ -102,10 +102,20 @@ public sealed class DocumentPrinter : IDocumentPrinter
             if (useNative)
             {
                 _logger.LogInformation("Printing natively (Windows.Data.Pdf + PrintDocument)");
+                using var nativeTimeout = new CancellationTokenSource(
+                    TimeSpan.FromSeconds(_settings.PrintTimeoutSeconds));
+                using var nativeCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    nativeTimeout.Token);
+
                 try
                 {
                     await NativePdfPrinter.PrintAsync(
-                        filePath, dispatchPrinterName, pages, settings, cancellationToken);
+                        filePath, dispatchPrinterName, pages, settings, nativeCts.Token);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    return Failed(PrintFailureStage.Timeout, "Native print timeout", expectedPages);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

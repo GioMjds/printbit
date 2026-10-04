@@ -15,6 +15,8 @@ internal static class NativePdfPrinter
 {
     // ponytail: fixed 300 DPI raster; make configurable if the driver is slower/faster at other DPI.
     private const double RenderDpi = 300;
+    private const uint MinRasterDimension = 1;
+    private const uint MaxRasterDimension = 5000;
 
     public static Task PrintAsync(
         string filePath,
@@ -28,6 +30,21 @@ internal static class NativePdfPrinter
             var file = await StorageFile.GetFileFromPathAsync(filePath);
             var pdf = await PdfDocument.LoadFromFileAsync(file);
 
+            if (pdf.PageCount == 0)
+            {
+                throw new InvalidOperationException("PDF document contains no pages.");
+            }
+
+            foreach (var pageNum in pages)
+            {
+                if (pageNum < 1 || pageNum > pdf.PageCount)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(pages),
+                        $"Requested page {pageNum} is out of range. Document contains {pdf.PageCount} page(s).");
+                }
+            }
+
             using var doc = new PrintDocument { DocumentName = Path.GetFileName(filePath) };
             doc.PrinterSettings.PrinterName = printerName;
             if (!doc.PrinterSettings.IsValid)
@@ -35,7 +52,13 @@ internal static class NativePdfPrinter
                 throw new InvalidOperationException($"Printer not found: {printerName}");
             }
 
-            doc.PrinterSettings.Copies = (short)Math.Max(1, settings.Copies);
+            var copies = Math.Max(1, settings.Copies);
+            if (copies > doc.PrinterSettings.MaximumCopies)
+            {
+                throw new InvalidOperationException(
+                    $"Printer supports at most {doc.PrinterSettings.MaximumCopies} copies per job.");
+            }
+            doc.PrinterSettings.Copies = (short)copies;
             doc.PrinterSettings.Collate = true;
             doc.DefaultPageSettings.Color = settings.Color;
             doc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
@@ -52,12 +75,27 @@ internal static class NativePdfPrinter
                 try
                 {
                     ct.ThrowIfCancellationRequested();
-                    using var page = pdf.GetPage((uint)(pages[index] - 1));
+                    var pageNumber = pages[index];
+                    if (pageNumber < 1 || pageNumber > pdf.PageCount)
+                    {
+                        throw new ArgumentOutOfRangeException(
+                            nameof(pages),
+                            $"Requested page {pageNumber} is out of range. Document contains {pdf.PageCount} page(s).");
+                    }
+
+                    using var page = pdf.GetPage((uint)(pageNumber - 1));
                     using var stream = new InMemoryRandomAccessStream();
+
+                    var targetWidth = page.Size.Width > 0 ? Math.Round(page.Size.Width / 96.0 * RenderDpi) : MinRasterDimension;
+                    var destWidth = (uint)Math.Clamp(targetWidth, MinRasterDimension, MaxRasterDimension);
+
+                    var targetHeight = page.Size.Height > 0 ? Math.Round(page.Size.Height / 96.0 * RenderDpi) : MinRasterDimension;
+                    var destHeight = (uint)Math.Clamp(targetHeight, MinRasterDimension, MaxRasterDimension);
+
                     page.RenderToStreamAsync(stream, new PdfPageRenderOptions
                     {
-                        DestinationWidth = (uint)(page.Size.Width / 96 * RenderDpi),
-                        DestinationHeight = (uint)(page.Size.Height / 96 * RenderDpi)
+                        DestinationWidth = destWidth,
+                        DestinationHeight = destHeight
                     }).AsTask(ct).GetAwaiter().GetResult();
 
                     using var image = Image.FromStream(stream.AsStreamForRead());
