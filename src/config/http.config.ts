@@ -141,7 +141,7 @@ export const SESSION_EXPIRY_ENABLED =
 export const SESSION_TTL_MS =
   readPositiveIntEnv('PRINTBIT_SESSION_TTL_MS') ?? 30 * 60 * 1000;
 
-export type PrintDispatchMode = 'legacy' | 'phased' | 'new-only';
+export type PrintDispatchMode = 'legacy' | 'worker' | 'phased' | 'new-only';
 
 function readPathEnv(...keys: string[]): string | undefined {
   for (const key of keys) {
