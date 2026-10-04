@@ -67,7 +67,10 @@ public sealed class DocumentPrinter : IDocumentPrinter
                 return Failed(PrintFailureStage.Validation, "PDF file not found", expectedPages);
             }
 
-            if (!File.Exists(_settings.SumatraPath))
+            var useNative = string.Equals(
+                _settings.PdfPrintEngine, "native", StringComparison.OrdinalIgnoreCase);
+
+            if (!useNative && !File.Exists(_settings.SumatraPath))
             {
                 return Failed(PrintFailureStage.Validation, "SumatraPDF executable not found", expectedPages);
             }
@@ -95,6 +98,31 @@ public sealed class DocumentPrinter : IDocumentPrinter
                 settings.Orientation,
                 settings.PaperSize,
                 pages.Count);
+
+            if (useNative)
+            {
+                _logger.LogInformation("Printing natively (Windows.Data.Pdf + PrintDocument)");
+                try
+                {
+                    await NativePdfPrinter.PrintAsync(
+                        filePath, dispatchPrinterName, pages, settings, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return Failed(PrintFailureStage.ProcessStart, ex.Message, expectedPages);
+                }
+
+                return await VerifySpoolerDocumentLifecycleAsync(
+                    dispatchPrinterName,
+                    printerName,
+                    Path.GetFileName(filePath),
+                    expectedPages,
+                    pages.Count,
+                    onProgress,
+                    onPaused,
+                    onResumed,
+                    cancellationToken);
+            }
 
             using var process = BuildPrintProcess(
                 _settings.SumatraPath,
