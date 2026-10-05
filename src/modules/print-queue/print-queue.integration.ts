@@ -1,28 +1,9 @@
-/**
- * Print Queue Integration for Financial Service
- /**
-  * Handles coordination between financial confirm-payment flow and local JobProcessor:
-
- * - Creates enqueue payload from print request
- * - Manages transaction-to-job correlation
- * - Handles idempotency verification
- * - Bridges existing financial context with queue job
- *
- * Phase 2: Workerized print pipeline integration
- */
-
 import { randomUUID } from 'node:crypto';
 import type { PrintJobEnqueuePayload } from './print-job.schema';
 import { PRINT_JOB_PAYLOAD_VERSION } from './print-job.schema';
 import type { PrintJobOptions } from '@/services/printer';
 import { getTrustedTimestamp } from '@/services/time-source';
 
-/**
- * Build print job enqueue payload from confirm-payment context
- *
- * @param context Financial confirm-payment request context
- * @returns Complete PrintJobEnqueuePayload ready for queue
- */
 export function buildPrintJobEnqueuePayload(context: {
   transactionId: string;
   idempotencyKey: string;
@@ -37,7 +18,6 @@ export function buildPrintJobEnqueuePayload(context: {
   printerName: string | null;
   spoolerCorrelationKey?: string | null;
 }): PrintJobEnqueuePayload {
-  // Generate new spooler correlation key for this enqueue
   const spoolerCorrelationKey =
     typeof context.spoolerCorrelationKey === 'string' &&
     context.spoolerCorrelationKey.trim().length > 0
@@ -66,8 +46,10 @@ export function buildPrintJobEnqueuePayload(context: {
       serverFilename: context.serverFilename,
       printerName: context.printerName,
       quality: context.printOptions.quality ?? 'standard',
+      scaling: context.printOptions.scaling ?? 'fit',
       settings: {
         quality: context.printOptions.quality ?? 'standard',
+        scaling: context.printOptions.scaling ?? 'fit',
       },
     },
     financial: {
@@ -83,9 +65,6 @@ export function buildPrintJobEnqueuePayload(context: {
   return payload;
 }
 
-/**
- * Error class for print job enqueue operations
- */
 export class PrintJobEnqueueError extends Error {
   constructor(
     public code: string,

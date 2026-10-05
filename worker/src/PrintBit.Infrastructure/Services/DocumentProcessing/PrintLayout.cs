@@ -12,8 +12,8 @@ internal readonly record struct PrintLayout(double Width, double Height, double 
     {
         var (width, height) = paperSize?.Trim().ToUpperInvariant() switch
         {
-            "LETTER" => (612d, 792d),
-            "LEGAL" or "FOLIO" => (612d, 936d),
+            "LETTER" or "SHORT" => (612d, 792d),
+            "LEGAL" or "FOLIO" or "LONG" => (612d, 936d),
             _ => (595.28d, 841.89d)
         };
         return string.Equals(orientation?.Trim(), "landscape", StringComparison.OrdinalIgnoreCase)

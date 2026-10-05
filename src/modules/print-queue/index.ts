@@ -1,12 +1,3 @@
-/**
- * Print Queue Module
- *
- * Lightweight local orchestration for print jobs with:
- * - SQLite-backed job persistence
- * - Sequential processing with exponential backoff
- * - Socket.IO progress emissions
- */
-
 export {
   PRINT_JOB_PAYLOAD_VERSION,
   type PrintJobCorrelation,

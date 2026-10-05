@@ -120,15 +120,18 @@ internal static class NativePdfPrinter
             }
         }, ct);
 
-    private static PaperSize? FindPaper(PrinterSettings printer, string? paperSize)
-    {
-        var kind = paperSize?.Trim().ToLowerInvariant() switch
+    internal static PaperKind MapPaperKind(string? paperSize) =>
+        paperSize?.Trim().ToLowerInvariant() switch
         {
-            "letter" => PaperKind.Letter,
-            // Epson "8.5 x 13 in" = DMPAPER_FOLIO (14); same mapping as the Sumatra path.
-            "legal" or "folio" => PaperKind.Folio,
+            "letter" or "short" => PaperKind.Letter,
+            "legal" or "folio" or "long" => PaperKind.Folio,
             _ => PaperKind.A4
         };
-        return printer.PaperSizes.Cast<PaperSize>().FirstOrDefault(p => p.Kind == kind);
+
+    private static PaperSize? FindPaper(PrinterSettings printer, string? paperSize)
+    {
+        var kind = MapPaperKind(paperSize);
+        return printer.PaperSizes.Cast<PaperSize>().FirstOrDefault(p =>
+            p.Kind == kind || (kind == PaperKind.Folio && p.RawKind == 14));
     }
 }

@@ -243,14 +243,11 @@ public sealed class DocumentPrinter : IDocumentPrinter
         return new Process { StartInfo = startInfo };
     }
 
-    private static string NormalizePaperSetting(string? paperSize) =>
+    internal static string NormalizePaperSetting(string? paperSize) =>
         paperSize?.Trim().ToLowerInvariant() switch
         {
-            "letter" => "paper=letter",
-            // In SumatraPDF, standard paper names do not include "8.5 x 13 in" or "folio".
-            // "paperkind=14" explicitly sets Windows DMPAPER_FOLIO (14), which maps
-            // directly to the Epson driver's "8.5 x 13 in" preset (RawKind 14).
-            "legal" or "folio" => "paperkind=14",
+            "letter" or "short" => "paper=letter",
+            "legal" or "folio" or "long" => "paperkind=14",
             _ => "paper=A4"
         };
 
