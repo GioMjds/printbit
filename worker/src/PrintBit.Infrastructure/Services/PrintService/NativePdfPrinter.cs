@@ -61,6 +61,7 @@ internal static class NativePdfPrinter
             doc.PrinterSettings.Copies = (short)copies;
             doc.PrinterSettings.Collate = true;
             doc.DefaultPageSettings.Color = settings.Color;
+            doc.DefaultPageSettings.Landscape = string.Equals(settings.Orientation?.Trim(), "landscape", StringComparison.OrdinalIgnoreCase);
             doc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
             var paper = FindPaper(doc.PrinterSettings, settings.PaperSize);
             if (paper is not null)
@@ -86,10 +87,10 @@ internal static class NativePdfPrinter
                     using var page = pdf.GetPage((uint)(pageNumber - 1));
                     using var stream = new InMemoryRandomAccessStream();
 
-                    var targetWidth = page.Size.Width > 0 ? Math.Round(page.Size.Width / 96.0 * RenderDpi) : MinRasterDimension;
+                    var targetWidth = page.Size.Width > 0 ? Math.Round(page.Size.Width / 72.0 * RenderDpi) : MinRasterDimension;
                     var destWidth = (uint)Math.Clamp(targetWidth, MinRasterDimension, MaxRasterDimension);
 
-                    var targetHeight = page.Size.Height > 0 ? Math.Round(page.Size.Height / 96.0 * RenderDpi) : MinRasterDimension;
+                    var targetHeight = page.Size.Height > 0 ? Math.Round(page.Size.Height / 72.0 * RenderDpi) : MinRasterDimension;
                     var destHeight = (uint)Math.Clamp(targetHeight, MinRasterDimension, MaxRasterDimension);
 
                     page.RenderToStreamAsync(stream, new PdfPageRenderOptions

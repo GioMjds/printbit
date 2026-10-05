@@ -27,6 +27,17 @@ public class PaperConfigurationTests
         Assert.Equal(expectedHeight, height, 2);
     }
 
+    [Theory]
+    [InlineData("Short", 792d, 612d)]
+    [InlineData("Long", 936d, 612d)]
+    [InlineData("A4", 841.89d, 595.28d)]
+    public void PaperGeometry_ResolvesExpectedDimensions_Landscape(string paperSize, double expectedWidth, double expectedHeight)
+    {
+        var (width, height) = PrintLayout.PaperGeometry(paperSize, "landscape");
+        Assert.Equal(expectedWidth, width, 2);
+        Assert.Equal(expectedHeight, height, 2);
+    }
+
     [Fact]
     public void Calculate_LetterSourceWithShortPaper_DoesNotScaleOrChangeDimensions()
     {

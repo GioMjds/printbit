@@ -215,7 +215,10 @@ public sealed class DocumentPrinter : IDocumentPrinter
         };
 
         printSettings.Add(NormalizePaperSetting(settings.PaperSize));
-
+        if (string.Equals(settings.Orientation?.Trim(), "landscape", StringComparison.OrdinalIgnoreCase))
+        {
+            printSettings.Add("landscape");
+        }
 
         // The prepared PDF is already paper-sized with the customer's fit/actual layout baked in
         // (DocumentPreprocessor). Sumatra "fit" would shrink it again into the printer's printable

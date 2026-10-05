@@ -32,9 +32,10 @@ async function rotatePdfFile(
   outputPath: string,
   rotationDeg: RotationDeg,
   targetOrientation?: 'portrait' | 'landscape',
-): Promise<void> {
+): Promise<boolean> {
   const bytes = await fs.promises.readFile(sourcePath);
   const pdf = await PDFDocument.load(bytes);
+  let modified = false;
 
   for (const page of pdf.getPages()) {
     const current = page.getRotation().angle;
@@ -43,7 +44,8 @@ async function rotatePdfFile(
     if (targetOrientation) {
       const w = page.getWidth();
       const h = page.getHeight();
-      const isLandscape = w > h;
+      const isLandscape =
+        current === 90 || current === 270 ? h > w : w > h;
       const wantsLandscape = targetOrientation === 'landscape';
       if (isLandscape !== wantsLandscape) {
         extraRotation = 90;
@@ -53,12 +55,17 @@ async function rotatePdfFile(
     const next = ((current + rotationDeg + extraRotation) % 360 + 360) % 360;
     if (next !== current) {
       page.setRotation(degrees(next));
+      modified = true;
     }
   }
 
-  // Always save if we need to enforce orientation or if rotation was requested
+  if (!modified) {
+    return false;
+  }
+
   const rotatedBytes = await pdf.save();
   await fs.promises.writeFile(outputPath, rotatedBytes);
+  return true;
 }
 
 async function rotateImageFile(
@@ -66,7 +73,7 @@ async function rotateImageFile(
   outputPath: string,
   rotationDeg: RotationDeg,
   targetOrientation?: 'portrait' | 'landscape',
-): Promise<void> {
+): Promise<boolean> {
   const image = sharp(sourcePath).rotate(); // auto-orient based on EXIF first
   const metadata = await image.metadata();
   const w = metadata.width || 0;
@@ -82,11 +89,12 @@ async function rotateImageFile(
   }
 
   const finalRotation = (rotationDeg + extraRotation) % 360;
-  if (finalRotation !== 0) {
-    await image.rotate(finalRotation).toFile(outputPath);
-  } else {
-    await image.toFile(outputPath);
+  if (finalRotation === 0) {
+    return false;
   }
+
+  await image.rotate(finalRotation).toFile(outputPath);
+  return true;
 }
 
 async function rotateFileToPath(
@@ -94,15 +102,13 @@ async function rotateFileToPath(
   outputPath: string,
   rotationDeg: RotationDeg,
   targetOrientation?: 'portrait' | 'landscape',
-): Promise<void> {
+): Promise<boolean> {
   const extension = path.extname(sourcePath).toLowerCase();
   if (extension === '.pdf') {
-    await rotatePdfFile(sourcePath, outputPath, rotationDeg, targetOrientation);
-    return;
+    return rotatePdfFile(sourcePath, outputPath, rotationDeg, targetOrientation);
   }
   if (IMAGE_EXTENSIONS.has(extension)) {
-    await rotateImageFile(sourcePath, outputPath, rotationDeg, targetOrientation);
-    return;
+    return rotateImageFile(sourcePath, outputPath, rotationDeg, targetOrientation);
   }
   throw new Error(
     `Rotation is not supported for ${extension || 'this'} file type.`,
@@ -115,15 +121,6 @@ export async function prepareScanRotationArtifact(input: {
   rotationDeg: RotationDeg;
 }): Promise<{ filePath: string; transformed: boolean }> {
   const { sourcePath, orientation, rotationDeg } = input;
-  const orientationRotation = orientation === 'landscape' ? 90 : 0;
-  const finalRotation = normalizeRotationDeg(
-    (orientationRotation + rotationDeg) % 360,
-  );
-
-  if (finalRotation === 0) {
-    return { filePath: sourcePath, transformed: false };
-  }
-
   const sourceExt = normalizeFileExtension(path.extname(sourcePath).toLowerCase());
   if (sourceExt !== '.pdf' && !IMAGE_EXTENSIONS.has(sourceExt)) {
     throw new Error(
@@ -133,8 +130,16 @@ export async function prepareScanRotationArtifact(input: {
 
   const outputPath = path.join(
     path.dirname(sourcePath),
-    `${path.basename(sourcePath, path.extname(sourcePath))}-r${finalRotation}-${randomUUID()}${sourceExt}`,
+    `${path.basename(sourcePath, path.extname(sourcePath))}-r${rotationDeg}-${randomUUID()}${sourceExt}`,
   );
-  await rotateFileToPath(sourcePath, outputPath, finalRotation);
+  const transformed = await rotateFileToPath(
+    sourcePath,
+    outputPath,
+    rotationDeg,
+    orientation,
+  );
+  if (!transformed) {
+    return { filePath: sourcePath, transformed: false };
+  }
   return { filePath: outputPath, transformed: true };
 }
