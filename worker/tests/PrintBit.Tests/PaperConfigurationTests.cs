@@ -39,7 +39,24 @@ public class PaperConfigurationTests
     }
 
     [Fact]
-    public void Calculate_LetterSourceWithShortPaper_DoesNotScaleOrChangeDimensions()
+    public void Calculate_LetterSourceWithShortPaper_ActualScalingPreservesFullSize()
+    {
+        var settings = new PrintJobSettings
+        {
+            PaperSize = "Short",
+            Orientation = "portrait",
+            Scaling = "actual"
+        };
+
+        var layout = PrintLayout.Calculate(612d, 792d, settings, 0);
+
+        Assert.Equal(612d, layout.Width, 2);
+        Assert.Equal(792d, layout.Height, 2);
+        Assert.Equal(1.0d, layout.Scale, 4);
+    }
+
+    [Fact]
+    public void Calculate_LetterSourceWithShortPaper_FitScalingAppliesSafePrintMargin()
     {
         var settings = new PrintJobSettings
         {
@@ -52,7 +69,8 @@ public class PaperConfigurationTests
 
         Assert.Equal(612d, layout.Width, 2);
         Assert.Equal(792d, layout.Height, 2);
-        Assert.Equal(1.0d, layout.Scale, 4);
+        var expectedScale = (612d - 2 * PrintLayout.MarginPoints) / 612d;
+        Assert.Equal(expectedScale, layout.Scale, 4);
     }
 
     [Theory]

@@ -6,7 +6,7 @@ namespace PrintBit.Infrastructure.Services.DocumentProcessing;
 internal readonly record struct PrintLayout(double Width, double Height, double Scale)
 {
     // Must equal PRINT_MARGIN_POINTS in src/shared/print-configuration.ts, or print != preview.
-    public const double MarginPoints = 0;
+    public const double MarginPoints = 14.4;
 
     public static (double Width, double Height) PaperGeometry(string? paperSize, string? orientation)
     {
