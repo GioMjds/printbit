@@ -17,11 +17,13 @@ import {
 } from '@/middleware/file-validation';
 import { createRateLimit } from '@/middleware/rate-limit';
 import { ReportService } from './report.service';
-import type {
-  LogMeta,
-  ReportIssueCategory,
-  ReportIssueStatus,
-  AdminQueueView,
+import {
+  type LogMeta,
+  type ReportIssueCategory,
+  type ReportIssueStatus,
+  type AdminQueueView,
+  type ReportResolutionReason,
+  REPORT_RESOLUTION_REASONS,
 } from './report.schema';
 
 export interface ReportControllerDeps {
@@ -34,6 +36,7 @@ type ReportBody = {
   category?: unknown;
   attachmentIds?: unknown;
   meta?: unknown;
+  transactionRef?: unknown;
 };
 
 const reportPortalAssetRateLimit = createRateLimit({
@@ -331,13 +334,19 @@ export class ReportController {
     const attachmentIds = Array.isArray(body.attachmentIds)
       ? body.attachmentIds.filter((id): id is string => typeof id === 'string')
       : [];
+    const rawTxRef = body.transactionRef ?? req.query.transactionRef;
+    const transactionRef =
+      typeof rawTxRef === 'string' && rawTxRef.trim()
+        ? rawTxRef.trim()
+        : null;
 
     try {
-      const entry = await this.service.submitReportIssue({
+      const entry = await this.service.submitDirectReportIssue({
         title,
         description,
         category,
         attachmentIds,
+        transactionRef,
       });
       res.status(201).json({ ok: true, reportIssueId: entry.id });
     } catch (err) {
@@ -360,6 +369,11 @@ export class ReportController {
     const attachmentIds = Array.isArray(body.attachmentIds)
       ? body.attachmentIds.filter((id): id is string => typeof id === 'string')
       : [];
+    const rawTxRef = body.transactionRef ?? req.query.transactionRef;
+    const transactionRef =
+      typeof rawTxRef === 'string' && rawTxRef.trim()
+        ? rawTxRef.trim()
+        : null;
 
     try {
       const entry = await this.service.submitReportIssue({
@@ -369,6 +383,7 @@ export class ReportController {
         description,
         category,
         attachmentIds,
+        transactionRef,
       });
       res.status(201).json({ ok: true, reportIssueId: entry.id });
     } catch (err) {
@@ -500,12 +515,16 @@ export class ReportController {
     res: Response,
   ): Promise<void> {
     const { id } = req.params as { id: string };
-    const body = req.body as { status?: unknown };
+    const body = req.body as {
+      status?: unknown;
+      resolutionReason?: unknown;
+      resolutionNote?: unknown;
+    };
     const status =
       body.status === 'open' ||
       body.status === 'acknowledged' ||
       body.status === 'resolved'
-        ? body.status
+        ? (body.status as ReportIssueStatus)
         : null;
 
     if (!status) {
@@ -515,13 +534,54 @@ export class ReportController {
       return;
     }
 
-    const updated = await this.service.updateStatus(id, status);
-    if (!updated) {
-      res.status(404).json({ error: 'Report issue not found.' });
-      return;
+    const rawReason = body.resolutionReason;
+    const resolutionReason =
+      typeof rawReason === 'string' && rawReason.trim()
+        ? (rawReason.trim() as ReportResolutionReason)
+        : undefined;
+
+    const resolutionNote =
+      typeof body.resolutionNote === 'string'
+        ? body.resolutionNote.trim()
+        : null;
+
+    if (status === 'resolved') {
+      if (!resolutionReason) {
+        res.status(400).json({
+          error: 'resolutionReason is required when resolving a report.',
+        });
+        return;
+      }
+      if (!REPORT_RESOLUTION_REASONS.includes(resolutionReason)) {
+        res.status(400).json({
+          error: 'Invalid resolutionReason.',
+        });
+        return;
+      }
+    } else if (rawReason !== undefined && rawReason !== null) {
+      if (!resolutionReason || !REPORT_RESOLUTION_REASONS.includes(resolutionReason)) {
+        res.status(400).json({
+          error: 'Invalid resolutionReason.',
+        });
+        return;
+      }
     }
 
-    res.json({ ok: true, entry: updated });
+    try {
+      const updated = await this.service.updateReportStatus(id, status, {
+        resolutionReason,
+        resolutionNote,
+      });
+      if (!updated) {
+        res.status(404).json({ error: 'Report issue not found.' });
+        return;
+      }
+
+      res.status(200).json({ ok: true, issue: updated, entry: updated, ...updated });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(400).json({ error: message });
+    }
   }
 
   private async createAdminReportIssue(

@@ -139,7 +139,7 @@ export const SESSION_EXPIRY_ENABLED =
 
 /** Session TTL in milliseconds (defaults to 30 minutes, preventing premature silent expiry on kiosk). */
 export const SESSION_TTL_MS =
-  readPositiveIntEnv('PRINTBIT_SESSION_TTL_MS') ?? 30 * 60 * 1000;
+  readPositiveIntEnv(process.env.PRINTBIT_SESSION_TTL_MS, 30 * 60 * 1000);
 
 export type PrintDispatchMode = 'legacy' | 'worker' | 'phased' | 'new-only';
 
