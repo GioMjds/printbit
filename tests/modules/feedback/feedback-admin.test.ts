@@ -251,6 +251,105 @@ describe('Feedback Admin API & Lifecycle', () => {
       expect(body.error).toBe('Valid status required: new | reviewed');
     });
 
+    it('returns 400 without mutating row when invalid status is sent alongside needsAction', async () => {
+      const entry = await feedbackService.submitFeedback({
+        comment: 'Needs action test',
+      });
+      expect(entry.needsAction).toBe(false);
+
+      const response = await fetch(
+        `${baseUrl}/api/admin/feedback/${entry.id}/status`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            needsAction: true,
+            status: 'invalid_status_value',
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe('Valid status required: new | reviewed');
+
+      // Verify needsAction was NOT mutated in SQLite
+      const untouched = feedbackStore.findFeedbackById(entry.id);
+      expect(untouched?.needsAction).toBe(false);
+      expect(untouched?.status).toBe('new');
+    });
+
+    it('returns 400 when action="archive" and status are both provided', async () => {
+      const entry = await feedbackService.submitFeedback({
+        comment: 'Conflicting update test',
+      });
+
+      const response = await fetch(
+        `${baseUrl}/api/admin/feedback/${entry.id}/status`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'archive',
+            status: 'reviewed',
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe(
+        'Cannot set both action="archive" and status simultaneously.',
+      );
+
+      // Verify no mutation occurred
+      const untouched = feedbackStore.findFeedbackById(entry.id);
+      expect(untouched?.status).toBe('new');
+      expect(untouched?.archivedAt).toBeNull();
+    });
+
+    it('returns 400 when invalid action is provided', async () => {
+      const entry = await feedbackService.submitFeedback({
+        comment: 'Invalid action test',
+      });
+
+      const response = await fetch(
+        `${baseUrl}/api/admin/feedback/${entry.id}/status`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'destroy',
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe('Invalid action. Only "archive" is supported.');
+    });
+
+    it('returns 400 when non-boolean needsAction is provided', async () => {
+      const entry = await feedbackService.submitFeedback({
+        comment: 'Non boolean test',
+      });
+
+      const response = await fetch(
+        `${baseUrl}/api/admin/feedback/${entry.id}/status`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            needsAction: 'not-a-bool',
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe('needsAction must be a boolean.');
+    });
+
     it('returns 404 for non-existent feedback id', async () => {
       const response = await fetch(
         `${baseUrl}/api/admin/feedback/non-existent-uuid/status`,

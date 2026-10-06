@@ -366,17 +366,17 @@ export class FeedbackController {
       return;
     }
 
-    if (body.action === 'archive') {
-      entry = this.feedbackService.archiveFeedback(id);
+    // 1. Validate action parameter
+    if (body.action !== undefined) {
+      if (typeof body.action !== 'string' || body.action !== 'archive') {
+        res
+          .status(400)
+          .json({ error: 'Invalid action. Only "archive" is supported.' });
+        return;
+      }
     }
 
-    if (body.needsAction !== undefined) {
-      entry = this.feedbackService.setNeedsAction(
-        id,
-        Boolean(body.needsAction),
-      );
-    }
-
+    // 2. Validate status parameter
     if (body.status !== undefined) {
       if (body.status !== 'new' && body.status !== 'reviewed') {
         res
@@ -384,9 +384,36 @@ export class FeedbackController {
           .json({ error: 'Valid status required: new | reviewed' });
         return;
       }
+    }
+
+    // 3. Mutually exclusive check: action === 'archive' and status cannot be provided together
+    if (body.action === 'archive' && body.status !== undefined) {
+      res.status(400).json({
+        error: 'Cannot set both action="archive" and status simultaneously.',
+      });
+      return;
+    }
+
+    // 4. Validate needsAction parameter if provided
+    if (body.needsAction !== undefined && typeof body.needsAction !== 'boolean') {
+      res.status(400).json({ error: 'needsAction must be a boolean.' });
+      return;
+    }
+
+    // All validation passed. Apply mutations safely.
+    if (body.action === 'archive') {
+      entry = this.feedbackService.archiveFeedback(id);
+    } else if (body.status !== undefined) {
       entry = this.feedbackService.updateFeedbackStatus(
         id,
         body.status as FeedbackStatus,
+      );
+    }
+
+    if (body.needsAction !== undefined) {
+      entry = this.feedbackService.setNeedsAction(
+        id,
+        Boolean(body.needsAction),
       );
     }
 
