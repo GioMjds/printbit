@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
+import { ensureSchema } from '@/core/database/sqlite-storage';
 
 describe('Report and Feedback Schema Migration', () => {
-  it('adds missing columns and indexes to report_issue_entries and feedback_entries', () => {
+  it('adds missing columns, creates indexes, and migrates row statuses on existing legacy tables', () => {
     const db = new DatabaseSync(':memory:');
     // Set up legacy tables
     db.exec(`
@@ -34,7 +35,7 @@ describe('Report and Feedback Schema Migration', () => {
              ('f2', 's2', '2026-10-02T00:00:00Z', 'Paper jam fixed', 'resolved');
     `);
 
-    // Verify migrations apply properly
+    // Verify before migration
     const reportColsBefore = new Set(
       (db.prepare('PRAGMA table_info(report_issue_entries)').all() as any[]).map((r) => r.name)
     );
@@ -42,38 +43,15 @@ describe('Report and Feedback Schema Migration', () => {
     expect(reportColsBefore.has('resolution_reason')).toBe(false);
     expect(reportColsBefore.has('resolution_note')).toBe(false);
 
-    // Migration function replicating ensureSchema checks
-    const applyMigrations = () => {
-      const reportColRows = db.prepare('PRAGMA table_info(report_issue_entries)').all() as any[];
-      const reportCols = new Set(reportColRows.map((r) => r.name));
-      if (!reportCols.has('transaction_ref')) {
-        db.exec('ALTER TABLE report_issue_entries ADD COLUMN transaction_ref TEXT');
-      }
-      if (!reportCols.has('resolution_reason')) {
-        db.exec('ALTER TABLE report_issue_entries ADD COLUMN resolution_reason TEXT');
-      }
-      if (!reportCols.has('resolution_note')) {
-        db.exec('ALTER TABLE report_issue_entries ADD COLUMN resolution_note TEXT');
-      }
-      db.exec('CREATE INDEX IF NOT EXISTS idx_report_issue_entries_transaction_ref ON report_issue_entries(transaction_ref)');
+    const feedbackColsBefore = new Set(
+      (db.prepare('PRAGMA table_info(feedback_entries)').all() as any[]).map((r) => r.name)
+    );
+    expect(feedbackColsBefore.has('transaction_ref')).toBe(false);
+    expect(feedbackColsBefore.has('needs_action')).toBe(false);
+    expect(feedbackColsBefore.has('archived_at')).toBe(false);
 
-      const feedbackColRows = db.prepare('PRAGMA table_info(feedback_entries)').all() as any[];
-      const feedbackCols = new Set(feedbackColRows.map((r) => r.name));
-      if (!feedbackCols.has('transaction_ref')) {
-        db.exec('ALTER TABLE feedback_entries ADD COLUMN transaction_ref TEXT');
-      }
-      if (!feedbackCols.has('needs_action')) {
-        db.exec('ALTER TABLE feedback_entries ADD COLUMN needs_action INTEGER NOT NULL DEFAULT 0');
-      }
-      if (!feedbackCols.has('archived_at')) {
-        db.exec('ALTER TABLE feedback_entries ADD COLUMN archived_at TEXT');
-      }
-      db.exec('CREATE INDEX IF NOT EXISTS idx_feedback_entries_archived_at ON feedback_entries(archived_at)');
-      db.exec("UPDATE feedback_entries SET status = 'new' WHERE status = 'open'");
-      db.exec("UPDATE feedback_entries SET status = 'reviewed' WHERE status = 'resolved'");
-    };
-
-    applyMigrations();
+    // Call production ensureSchema
+    ensureSchema(db);
 
     // Verify report_issue_entries columns
     const reportColsAfter = new Set(
@@ -91,7 +69,7 @@ describe('Report and Feedback Schema Migration', () => {
     expect(feedbackColsAfter.has('needs_action')).toBe(true);
     expect(feedbackColsAfter.has('archived_at')).toBe(true);
 
-    // Verify feedback row status updates
+    // Verify feedback row status updates: open -> new, resolved -> reviewed
     const f1 = db.prepare("SELECT status, needs_action FROM feedback_entries WHERE id = 'f1'").get() as any;
     expect(f1.status).toBe('new');
     expect(f1.needs_action).toBe(0);
@@ -110,7 +88,41 @@ describe('Report and Feedback Schema Migration', () => {
     ).map((r) => r.name);
     expect(feedbackIndexes).toContain('idx_feedback_entries_archived_at');
 
-    // Verify migration idempotency
-    expect(() => applyMigrations()).not.toThrow();
+    // Verify migration idempotency by calling ensureSchema a second time
+    expect(() => ensureSchema(db)).not.toThrow();
+
+    const f1Again = db.prepare("SELECT status FROM feedback_entries WHERE id = 'f1'").get() as any;
+    expect(f1Again.status).toBe('new');
+    const f2Again = db.prepare("SELECT status FROM feedback_entries WHERE id = 'f2'").get() as any;
+    expect(f2Again.status).toBe('reviewed');
+  });
+
+  it('creates fresh empty in-memory DB with all new columns and indexes via ensureSchema', () => {
+    const db = new DatabaseSync(':memory:');
+    ensureSchema(db);
+
+    const reportCols = new Set(
+      (db.prepare('PRAGMA table_info(report_issue_entries)').all() as any[]).map((r) => r.name)
+    );
+    expect(reportCols.has('transaction_ref')).toBe(true);
+    expect(reportCols.has('resolution_reason')).toBe(true);
+    expect(reportCols.has('resolution_note')).toBe(true);
+
+    const feedbackCols = new Set(
+      (db.prepare('PRAGMA table_info(feedback_entries)').all() as any[]).map((r) => r.name)
+    );
+    expect(feedbackCols.has('transaction_ref')).toBe(true);
+    expect(feedbackCols.has('needs_action')).toBe(true);
+    expect(feedbackCols.has('archived_at')).toBe(true);
+
+    const reportIndexes = (
+      db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'report_issue_entries'").all() as any[]
+    ).map((r) => r.name);
+    expect(reportIndexes).toContain('idx_report_issue_entries_transaction_ref');
+
+    const feedbackIndexes = (
+      db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'feedback_entries'").all() as any[]
+    ).map((r) => r.name);
+    expect(feedbackIndexes).toContain('idx_feedback_entries_archived_at');
   });
 });

@@ -231,8 +231,6 @@ export function ensureSchema(db: DatabaseSync): void {
       ON feedback_entries(status, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_feedback_entries_session_id
       ON feedback_entries(session_id);
-    CREATE INDEX IF NOT EXISTS idx_feedback_entries_archived_at
-      ON feedback_entries(archived_at);
 
     CREATE TABLE IF NOT EXISTS report_issue_sessions (
       id TEXT PRIMARY KEY,
@@ -275,8 +273,6 @@ export function ensureSchema(db: DatabaseSync): void {
       ON report_issue_entries(category, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_report_issue_entries_session_id
       ON report_issue_entries(session_id);
-    CREATE INDEX IF NOT EXISTS idx_report_issue_entries_transaction_ref
-      ON report_issue_entries(transaction_ref);
 
     CREATE TABLE IF NOT EXISTS report_issue_attachments (
       id TEXT PRIMARY KEY,
