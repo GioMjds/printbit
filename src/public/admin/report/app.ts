@@ -155,8 +155,8 @@ function renderCard(entry: ReportIssueEntry): HTMLElement {
   card.dataset.id = entry.id;
 
   const txnBadge = entry.transactionRef
-    ? `<span class="badge badge-txn" title="Transaction Ref">${escHtml(entry.transactionRef)}</span>`
-    : `<span class="badge badge-muted">Unlinked</span>`;
+    ? `<span class="ri-badge ri-badge--txn" title="Transaction Ref">${escHtml(entry.transactionRef)}</span>`
+    : `<span class="ri-badge ri-badge--muted">Unlinked</span>`;
 
   card.innerHTML = `
     <div class="ri-card__accent" aria-hidden="true"></div>
@@ -313,7 +313,7 @@ async function openDetail(id: string): Promise<void> {
     const timelineHtml = `
       <div class="timeline-section">
         <h4 class="timeline-title">Status Timeline</h4>
-        <div class="timeline-container">
+        <div id="statusTimeline" class="timeline-container">
           <div class="timeline-step done">
             <div class="timeline-dot"></div>
             <div class="timeline-content">
@@ -356,7 +356,7 @@ async function openDetail(id: string): Promise<void> {
           </div>
           <div class="detail-txn-row">
             <span class="detail-txn-label">Transaction Ref:</span>
-            <span class="detail-txn-container">${txnHtml}</span>
+            <span id="detailTxnRef" class="detail-txn-container">${txnHtml}</span>
           </div>
           <p class="ri-detail-desc">${escHtml(issue.description)}</p>
           ${timelineHtml}
@@ -434,6 +434,7 @@ async function submitResolution(): Promise<void> {
   }
   const note = resolutionNoteInput.value.trim() || null;
 
+  submitResolveBtn.disabled = true;
   try {
     const res = await apiFetch(
       `/api/admin/report-issues/${encodeURIComponent(activeDetailId)}/status`,
@@ -465,8 +466,11 @@ async function submitResolution(): Promise<void> {
     setMessage('Report marked as resolved.');
   } catch {
     setMessage('Network error resolving report.');
+  } finally {
+    submitResolveBtn.disabled = false;
   }
 }
+
 
 async function updateDetailStatus(
   status: 'open' | 'acknowledged' | 'resolved',
