@@ -13,7 +13,10 @@ interface FeedbackEntry {
   comment: string;
   category: string | null;
   rating: number | null;
-  status: 'open' | 'resolved';
+  status: 'new' | 'reviewed' | 'archived' | 'open' | 'resolved';
+  needsAction: boolean;
+  archivedAt?: string | null;
+  transactionRef?: string | null;
   resolvedAt?: string | null;
 }
 
@@ -29,7 +32,26 @@ const filterBar = document.getElementById('filterBar') as HTMLElement;
 const exportCsvBtn = document.getElementById(
   'exportCsvBtn',
 ) as HTMLButtonElement;
-const clearAllBtn = document.getElementById('clearAllBtn') as HTMLButtonElement;
+const archiveReviewedBtn = document.getElementById(
+  'archiveReviewedBtn',
+) as HTMLButtonElement | null;
+const purgeBtn = document.getElementById(
+  'purgeBtn',
+) as HTMLButtonElement | null;
+const purgeModal = document.getElementById('purgeModal') as HTMLElement | null;
+const closePurgeModalBtn = document.getElementById(
+  'closePurgeModalBtn',
+) as HTMLButtonElement | null;
+const cancelPurgeBtn = document.getElementById(
+  'cancelPurgeBtn',
+) as HTMLButtonElement | null;
+const confirmPurgeBtn = document.getElementById(
+  'confirmPurgeBtn',
+) as HTMLButtonElement | null;
+const purgeConfirmInput = document.getElementById(
+  'purgeConfirmInput',
+) as HTMLInputElement | null;
+
 const prevPageBtn = document.getElementById('prevPageBtn') as HTMLButtonElement;
 const nextPageBtn = document.getElementById('nextPageBtn') as HTMLButtonElement;
 const pageInfo = document.getElementById('pageInfo') as HTMLElement;
@@ -39,12 +61,6 @@ const statResolved = document.getElementById('statResolved') as HTMLElement;
 const openBadge = document.getElementById('openBadge') as HTMLElement;
 const openBadgeMob = document.getElementById(
   'openBadgeMob',
-) as HTMLElement | null;
-const openAlertBadge = document.getElementById(
-  'openAlertBadge',
-) as HTMLElement | null;
-const openAlertBadgeMob = document.getElementById(
-  'openAlertBadgeMob',
 ) as HTMLElement | null;
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -66,6 +82,8 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
+const escHtml = escapeHtml;
+
 function starsHtml(rating: number | null): string {
   if (rating === null) return '';
   return '★'.repeat(rating) + '☆'.repeat(5 - rating);
@@ -83,20 +101,18 @@ function updatePagination(): void {
 }
 
 function updateStats(): void {
-  const openCount = allItems.filter((e) => e.status === 'open').length;
-  const resolvedCount = allItems.filter((e) => e.status === 'resolved').length;
+  const openCount = allItems.filter(
+    (e) => e.status === 'open' || e.status === 'new',
+  ).length;
+  const resolvedCount = allItems.filter(
+    (e) => e.status === 'resolved' || e.status === 'reviewed',
+  ).length;
   statTotal.textContent = String(allItems.length);
   statOpen.textContent = String(openCount);
   statResolved.textContent = String(resolvedCount);
   const badgeText = openCount > 0 ? String(openCount) : '';
   openBadge.textContent = badgeText;
   if (openBadgeMob) openBadgeMob.textContent = badgeText;
-}
-
-function setOpenAlertBadge(openCount: number): void {
-  const text = openCount > 0 ? String(openCount) : '';
-  if (openAlertBadge) openAlertBadge.textContent = text;
-  if (openAlertBadgeMob) openAlertBadgeMob.textContent = text;
 }
 
 // ── Rendering ───────────────────────────────────────────────────────────────
@@ -119,36 +135,77 @@ function renderItems(items: FeedbackEntry[]): void {
 
   for (const entry of items) {
     const card = document.createElement('div');
-    card.className = `fb-card${entry.status === 'resolved' ? ' fb-card--resolved' : ''}`;
+    const isResolvedOrReviewed =
+      entry.status === 'reviewed' || entry.status === 'resolved';
+    const isArchived = entry.status === 'archived';
+    card.className = `fb-card${
+      isResolvedOrReviewed
+        ? ' fb-card--resolved'
+        : isArchived
+          ? ' fb-card--archived'
+          : ''
+    }`;
     card.dataset.id = entry.id;
 
     const stars = starsHtml(entry.rating);
     const catBadge = entry.category
-      ? `<span class="fb-badge fb-badge--cat">${escapeHtml(entry.category)}</span>`
+      ? `<span class="fb-badge fb-badge--cat">${escHtml(entry.category)}</span>`
       : '';
     const ratingBadge = stars
-      ? `<span class="fb-stars">${escapeHtml(stars)}</span>`
+      ? `<span class="fb-stars">${escHtml(stars)}</span>`
       : '';
-    const statusBadge = `<span class="fb-badge fb-badge--${entry.status}">${entry.status}</span>`;
-    const resolveLabel = entry.status === 'open' ? 'Mark Resolved' : 'Reopen';
-    const resolveClass =
-      entry.status === 'open'
-        ? 'fb-action-btn--resolve'
-        : 'fb-action-btn--reopen';
+
+    let statusChipHtml = '';
+    if (entry.status === 'new' || entry.status === 'open') {
+      statusChipHtml = '<span class="status-chip status-chip--new">New</span>';
+    } else if (entry.status === 'reviewed' || entry.status === 'resolved') {
+      statusChipHtml =
+        '<span class="status-chip status-chip--reviewed">Reviewed</span>';
+    } else if (entry.status === 'archived') {
+      statusChipHtml =
+        '<span class="status-chip status-chip--archived">Archived</span>';
+    }
+
+    if (entry.needsAction) {
+      statusChipHtml +=
+        ' <span class="badge-action" title="Needs Action">Action Needed</span>';
+    }
+
+    const txnHtml = entry.transactionRef
+      ? `<div class="fb-card__txn">Txn: ${escHtml(entry.transactionRef)}</div>`
+      : '';
+
+    let actionsHtml = '';
+    if (entry.status === 'new' || entry.status === 'open') {
+      actionsHtml += `<button class="fb-action-btn fb-action-btn--review" data-action="review" data-id="${escHtml(entry.id)}" type="button">Mark Reviewed</button>`;
+    }
+    const actionToggleLabel = entry.needsAction
+      ? 'Unmark Action'
+      : 'Needs Action';
+    const actionToggleClass = entry.needsAction
+      ? 'fb-action-btn--action-active'
+      : '';
+    actionsHtml += `<button class="fb-action-btn fb-action-btn--toggle-action ${actionToggleClass}" data-action="toggle-action" data-id="${escHtml(entry.id)}" type="button">${actionToggleLabel}</button>`;
+
+    if (!isArchived) {
+      actionsHtml += `<button class="fb-action-btn fb-action-btn--archive" data-action="archive" data-id="${escHtml(entry.id)}" type="button">Archive</button>`;
+    } else {
+      actionsHtml += `<button class="fb-action-btn fb-action-btn--archive" data-action="archive" data-id="${escHtml(entry.id)}" type="button" disabled>Archived</button>`;
+    }
 
     card.innerHTML = `
       <div class="fb-card__accent" aria-hidden="true"></div>
       <div class="fb-card__body">
         <div class="fb-card__meta">
           <span class="fb-card__timestamp">${new Date(entry.timestamp).toLocaleString()}</span>
-          ${statusBadge}
+          ${statusChipHtml}
           ${catBadge}
           ${ratingBadge}
         </div>
-        <p class="fb-card__comment">${escapeHtml(entry.comment)}</p>
+        <p class="fb-card__comment">${escHtml(entry.comment)}</p>
+        ${txnHtml}
         <div class="fb-card__actions">
-          <button class="fb-action-btn ${resolveClass}" data-action="resolve" data-id="${escapeHtml(entry.id)}">${resolveLabel}</button>
-          <button class="fb-action-btn fb-action-btn--delete" data-action="delete" data-id="${escapeHtml(entry.id)}">Delete</button>
+          ${actionsHtml}
         </div>
       </div>
     `;
@@ -159,10 +216,12 @@ function renderItems(items: FeedbackEntry[]): void {
     .querySelectorAll<HTMLButtonElement>('[data-action]')
     .forEach((btn) => {
       btn.addEventListener('click', () => {
+        if (btn.disabled) return;
         const action = btn.dataset.action!;
         const id = btn.dataset.id!;
-        if (action === 'resolve') void handleToggleResolved(id);
-        if (action === 'delete') void handleDelete(id);
+        if (action === 'review') void handleMarkReviewed(id);
+        if (action === 'archive') void handleArchive(id);
+        if (action === 'toggle-action') void handleToggleAction(id);
       });
     });
 }
@@ -215,17 +274,13 @@ async function loadSummary(): Promise<void> {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-async function handleToggleResolved(id: string): Promise<void> {
-  const entry =
-    displayItems.find((e) => e.id === id) || allItems.find((e) => e.id === id);
-  if (!entry) return;
-  const resolved = entry.status === 'open';
+async function handleMarkReviewed(id: string): Promise<void> {
   try {
     const res = await apiFetch(
-      `/api/admin/feedback/${encodeURIComponent(id)}/resolve`,
+      `/api/admin/feedback/${encodeURIComponent(id)}/status`,
       {
         method: 'PATCH',
-        body: JSON.stringify({ resolved }),
+        body: JSON.stringify({ status: 'reviewed' }),
       },
     );
     if (!res.ok) {
@@ -233,44 +288,113 @@ async function handleToggleResolved(id: string): Promise<void> {
       return;
     }
     await loadFeedback();
-    setMessage(resolved ? 'Marked as resolved.' : 'Reopened.');
+    setMessage('Marked as reviewed.');
   } catch {
     setMessage('Network error.');
   }
 }
 
-async function handleDelete(id: string): Promise<void> {
-  if (!confirm('Delete this feedback entry?')) return;
+async function handleArchive(id: string): Promise<void> {
   try {
     const res = await apiFetch(
-      `/api/admin/feedback/${encodeURIComponent(id)}`,
+      `/api/admin/feedback/${encodeURIComponent(id)}/status`,
       {
-        method: 'DELETE',
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'archive' }),
       },
     );
     if (!res.ok) {
-      setMessage('Failed to delete feedback.');
+      setMessage('Failed to archive feedback.');
       return;
     }
     await loadFeedback();
-    setMessage('Feedback deleted.');
+    setMessage('Feedback archived.');
   } catch {
     setMessage('Network error.');
   }
 }
 
-async function handleClearAll(): Promise<void> {
-  if (!confirm('Delete ALL feedback entries? This cannot be undone.')) return;
+async function handleToggleAction(id: string): Promise<void> {
+  const entry =
+    displayItems.find((e) => e.id === id) || allItems.find((e) => e.id === id);
+  if (!entry) return;
+  const nextVal = !entry.needsAction;
   try {
-    const res = await apiFetch('/api/admin/feedback', { method: 'DELETE' });
+    const res = await apiFetch(
+      `/api/admin/feedback/${encodeURIComponent(id)}/status`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ needsAction: nextVal }),
+      },
+    );
     if (!res.ok) {
-      setMessage('Failed to clear feedback.');
+      setMessage('Failed to update action status.');
       return;
     }
     await loadFeedback();
-    setMessage('All feedback cleared.');
+    setMessage(nextVal ? 'Marked as needing action.' : 'Action flag cleared.');
   } catch {
     setMessage('Network error.');
+  }
+}
+
+async function handleArchiveReviewed(): Promise<void> {
+  if (archiveReviewedBtn) archiveReviewedBtn.disabled = true;
+  try {
+    const res = await apiFetch('/api/admin/feedback/archive-reviewed', {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      setMessage('Failed to archive reviewed feedback.');
+      return;
+    }
+    const data = (await res.json()) as { ok: boolean; count: number };
+    await loadFeedback();
+    setMessage(`Archived ${data.count} reviewed feedback entries.`);
+  } catch {
+    setMessage('Network error archiving feedback.');
+  } finally {
+    if (archiveReviewedBtn) archiveReviewedBtn.disabled = false;
+  }
+}
+
+function openPurgeModal(): void {
+  if (!purgeModal) return;
+  if (purgeConfirmInput) purgeConfirmInput.value = '';
+  if (confirmPurgeBtn) confirmPurgeBtn.disabled = true;
+  purgeModal.classList.remove('hidden');
+  purgeConfirmInput?.focus();
+}
+
+function closePurgeModal(): void {
+  if (!purgeModal) return;
+  purgeModal.classList.add('hidden');
+  if (purgeConfirmInput) purgeConfirmInput.value = '';
+  if (confirmPurgeBtn) confirmPurgeBtn.disabled = true;
+}
+
+async function handleConfirmPurge(): Promise<void> {
+  if (!confirmPurgeBtn || confirmPurgeBtn.disabled) return;
+  confirmPurgeBtn.disabled = true;
+  try {
+    const res = await apiFetch('/api/admin/feedback', {
+      method: 'DELETE',
+      body: JSON.stringify({ confirm: 'PURGE' }),
+    });
+    if (!res.ok) {
+      setMessage('Failed to purge feedback.');
+      confirmPurgeBtn.disabled = false;
+      return;
+    }
+    const data = (await res.json().catch(() => ({}))) as { count?: number };
+    closePurgeModal();
+    await loadFeedback();
+    const countMsg =
+      typeof data.count === 'number' ? ` (${data.count} deleted)` : '';
+    setMessage(`Feedback records permanently deleted${countMsg}.`);
+  } catch {
+    setMessage('Network error purging feedback.');
+    confirmPurgeBtn.disabled = false;
   }
 }
 
@@ -307,7 +431,44 @@ nextPageBtn.addEventListener('click', () => {
 });
 
 exportCsvBtn.addEventListener('click', handleExportCsv);
-clearAllBtn.addEventListener('click', () => void handleClearAll());
+archiveReviewedBtn?.addEventListener(
+  'click',
+  () => void handleArchiveReviewed(),
+);
+
+purgeBtn?.addEventListener('click', openPurgeModal);
+closePurgeModalBtn?.addEventListener('click', closePurgeModal);
+cancelPurgeBtn?.addEventListener('click', closePurgeModal);
+confirmPurgeBtn?.addEventListener('click', () => void handleConfirmPurge());
+
+purgeConfirmInput?.addEventListener('input', () => {
+  if (confirmPurgeBtn && purgeConfirmInput) {
+    confirmPurgeBtn.disabled = purgeConfirmInput.value !== 'PURGE';
+  }
+});
+
+purgeConfirmInput?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && purgeConfirmInput.value === 'PURGE') {
+    e.preventDefault();
+    void handleConfirmPurge();
+  }
+});
+
+purgeModal?.addEventListener('click', (e) => {
+  if (e.target === purgeModal) {
+    closePurgeModal();
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (
+    e.key === 'Escape' &&
+    purgeModal &&
+    !purgeModal.classList.contains('hidden')
+  ) {
+    closePurgeModal();
+  }
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
