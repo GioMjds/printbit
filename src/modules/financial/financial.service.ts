@@ -390,8 +390,8 @@ export class FinancialService {
     eventId?: string,
   ): Promise<number> {
     if (
-      isCoinSlotLockedBy('power-safety') ||
-      !this.powerSafety.canAcceptCustomerWork()
+      !this.powerSafety.canAcceptCustomerWork() ||
+      (!this.powerSafety.isBypassed() && isCoinSlotLockedBy('power-safety'))
     ) {
       throw new CoinCreditRejectedError('slot_locked', 503, false, {
         code: 'POWER_EMERGENCY',
@@ -650,8 +650,8 @@ export class FinancialService {
     }
 
     if (
-      isCoinSlotLockedBy('power-safety') ||
-      !this.powerSafety.canAcceptCustomerWork()
+      !this.powerSafety.canAcceptCustomerWork() ||
+      (!this.powerSafety.isBypassed() && isCoinSlotLockedBy('power-safety'))
     ) {
       res.status(503).json({
         code: 'POWER_EMERGENCY',
@@ -862,8 +862,8 @@ export class FinancialService {
     let balance: number;
     try {
       if (
-        isCoinSlotLockedBy('power-safety') ||
-        !this.powerSafety.canAcceptCustomerWork()
+        !this.powerSafety.canAcceptCustomerWork() ||
+        (!this.powerSafety.isBypassed() && isCoinSlotLockedBy('power-safety'))
       ) {
         throw new CoinSimulationError(
           409,

@@ -384,14 +384,30 @@
       aria-modal="true"
       aria-labelledby="detailTitle"
     >
-      <div class="ri-modal">
+      <div id="detailModal" class="ri-modal">
         <div class="ri-modal__header">
           <h3 id="detailTitle" class="ri-modal__title">Issue Details</h3>
           <button id="closeDetail" class="ri-modal__close" aria-label="Close">
             &times;
           </button>
         </div>
-        <div id="detailBody" class="ri-modal__body"></div>
+        <div id="detailBody" class="ri-modal__body">
+          <div class="ri-detail-layout">
+            <section class="ri-detail-content">
+              <div id="detailMeta" class="ri-detail-meta"></div>
+              <div class="detail-txn-row">
+                <span class="detail-txn-label">Transaction Ref:</span>
+                <span id="detailTxnRef" class="detail-txn-container">Unlinked</span>
+              </div>
+              <p id="detailDesc" class="ri-detail-desc"></p>
+              <div class="timeline-section">
+                <h4 class="timeline-title">Status Timeline</h4>
+                <div id="statusTimeline" class="timeline-container"></div>
+              </div>
+            </section>
+            <section id="detailMedia" class="ri-detail-media"></section>
+          </div>
+        </div>
         <div class="ri-modal__actions">
           <button id="detailAckBtn" class="ri-action-btn ri-action-btn--ack">
             Mark Acknowledged
@@ -407,6 +423,75 @@
             class="ri-action-btn ri-action-btn--reopen"
           >
             Reopen
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Resolution modal ────────────────────────────────────────────────── -->
+    <div
+      id="resolveModal"
+      class="ri-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="resolveModalTitle"
+    >
+      <div class="ri-modal resolve-modal-card">
+        <div class="ri-modal__header">
+          <h3 id="resolveModalTitle" class="ri-modal__title">Resolve Report</h3>
+          <button
+            id="closeResolveModalBtn"
+            class="ri-modal__close"
+            type="button"
+            aria-label="Close"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="ri-modal__body">
+          <form id="resolveForm" onsubmit="return false;">
+            <div class="form-group">
+              <label for="resolutionReasonSelect" class="form-label">
+                Resolution Reason <span style="color: var(--ri-red);">*</span>
+              </label>
+              <select id="resolutionReasonSelect" class="form-select" required>
+                <option value="" disabled selected>Select a reason...</option>
+                <option value="refunded">Refunded</option>
+                <option value="reprinted">Reprinted</option>
+                <option value="hardware_fix">Hardware Fix</option>
+                <option value="no_fault_found">No Fault Found</option>
+                <option value="duplicate">Duplicate</option>
+                <option value="user_error">User Error</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="resolutionNoteInput" class="form-label">
+                Resolution Note (optional)
+              </label>
+              <textarea
+                id="resolutionNoteInput"
+                class="form-textarea"
+                rows="3"
+                placeholder="Enter resolution note or refund details..."
+              ></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="ri-modal__actions">
+          <button
+            id="cancelResolveBtn"
+            class="ri-action-btn ri-action-btn--view"
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            id="submitResolveBtn"
+            class="ri-action-btn ri-action-btn--resolve"
+            type="button"
+          >
+            Confirm Resolution
           </button>
         </div>
       </div>

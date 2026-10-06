@@ -1,24 +1,3 @@
-/**
- * Print Queue Orchestration - Phase 2 Implementation Framework
- *
- * 5-stage print job execution pipeline with service integration:
- * 1. Preflight: Printer state, ink policy, document validation
- * 2. Dispatch: Send to printer, capture result
- * 3. Settlement: Process payment and change dispensing
- * 4. Spooler: Monitor job lifecycle until terminal state
- * 5. Reconciliation: Generate receipt and emit completion
- *
- * Phase 2: Service integration ready for development
- * All stage helpers prepared; service calls marked with TODO
- *
- * Service Integration Dependencies:
- * - @/services: getPrinterTelemetry, evaluateInkPreflight, printFile, etc.
- * - @/services/print-spooler: monitorSpoolerJob
- * - @/services/settlement: settlementService
- * - @/modules/receipt/receipt.service: receiptService instance
- * - @/services/print-dispatcher: PrintDispatchError, print dispatch types
- */
-
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import type { Server } from 'socket.io';
@@ -37,9 +16,6 @@ import {
 } from '@/infrastructure/worker';
 import { powerSafetyService } from '@/services/power-safety';
 
-/**
- * Result of orchestration execution
- */
 export interface PrintWorkerOrchestrationResult {
   success: boolean;
   transactionId: string;
@@ -51,9 +27,6 @@ export interface PrintWorkerOrchestrationResult {
   failureReason?: string;
 }
 
-/**
- * Error class for worker orchestration with retry classification
- */
 export class WorkerOrchestrationError extends Error {
   constructor(
     public failureClass: string,
@@ -68,9 +41,6 @@ export class WorkerOrchestrationError extends Error {
   }
 }
 
-/**
- * Build context for logging and Socket.IO emissions
- */
 export function buildPrintJobContext(job: PrintJob): {
   transactionId: string;
   spoolerCorrelationKey: string;
@@ -87,9 +57,6 @@ export function buildPrintJobContext(job: PrintJob): {
   };
 }
 
-/**
- * Record attempt in job history for diagnostics
- */
 export function recordJobAttempt(
   job: PrintJob,
   attemptNumber: number,
@@ -114,59 +81,6 @@ export function recordJobAttempt(
   });
 }
 
-/**
- * Orchestrate print job through 5-stage pipeline
- *
- * Phase 2 Implementation Roadmap:
- *
- * Stage 1 - Preflight (validation):
- * TODO: Call getPrinterTelemetry() to verify printer online
- * TODO: Call evaluateInkPreflight() to verify ink levels
- * TODO: Validate document file exists and is accessible
- * TODO: Verify required amount vs balance
- * TODO: Emit printQueueJobStarted event
- *
- * Stage 2 - Dispatch (send to printer):
- * TODO: Call printFile(filePath, options, context)
- * TODO: Handle PrintDispatchError with failure classification
- * TODO: Capture PrintDispatchResult (engine, duration, success)
- * TODO: Call checkpointRecoverySession() with dispatch checkpoint
- * TODO: Emit printQueueJobDispatched event
- *
- * Stage 3 - Settlement (payment processing):
- * TODO: Call settlementService.settle(requiredAmount)
- * TODO: Verify settlement.ok === true
- * TODO: Capture chargedAmount from settlement
- * TODO: Handle insufficient balance (non-retryable)
- * TODO: Call checkpointRecoverySession() with settled checkpoint
- * TODO: Emit transactionSettled event
- *
- * Stage 4 - Spooler (monitor print completion):
- * TODO: Call monitorSpoolerJob() with spooler correlation key
- * TODO: Poll until terminal state (completed/failed/error)
- * TODO: Handle timeout (retryable) vs permanent failures
- * TODO: Call checkpointRecoverySession() with print_confirmed
- * TODO: Emit printQueueJobPrinted event
- *
- * Stage 5 - Reconciliation (generate receipt):
- * TODO: Call receiptService to generate receipt snapshot
- * TODO: Emit printQueueJobCompleted event
- * TODO: Emit transactionReceiptStatusChanged event
- * TODO: Return success with final status
- *
- * Error Handling:
- * - Retryable failures: Dispatch errors, spooler timeouts, settlement locks
- * - Non-retryable: Missing printer, unsupported capabilities, insufficient balance
- * - Unknown errors: Wrapped as retryable by default
- *
- * Socket.IO Events:
- * - printQueueJobStarted: Preflight passed, execution starting
- * - printQueueJobDispatched: Print engine successfully dispatched
- * - transactionSettled: Payment processed
- * - printQueueJobPrinted: Print confirmed by spooler
- * - printQueueJobCompleted: Receipt generated, transaction complete
- * - printQueueJobFailed: Job failed with failure class and retryability
- */
 export async function orchestratePrintJob(
   job: PrintJob,
   io: Server,
@@ -179,9 +93,6 @@ export async function orchestratePrintJob(
   const uploadPath = path.resolve(UPLOAD_DIR, job.data.request.serverFilename);
 
   try {
-    // =========================================================================
-    // STAGE 1: PREFLIGHT VALIDATION
-    // =========================================================================
     currentStage = 'preflight';
 
     if (WORKER_PRECHECKS_ENABLED) {
@@ -218,16 +129,12 @@ export async function orchestratePrintJob(
       startedAt: new Date().toISOString(),
     });
 
-    // Also emit the legacy event that the confirm page expects for immediate feedback
     io.emit('workerPrintStarted', {
       transactionId: ctx.transactionId,
       spoolerCorrelationKey: ctx.spoolerCorrelationKey,
       timestampUtc: new Date().toISOString(),
     });
 
-    // =========================================================================
-    // STAGE 3: HANDOFF TO C# WORKER
-    // =========================================================================
     currentStage = 'handoff';
 
     if (!powerSafetyService.canAcceptCustomerWork()) {
@@ -263,6 +170,7 @@ export async function orchestratePrintJob(
         paperSize: job.data.request.paperSize,
         duplex: job.data.request.duplex ?? false,
         quality: job.data.request.settings?.quality ?? job.data.request.quality ?? 'standard',
+        scaling: job.data.request.scaling ?? job.data.request.settings?.scaling ?? 'fit',
       },
     });
 

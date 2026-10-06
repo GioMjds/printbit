@@ -410,6 +410,31 @@ body {
   cursor: not-allowed;
 }
 
+/* ── Linked transaction badge ────────────────────────────────────────────── */
+
+.rp-linked-txn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.25rem 1.5rem -0.25rem;
+  padding: 0.55rem 0.85rem;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  color: #3730a3;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.rp-linked-txn::before {
+  content: '🏷️';
+  font-size: 0.9rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 /* ── Utility ─────────────────────────────────────────────────────────────── */
 
 .hidden {

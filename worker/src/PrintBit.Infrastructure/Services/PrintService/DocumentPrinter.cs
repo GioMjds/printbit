@@ -67,7 +67,10 @@ public sealed class DocumentPrinter : IDocumentPrinter
                 return Failed(PrintFailureStage.Validation, "PDF file not found", expectedPages);
             }
 
-            if (!File.Exists(_settings.SumatraPath))
+            var useNative = string.Equals(
+                _settings.PdfPrintEngine, "native", StringComparison.OrdinalIgnoreCase);
+
+            if (!useNative && !File.Exists(_settings.SumatraPath))
             {
                 return Failed(PrintFailureStage.Validation, "SumatraPDF executable not found", expectedPages);
             }
@@ -95,6 +98,41 @@ public sealed class DocumentPrinter : IDocumentPrinter
                 settings.Orientation,
                 settings.PaperSize,
                 pages.Count);
+
+            if (useNative)
+            {
+                _logger.LogInformation("Printing natively (Windows.Data.Pdf + PrintDocument)");
+                using var nativeTimeout = new CancellationTokenSource(
+                    TimeSpan.FromSeconds(_settings.PrintTimeoutSeconds));
+                using var nativeCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    nativeTimeout.Token);
+
+                try
+                {
+                    await NativePdfPrinter.PrintAsync(
+                        filePath, dispatchPrinterName, pages, settings, nativeCts.Token);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    return Failed(PrintFailureStage.Timeout, "Native print timeout", expectedPages);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return Failed(PrintFailureStage.ProcessStart, ex.Message, expectedPages);
+                }
+
+                return await VerifySpoolerDocumentLifecycleAsync(
+                    dispatchPrinterName,
+                    printerName,
+                    Path.GetFileName(filePath),
+                    expectedPages,
+                    pages.Count,
+                    onProgress,
+                    onPaused,
+                    onResumed,
+                    cancellationToken);
+            }
 
             using var process = BuildPrintProcess(
                 _settings.SumatraPath,
@@ -177,7 +215,10 @@ public sealed class DocumentPrinter : IDocumentPrinter
         };
 
         printSettings.Add(NormalizePaperSetting(settings.PaperSize));
-
+        if (string.Equals(settings.Orientation?.Trim(), "landscape", StringComparison.OrdinalIgnoreCase))
+        {
+            printSettings.Add("landscape");
+        }
 
         // The prepared PDF is already paper-sized with the customer's fit/actual layout baked in
         // (DocumentPreprocessor). Sumatra "fit" would shrink it again into the printer's printable
@@ -205,14 +246,11 @@ public sealed class DocumentPrinter : IDocumentPrinter
         return new Process { StartInfo = startInfo };
     }
 
-    private static string NormalizePaperSetting(string? paperSize) =>
+    internal static string NormalizePaperSetting(string? paperSize) =>
         paperSize?.Trim().ToLowerInvariant() switch
         {
-            "letter" => "paper=letter",
-            // In SumatraPDF, standard paper names do not include "8.5 x 13 in" or "folio".
-            // "paperkind=14" explicitly sets Windows DMPAPER_FOLIO (14), which maps
-            // directly to the Epson driver's "8.5 x 13 in" preset (RawKind 14).
-            "legal" or "folio" => "paperkind=14",
+            "letter" or "short" => "paper=letter",
+            "legal" or "folio" or "long" => "paperkind=14",
             _ => "paper=A4"
         };
 

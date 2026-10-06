@@ -38,21 +38,37 @@ if (idleBootFlag) {
 }
 
 function syncFabVisibility(): void {
-  const isPricingOpen = Boolean(document.getElementById('pricingOverlay')?.classList.contains('is-open'));
-  const isGuideOpen = Boolean(document.getElementById('guideOverlay')?.classList.contains('is-visible'));
-  const isReportOpen = Boolean(document.getElementById('reportOverlay')?.classList.contains('is-visible'));
-  const isFeedbackOpen = Boolean(document.getElementById('feedbackOverlay')?.classList.contains('is-visible'));
-  const isWifiOpen = Boolean(document.getElementById('wifiOverlay')?.classList.contains('is-visible'));
-  const isAdminOpen = Boolean(document.getElementById('adminOverlay')?.classList.contains('is-visible'));
+  const isPricingOpen = Boolean(
+    document.getElementById('pricingOverlay')?.classList.contains('is-open'),
+  );
+  const isGuideOpen = Boolean(
+    document.getElementById('guideOverlay')?.classList.contains('is-visible'),
+  );
+  const isReportOpen = Boolean(
+    document.getElementById('reportOverlay')?.classList.contains('is-visible'),
+  );
+  const isFeedbackOpen = Boolean(
+    document
+      .getElementById('feedbackOverlay')
+      ?.classList.contains('is-visible'),
+  );
+  const isWifiOpen = Boolean(
+    document.getElementById('wifiOverlay')?.classList.contains('is-visible'),
+  );
+  const isAdminOpen = Boolean(
+    document.getElementById('adminOverlay')?.classList.contains('is-visible'),
+  );
   const isIdleAttractorOpen = Boolean(
     document.getElementById('idleOverlay')?.classList.contains('is-visible') ||
-    document.documentElement.classList.contains('kiosk-boot-idle')
+    document.documentElement.classList.contains('kiosk-boot-idle'),
   );
-  const idleWarning = document.querySelector<HTMLElement>('.idle-warning-overlay');
+  const idleWarning = document.querySelector<HTMLElement>(
+    '.idle-warning-overlay',
+  );
   const isIdleWarningOpen = Boolean(
     idleWarning &&
     (idleWarning.classList.contains('is-visible') ||
-      (idleWarning.style.display && idleWarning.style.display !== 'none'))
+      (idleWarning.style.display && idleWarning.style.display !== 'none')),
   );
 
   const shouldHide =
@@ -67,10 +83,12 @@ function syncFabVisibility(): void {
 
   document.body?.setAttribute('data-modal-open', String(shouldHide));
   if (typeof document.querySelectorAll === 'function') {
-    document.querySelectorAll<HTMLElement>('.kiosk-fab, .printbit-language-fab').forEach((fab) => {
-      fab.classList.toggle('is-hidden', shouldHide);
-      fab.setAttribute('aria-hidden', String(shouldHide));
-    });
+    document
+      .querySelectorAll<HTMLElement>('.kiosk-fab, .printbit-language-fab')
+      .forEach((fab) => {
+        fab.classList.toggle('is-hidden', shouldHide);
+        fab.setAttribute('aria-hidden', String(shouldHide));
+      });
   }
 }
 
@@ -120,7 +138,13 @@ function setPricingModalOpen(open: boolean): void {
   else openPricingBtn?.focus();
 }
 
-openPricingBtn?.addEventListener('click', () => setPricingModalOpen(true));
+// The pricing pill lives inside the Print card <button>, so stop the click from
+// bubbling up to the card's /print navigation (same pattern as .action-card__help).
+openPricingBtn?.addEventListener('click', (event) => {
+  event.stopPropagation();
+  event.preventDefault();
+  setPricingModalOpen(true);
+});
 closePricingBtn?.addEventListener('click', () => setPricingModalOpen(false));
 pricingOverlay?.addEventListener('click', (event) => {
   if (event.target === pricingOverlay) setPricingModalOpen(false);
@@ -192,7 +216,6 @@ window.addEventListener('pagehide', (event) => {
     homeScanController?.destroy();
   }
 });
-
 
 openPrint?.addEventListener('click', () => {
   navigateTo('/print');
@@ -409,8 +432,7 @@ const guides = {
     {
       imageUrl: '/assets/print-steps/print-4.png',
       captionKey: 'print.guide.step6',
-      captionFallback:
-        'You may now proceed inserting coins.',
+      captionFallback: 'You may now proceed inserting coins.',
     },
     {
       imageUrl: '/assets/print-steps/print-5.png',
@@ -433,8 +455,7 @@ const guides = {
     {
       imageUrl: '/assets/print-steps/print-8.png',
       captionKey: 'print.guide.step10',
-      captionFallback:
-        'The printer is processed in background.',
+      captionFallback: 'The printer is processed in background.',
     },
     {
       imageUrl: '/assets/print-steps/print-9.png',
@@ -488,8 +509,7 @@ const guides = {
     {
       imageUrl: '/assets/copy-steps/copy-8.png',
       captionKey: 'copy.guide.step8',
-      captionFallback:
-        'The printer is processed in background.',
+      captionFallback: 'The printer is processed in background.',
     },
     {
       imageUrl: '/assets/copy-steps/copy-9.png',

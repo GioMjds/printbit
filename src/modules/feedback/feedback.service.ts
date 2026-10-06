@@ -29,6 +29,7 @@ export interface SubmitFeedbackInput {
   comment: string;
   category?: string | null;
   rating?: number | null;
+  transactionRef?: string | null;
   meta?: LogMeta;
 }
 
@@ -116,8 +117,11 @@ export class FeedbackService {
       comment,
       category,
       rating,
-      status: 'open',
+      status: 'new',
       resolvedAt: null,
+      transactionRef: input.transactionRef ?? null,
+      needsAction: false,
+      archivedAt: null,
       meta: input.meta,
     };
 
@@ -163,6 +167,102 @@ export class FeedbackService {
     );
 
     return entry;
+  }
+
+  archiveFeedback(id: string): FeedbackEntry | null {
+    const entry = feedbackStore.archiveFeedback(id);
+    if (entry) {
+      void adminService.appendAdminLog(
+        'feedback_archived',
+        'Feedback entry archived by admin.',
+        { feedbackId: id },
+      );
+    }
+    return entry;
+  }
+
+  archiveAllReviewedFeedback(): number {
+    const count = feedbackStore.archiveAllReviewedFeedback();
+    if (count > 0) {
+      void adminService.appendAdminLog(
+        'feedback_archived_all_reviewed',
+        'All reviewed feedback entries archived',
+        { count },
+      );
+    }
+    return count;
+  }
+
+  setNeedsAction(id: string, needsAction: boolean): FeedbackEntry | null {
+    const entry = feedbackStore.setNeedsAction(id, needsAction);
+    if (entry) {
+      void adminService.appendAdminLog(
+        'feedback_needs_action_updated',
+        `Feedback needsAction updated to ${needsAction}`,
+        { feedbackId: id, needsAction },
+      );
+    }
+    return entry;
+  }
+
+  purgeFeedback(id: string, confirm: string): boolean {
+    const purged = feedbackStore.purgeFeedback(id, confirm);
+    if (purged) {
+      void adminService.appendAdminLog(
+        'feedback_purged',
+        'Feedback entry permanently purged.',
+        { feedbackId: id },
+      );
+    }
+    return purged;
+  }
+
+  purgeAllFeedback(confirm: string): number {
+    const count = feedbackStore.purgeAllFeedback(confirm);
+    if (count > 0) {
+      void adminService.appendAdminLog(
+        'feedback_purged_all',
+        'All feedback entries permanently purged.',
+        { count },
+      );
+    }
+    return count;
+  }
+
+  findFeedbackById(id: string): FeedbackEntry | null {
+    return feedbackStore.findFeedbackById(id);
+  }
+
+  updateFeedbackStatus(
+    id: string,
+    status: FeedbackStatus,
+  ): FeedbackEntry | null {
+    if (status === 'reviewed') {
+      const entry = feedbackStore.updateFeedbackResolved(id, true);
+      if (entry) {
+        void adminService.appendAdminLog(
+          'feedback_resolved',
+          'Feedback marked as resolved',
+          { feedbackId: id },
+        );
+      }
+      return entry;
+    }
+    if (status === 'new' || status === 'open') {
+      const entry = feedbackStore.updateFeedbackResolved(id, false);
+      if (entry) {
+        void adminService.appendAdminLog(
+          'feedback_reopened',
+          'Feedback reopened',
+          { feedbackId: id },
+        );
+      }
+      return entry;
+    }
+    if (status === 'archived') {
+      return this.archiveFeedback(id);
+    }
+    return feedbackStore.findFeedbackById(id);
   }
 
   async deleteFeedback(feedbackId: string): Promise<boolean> {

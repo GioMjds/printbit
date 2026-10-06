@@ -29,6 +29,9 @@ public class HardwareSettings
 
     public string SumatraPath { get; set; } = @"C:\Users\printbit\bin\SumatraPDF.exe";
 
+    // "native" (default; Windows.Data.Pdf + PrintDocument, no external exe) or "sumatra".
+    public string PdfPrintEngine { get; set; } = "native";
+
     public string QpdfPath { get; set; } = @"C:\Users\printbit\bin\qpdf.exe";
 
     public int PauseTimeoutMinutes { get; set; } = 15;

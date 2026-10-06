@@ -234,7 +234,10 @@ body {
   position: absolute;
   right: 24px;
   top: 24px;
-  transition: background 150ms ease, border-color 150ms ease, transform 120ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 120ms ease;
   -webkit-tap-highlight-color: transparent;
 }
 .pricing-close:hover {
@@ -283,8 +286,11 @@ body {
   font-size: 16px;
   text-rendering: optimizeLegibility;
 }
-.pricing-table caption { display: none; }
-.pricing-table th, .pricing-table td {
+.pricing-table caption {
+  display: none;
+}
+.pricing-table th,
+.pricing-table td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   padding: 13px 10px;
   text-align: center;
@@ -295,7 +301,7 @@ body {
   font-size: 14px;
   background: rgba(255, 255, 255, 0.04);
 }
-.pricing-table th[scope="col"] {
+.pricing-table th[scope='col'] {
   font-weight: 700;
   line-height: 1.3;
   padding: 15px 10px;
@@ -376,11 +382,11 @@ body {
 }
 
 /* Cols 4-7: Coverage Tiers */
-.pricing-table th:nth-child(n+4):nth-child(-n+7),
-.pricing-table td:nth-child(n+4):nth-child(-n+7) {
+.pricing-table th:nth-child(n + 4):nth-child(-n + 7),
+.pricing-table td:nth-child(n + 4):nth-child(-n + 7) {
   width: 13%;
 }
-.pricing-table td:nth-child(n+4):nth-child(-n+7) {
+.pricing-table td:nth-child(n + 4):nth-child(-n + 7) {
   font-weight: 700;
   font-size: 17px;
   color: #e2e8f0;
@@ -421,7 +427,9 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: border-color 150ms ease, background 150ms ease;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
 }
 .pricing-tier-tag--low {
   background: rgba(52, 211, 153, 0.05);
@@ -586,7 +594,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: 28px;
-  padding: 24px 0;
+  /* Side padding keeps content clear of the fixed support dock (right)
+     and the language button; symmetric so the layout stays centred. */
+  padding: 24px 76px;
 }
 
 .action-hint {
@@ -673,7 +683,10 @@ body {
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease, transform 120ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 120ms ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -730,7 +743,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: clamp(12px, 1.5vw, 18px);
-  padding: clamp(28px, 3.6vw, 52px) clamp(20px, 2.5vw, 42px);
+  /* Extra top padding reserves a row for the label pills (prices / help) */
+  padding: clamp(60px, 4.4vw, 68px) clamp(20px, 2.5vw, 42px)
+    clamp(24px, 3vw, 40px);
   border: none;
   border-radius: 28px;
   cursor: pointer;
@@ -874,42 +889,74 @@ body {
 /* Sub */
 .action-card__sub {
   text-transform: uppercase;
-  font-size: clamp(8px, 1.1vw, 14px);
-  font-weight: 400;
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.3px;
+  text-wrap: balance;
   color: inherit;
-  opacity: 0.75;
+  opacity: 0.85;
   margin: 0;
 }
 
-/* ── Help button on each card ─────────────────────────────── */
-.action-card__help {
+/* ── Labelled pills on each card (help = every card, prices = Print only) ── */
+.action-card__help,
+.action-card__price {
   position: absolute;
   top: 14px;
-  right: 14px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 20px;
-  font-weight: 800;
-  display: flex;
+  height: 40px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  padding: 0 14px 0 6px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  background: rgba(14, 13, 31, 0.55);
+  color: var(--white);
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
   cursor: pointer;
   z-index: 2;
   transition:
     background 150ms,
     border-color 150ms,
-    color 150ms;
+    transform 120ms;
   -webkit-tap-highlight-color: transparent;
 }
 
-.action-card__help:hover {
-  background: rgba(255, 255, 255, 0.26);
-  border-color: rgba(255, 255, 255, 0.55);
-  color: var(--white);
+.action-card__help {
+  right: 14px;
+}
+
+.action-card__price {
+  left: 14px;
+}
+
+.action-card__help:hover,
+.action-card__price:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.action-card__help:active,
+.action-card__price:active {
+  transform: scale(0.96);
+}
+
+.action-card__pill-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  color: #14122b;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 /* ── Guide overlay ───────────────────────────────────────── */
@@ -1191,6 +1238,10 @@ body {
     padding: 0 20px;
   }
 
+  .action-area {
+    padding-inline: 0;
+  }
+
   .action-grid {
     grid-template-columns: 1fr;
     max-width: 420px;
@@ -1394,7 +1445,9 @@ body {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 140ms, transform 120ms;
+  transition:
+    background 140ms,
+    transform 120ms;
   -webkit-tap-highlight-color: transparent;
 }
 

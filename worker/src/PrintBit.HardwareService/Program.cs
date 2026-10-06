@@ -18,7 +18,11 @@ using PrintBit.Infrastructure.Windows.Storage;
 using PrintBit.Infrastructure.Windows.Time;
 using PrintBit.Shared.Configurations;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
 builder.Services.Configure<HardwareSettings>(builder.Configuration.GetSection("HardwareSettings"));
 

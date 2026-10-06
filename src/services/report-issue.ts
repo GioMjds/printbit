@@ -44,6 +44,7 @@ export interface SubmitReportIssueInput {
   description: string;
   category?: string | null;
   attachmentIds?: string[] | null;
+  transactionRef?: string | null;
   meta?: LogMeta;
 }
 
@@ -201,6 +202,7 @@ class ReportIssueService {
       attachmentIds,
       acknowledgedAt: null,
       resolvedAt: null,
+      transactionRef: input.transactionRef ?? null,
       meta: input.meta,
     };
 

@@ -15,7 +15,12 @@ export type FeedbackCategory =
   | 'payment'
   | 'other';
 
-export type FeedbackStatus = 'open' | 'resolved';
+export type FeedbackStatus =
+  | 'new'
+  | 'reviewed'
+  | 'archived'
+  | 'open'
+  | 'resolved';
 
 export type AdminQueueView = 'active' | 'archived' | 'all';
 
@@ -28,6 +33,9 @@ export interface FeedbackEntry {
   rating: number | null;
   status: FeedbackStatus;
   resolvedAt?: string | null;
+  transactionRef?: string | null;
+  needsAction: boolean;
+  archivedAt?: string | null;
   meta?: LogMeta;
 }
 

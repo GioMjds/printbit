@@ -1,5 +1,4 @@
 import { getSqliteDb } from '../sqlite-storage';
-import { db as runtimeDb } from '../db';
 
 export interface ConsumableUsageEventEntry {
   id: string;
@@ -245,6 +244,7 @@ export class ConsumablesSqliteStore {
       Math.min(Math.floor(nextCurrentSheets), normalizedCapacity),
     );
     getSqliteDb();
+    const { db: runtimeDb } = await import('../db');
     if (!runtimeDb.data) await runtimeDb.read();
     if (!runtimeDb.data)
       throw new Error('Runtime database was not initialized properly.');
