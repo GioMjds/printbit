@@ -12,6 +12,34 @@ export type ReportIssueCategory =
 
 export type ReportIssueStatus = 'open' | 'acknowledged' | 'resolved';
 
+export type ReportResolutionReason =
+  | 'refunded'
+  | 'reprinted'
+  | 'hardware_fix'
+  | 'no_fault_found'
+  | 'duplicate'
+  | 'user_error'
+  | 'other';
+
+export const REPORT_RESOLUTION_REASONS: readonly ReportResolutionReason[] = [
+  'refunded',
+  'reprinted',
+  'hardware_fix',
+  'no_fault_found',
+  'duplicate',
+  'user_error',
+  'other',
+] as const;
+
+export function isReportResolutionReason(
+  value: unknown,
+): value is ReportResolutionReason {
+  return (
+    typeof value === 'string' &&
+    REPORT_RESOLUTION_REASONS.includes(value as ReportResolutionReason)
+  );
+}
+
 export type AdminQueueView = 'active' | 'archived' | 'all';
 
 export interface ReportIssueSessionEntry {
@@ -46,6 +74,9 @@ export interface ReportIssueEntry {
   attachmentIds: string[];
   acknowledgedAt: string | null;
   resolvedAt: string | null;
+  transactionRef?: string | null;
+  resolutionReason?: ReportResolutionReason | null;
+  resolutionNote?: string | null;
   meta?: Record<string, string | number | boolean | null>;
 }
 
@@ -225,7 +256,28 @@ export class ReportIssueSqliteStore {
     return rows.map((row) => this.toAttachmentEntry(row));
   }
 
-  createReportIssue(entry: ReportIssueEntry): void {
+  createReportIssue(
+    entry: Omit<
+      ReportIssueEntry,
+      'attachmentIds' | 'status' | 'acknowledgedAt' | 'resolvedAt'
+    > & {
+      attachmentIds?: string[];
+      status?: ReportIssueStatus;
+      acknowledgedAt?: string | null;
+      resolvedAt?: string | null;
+      transactionRef?: string | null;
+      resolutionReason?: ReportResolutionReason | null;
+      resolutionNote?: string | null;
+    },
+  ): void {
+    const status = entry.status ?? 'open';
+    const attachmentIds = entry.attachmentIds ?? [];
+    const acknowledgedAt = entry.acknowledgedAt ?? null;
+    const resolvedAt = entry.resolvedAt ?? null;
+    const transactionRef = entry.transactionRef ?? null;
+    const resolutionReason = entry.resolutionReason ?? null;
+    const resolutionNote = entry.resolutionNote ?? null;
+
     getSqliteDb()
       .prepare(
         `INSERT INTO report_issue_entries (
@@ -239,8 +291,11 @@ export class ReportIssueSqliteStore {
           attachment_ids_json,
           acknowledged_at,
           resolved_at,
-          meta_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          meta_json,
+          transaction_ref,
+          resolution_reason,
+          resolution_note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         entry.id,
@@ -249,11 +304,14 @@ export class ReportIssueSqliteStore {
         entry.title,
         entry.description,
         entry.category,
-        entry.status,
-        JSON.stringify(entry.attachmentIds),
-        entry.acknowledgedAt,
-        entry.resolvedAt,
+        status,
+        JSON.stringify(attachmentIds),
+        acknowledgedAt,
+        resolvedAt,
         jsonOrNull(entry.meta),
+        transactionRef,
+        resolutionReason,
+        resolutionNote,
       );
   }
 
@@ -375,7 +433,10 @@ export class ReportIssueSqliteStore {
           attachment_ids_json,
           acknowledged_at,
           resolved_at,
-          meta_json
+          meta_json,
+          transaction_ref,
+          resolution_reason,
+          resolution_note
          FROM report_issue_entries
          ${whereSql}
          ORDER BY timestamp DESC
@@ -442,7 +503,10 @@ export class ReportIssueSqliteStore {
           attachment_ids_json,
           acknowledged_at,
           resolved_at,
-          meta_json
+          meta_json,
+          transaction_ref,
+          resolution_reason,
+          resolution_note
          FROM report_issue_entries
          WHERE id = ?
          LIMIT 1`,
@@ -495,6 +559,76 @@ export class ReportIssueSqliteStore {
       .get(attachmentId) as Record<string, unknown> | undefined;
     if (!row) return null;
     return this.toAttachmentEntry(row);
+  }
+
+  updateReportIssueStatus(
+    id: string,
+    status: ReportIssueStatus,
+    options?: {
+      resolutionReason?: ReportResolutionReason;
+      resolutionNote?: string | null;
+    },
+  ): ReportIssueEntry | null {
+    const nowIso = new Date().toISOString();
+
+    if (status === 'resolved') {
+      if (!options?.resolutionReason) {
+        throw new Error('Resolution reason is required to resolve a report.');
+      }
+      if (!isReportResolutionReason(options.resolutionReason)) {
+        throw new Error('Invalid resolution reason.');
+      }
+      const note = options.resolutionNote ?? null;
+      const result = getSqliteDb()
+        .prepare(
+          `UPDATE report_issue_entries
+           SET status = ?,
+               acknowledged_at = COALESCE(acknowledged_at, ?),
+               resolved_at = ?,
+               resolution_reason = ?,
+               resolution_note = ?
+           WHERE id = ?`,
+        )
+        .run(status, nowIso, nowIso, options.resolutionReason, note, id) as {
+        changes?: unknown;
+      };
+      if (Number(result.changes ?? 0) === 0) return null;
+      return this.getReportIssueById(id);
+    }
+
+    if (status === 'acknowledged') {
+      const result = getSqliteDb()
+        .prepare(
+          `UPDATE report_issue_entries
+           SET status = ?,
+               acknowledged_at = COALESCE(acknowledged_at, ?),
+               resolved_at = NULL,
+               resolution_reason = NULL,
+               resolution_note = NULL
+           WHERE id = ?`,
+        )
+        .run(status, nowIso, id) as {
+        changes?: unknown;
+      };
+      if (Number(result.changes ?? 0) === 0) return null;
+      return this.getReportIssueById(id);
+    }
+
+    const result = getSqliteDb()
+      .prepare(
+        `UPDATE report_issue_entries
+         SET status = ?,
+             acknowledged_at = NULL,
+             resolved_at = NULL,
+             resolution_reason = NULL,
+             resolution_note = NULL
+         WHERE id = ?`,
+      )
+      .run(status, id) as {
+      changes?: unknown;
+    };
+    if (Number(result.changes ?? 0) === 0) return null;
+    return this.getReportIssueById(id);
   }
 
   updateIssueStatus(
@@ -607,51 +741,7 @@ export class ReportIssueSqliteStore {
   }
 
   private toIssueEntry(row: Record<string, unknown>): ReportIssueEntry {
-    const parsedMeta = normalizeLogMeta(parseJsonValue<unknown>(row.meta_json));
-    const parsedAttachmentIds =
-      parseJsonValue<unknown>(row.attachment_ids_json) ?? [];
-    const attachmentIds = Array.isArray(parsedAttachmentIds)
-      ? parsedAttachmentIds.filter(
-          (item): item is string => typeof item === 'string',
-        )
-      : [];
-
-    const validCategories = new Set<string>([
-      'hardware',
-      'software',
-      'print',
-      'copy',
-      'scan',
-      'payment',
-      'network',
-      'other',
-    ]);
-    const validStatuses = new Set<string>(['open', 'acknowledged', 'resolved']);
-
-    const categoryRaw = typeof row.category === 'string' ? row.category : '';
-    const categoryValue = validCategories.has(categoryRaw)
-      ? (categoryRaw as ReportIssueCategory)
-      : 'other';
-
-    const statusRaw = typeof row.status === 'string' ? row.status : '';
-    const statusValue = validStatuses.has(statusRaw)
-      ? (statusRaw as ReportIssueStatus)
-      : 'open';
-
-    return {
-      id: String(row.id ?? ''),
-      sessionId: String(row.session_id ?? ''),
-      timestamp: String(row.timestamp ?? ''),
-      title: String(row.title ?? ''),
-      description: String(row.description ?? ''),
-      category: categoryValue,
-      status: statusValue,
-      attachmentIds,
-      acknowledgedAt:
-        typeof row.acknowledged_at === 'string' ? row.acknowledged_at : null,
-      resolvedAt: typeof row.resolved_at === 'string' ? row.resolved_at : null,
-      meta: parsedMeta,
-    };
+    return mapReportIssueEntry(row);
   }
 
   private toAttachmentEntry(
@@ -672,4 +762,80 @@ export class ReportIssueSqliteStore {
   }
 }
 
+export function mapReportIssueEntry(
+  row: Record<string, unknown>,
+): ReportIssueEntry {
+  const parsedMeta = normalizeLogMeta(parseJsonValue<unknown>(row.meta_json));
+  const parsedAttachmentIds =
+    parseJsonValue<unknown>(row.attachment_ids_json) ?? [];
+  const attachmentIds = Array.isArray(parsedAttachmentIds)
+    ? parsedAttachmentIds.filter(
+        (item): item is string => typeof item === 'string',
+      )
+    : [];
+
+  const validCategories = new Set<string>([
+    'hardware',
+    'software',
+    'print',
+    'copy',
+    'scan',
+    'payment',
+    'network',
+    'other',
+  ]);
+  const validStatuses = new Set<string>(['open', 'acknowledged', 'resolved']);
+
+  const categoryRaw = typeof row.category === 'string' ? row.category : '';
+  const categoryValue = validCategories.has(categoryRaw)
+    ? (categoryRaw as ReportIssueCategory)
+    : 'other';
+
+  const statusRaw = typeof row.status === 'string' ? row.status : '';
+  const statusValue = validStatuses.has(statusRaw)
+    ? (statusRaw as ReportIssueStatus)
+    : 'open';
+
+  return {
+    id: String(row.id ?? ''),
+    sessionId: String(row.session_id ?? ''),
+    timestamp: String(row.timestamp ?? ''),
+    title: String(row.title ?? ''),
+    description: String(row.description ?? ''),
+    category: categoryValue,
+    status: statusValue,
+    attachmentIds,
+    acknowledgedAt:
+      typeof row.acknowledged_at === 'string' ? row.acknowledged_at : null,
+    resolvedAt: typeof row.resolved_at === 'string' ? row.resolved_at : null,
+    transactionRef:
+      typeof row.transaction_ref === 'string' ? row.transaction_ref : null,
+    resolutionReason:
+      typeof row.resolution_reason === 'string' &&
+      isReportResolutionReason(row.resolution_reason)
+        ? row.resolution_reason
+        : null,
+    resolutionNote:
+      typeof row.resolution_note === 'string' ? row.resolution_note : null,
+    meta: parsedMeta,
+  };
+}
+
 export const reportIssueStore = new ReportIssueSqliteStore();
+
+export function createReportIssue(
+  entry: Parameters<ReportIssueSqliteStore['createReportIssue']>[0],
+): void {
+  reportIssueStore.createReportIssue(entry);
+}
+
+export function updateReportIssueStatus(
+  id: string,
+  status: ReportIssueStatus,
+  options?: {
+    resolutionReason?: ReportResolutionReason;
+    resolutionNote?: string | null;
+  },
+): ReportIssueEntry | null {
+  return reportIssueStore.updateReportIssueStatus(id, status, options);
+}
