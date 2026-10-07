@@ -659,6 +659,12 @@ export class AdminController {
       this.handleGetSystemLogs,
     );
     this.router.get(
+      '/logs/transactions/page-output-summary',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleGetPageOutputSummary,
+    );
+    this.router.get(
       '/logs/transactions',
       requireAdminLocalAccess,
       requireAdminPin,
@@ -2938,6 +2944,17 @@ export class AdminController {
     res.json({ logs: this.adminService.listSystemLogs(limit) });
   };
 
+  private handleGetPageOutputSummary = (req: Request, res: Response) => {
+    const parsed = this.parseTransactionLogFilters(req);
+    if (parsed.error) {
+      return res.status(400).json({ error: parsed.error });
+    }
+    const summary = this.adminService.computePageOutputSummary(
+      parsed.filters ?? {},
+    );
+    return res.json(summary);
+  };
+
   private handleGetTransactionLogs = (req: Request, res: Response) => {
     const parsed = this.parseTransactionLogFilters(req);
     if (parsed.error) {
@@ -3587,7 +3604,7 @@ export class AdminController {
     lifecycleRecord: ReturnType<typeof getSpoolerLifecycleRecord> | null,
     pendingRefunds: PendingRefundEntry[],
     logs: AdminLogEntry[],
-    ledgerEntries: Array<{ eventType: string }> = [],
+    ledgerEntries: { eventType: string }[] = [],
   ): string | null {
     if (
       pendingRefunds.some((entry) => entry.status === 'refunded') ||

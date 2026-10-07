@@ -47,6 +47,34 @@ export interface TransactionLogFilters {
   status?: TransactionLogStatus;
 }
 
+export interface PageOutputSummaryResult {
+  scope: {
+    totalTransactions: number;
+    dateFrom: string | null;
+    dateTo: string | null;
+  };
+  financials: {
+    grossCharged: number;
+    cashRefundsIssued: number;
+    refundCount: number;
+    netCashRetained: number;
+    unresolvedOwedChange: number;
+    unresolvedOwedChangeCount: number;
+  };
+  pages: {
+    totalRequested: number;
+    totalPrinted: number;
+    totalFailed: number;
+    fulfillmentRatePercent: number;
+    colorPagesPrinted: number;
+    bwPagesPrinted: number;
+  };
+  hardwareIncidents: {
+    spoolerFailures: number;
+    hopperShortfalls: number;
+  };
+}
+
 const TRANSACTION_TYPE_PREFIXES = [
   'print_',
   'copy_',
@@ -536,10 +564,434 @@ export class AdminService {
     );
   }
 
-  listAllTransactionLogs(filters: TransactionLogFilters): AdminLogEntry[] {
+  private getAllRawTransactionLogs(): AdminLogEntry[] {
     const rawTxLogs = adminLogStore.listAllTransactionLogs();
+    const rawDb = db.data as (Record<string, unknown> & typeof db.data) | null;
+    const fallbackLogs = (rawDb?.adminLogs ??
+      rawDb?.logs ??
+      []) as AdminLogEntry[];
+    if (fallbackLogs.length > 0) {
+      const existingIds = new Set(rawTxLogs.map((l) => l.id));
+      const extras = fallbackLogs.filter(
+        (l) => !existingIds.has(l.id) && this.isTransactionLog(l),
+      );
+      return [...rawTxLogs, ...extras];
+    }
+    return rawTxLogs;
+  }
+
+  listAllTransactionLogs(filters: TransactionLogFilters): AdminLogEntry[] {
+    const rawTxLogs = this.getAllRawTransactionLogs();
     const logs = this.filterTransactionLogs(rawTxLogs, filters);
     return this.groupLogsByTransaction(logs);
+  }
+
+  computePageOutputSummary(
+    filters: TransactionLogFilters = {},
+  ): PageOutputSummaryResult {
+    const rawLogs = this.getAllRawTransactionLogs();
+    const filteredLogs = this.filterTransactionLogs(rawLogs, filters);
+    const matchingTxGroups = this.groupLogsByTransaction(filteredLogs);
+
+    const totalTransactions = matchingTxGroups.length;
+    const dateFrom = filters.dateFrom ?? null;
+    const dateTo = filters.dateTo ?? null;
+
+    let grossCharged = 0;
+    let cashRefundsIssued = 0;
+    let refundCount = 0;
+
+    let totalRequested = 0;
+    let totalPrinted = 0;
+    let totalFailed = 0;
+    let colorPagesPrinted = 0;
+    let bwPagesPrinted = 0;
+
+    let spoolerFailures = 0;
+    let hopperShortfalls = 0;
+
+    const countedSpoolerTxIds = new Set<string>();
+    const countedHopperTxIds = new Set<string>();
+
+    for (const txLog of matchingTxGroups) {
+      const txId = this.getTransactionId(txLog);
+
+      // Collect all logs for this specific transaction
+      const allTxLogs = txId
+        ? rawLogs.filter((l) => this.getTransactionId(l) === txId)
+        : [txLog];
+
+      // ── Financials for this transaction ──────────────────────────────────
+      const ledgerEntries = txId
+        ? (db.data?.financialLedger ?? []).filter(
+            (e) => e.referenceId === txId,
+          )
+        : [];
+
+      const pendingRefunds = txId
+        ? (db.data?.pendingRefunds ?? []).filter(
+            (p) =>
+              p.jobContext?.transactionId === txId ||
+              p.id === txId,
+          )
+        : [];
+
+      const recoverySession = txId
+        ? (db.data?.recovery?.sessions ?? []).find((s) => s.id === txId)
+        : undefined;
+
+      const receiptRecord = txId
+        ? (db.data?.receiptRecords ?? []).find((r) => r.transactionId === txId)
+        : undefined;
+
+      // 1. Charged Amount
+      let txCharged: number | null = null;
+      if (typeof receiptRecord?.chargedAmount === 'number') {
+        txCharged = receiptRecord.chargedAmount;
+      } else {
+        const paymentLedger = ledgerEntries.find(
+          (e) =>
+            e.eventType === 'job_completed' ||
+            (e.eventType as string) === 'payment_received',
+        );
+        if (paymentLedger && typeof paymentLedger.amount === 'number') {
+          txCharged = paymentLedger.amount;
+        } else if (typeof recoverySession?.chargedAmount === 'number') {
+          txCharged = recoverySession.chargedAmount;
+        } else if (
+          pendingRefunds.length > 0 &&
+          typeof pendingRefunds[0].chargedAmount === 'number'
+        ) {
+          txCharged = pendingRefunds[0].chargedAmount;
+        } else {
+          for (const l of allTxLogs) {
+            if (
+              typeof l.meta?.amount === 'number' &&
+              Number.isFinite(l.meta.amount)
+            ) {
+              txCharged = l.meta.amount;
+              break;
+            }
+            if (
+              typeof l.meta?.chargedAmount === 'number' &&
+              Number.isFinite(l.meta.chargedAmount)
+            ) {
+              txCharged = l.meta.chargedAmount;
+              break;
+            }
+          }
+        }
+      }
+
+      if (
+        typeof txCharged === 'number' &&
+        Number.isFinite(txCharged) &&
+        txCharged > 0
+      ) {
+        grossCharged += txCharged;
+      }
+
+      // 2. Refunds
+      const pendingRefundIds = new Set(pendingRefunds.map((p) => p.id));
+      const refundLedgerEntries = (db.data?.financialLedger ?? []).filter(
+        (e) =>
+          e.eventType === 'refund_issued' &&
+          ((txId && e.referenceId === txId) ||
+            (e.referenceId && pendingRefundIds.has(e.referenceId))),
+      );
+
+      let txRefundSum = 0;
+      let txRefundCount = 0;
+      for (const refEntry of refundLedgerEntries) {
+        if (typeof refEntry.amount === 'number' && refEntry.amount > 0) {
+          txRefundSum += refEntry.amount;
+          txRefundCount += 1;
+        }
+      }
+
+      if (txRefundCount === 0) {
+        for (const p of pendingRefunds) {
+          if (p.status === 'refunded') {
+            const refAmt =
+              typeof p.jobContext?.refundedAmount === 'number'
+                ? p.jobContext.refundedAmount
+                : p.chargedAmount;
+            if (typeof refAmt === 'number' && refAmt > 0) {
+              txRefundSum += refAmt;
+              txRefundCount += 1;
+            }
+          }
+        }
+      }
+
+      cashRefundsIssued += txRefundSum;
+      refundCount += txRefundCount;
+
+      // ── Pages for this transaction ───────────────────────────────────────
+      let rawReq: number | null = null;
+      let rawPrint: number | null = null;
+      let rawCol: number | null = null;
+      let rawBw: number | null = null;
+
+      if (typeof receiptRecord?.details?.printConfiguration?.copies === 'number') {
+        rawReq = receiptRecord.details.printConfiguration.copies;
+      }
+      if (typeof receiptRecord?.colorPages === 'number') {
+        rawCol = receiptRecord.colorPages;
+      }
+      if (typeof receiptRecord?.bwPages === 'number') {
+        rawBw = receiptRecord.bwPages;
+      }
+
+      for (const l of allTxLogs) {
+        if (rawReq === null) {
+          const reqVal =
+            l.meta?.totalPages ??
+            l.meta?.totalRequested ??
+            l.meta?.pagesRequested ??
+            l.meta?.pages;
+          if (typeof reqVal === 'number' && Number.isFinite(reqVal)) {
+            rawReq = reqVal;
+          }
+        }
+        if (rawPrint === null) {
+          const printVal =
+            l.meta?.pagesPrinted ??
+            l.meta?.printedPages ??
+            l.meta?.pagesDelivered;
+          if (typeof printVal === 'number' && Number.isFinite(printVal)) {
+            rawPrint = printVal;
+          }
+        }
+        if (rawCol === null) {
+          const colVal =
+            l.meta?.colorPages ??
+            l.meta?.colorPagesPrinted;
+          if (typeof colVal === 'number' && Number.isFinite(colVal)) {
+            rawCol = colVal;
+          }
+        }
+        if (rawBw === null) {
+          const bwVal =
+            l.meta?.bwPages ??
+            l.meta?.bwPagesPrinted;
+          if (typeof bwVal === 'number' && Number.isFinite(bwVal)) {
+            rawBw = bwVal;
+          }
+        }
+      }
+
+      if (rawReq === null && recoverySession?.context) {
+        const ctxPages = recoverySession.context.totalPages;
+        if (typeof ctxPages === 'number' && Number.isFinite(ctxPages)) {
+          rawReq = ctxPages;
+        }
+      }
+      if (rawPrint === null && recoverySession?.context) {
+        const prVal = recoverySession.context.pagesPrinted;
+        if (typeof prVal === 'number' && Number.isFinite(prVal)) {
+          rawPrint = prVal;
+        }
+      }
+
+      const txStatus = this.classifyTransactionStatus(txLog);
+      const isCompleted =
+        txStatus === 'completed' ||
+        allTxLogs.some(
+          (l) => this.classifyTransactionStatus(l) === 'completed',
+        );
+
+      const requested =
+        typeof rawReq === 'number' && Number.isFinite(rawReq)
+          ? Math.max(0, Math.floor(rawReq))
+          : typeof rawPrint === 'number' && Number.isFinite(rawPrint)
+            ? Math.max(0, Math.floor(rawPrint))
+            : 0;
+
+      const printed =
+        typeof rawPrint === 'number' && Number.isFinite(rawPrint)
+          ? Math.max(0, Math.floor(rawPrint))
+          : isCompleted && requested > 0
+            ? requested
+            : 0;
+
+      const failed = Math.max(0, requested - printed);
+
+      let colPrinted = 0;
+      let bwPrinted = 0;
+      if (printed > 0) {
+        const hasCol = typeof rawCol === 'number' && Number.isFinite(rawCol);
+        const hasBw = typeof rawBw === 'number' && Number.isFinite(rawBw);
+        if (hasCol && hasBw) {
+          colPrinted = Math.max(0, Math.floor(rawCol!));
+          bwPrinted = Math.max(0, Math.floor(rawBw!));
+        } else if (hasCol) {
+          colPrinted = Math.max(0, Math.floor(rawCol!));
+          bwPrinted = Math.max(0, printed - colPrinted);
+        } else if (hasBw) {
+          bwPrinted = Math.max(0, Math.floor(rawBw!));
+          colPrinted = Math.max(0, printed - bwPrinted);
+        } else {
+          const colorMode =
+            allTxLogs.find((l) => typeof l.meta?.colorMode === 'string')?.meta
+              ?.colorMode ??
+            recoverySession?.context?.colorMode ??
+            receiptRecord?.details?.printConfiguration?.colorMode;
+          if (colorMode === 'colored' || colorMode === 'color') {
+            colPrinted = printed;
+            bwPrinted = 0;
+          } else {
+            bwPrinted = printed;
+            colPrinted = 0;
+          }
+        }
+      }
+
+      totalRequested += requested;
+      totalPrinted += printed;
+      totalFailed += failed;
+      colorPagesPrinted += colPrinted;
+      bwPagesPrinted += bwPrinted;
+
+      // ── Hardware incidents for this transaction ─────────────────────────
+      const hasSpoolerFailure =
+        allTxLogs.some((l) => {
+          const t = l.type.toLowerCase();
+          return (
+            t === 'print_spooler_job_failed' ||
+            t === 'spooler_failed' ||
+            t === 'print_spooler_failed' ||
+            t === 'print_spooler_monitor_timeout' ||
+            (t.includes('spooler') && t.includes('fail'))
+          );
+        }) ||
+        recoverySession?.phase === 'spooler_failed' ||
+        pendingRefunds.some((p) =>
+          p.reason?.toLowerCase().includes('spooler'),
+        );
+
+      if (hasSpoolerFailure) {
+        spoolerFailures++;
+        if (txId) countedSpoolerTxIds.add(txId);
+      }
+
+      const hasHopperFailure =
+        allTxLogs.some((l) => {
+          const t = l.type.toLowerCase();
+          return (
+            t === 'hopper_dispense_failed' ||
+            t === 'hopper_dispense_shortfall' ||
+            (t.startsWith('hopper_') &&
+              (t.includes('fail') ||
+                t.includes('shortfall') ||
+                t.includes('jam')))
+          );
+        }) ||
+        (db.data?.owedChanges ?? []).some(
+          (oc) => txId && (oc.meta?.transactionId === txId || oc.id === txId),
+        );
+
+      if (hasHopperFailure) {
+        hopperShortfalls++;
+        if (txId) countedHopperTxIds.add(txId);
+      }
+    }
+
+    // Check any uncounted spooler failures in filtered logs
+    for (const l of filteredLogs) {
+      const t = l.type.toLowerCase();
+      const isSpoolerFail =
+        t === 'print_spooler_job_failed' ||
+        t === 'spooler_failed' ||
+        t === 'print_spooler_failed' ||
+        t === 'print_spooler_monitor_timeout' ||
+        (t.includes('spooler') && t.includes('fail'));
+      if (isSpoolerFail) {
+        const txId = this.getTransactionId(l);
+        if (!txId || !countedSpoolerTxIds.has(txId)) {
+          spoolerFailures++;
+          if (txId) countedSpoolerTxIds.add(txId);
+        }
+      }
+    }
+
+    // ── Unresolved Owed Changes & Hopper Shortfalls ────────────────────────
+    let unresolvedOwedChange = 0;
+    let unresolvedOwedChangeCount = 0;
+
+    const dateFromMs =
+      typeof filters.dateFrom === 'string'
+        ? Date.parse(filters.dateFrom)
+        : NaN;
+    const dateToMs =
+      typeof filters.dateTo === 'string' ? Date.parse(filters.dateTo) : NaN;
+
+    for (const oc of db.data?.owedChanges ?? []) {
+      const ocTimeMs = Date.parse(oc.timestamp);
+      if (Number.isFinite(dateFromMs) && ocTimeMs < dateFromMs) continue;
+      if (Number.isFinite(dateToMs) && ocTimeMs > dateToMs) continue;
+
+      if (filters.mode) {
+        const ocMode = oc.meta?.mode;
+        if (ocMode && ocMode !== filters.mode) continue;
+      }
+
+      const ocTxId =
+        typeof oc.meta?.transactionId === 'string'
+          ? oc.meta.transactionId.trim()
+          : null;
+      if (!ocTxId || !countedHopperTxIds.has(ocTxId)) {
+        hopperShortfalls++;
+        if (ocTxId) countedHopperTxIds.add(ocTxId);
+      }
+
+      if (oc.status === 'open') {
+        unresolvedOwedChange += oc.amount;
+        unresolvedOwedChangeCount += 1;
+      }
+    }
+
+    // Fulfillment rate percent
+    const fulfillmentRatePercent =
+      totalRequested > 0
+        ? Math.round((totalPrinted / totalRequested) * 10000) / 100
+        : 100;
+
+    // Normalizing financials
+    const round2 = (v: number) =>
+      Math.round((v + Number.EPSILON) * 100) / 100;
+    const finalGrossCharged = round2(grossCharged);
+    const finalRefunds = round2(cashRefundsIssued);
+    const finalNetRetained = round2(finalGrossCharged - finalRefunds);
+    const finalUnresolvedOwedChange = round2(unresolvedOwedChange);
+
+    return {
+      scope: {
+        totalTransactions,
+        dateFrom,
+        dateTo,
+      },
+      financials: {
+        grossCharged: finalGrossCharged,
+        cashRefundsIssued: finalRefunds,
+        refundCount,
+        netCashRetained: finalNetRetained,
+        unresolvedOwedChange: finalUnresolvedOwedChange,
+        unresolvedOwedChangeCount,
+      },
+      pages: {
+        totalRequested,
+        totalPrinted,
+        totalFailed,
+        fulfillmentRatePercent,
+        colorPagesPrinted,
+        bwPagesPrinted,
+      },
+      hardwareIncidents: {
+        spoolerFailures,
+        hopperShortfalls,
+      },
+    };
   }
 
   private groupLogsByTransaction(logs: AdminLogEntry[]): AdminLogEntry[] {
