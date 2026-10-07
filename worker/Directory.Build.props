@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <!-- Enable fast up-to-date checks and incremental build acceleration -->
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+
+    <!-- Disable Git SourceLink and repository queries in Debug to avoid slow git execution on every build -->
+    <EnableSourceLink Condition="'$(Configuration)' != 'Release'">false</EnableSourceLink>
+    <EnableSourceControlManagerQueries Condition="'$(Configuration)' != 'Release'">false</EnableSourceControlManagerQueries>
+  </PropertyGroup>
+</Project>

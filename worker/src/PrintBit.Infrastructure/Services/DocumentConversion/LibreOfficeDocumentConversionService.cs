@@ -220,17 +220,23 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
         var executableToRun = File.Exists(resolvedExecutable) ? resolvedExecutable : _settings.SofficePath;
 
         await LibreOfficeGate.WaitAsync(cancellationToken);
-        string? profileDir = null;
         try
         {
             var baseProfileDir = string.IsNullOrWhiteSpace(_settings.UserProfileDirectory)
                 ? Path.Combine(Path.GetTempPath(), "printbit-lo-profile")
                 : _settings.UserProfileDirectory;
 
-            profileDir = Path.Combine(baseProfileDir, $"inst-{Guid.NewGuid():N}");
+            var profileDir = Path.Combine(baseProfileDir, "shared");
             if (!Directory.Exists(profileDir))
             {
                 Directory.CreateDirectory(profileDir);
+            }
+
+            // Remove stale lock files left from abrupt power losses or unexpected crashes
+            var lockFile = Path.Combine(profileDir, ".lock");
+            if (File.Exists(lockFile))
+            {
+                try { File.Delete(lockFile); } catch { }
             }
 
             var profileUri = new Uri(Path.GetFullPath(profileDir)).AbsoluteUri;
@@ -254,6 +260,21 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
             psi.ArgumentList.Add("--nolockcheck");
             psi.ArgumentList.Add("--nofirststartwizard");
             psi.ArgumentList.Add($"-env:UserInstallation={profileUri}");
+
+            var ext = Path.GetExtension(request.SourcePath).ToLowerInvariant();
+            if (ext is ".doc" or ".docx" or ".odt" or ".rtf" or ".txt")
+            {
+                psi.ArgumentList.Add("--writer");
+            }
+            else if (ext is ".xls" or ".xlsx" or ".ods")
+            {
+                psi.ArgumentList.Add("--calc");
+            }
+            else if (ext is ".ppt" or ".pptx" or ".odp")
+            {
+                psi.ArgumentList.Add("--impress");
+            }
+
             psi.ArgumentList.Add("--convert-to");
             psi.ArgumentList.Add("pdf");
             psi.ArgumentList.Add("--outdir");
@@ -376,18 +397,6 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
         }
         finally
         {
-            if (!string.IsNullOrWhiteSpace(profileDir))
-            {
-                try
-                {
-                    if (Directory.Exists(profileDir))
-                    {
-                        Directory.Delete(profileDir, recursive: true);
-                    }
-                }
-                catch { }
-            }
-
             LibreOfficeGate.Release();
         }
     }
