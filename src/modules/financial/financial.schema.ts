@@ -31,5 +31,6 @@ export interface PendingRefundEntry {
   reason: string;
   status: 'open' | 'refunded' | 'dismissed';
   closedAt: string | null;
+  payoutType?: 'cash' | 'balance' | null;
   jobContext: Record<string, string | number | boolean | null>;
 }

@@ -263,6 +263,10 @@ export async function processPendingRefund(input: {
   entry.status = 'refunded';
   entry.closedAt = getTrustedTimestamp().timestamp;
 
+  const payoutType = input.restoreBalance ? 'balance' : 'cash';
+  entry.payoutType = payoutType;
+  entry.jobContext.payoutType = payoutType;
+
   if (input.restoreBalance) {
     await withBalanceLock(async () => {
       db.data!.balance += entry.chargedAmount;
@@ -271,10 +275,25 @@ export async function processPendingRefund(input: {
     await financialLedgerService.append({
       eventType: 'refund_issued',
       amount: entry.chargedAmount,
-      referenceId: entry.id,
+      referenceId: (entry.jobContext.transactionId as string) || entry.id,
       meta: {
         source: 'admin_pending_refund',
         reason: entry.reason,
+        payoutType: 'balance',
+      },
+    });
+  } else {
+    await withBalanceLock(async () => {
+      db.data!.earnings = Math.max(0, db.data!.earnings - entry.chargedAmount);
+    });
+    await financialLedgerService.append({
+      eventType: 'refund_issued',
+      amount: entry.chargedAmount,
+      referenceId: (entry.jobContext.transactionId as string) || entry.id,
+      meta: {
+        source: 'admin_cash_refund',
+        reason: entry.reason,
+        payoutType: 'cash',
       },
     });
   }
@@ -285,6 +304,49 @@ export async function processPendingRefund(input: {
     balance: db.data!.balance,
     restoreBalance: input.restoreBalance,
   };
+}
+
+export async function syncCashRefundPendingEntry(input: {
+  transactionId: string;
+  amount: number;
+  reason: string;
+  unprintedPages?: number | null;
+  timestamp?: string;
+}): Promise<PendingRefundEntry> {
+  ensureDb();
+  const now = input.timestamp ?? getTrustedTimestamp().timestamp;
+  const existingOpen = db.data!.pendingRefunds.find(
+    (e) =>
+      e.jobContext.transactionId === input.transactionId && e.status === 'open',
+  );
+
+  if (existingOpen) {
+    existingOpen.status = 'refunded';
+    existingOpen.closedAt = now;
+    existingOpen.payoutType = 'cash';
+    existingOpen.jobContext.payoutType = 'cash';
+    if (input.unprintedPages !== undefined) {
+      existingOpen.jobContext.unprintedPages = input.unprintedPages;
+    }
+    return existingOpen;
+  }
+
+  const entry: PendingRefundEntry = {
+    id: randomUUID(),
+    timestamp: now,
+    chargedAmount: input.amount,
+    reason: input.reason,
+    status: 'refunded',
+    closedAt: now,
+    payoutType: 'cash',
+    jobContext: {
+      transactionId: input.transactionId,
+      payoutType: 'cash',
+      unprintedPages: input.unprintedPages ?? null,
+    },
+  };
+  db.data!.pendingRefunds.unshift(entry);
+  return entry;
 }
 
 export async function dismissPendingRefund(

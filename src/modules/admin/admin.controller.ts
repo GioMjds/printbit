@@ -25,11 +25,14 @@ import {
   type PendingRefundEntry,
   type RecoverySessionEntry,
   type SpoolerLifecycleTransitionEntry,
+  withBalanceLock,
 } from '@/services/db';
+import { financialLedgerService } from '@/services/financial-ledger';
 import {
   PendingRefundServiceError,
   dismissPendingRefund,
   processPendingRefund,
+  syncCashRefundPendingEntry,
 } from '@/services/pending-refund';
 import { detectDefaultPrinter } from '@/services/printer';
 import {
@@ -50,7 +53,9 @@ import {
 import { getScannerStatus } from '@/services/scanner';
 import { generateTestPagePdf } from '@/services/test-page';
 import {
+  assertTrustedTimeForFinancialOperation,
   getTrustedTimeStatus,
+  isTrustedTimeError,
   verifyTrustedClockSync,
 } from '@/services/time-source';
 import { getExternalWatchdogState } from '@/services/watchdog-health';
@@ -670,6 +675,12 @@ export class AdminController {
       requireAdminLocalAccess,
       requireAdminPin,
       this.handleGetTransactionContextById,
+    );
+    this.router.post(
+      '/transactions/:transactionId/refund',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleRefundTransaction,
     );
     this.router.get(
       '/logs/export.csv',
@@ -2993,6 +3004,122 @@ export class AdminController {
     return res.json(context);
   };
 
+  private handleRefundTransaction = async (req: Request, res: Response) => {
+    const rawId = String(req.params.transactionId ?? '').trim();
+    if (!rawId) {
+      return res.status(400).json({ error: 'transactionId is required.' });
+    }
+
+    let targetTransactionId = rawId;
+    let context = this.buildTransactionContextResponse(targetTransactionId);
+    if (!context) {
+      const resolved = this.adminService.resolveTransactionId(targetTransactionId);
+      if (resolved && resolved !== targetTransactionId) {
+        targetTransactionId = resolved;
+        context = this.buildTransactionContextResponse(targetTransactionId);
+      }
+    }
+    if (!context) {
+      return res.status(404).json({ error: 'Transaction not found.' });
+    }
+
+    const rawAmount = req.body?.amount;
+    const amount = Number(rawAmount);
+    if (typeof rawAmount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Refund amount must be a positive number.' });
+    }
+
+    const chargedAmount = context.chargedAmount ?? 0;
+    const previousRefunds = (db.data!.financialLedger ?? [])
+      .filter(
+        (entry) =>
+          entry.referenceId === targetTransactionId &&
+          entry.eventType === 'refund_issued',
+      )
+      .reduce((sum, entry) => sum + (entry.amount || 0), 0);
+
+    const maxRefundable = Math.max(0, chargedAmount - previousRefunds);
+    if (amount > maxRefundable) {
+      return res.status(400).json({
+        error: `Refund amount (${amount}) exceeds maximum refundable amount (${maxRefundable}).`,
+        chargedAmount,
+        previousRefunds,
+        maxRefundable,
+      });
+    }
+
+    try {
+      assertTrustedTimeForFinancialOperation('admin_cash_refund');
+    } catch (error) {
+      if (isTrustedTimeError(error)) {
+        return res.status(error.statusCode).json({
+          code: error.code,
+          error: error.message,
+          trustedTime: error.trustedTime,
+        });
+      }
+      throw error;
+    }
+
+    const reason =
+      typeof req.body?.reason === 'string' && req.body.reason.trim()
+        ? req.body.reason.trim()
+        : 'Admin physical cash refund';
+    const unprintedPages =
+      typeof req.body?.unprintedPages === 'number' &&
+      Number.isFinite(req.body.unprintedPages)
+        ? req.body.unprintedPages
+        : undefined;
+
+    await withBalanceLock(async () => {
+      // 1. Machine screen balance (db.data!.balance) is NEVER modified.
+      // 2. Kiosk earnings (db.data!.earnings) are deducted in real-time.
+      db.data!.earnings = Math.max(0, db.data!.earnings - amount);
+
+      // 3. Ledger entry
+      await financialLedgerService.append({
+        eventType: 'refund_issued',
+        amount,
+        referenceId: targetTransactionId,
+        meta: {
+          source: 'admin_cash_refund',
+          payoutType: 'cash',
+          reason,
+          unprintedPages: unprintedPages ?? null,
+        },
+      });
+
+      // 4. Pending refund sync
+      await syncCashRefundPendingEntry({
+        transactionId: targetTransactionId,
+        amount,
+        reason,
+        unprintedPages: unprintedPages ?? null,
+      });
+
+      await db.write();
+    });
+
+    try {
+      await this.adminService.appendAdminLog(
+        'admin_cash_refund_issued',
+        `Admin issued physical cash refund ₱${amount} for transaction ${targetTransactionId}.`,
+        {
+          transactionId: targetTransactionId,
+          amount,
+          reason,
+          unprintedPages: unprintedPages ?? null,
+          payoutType: 'cash',
+        },
+      );
+    } catch (logError) {
+      console.error('[ADMIN] Failed to log admin cash refund', logError);
+    }
+
+    const updatedContext = this.buildTransactionContextResponse(targetTransactionId);
+    return res.json(updatedContext);
+  };
+
   private buildTransactionContextResponse(transactionId: string): {
     transactionId: string;
     mode: string | null;
@@ -3055,6 +3182,7 @@ export class AdminController {
       chargedAmount: number;
       reason: string;
       closedAt: string | null;
+      payoutType?: string | null;
     }[];
     ledgerEntries: {
       id: string;
@@ -3104,8 +3232,11 @@ export class AdminController {
 
     const chargedAmount =
       receiptPayload?.chargedAmount ??
-      ledgerEntries.find((entry) => entry.eventType === 'job_completed')
-        ?.amount ??
+      ledgerEntries.find(
+        (entry) =>
+          entry.eventType === 'job_completed' ||
+          (entry.eventType as string) === 'payment_received',
+      )?.amount ??
       recoverySession?.chargedAmount ??
       pendingRefunds[0]?.chargedAmount ??
       null;
@@ -3330,6 +3461,11 @@ export class AdminController {
         chargedAmount: entry.chargedAmount,
         reason: entry.reason,
         closedAt: entry.closedAt,
+        payoutType:
+          entry.payoutType ??
+          (typeof entry.jobContext?.payoutType === 'string'
+            ? entry.jobContext.payoutType
+            : null),
       })),
       ledgerEntries: ledgerEntries.map((entry) => ({
         id: entry.id,
