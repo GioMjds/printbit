@@ -220,14 +220,14 @@ function setDocumentConversionEnabled(enabled: boolean): void {
 
   if (fileInput) {
     fileInput.accept = enabled
-      ? '.pdf,.doc,.docx,.jpeg,.jpg,.png,.gif'
-      : '.pdf,.jpeg,.jpg,.png,.gif';
+      ? '.pdf,.doc,.docx,.jpeg,.jpg,.png,'
+      : '.pdf,.jpeg,.jpg,.png,';
   }
 
   if (uploadSubTitle) {
     uploadSubTitle.textContent = enabled
-      ? 'PDF, DOCX, JPG, PNG, and GIF files only · up to 25 MB each'
-      : 'PDF, JPG, PNG, and GIF files only · up to 25 MB each';
+      ? 'PDF, DOCX, JPG, and PNG files only · up to 25 MB each'
+      : 'PDF, JPG, and PNG files only · up to 25 MB each';
   }
 
   if (dropZoneHint) {
@@ -262,15 +262,14 @@ function normalizeMimeByExtension(
 ): string | null {
   const normalizedMime = mimeType.trim().toLowerCase();
   const ext = extOf(fileName);
-  const extensionMimeMap: Record<string, string> = {
+  const extensionMimeMap = {
     pdf: 'application/pdf',
     doc: 'application/msword',
     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     jpg: 'image/jpeg',
     jpeg: 'image/jpeg',
     png: 'image/png',
-    gif: 'image/gif',
-  };
+  } as Record<string, string>;
 
   if (normalizedMime !== '' && normalizedMime !== 'application/octet-stream') {
     return normalizedMime;
@@ -289,7 +288,6 @@ function collectUnsupportedFiles(files: File[]): UnsupportedFilesResult {
     'application/pdf',
     'image/jpeg',
     'image/png',
-    'image/gif',
   ]);
   if (documentConversionEnabled) {
     allowedMimeTypes.add('application/msword');

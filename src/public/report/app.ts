@@ -58,8 +58,15 @@ const imageInput = document.getElementById('imageInput') as HTMLInputElement;
 const attachmentList = document.getElementById('attachmentList') as HTMLElement;
 const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
 const formMsg = document.getElementById('formMsg') as HTMLElement;
+const linkedTxnBadge = document.getElementById(
+  'linkedTxnBadge',
+) as HTMLElement | null;
 
 // ── State ─────────────────────────────────────────────────────────────────────
+
+const urlParams = new URLSearchParams(window.location.search);
+const linkedTransactionRef =
+  urlParams.get('txn') || urlParams.get('transaction_ref') || null;
 
 let selectedCategory: string = 'other';
 const attachmentIds: string[] = [];
@@ -257,6 +264,7 @@ reportForm.addEventListener('submit', (e) => {
           description,
           category: selectedCategory,
           attachmentIds,
+          transactionRef: linkedTransactionRef,
         }),
       });
 
@@ -276,6 +284,20 @@ reportForm.addEventListener('submit', (e) => {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+
+if (linkedTransactionRef && linkedTransactionRef.trim()) {
+  let badge = linkedTxnBadge ?? document.getElementById('linkedTxnBadge');
+  if (!badge && reportForm?.parentNode) {
+    badge = document.createElement('div');
+    badge.id = 'linkedTxnBadge';
+    badge.className = 'rp-linked-txn';
+    reportForm.parentNode.insertBefore(badge, reportForm);
+  }
+  if (badge) {
+    badge.textContent = `Linked Transaction: ${linkedTransactionRef}`;
+    badge.classList.remove('hidden');
+  }
+}
 
 buildCategoryChips();
 setState('ready');

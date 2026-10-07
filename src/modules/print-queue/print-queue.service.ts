@@ -10,11 +10,6 @@ export interface EnqueuePrintJobOptions {
   powerSafetyService?: PowerSafetyService;
 }
 
-/**
- * Enqueues a print job into the local JobProcessor after ensuring power safety checks pass.
- * If power emergency is active, throws PrintJobEnqueueError(POWER_EMERGENCY) so caller can
- * execute auto-refund without submitting the job to the worker queue.
- */
 export async function enqueuePrintJob(
   payload: PrintJobEnqueuePayload,
   options?: EnqueuePrintJobOptions,

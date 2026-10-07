@@ -3,7 +3,7 @@ export type PaperSize = 'A4' | 'Short' | 'Long';
 export type Orientation = 'portrait' | 'landscape';
 export type PrintScaling = 'fit' | 'actual';
 export const DEFAULT_PRINT_SCALING: PrintScaling = 'fit';
-export const PRINT_MARGIN_POINTS = 0;
+export const PRINT_MARGIN_POINTS = 14.4;
 export const PAPER_POINTS = {
   A4: [595.28, 841.89],
   Short: [612, 792],

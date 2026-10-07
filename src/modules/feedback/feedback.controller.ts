@@ -96,17 +96,22 @@ export class FeedbackController {
       comment?: unknown;
       category?: unknown;
       rating?: unknown;
+      transactionRef?: unknown;
     };
 
     const comment = typeof body.comment === 'string' ? body.comment : '';
     const category = typeof body.category === 'string' ? body.category : null;
     const rating = typeof body.rating === 'number' ? body.rating : null;
+    const rawTx = body.transactionRef ?? req.query.transactionRef;
+    const transactionRef =
+      typeof rawTx === 'string' && rawTx.trim() ? rawTx.trim() : null;
 
     try {
       const entry = await this.feedbackService.submitFeedback({
         comment,
         category,
         rating,
+        transactionRef,
       });
       res.status(201).json({ ok: true, feedbackId: entry.id });
     } catch (err) {
@@ -163,11 +168,15 @@ export class FeedbackController {
       comment?: unknown;
       category?: unknown;
       rating?: unknown;
+      transactionRef?: unknown;
     };
 
     const comment = typeof body.comment === 'string' ? body.comment : '';
     const category = typeof body.category === 'string' ? body.category : null;
     const rating = typeof body.rating === 'number' ? body.rating : null;
+    const rawTx = body.transactionRef ?? req.query.transactionRef;
+    const transactionRef =
+      typeof rawTx === 'string' && rawTx.trim() ? rawTx.trim() : null;
 
     try {
       const entry = await this.feedbackService.submitFeedback({
@@ -176,6 +185,7 @@ export class FeedbackController {
         comment,
         category,
         rating,
+        transactionRef,
       });
       res.status(201).json({ ok: true, feedbackId: entry.id });
     } catch (err) {
@@ -247,6 +257,20 @@ export class FeedbackController {
       requireAdminLocalAccess,
       requireAdminPin,
       this.toggleResolved,
+    );
+
+    adminRouter.patch(
+      '/:id/status',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.patchFeedbackStatus,
+    );
+
+    adminRouter.post(
+      '/archive-reviewed',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.archiveAllReviewedFeedback,
     );
 
     adminRouter.delete(
@@ -325,12 +349,102 @@ export class FeedbackController {
     res.json({ ok: true, entry });
   };
 
+  private patchFeedbackStatus = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    const { id } = req.params as { id: string };
+    const body = req.body as {
+      status?: unknown;
+      needsAction?: unknown;
+      action?: unknown;
+    };
+
+    let entry = this.feedbackService.findFeedbackById(id);
+    if (!entry) {
+      res.status(404).json({ error: 'Feedback entry not found.' });
+      return;
+    }
+
+    // 1. Validate action parameter
+    if (body.action !== undefined) {
+      if (typeof body.action !== 'string' || body.action !== 'archive') {
+        res
+          .status(400)
+          .json({ error: 'Invalid action. Only "archive" is supported.' });
+        return;
+      }
+    }
+
+    // 2. Validate status parameter
+    if (body.status !== undefined) {
+      if (body.status !== 'new' && body.status !== 'reviewed') {
+        res
+          .status(400)
+          .json({ error: 'Valid status required: new | reviewed' });
+        return;
+      }
+    }
+
+    // 3. Mutually exclusive check: action === 'archive' and status cannot be provided together
+    if (body.action === 'archive' && body.status !== undefined) {
+      res.status(400).json({
+        error: 'Cannot set both action="archive" and status simultaneously.',
+      });
+      return;
+    }
+
+    // 4. Validate needsAction parameter if provided
+    if (body.needsAction !== undefined && typeof body.needsAction !== 'boolean') {
+      res.status(400).json({ error: 'needsAction must be a boolean.' });
+      return;
+    }
+
+    // All validation passed. Apply mutations safely.
+    if (body.action === 'archive') {
+      entry = this.feedbackService.archiveFeedback(id);
+    } else if (body.status !== undefined) {
+      entry = this.feedbackService.updateFeedbackStatus(
+        id,
+        body.status as FeedbackStatus,
+      );
+    }
+
+    if (body.needsAction !== undefined) {
+      entry = this.feedbackService.setNeedsAction(
+        id,
+        Boolean(body.needsAction),
+      );
+    }
+
+    if (!entry) {
+      res.status(404).json({ error: 'Feedback entry not found.' });
+      return;
+    }
+
+    res.json({ ok: true, entry, feedback: entry, ...entry });
+  };
+
+  private archiveAllReviewedFeedback = async (
+    _req: Request,
+    res: Response,
+  ): Promise<void> => {
+    const count = this.feedbackService.archiveAllReviewedFeedback();
+    res.json({ ok: true, count });
+  };
+
   private deleteFeedback = async (
     req: Request,
     res: Response,
   ): Promise<void> => {
     const { id } = req.params as { id: string };
-    const deleted = await this.feedbackService.deleteFeedback(id);
+    const confirm = req.body?.confirm;
+    if (confirm !== 'PURGE') {
+      res.status(400).json({ error: 'Typed confirmation PURGE required.' });
+      return;
+    }
+
+    const deleted = this.feedbackService.purgeFeedback(id, 'PURGE');
     if (!deleted) {
       res.status(404).json({ error: 'Feedback entry not found.' });
       return;
@@ -339,11 +453,17 @@ export class FeedbackController {
   };
 
   private clearFeedback = async (
-    _req: Request,
+    req: Request,
     res: Response,
   ): Promise<void> => {
-    const removed = await this.feedbackService.clearFeedback();
-    res.json({ ok: true, removed });
+    const confirm = req.body?.confirm;
+    if (confirm !== 'PURGE') {
+      res.status(400).json({ error: 'Typed confirmation PURGE required.' });
+      return;
+    }
+
+    const count = this.feedbackService.purgeAllFeedback('PURGE');
+    res.json({ ok: true, count });
   };
 
   private exportCsv = (req: Request, res: Response): void => {

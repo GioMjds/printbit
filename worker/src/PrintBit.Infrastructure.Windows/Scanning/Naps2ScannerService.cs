@@ -447,15 +447,13 @@ public sealed class Naps2ScannerService : IScannerService
         var pageSize = isFeeder ? normPaper switch
         {
             "a4" => "a4",
-            "letter" => "letter",
-            // Use explicit dimensions for Long Bond (8.5×13 in) — "legal" in NAPS2/scanner
-            // context maps to US Legal (8.5×14 in), not the Philippine 13-inch size.
-            "legal" or "folio" => "216x330mm",
+            "letter" or "short" => "letter",
+            "legal" or "folio" or "long" => "216x330mm",
             _ => null
         } : normPaper switch
         {
-            "letter" => "216x279mm",
-            "legal" or "folio" => "216x330mm",
+            "letter" or "short" => "216x279mm",
+            "legal" or "folio" or "long" => "216x330mm",
             _ => "216x297mm"
         };
         if (pageSize is not null) sb.Append($"--pagesize {pageSize} ");

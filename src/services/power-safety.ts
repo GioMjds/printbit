@@ -91,14 +91,20 @@ export class PowerSafetyService extends EventEmitter {
       receivedTimestampUtc: null,
     };
 
-    try {
-      this.serial.lockCoinSlot('power-safety');
-    } catch (serialErr) {
-      console.error(
-        '[POWER_SAFETY] Failed to lock coin slot on startup:',
-        serialErr,
-      );
+    if (!POWER_SAFETY_BYPASS_ENABLED) {
+      try {
+        this.serial.lockCoinSlot('power-safety');
+      } catch (serialErr) {
+        console.error(
+          '[POWER_SAFETY] Failed to lock coin slot on startup:',
+          serialErr,
+        );
+      }
     }
+  }
+
+  isBypassed(): boolean {
+    return POWER_SAFETY_BYPASS_ENABLED;
   }
 
   canAcceptCustomerWork(): boolean {
@@ -216,10 +222,12 @@ export class PowerSafetyService extends EventEmitter {
         receivedTimestampUtc,
       };
 
-      try {
-        this.serial.lockCoinSlot('power-safety');
-      } catch (serialErr) {
-        console.error('[POWER_SAFETY] Failed to lock coin slot:', serialErr);
+      if (!POWER_SAFETY_BYPASS_ENABLED) {
+        try {
+          this.serial.lockCoinSlot('power-safety');
+        } catch (serialErr) {
+          console.error('[POWER_SAFETY] Failed to lock coin slot:', serialErr);
+        }
       }
 
       try {

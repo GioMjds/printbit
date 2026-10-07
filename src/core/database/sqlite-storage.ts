@@ -1,15 +1,19 @@
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import type { AdminLogEntry } from './models/admin.model';
 import type {
-  AdminLogEntry,
   FeedbackEntry,
   FeedbackSessionEntry,
+} from './models/feedback.model';
+import type {
   ReceiptAccessTokenEntry,
   ReceiptRecordEntry,
+} from './models/receipt.model';
+import type {
   ReportIssueAttachmentEntry,
   ReportIssueEntry,
   ReportIssueSessionEntry,
-} from './db';
+} from './models/report-issue.model';
 
 const SQLITE_FILE_PATH = path.resolve('printbit.sqlite');
 const LOWDB_IMPORT_META_KEY = 'lowdb_import_v1';
@@ -111,7 +115,7 @@ function openSqliteDatabase(): DatabaseSync {
   return db;
 }
 
-function ensureSchema(db: DatabaseSync): void {
+export function ensureSchema(db: DatabaseSync): void {
   const appliedMigrations: string[] = [];
   db.exec(`
     CREATE TABLE IF NOT EXISTS storage_meta (
@@ -214,7 +218,10 @@ function ensureSchema(db: DatabaseSync): void {
       rating INTEGER,
       status TEXT NOT NULL,
       resolved_at TEXT,
-      meta_json TEXT
+      meta_json TEXT,
+      transaction_ref TEXT,
+      needs_action INTEGER NOT NULL DEFAULT 0,
+      archived_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_feedback_entries_timestamp
       ON feedback_entries(timestamp DESC);
@@ -249,7 +256,10 @@ function ensureSchema(db: DatabaseSync): void {
       attachment_ids_json TEXT NOT NULL,
       acknowledged_at TEXT,
       resolved_at TEXT,
-      meta_json TEXT
+      meta_json TEXT,
+      transaction_ref TEXT,
+      resolution_reason TEXT,
+      resolution_note TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_report_issue_entries_timestamp
       ON report_issue_entries(timestamp DESC);
@@ -614,6 +624,63 @@ function ensureSchema(db: DatabaseSync): void {
     db.exec('ALTER TABLE admin_logs ADD COLUMN transaction_id TEXT');
     appliedMigrations.push('admin_logs.transaction_id');
   }
+
+  const reportIssueColumnRows = db
+    .prepare('PRAGMA table_info(report_issue_entries)')
+    .all() as Record<string, unknown>[];
+  const reportIssueColumns = new Set(
+    reportIssueColumnRows
+      .map((row) => (typeof row.name === 'string' ? row.name : ''))
+      .filter((name) => name.length > 0),
+  );
+  if (!reportIssueColumns.has('transaction_ref')) {
+    db.exec('ALTER TABLE report_issue_entries ADD COLUMN transaction_ref TEXT');
+    appliedMigrations.push('report_issue_entries.transaction_ref');
+  }
+  if (!reportIssueColumns.has('resolution_reason')) {
+    db.exec(
+      'ALTER TABLE report_issue_entries ADD COLUMN resolution_reason TEXT',
+    );
+    appliedMigrations.push('report_issue_entries.resolution_reason');
+  }
+  if (!reportIssueColumns.has('resolution_note')) {
+    db.exec(
+      'ALTER TABLE report_issue_entries ADD COLUMN resolution_note TEXT',
+    );
+    appliedMigrations.push('report_issue_entries.resolution_note');
+  }
+  db.exec(
+    'CREATE INDEX IF NOT EXISTS idx_report_issue_entries_transaction_ref ON report_issue_entries(transaction_ref)',
+  );
+
+  const feedbackColumnRows = db
+    .prepare('PRAGMA table_info(feedback_entries)')
+    .all() as Record<string, unknown>[];
+  const feedbackColumns = new Set(
+    feedbackColumnRows
+      .map((row) => (typeof row.name === 'string' ? row.name : ''))
+      .filter((name) => name.length > 0),
+  );
+  if (!feedbackColumns.has('transaction_ref')) {
+    db.exec('ALTER TABLE feedback_entries ADD COLUMN transaction_ref TEXT');
+    appliedMigrations.push('feedback_entries.transaction_ref');
+  }
+  if (!feedbackColumns.has('needs_action')) {
+    db.exec(
+      'ALTER TABLE feedback_entries ADD COLUMN needs_action INTEGER NOT NULL DEFAULT 0',
+    );
+    appliedMigrations.push('feedback_entries.needs_action');
+  }
+  if (!feedbackColumns.has('archived_at')) {
+    db.exec('ALTER TABLE feedback_entries ADD COLUMN archived_at TEXT');
+    appliedMigrations.push('feedback_entries.archived_at');
+  }
+  db.exec(
+    'CREATE INDEX IF NOT EXISTS idx_feedback_entries_archived_at ON feedback_entries(archived_at)',
+  );
+
+  db.exec("UPDATE feedback_entries SET status = 'new' WHERE status = 'open'");
+  db.exec("UPDATE feedback_entries SET status = 'reviewed' WHERE status = 'resolved'");
 
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_admin_logs_is_tx_ts ON admin_logs(is_transaction, timestamp DESC);

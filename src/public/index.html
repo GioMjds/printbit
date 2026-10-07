@@ -77,13 +77,31 @@
 
         <div class="action-grid">
           <!-- Print Card -->
-          <button class="action-card" id="openPrintBtn" aria-label="Open Print">
+          <button
+            class="action-card"
+            id="openPrintBtn"
+            aria-label="Print: send files from your phone to the kiosk"
+          >
+            <span
+              class="action-card__price"
+              id="openPricingBtn"
+              role="button"
+              aria-label="View printing prices"
+            >
+              <span class="action-card__pill-icon" aria-hidden="true"
+                >&#8369;</span
+              >
+              <span class="action-card__pill-label">Printing prices</span>
+            </span>
             <span
               class="action-card__help"
               data-guide="print"
+              role="button"
               aria-label="How to print"
-              >?</span
             >
+              <span class="action-card__pill-icon" aria-hidden="true">?</span>
+              <span class="action-card__pill-label">How to print</span>
+            </span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
@@ -126,21 +144,24 @@
               </svg>
             </div>
             <h2 class="action-card__title">Print</h2>
-            <p class="action-card__sub">Upload your file to print</p>
+            <p class="action-card__sub">Send files from your phone to print</p>
           </button>
 
           <!-- Copy Card -->
           <button
             class="action-card action-card--copy"
             id="openCopyBtn"
-            aria-label="Open Copy"
+            aria-label="Photocopy: copy your paper document"
           >
             <span
               class="action-card__help"
               data-guide="copy"
-              aria-label="How to copy"
-              >?</span
+              role="button"
+              aria-label="How to photocopy"
             >
+              <span class="action-card__pill-icon" aria-hidden="true">?</span>
+              <span class="action-card__pill-label">How to copy</span>
+            </span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
@@ -197,21 +218,24 @@
               </svg>
             </div>
             <h2 class="action-card__title">Copy</h2>
-            <p class="action-card__sub">Photocopy your document</p>
+            <p class="action-card__sub">Make photocopies of your paper document</p>
           </button>
 
           <!-- Scan Card -->
           <button
             class="action-card action-card--scan"
             id="openScanBtn"
-            aria-label="Open Scan"
+            aria-label="Scan: turn your paper document into a soft copy on your phone"
           >
             <span
               class="action-card__help"
               data-guide="scan"
+              role="button"
               aria-label="How to scan"
-              >?</span
             >
+              <span class="action-card__pill-icon" aria-hidden="true">?</span>
+              <span class="action-card__pill-label">How to scan</span>
+            </span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
@@ -295,7 +319,9 @@
               </svg>
             </div>
             <h2 class="action-card__title">Scan</h2>
-            <p class="action-card__sub">Convert your document to PDF</p>
+            <p class="action-card__sub">
+              Paper to soft copy, sent straight to your phone
+            </p>
           </button>
         </div>
       </main>
@@ -314,7 +340,17 @@
           type="button"
           aria-label="Close printing prices"
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -322,7 +358,9 @@
         <p class="pricing-modal__eyebrow">PRINT WITH CONFIDENCE</p>
         <h2 id="pricingTitle">Printing prices</h2>
         <p class="pricing-modal__intro">
-          Prices consist of physical bond paper per sheet + metered ink coverage per printed page. Your total updates automatically after choosing your document and settings.
+          Prices consist of physical bond paper per sheet + metered ink coverage
+          per printed page. Your total updates automatically after choosing your
+          document and settings.
         </p>
         <div id="pricingGuideContent" aria-live="polite">
           Loading printing prices…
@@ -394,7 +432,7 @@
         style="display: none"
       >
         <h3 class="guide-card__title" id="guideTitle-copy">How to Copy</h3>
-        <div class="guide-print-carousel" aria-label="Copy guide steps">
+        <div class="guide-print-carousel" aria-label="Photocopy guide steps">
           <div class="guide-print-carousel__frame">
             <img
               id="copyGuideImage"
@@ -410,7 +448,7 @@
               type="button"
               class="guide-print-nav-btn guide-print-nav-btn--prev"
               id="copyGuidePrevBtn"
-              aria-label="Previous copy guide step"
+              aria-label="Previous photocopy guide step"
             >
               &#10094;
             </button>
@@ -430,7 +468,7 @@
               type="button"
               class="guide-print-nav-btn guide-print-nav-btn--next"
               id="copyGuideNextBtn"
-              aria-label="Next copy guide step"
+              aria-label="Next photocopy guide step"
             >
               &#10095;
             </button>
@@ -492,64 +530,78 @@
       </div>
     </div>
 
-    <!-- Floating Action Buttons (FABs) -->
-    <!-- Printing prices floating button (Top-Right) -->
-    <button
-      class="kiosk-fab pricing-fab"
-      id="openPricingBtn"
-      type="button"
-      aria-label="Printing prices"
-      title="Printing prices"
-    >
-      <svg
-        class="kiosk-fab__icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
+    <!-- Support dock: always-visible labels (no hover on a touchscreen) -->
+    <nav class="support-dock" aria-label="Help and support">
+      <button
+        class="kiosk-fab wifi-fab"
+        id="openWifiBtn"
+        type="button"
+        aria-label="Wi-Fi connection help"
       >
-        <path
-          d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"
-        />
-        <line x1="7" y1="7" x2="7.01" y2="7" />
-      </svg>
-      <span class="pricing-fab__badge" aria-hidden="true">₱</span>
-      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--bottom"
-        >Printing prices</span
+        <svg
+          class="kiosk-fab__icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+          <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+          <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
+        </svg>
+        <span class="kiosk-fab__label">Wi-Fi Help</span>
+      </button>
+      <button
+        class="kiosk-fab report-fab"
+        id="openReportBtn"
+        type="button"
+        aria-label="Report an issue"
       >
-    </button>
-
-    <!-- Report floating button (Bottom-Right) -->
-    <button
-      class="kiosk-fab report-fab"
-      id="openReportBtn"
-      type="button"
-      aria-label="Report an issue"
-      title="Report an issue"
-    >
-      <svg
-        class="kiosk-fab__icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
+        <svg
+          class="kiosk-fab__icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path
+            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+          />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span class="kiosk-fab__label">Report Issue</span>
+      </button>
+      <button
+        class="kiosk-fab feedback-fab"
+        id="openFeedbackBtn"
+        type="button"
+        aria-label="Send feedback"
       >
-        <path
-          d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-        />
-        <line x1="12" y1="9" x2="12" y2="13" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
-      </svg>
-      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left"
-        >Report Issue</span
-      >
-    </button>
+        <svg
+          class="kiosk-fab__icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path
+            d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+          />
+        </svg>
+        <span class="kiosk-fab__label">Feedback</span>
+      </button>
+    </nav>
 
     <!-- Report QR modal -->
     <div class="report-overlay" id="reportOverlay" aria-hidden="true">
@@ -596,31 +648,6 @@
       </div>
     </div>
 
-    <!-- Feedback floating button (Bottom-Right) -->
-    <button
-      class="kiosk-fab feedback-fab"
-      id="openFeedbackBtn"
-      type="button"
-      aria-label="Send feedback"
-      title="Feedback"
-    >
-      <svg
-        class="kiosk-fab__icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path
-          d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-        />
-      </svg>
-      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left">Feedback</span>
-    </button>
-
     <!-- Feedback QR modal -->
     <div class="feedback-overlay" id="feedbackOverlay" aria-hidden="true">
       <div
@@ -665,34 +692,6 @@
         </button>
       </div>
     </div>
-
-    <!-- Wi-Fi Help floating button (Bottom-Right) -->
-    <button
-      class="kiosk-fab wifi-fab"
-      id="openWifiBtn"
-      type="button"
-      aria-label="Wi-Fi connection help"
-      title="Wi-Fi Help"
-    >
-      <svg
-        class="kiosk-fab__icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-        <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
-      </svg>
-      <span class="kiosk-fab__tooltip kiosk-fab__tooltip--left"
-        >Wi-Fi Help</span
-      >
-    </button>
 
     <!-- Wi-Fi Help Modal -->
     <div class="wifi-overlay" id="wifiOverlay" aria-hidden="true">
@@ -791,7 +790,9 @@
           </div>
           <p class="wifi-modal-tip__text">
             <strong>Important:</strong> Turn off your mobile data (cellular) so
-            your phone doesn't bypass the kiosk connection. (If using Canva, Google Drive, or Word, download or export your file to your phone storage first.)
+            your phone doesn't bypass the kiosk connection. (If using Canva,
+            Google Drive, or Word, download or export your file to your phone
+            storage first.)
           </p>
         </div>
 

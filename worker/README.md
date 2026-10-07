@@ -111,8 +111,7 @@ Cross-cutting types with no dependencies.
 | `PrinterName`                                    | `EPSON L5290 Series`                          | Physical printer identity used for health monitoring                                         |
 | `PrinterProfiles.Standard`                       | `EPSON L5290 Series`                          | Logical queue for Standard jobs; falls back to `PrinterName` when omitted                    |
 | `PrinterProfiles.High`                           | `PrintBit - High`                             | Logical queue with system-wide Epson Printing Defaults saved as High; required for High jobs |
-| `PrintQueueDirectory`                            | `C:\\Users\\printbit\\printbit\\worker\\queue` | Directory watched for PDFs                                                                   |
-| `PdfPrintEngine`                                 | `native`                                      | PDF print engine: `native` (Windows.Data.Pdf + PrintDocument) or `sumatra` (SumatraPDF.exe)  |
+| `PrintQueueDirectory`                            | `C:\\Users\\printbit\\printbit-worker\\queue` | Directory watched for PDFs                                                                   |
 | `IpcSettings.PipeName`                           | `printbit-node-errors`                        | Named pipe for Node error messages                                                           |
 | `IpcSettings.MaxMessageBytes`                    | `8192`                                        | Max bytes per error line                                                                     |
 | `IpcSettings.WorkerReturnPipeName`               | `printbit-worker-events`                      | Named pipe for worker return events                                                          |
@@ -264,10 +263,76 @@ Common failures:
 | `FAILED 1073`                | The service already exists                             | Use the update procedure instead.                                                                 |
 | Start error `1069`           | A stale per-user service credential remains configured | Run `sc.exe config PrintBitHardware obj= LocalSystem password= ""`, then start the service again. |
 | Start error `1053` or `1067` | The worker exited during startup                       | Check the Application and System logs in Event Viewer.                                            |
+| `0x80070005` / DCOM `10016`  | Session 0 isolation blocks WinRT `PerAppRuntimeBroker` | Use the Interactive Scheduled Task deployment below instead of an SCM service.                    |
 
 References: [Microsoft .NET Windows Service installation](https://learn.microsoft.com/en-us/dotnet/core/extensions/windows-service),
 [`sc.exe create` syntax](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/sc-create),
 and [solution-level `--output` restrictions](https://learn.microsoft.com/en-us/dotnet/core/compatibility/sdk/7.0/solution-level-output-no-longer-valid).
+
+### 3. Alternative: Interactive Scheduled Task (Recommended for Native WinRT & Kiosk Mode)
+
+When `PdfPrintEngine` is set to `"native"`, the worker utilizes the Windows Runtime (`Windows.Data.Pdf.PdfDocument`) and GDI/GDI+ (`System.Drawing.Printing.PrintDocument`).
+
+When hosted as a standard SCM Windows Service under `LocalSystem`, it executes in **Session 0**. Windows Session 0 Isolation restricts:
+
+1. Cross-session DCOM activation of `PerAppRuntimeBroker` (`{15c20b67-12e7-4bb6-92bb-7aff07997402}`), causing `E_ACCESSDENIED (0x80070005)` or `CO_E_RUNAS_INCOMPATIBLE`.
+2. Interactive window stations and GUI print prompts (e.g. `Microsoft Print to PDF` file save dialogs or certain vendor status monitors like `epstatus.dll`).
+
+Running the worker as an **Interactive Scheduled Task** under the kiosk user (`printbit`) starts the process inside **Session 1 (the interactive user session)** at logon. This matches the exact runtime behavior of `dotnet run`, giving full, unblocked access to WinRT APIs, hardware drivers, and printer queues without needing DCOM permission hacks.
+
+#### Setup via Elevated PowerShell:
+
+```powershell
+# 1. Stop and disable the SCM Windows service so they do not conflict
+sc.exe stop PrintBitHardware
+sc.exe config PrintBitHardware start= disabled
+
+# 2. Register scheduled task to start automatically on kiosk logon (Session 1)
+$workerExe = "C:\Users\printbit\printbit\worker\publish\PrintBit.HardwareService.exe"
+$workerDir = "C:\Users\printbit\printbit\worker\publish"
+
+$action = New-ScheduledTaskAction `
+  -Execute $workerExe `
+  -WorkingDirectory $workerDir
+
+$trigger = New-ScheduledTaskTrigger `
+  -AtLogOn `
+  -User "printbit"
+
+$principal = New-ScheduledTaskPrincipal `
+  -UserId "printbit" `
+  -RunLevel Highest `
+  -LogonType Interactive
+
+$settings = New-ScheduledTaskSettingsSet `
+  -AllowStartIfOnBatteries `
+  -DontStopIfGoingOnBatteries `
+  -ExecutionTimeLimit 0 `
+  -RestartCount 3 `
+  -RestartInterval (New-TimeSpan -Minutes 1)
+
+Register-ScheduledTask `
+  -TaskName "PrintBitHardwareWorker" `
+  -Action $action `
+  -Trigger $trigger `
+  -Principal $principal `
+  -Settings $settings
+
+# 3. Start immediately or verify status
+Start-ScheduledTask -TaskName "PrintBitHardwareWorker"
+Get-ScheduledTask -TaskName "PrintBitHardwareWorker"
+Get-ScheduledTaskInfo -TaskName "PrintBitHardwareWorker"
+```
+
+#### To Revert Back to SCM Windows Service:
+
+```powershell
+Stop-ScheduledTask -TaskName "PrintBitHardwareWorker" -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName "PrintBitHardwareWorker" -Confirm:$false
+
+sc.exe config PrintBitHardware start= auto
+sc.exe start PrintBitHardware
+```
 
 ## Running Locally
 

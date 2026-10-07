@@ -318,16 +318,8 @@
               </svg>
               <span>Export CSV</span>
             </button>
-            <button id="clearAllBtn" class="topbar-btn topbar-btn--danger">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                  fill-rule="evenodd"
-                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <span>Clear All</span>
-            </button>
+            <button id="archiveReviewedBtn" class="btn btn-secondary" type="button">Archive Reviewed</button>
+            <button id="purgeBtn" class="btn btn-danger-outline" type="button">Purge All...</button>
           </div>
         </header>
 
@@ -418,6 +410,25 @@
               </button>
             </div>
           </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Purge confirmation modal ──────────────────────────────────────── -->
+    <div id="purgeModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="purgeModalTitle">
+      <div class="modal-card purge-modal-card">
+        <div class="modal-header">
+          <h3 id="purgeModalTitle" class="modal-title">Confirm Permanent Purge</h3>
+          <button id="closePurgeModalBtn" class="modal-close-btn" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="purge-warning">This action permanently deletes feedback records from the database and cannot be undone.</p>
+          <p class="purge-prompt">Type <strong>PURGE</strong> to confirm:</p>
+          <input type="text" id="purgeConfirmInput" class="form-input" placeholder="PURGE" autocomplete="off" />
+        </div>
+        <div class="modal-footer">
+          <button id="cancelPurgeBtn" class="btn btn-secondary" type="button">Cancel</button>
+          <button id="confirmPurgeBtn" class="btn btn-danger" type="button" disabled>Permanently Delete</button>
         </div>
       </div>
     </div>

@@ -17,6 +17,12 @@ export type ReportIssueCategory =
 
 export type ReportIssueStatus = 'open' | 'acknowledged' | 'resolved';
 
+export {
+  type ReportResolutionReason,
+  REPORT_RESOLUTION_REASONS,
+  isReportResolutionReason,
+} from '@/core/database/models/report-issue.model';
+
 export type AdminQueueView = 'active' | 'archived' | 'all';
 
 export interface ReportIssueSessionEntry {
@@ -51,5 +57,8 @@ export interface ReportIssueEntry {
   attachmentIds: string[];
   acknowledgedAt: string | null;
   resolvedAt: string | null;
+  transactionRef?: string | null;
+  resolutionReason?: import('@/core/database/models/report-issue.model').ReportResolutionReason | null;
+  resolutionNote?: string | null;
   meta?: LogMeta;
 }

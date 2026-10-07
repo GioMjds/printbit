@@ -26,6 +26,9 @@ interface ReportIssueEntry {
   attachmentIds: string[];
   acknowledgedAt: string | null;
   resolvedAt: string | null;
+  transactionRef?: string | null;
+  resolutionReason?: string | null;
+  resolutionNote?: string | null;
 }
 
 interface AttachmentMeta {
@@ -82,6 +85,23 @@ const detailReopenBtn = document.getElementById(
   'detailReopenBtn',
 ) as HTMLButtonElement;
 
+const resolveModal = document.getElementById('resolveModal') as HTMLElement;
+const resolutionReasonSelect = document.getElementById(
+  'resolutionReasonSelect',
+) as HTMLSelectElement;
+const resolutionNoteInput = document.getElementById(
+  'resolutionNoteInput',
+) as HTMLTextAreaElement;
+const closeResolveModalBtn = document.getElementById(
+  'closeResolveModalBtn',
+) as HTMLButtonElement;
+const cancelResolveBtn = document.getElementById(
+  'cancelResolveBtn',
+) as HTMLButtonElement;
+const submitResolveBtn = document.getElementById(
+  'submitResolveBtn',
+) as HTMLButtonElement;
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 10;
@@ -129,6 +149,35 @@ function statusBadgeHtml(status: string): string {
   return `<span class="ri-badge ri-badge--${status}">${escHtml(status)}</span>`;
 }
 
+function renderCard(entry: ReportIssueEntry): HTMLElement {
+  const card = document.createElement('div');
+  card.className = `ri-card ri-card--${entry.status}`;
+  card.dataset.id = entry.id;
+
+  const txnBadge = entry.transactionRef
+    ? `<span class="ri-badge ri-badge--txn" title="Transaction Ref">${escHtml(entry.transactionRef)}</span>`
+    : `<span class="ri-badge ri-badge--muted">Unlinked</span>`;
+
+  card.innerHTML = `
+    <div class="ri-card__accent" aria-hidden="true"></div>
+    <div class="ri-card__body">
+      <div class="ri-card__meta">
+        <span class="ri-card__time">${new Date(entry.timestamp).toLocaleString()}</span>
+        ${statusBadgeHtml(entry.status)}
+        <span class="ri-badge ri-badge--cat">${escHtml(entry.category)}</span>
+        ${txnBadge}
+        ${entry.attachmentIds.length > 0 ? `<span class="ri-badge ri-badge--img">📷 ${entry.attachmentIds.length}</span>` : ''}
+      </div>
+      <p class="ri-card__title">${escHtml(entry.title)}</p>
+      <p class="ri-card__desc">${escHtml(entry.description.slice(0, 160))}${entry.description.length > 160 ? '…' : ''}</p>
+      <div class="ri-card__actions">
+        <button class="ri-action-btn ri-action-btn--view" data-action="view" data-id="${escHtml(entry.id)}">View Details</button>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
 function renderPage(): void {
   const slice = displayItems;
   reportList.innerHTML = '';
@@ -141,25 +190,7 @@ function renderPage(): void {
   }
 
   for (const entry of slice) {
-    const card = document.createElement('div');
-    card.className = `ri-card ri-card--${entry.status}`;
-    card.dataset.id = entry.id;
-    card.innerHTML = `
-      <div class="ri-card__accent" aria-hidden="true"></div>
-      <div class="ri-card__body">
-        <div class="ri-card__meta">
-          <span class="ri-card__time">${new Date(entry.timestamp).toLocaleString()}</span>
-          ${statusBadgeHtml(entry.status)}
-          <span class="ri-badge ri-badge--cat">${escHtml(entry.category)}</span>
-          ${entry.attachmentIds.length > 0 ? `<span class="ri-badge ri-badge--img">📷 ${entry.attachmentIds.length}</span>` : ''}
-        </div>
-        <p class="ri-card__title">${escHtml(entry.title)}</p>
-        <p class="ri-card__desc">${escHtml(entry.description.slice(0, 160))}${entry.description.length > 160 ? '…' : ''}</p>
-        <div class="ri-card__actions">
-          <button class="ri-action-btn ri-action-btn--view" data-action="view" data-id="${escHtml(entry.id)}">View Details</button>
-        </div>
-      </div>
-    `;
+    const card = renderCard(entry);
     reportList.appendChild(card);
   }
 
@@ -275,6 +306,46 @@ async function openDetail(id: string): Promise<void> {
       )
       .join('');
 
+    const txnHtml = issue.transactionRef
+      ? `<a href="/admin/transactions?q=${encodeURIComponent(issue.transactionRef)}" target="_blank" rel="noopener noreferrer" class="txn-link">${escHtml(issue.transactionRef)} &nearr;</a>`
+      : `<span class="ri-badge ri-badge--muted">Unlinked</span>`;
+
+    const timelineHtml = `
+      <div class="timeline-section">
+        <h4 class="timeline-title">Status Timeline</h4>
+        <div id="statusTimeline" class="timeline-container">
+          <div class="timeline-step done">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-label">Submitted</div>
+              <div class="timeline-time">${new Date(issue.timestamp).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="timeline-step ${issue.acknowledgedAt ? 'done' : 'pending'}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-label">Acknowledged</div>
+              <div class="timeline-time">${issue.acknowledgedAt ? new Date(issue.acknowledgedAt).toLocaleString() : 'Pending'}</div>
+            </div>
+          </div>
+          <div class="timeline-step ${issue.resolvedAt ? 'done' : 'pending'}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-label">Resolved</div>
+              <div class="timeline-time">${issue.resolvedAt ? new Date(issue.resolvedAt).toLocaleString() : 'Pending'}</div>
+              ${
+                issue.resolutionReason
+                  ? `<div class="timeline-reason">Reason: <strong>${escHtml(issue.resolutionReason)}</strong>${
+                      issue.resolutionNote ? ` — <em>${escHtml(issue.resolutionNote)}</em>` : ''
+                    }</div>`
+                  : ''
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
     detailBody.innerHTML = `
       <div class="ri-detail-layout">
         <section class="ri-detail-content">
@@ -283,7 +354,12 @@ async function openDetail(id: string): Promise<void> {
             <span class="ri-badge ri-badge--cat">${escHtml(issue.category)}</span>
             <span class="ri-detail-time">${new Date(issue.timestamp).toLocaleString()}</span>
           </div>
+          <div class="detail-txn-row">
+            <span class="detail-txn-label">Transaction Ref:</span>
+            <span id="detailTxnRef" class="detail-txn-container">${txnHtml}</span>
+          </div>
           <p class="ri-detail-desc">${escHtml(issue.description)}</p>
+          ${timelineHtml}
         </section>
         <section class="ri-detail-media">
           ${
@@ -337,6 +413,64 @@ function closeDetailModal(): void {
     detailOverlay?.classList.add('hidden');
   }
 }
+
+function openResolveModal(): void {
+  if (!activeDetailId) return;
+  resolutionReasonSelect.value = '';
+  resolutionNoteInput.value = '';
+  resolveModal.classList.remove('hidden');
+}
+
+function closeResolveModal(): void {
+  resolveModal.classList.add('hidden');
+}
+
+async function submitResolution(): Promise<void> {
+  if (!activeDetailId) return;
+  const reason = resolutionReasonSelect.value;
+  if (!reason) {
+    setMessage('Please select a resolution reason.');
+    return;
+  }
+  const note = resolutionNoteInput.value.trim() || null;
+
+  submitResolveBtn.disabled = true;
+  try {
+    const res = await apiFetch(
+      `/api/admin/report-issues/${encodeURIComponent(activeDetailId)}/status`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'resolved',
+          resolutionReason: reason,
+          resolutionNote: note,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      setMessage(err?.error || 'Failed to resolve report.');
+      return;
+    }
+
+    const entry = allItems.find((e) => e.id === activeDetailId);
+    if (entry) {
+      entry.status = 'resolved';
+      entry.resolutionReason = reason;
+      entry.resolutionNote = note;
+      entry.resolvedAt = new Date().toISOString();
+    }
+    closeResolveModal();
+    closeDetailModal();
+    await loadReports();
+    setMessage('Report marked as resolved.');
+  } catch {
+    setMessage('Network error resolving report.');
+  } finally {
+    submitResolveBtn.disabled = false;
+  }
+}
+
 
 async function updateDetailStatus(
   status: 'open' | 'acknowledged' | 'resolved',
@@ -393,8 +527,12 @@ detailOverlay.addEventListener('click', (e) => {
   if (e.target === detailOverlay) closeDetailModal();
 });
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && detailOverlay && !detailOverlay.classList.contains('hidden')) {
-    closeDetailModal();
+  if (e.key === 'Escape') {
+    if (resolveModal && !resolveModal.classList.contains('hidden')) {
+      closeResolveModal();
+    } else if (detailOverlay && !detailOverlay.classList.contains('hidden')) {
+      closeDetailModal();
+    }
   }
 });
 
@@ -404,12 +542,20 @@ detailAckBtn.addEventListener(
 );
 detailResolveBtn.addEventListener(
   'click',
-  () => void updateDetailStatus('resolved'),
+  openResolveModal,
 );
 detailReopenBtn.addEventListener(
   'click',
   () => void updateDetailStatus('open'),
 );
+
+closeResolveModalBtn?.addEventListener('click', closeResolveModal);
+cancelResolveBtn?.addEventListener('click', closeResolveModal);
+submitResolveBtn?.addEventListener('click', () => void submitResolution());
+resolveModal?.addEventListener('click', (e) => {
+  if (e.target === resolveModal) closeResolveModal();
+});
+
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 

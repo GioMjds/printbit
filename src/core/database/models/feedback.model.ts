@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getSqliteDb, withTransaction } from '../sqlite-storage';
 
 export type FeedbackCategory =
@@ -10,7 +11,12 @@ export type FeedbackCategory =
   | 'payment'
   | 'other';
 
-export type FeedbackStatus = 'open' | 'resolved';
+export type FeedbackStatus =
+  | 'new'
+  | 'reviewed'
+  | 'archived'
+  | 'open'
+  | 'resolved';
 
 export type AdminQueueView = 'active' | 'archived' | 'all';
 
@@ -23,6 +29,24 @@ export interface FeedbackEntry {
   rating: number | null;
   status: FeedbackStatus;
   resolvedAt?: string | null;
+  transactionRef?: string | null;
+  needsAction: boolean;
+  archivedAt?: string | null;
+  meta?: Record<string, string | number | boolean | null>;
+}
+
+export interface CreateFeedbackInput {
+  id?: string;
+  sessionId?: string;
+  timestamp?: string;
+  comment: string;
+  category?: FeedbackCategory | null;
+  rating?: number | null;
+  status?: FeedbackStatus;
+  resolvedAt?: string | null;
+  transactionRef?: string | null;
+  needsAction?: boolean;
+  archivedAt?: string | null;
   meta?: Record<string, string | number | boolean | null>;
 }
 
@@ -155,20 +179,45 @@ export class FeedbackSqliteStore {
           rating,
           status,
           resolved_at,
-          meta_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          meta_json,
+          transaction_ref,
+          needs_action,
+          archived_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         entry.id,
         entry.sessionId,
         entry.timestamp,
         entry.comment,
-        entry.category,
-        entry.rating,
-        entry.status,
+        entry.category ?? null,
+        entry.rating ?? null,
+        entry.status ?? 'new',
         entry.resolvedAt ?? null,
         jsonOrNull(entry.meta),
+        entry.transactionRef ?? null,
+        entry.needsAction ? 1 : 0,
+        entry.archivedAt ?? null,
       );
+  }
+
+  createFeedback(input: CreateFeedbackInput): FeedbackEntry {
+    const entry: FeedbackEntry = {
+      id: input.id ?? randomUUID(),
+      sessionId: input.sessionId ?? '',
+      timestamp: input.timestamp ?? toIsoDate(new Date()),
+      comment: input.comment,
+      category: input.category ?? null,
+      rating: input.rating ?? null,
+      status: input.status ?? 'new',
+      resolvedAt: input.resolvedAt ?? null,
+      transactionRef: input.transactionRef ?? null,
+      needsAction: Boolean(input.needsAction),
+      archivedAt: input.archivedAt ?? null,
+      meta: input.meta,
+    };
+    this.insertFeedback(entry);
+    return entry;
   }
 
   createFeedbackSubmission(entry: FeedbackEntry): void {
@@ -201,16 +250,17 @@ export class FeedbackSqliteStore {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
-    if (options.view === 'active') {
-      where.push('status = ?');
-      params.push('open');
-    } else if (options.view === 'archived') {
-      where.push('status = ?');
-      params.push('resolved');
-    } else if (options.status) {
+    const view = options.view ?? (options.status ? undefined : 'active');
+
+    if (options.status) {
       where.push('status = ?');
       params.push(options.status);
+    } else if (view === 'active') {
+      where.push("status IN ('new', 'open', 'reviewed')");
+    } else if (view === 'archived') {
+      where.push("status = 'archived'");
     }
+    // view === 'all': no status filter
 
     const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
@@ -228,7 +278,10 @@ export class FeedbackSqliteStore {
           rating,
           status,
           resolved_at,
-          meta_json
+          meta_json,
+          transaction_ref,
+          needs_action,
+          archived_at
          FROM feedback_entries
          ${whereSql}
          ORDER BY timestamp DESC
@@ -246,27 +299,49 @@ export class FeedbackSqliteStore {
     const db = getSqliteDb();
     const row = db
       .prepare(
-        "SELECT COUNT(*) AS total FROM feedback_entries WHERE status = 'open'",
+        "SELECT COUNT(*) AS total FROM feedback_entries WHERE status IN ('new', 'open')",
       )
       .get() as { total?: unknown };
     return Number(row?.total ?? 0);
   }
 
-  getFeedbackStats(): { total: number; open: number; resolved: number } {
+  getFeedbackStats(): {
+    total: number;
+    open: number;
+    resolved: number;
+    new: number;
+    reviewed: number;
+    archived: number;
+  } {
     const db = getSqliteDb();
     const rows = db
       .prepare(
         'SELECT status, COUNT(*) AS count FROM feedback_entries GROUP BY status',
       )
       .all() as { status?: unknown; count?: unknown }[];
-    let open = 0;
-    let resolved = 0;
+    let newCount = 0;
+    let openCount = 0;
+    let reviewedCount = 0;
+    let resolvedCount = 0;
+    let archivedCount = 0;
     for (const row of rows) {
       const count = Number(row.count ?? 0);
-      if (row.status === 'open') open += count;
-      else if (row.status === 'resolved') resolved += count;
+      if (row.status === 'new') newCount += count;
+      else if (row.status === 'open') openCount += count;
+      else if (row.status === 'reviewed') reviewedCount += count;
+      else if (row.status === 'resolved') resolvedCount += count;
+      else if (row.status === 'archived') archivedCount += count;
     }
-    return { total: open + resolved, open, resolved };
+    const combinedOpen = newCount + openCount;
+    const combinedResolved = reviewedCount + resolvedCount;
+    return {
+      total: combinedOpen + combinedResolved + archivedCount,
+      open: combinedOpen,
+      resolved: combinedResolved,
+      new: newCount,
+      reviewed: reviewedCount,
+      archived: archivedCount,
+    };
   }
 
   findFeedbackById(feedbackId: string): FeedbackEntry | null {
@@ -281,7 +356,10 @@ export class FeedbackSqliteStore {
           rating,
           status,
           resolved_at,
-          meta_json
+          meta_json,
+          transaction_ref,
+          needs_action,
+          archived_at
          FROM feedback_entries
          WHERE id = ?
          LIMIT 1`,
@@ -296,7 +374,7 @@ export class FeedbackSqliteStore {
     resolved: boolean,
   ): FeedbackEntry | null {
     const resolvedAt = resolved ? toIsoDate(new Date()) : null;
-    const status: FeedbackEntry['status'] = resolved ? 'resolved' : 'open';
+    const status: FeedbackEntry['status'] = resolved ? 'reviewed' : 'new';
 
     const result = getSqliteDb()
       .prepare(
@@ -305,6 +383,59 @@ export class FeedbackSqliteStore {
       .run(status, resolvedAt, feedbackId) as { changes?: unknown };
     if (Number(result.changes ?? 0) === 0) return null;
     return this.findFeedbackById(feedbackId);
+  }
+
+  archiveFeedback(id: string): FeedbackEntry | null {
+    const nowIso = toIsoDate(new Date());
+    const result = getSqliteDb()
+      .prepare(
+        "UPDATE feedback_entries SET status = 'archived', archived_at = ? WHERE id = ?",
+      )
+      .run(nowIso, id) as { changes?: unknown };
+    if (Number(result.changes ?? 0) === 0) return null;
+    return this.findFeedbackById(id);
+  }
+
+  archiveAllReviewedFeedback(): number {
+    const nowIso = toIsoDate(new Date());
+    const result = getSqliteDb()
+      .prepare(
+        "UPDATE feedback_entries SET status = 'archived', archived_at = ? WHERE status = 'reviewed'",
+      )
+      .run(nowIso) as { changes?: unknown };
+    return Number(result.changes ?? 0);
+  }
+
+  setNeedsAction(id: string, needsAction: boolean): FeedbackEntry | null {
+    const result = getSqliteDb()
+      .prepare('UPDATE feedback_entries SET needs_action = ? WHERE id = ?')
+      .run(needsAction ? 1 : 0, id) as { changes?: unknown };
+    if (Number(result.changes ?? 0) === 0) return null;
+    return this.findFeedbackById(id);
+  }
+
+  purgeFeedback(id: string, confirm: string): boolean {
+    if (confirm !== 'PURGE') {
+      throw new Error(
+        'Typed confirmation PURGE required for permanent deletion.',
+      );
+    }
+    const result = getSqliteDb()
+      .prepare('DELETE FROM feedback_entries WHERE id = ?')
+      .run(id) as { changes?: unknown };
+    return Number(result.changes ?? 0) > 0;
+  }
+
+  purgeAllFeedback(confirm: string): number {
+    if (confirm !== 'PURGE') {
+      throw new Error(
+        'Typed confirmation PURGE required for permanent deletion.',
+      );
+    }
+    const result = getSqliteDb()
+      .prepare('DELETE FROM feedback_entries')
+      .run() as { changes?: unknown };
+    return Number(result.changes ?? 0);
   }
 
   deleteFeedback(feedbackId: string): boolean {
@@ -333,7 +464,10 @@ export class FeedbackSqliteStore {
           rating,
           status,
           resolved_at,
-          meta_json
+          meta_json,
+          transaction_ref,
+          needs_action,
+          archived_at
          FROM feedback_entries
          ORDER BY timestamp DESC`,
       )
@@ -380,40 +514,86 @@ export class FeedbackSqliteStore {
   }
 
   private toFeedbackEntry(row: Record<string, unknown>): FeedbackEntry {
-    const parsedMeta = normalizeLogMeta(parseJsonValue<unknown>(row.meta_json));
-    const validCategories = new Set<string>([
-      'service',
-      'hardware',
-      'software',
-      'print',
-      'scan',
-      'copy',
-      'payment',
-      'other',
-    ]);
-    const categoryRaw = typeof row.category === 'string' ? row.category : null;
-    const categoryValue =
-      categoryRaw && validCategories.has(categoryRaw)
-        ? (categoryRaw as FeedbackCategory)
-        : null;
-    const ratingValue =
-      typeof row.rating === 'number' && Number.isFinite(row.rating)
-        ? row.rating
-        : null;
-    const statusValue = row.status === 'resolved' ? 'resolved' : 'open';
-
-    return {
-      id: String(row.id ?? ''),
-      sessionId: String(row.session_id ?? ''),
-      timestamp: String(row.timestamp ?? ''),
-      comment: String(row.comment ?? ''),
-      category: categoryValue,
-      rating: ratingValue,
-      status: statusValue,
-      resolvedAt: typeof row.resolved_at === 'string' ? row.resolved_at : null,
-      meta: parsedMeta,
-    };
+    return mapFeedbackEntry(row);
   }
 }
 
+export function mapFeedbackEntry(row: Record<string, unknown>): FeedbackEntry {
+  const parsedMeta = normalizeLogMeta(parseJsonValue<unknown>(row.meta_json));
+  const validCategories = new Set<string>([
+    'service',
+    'hardware',
+    'software',
+    'print',
+    'scan',
+    'copy',
+    'payment',
+    'other',
+  ]);
+  const categoryRaw = typeof row.category === 'string' ? row.category : null;
+  const categoryValue =
+    categoryRaw && validCategories.has(categoryRaw)
+      ? (categoryRaw as FeedbackCategory)
+      : null;
+  const ratingValue =
+    typeof row.rating === 'number' && Number.isFinite(row.rating)
+      ? row.rating
+      : null;
+  const validStatuses = new Set<string>([
+    'new',
+    'reviewed',
+    'archived',
+    'open',
+    'resolved',
+  ]);
+  const statusRaw = typeof row.status === 'string' ? row.status : '';
+  const statusValue = validStatuses.has(statusRaw)
+    ? (statusRaw as FeedbackStatus)
+    : 'new';
+
+  return {
+    id: String(row.id ?? ''),
+    sessionId: String(row.session_id ?? ''),
+    timestamp: String(row.timestamp ?? ''),
+    comment: String(row.comment ?? ''),
+    category: categoryValue,
+    rating: ratingValue,
+    status: statusValue,
+    resolvedAt: typeof row.resolved_at === 'string' ? row.resolved_at : null,
+    transactionRef:
+      typeof row.transaction_ref === 'string' ? row.transaction_ref : null,
+    needsAction: Boolean(row.needs_action),
+    archivedAt:
+      typeof row.archived_at === 'string' ? row.archived_at : null,
+    meta: parsedMeta,
+  };
+}
+
 export const feedbackStore = new FeedbackSqliteStore();
+
+export function createFeedback(input: CreateFeedbackInput): FeedbackEntry {
+  return feedbackStore.createFeedback(input);
+}
+
+export function archiveFeedback(id: string): FeedbackEntry | null {
+  return feedbackStore.archiveFeedback(id);
+}
+
+export function archiveAllReviewedFeedback(): number {
+  return feedbackStore.archiveAllReviewedFeedback();
+}
+
+export function setNeedsAction(
+  id: string,
+  needsAction: boolean,
+): FeedbackEntry | null {
+  return feedbackStore.setNeedsAction(id, needsAction);
+}
+
+export function purgeFeedback(id: string, confirm: string): boolean {
+  return feedbackStore.purgeFeedback(id, confirm);
+}
+
+export function purgeAllFeedback(confirm: string): number {
+  return feedbackStore.purgeAllFeedback(confirm);
+}

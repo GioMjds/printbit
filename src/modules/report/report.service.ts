@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import {
@@ -11,6 +12,14 @@ import type {
   ReportIssueSessionEntry,
   ReportIssueStatus,
 } from '@/services/db';
+import {
+  reportIssueStore,
+  getSqliteDb,
+} from '@/core/database/sqlite-storage';
+import {
+  type ReportResolutionReason,
+  REPORT_RESOLUTION_REASONS,
+} from '@/core/database/models/report-issue.model';
 import type { AdminQueueView } from './report.schema';
 import { serializeForInlineScript } from '@/utils/helpers';
 import { promoteStagedUpload } from '@/services/upload-staging';
@@ -74,6 +83,15 @@ export interface SubmitReportIssueInput {
   description: string;
   category?: string | null;
   attachmentIds?: string[] | null;
+  transactionRef?: string | null;
+}
+
+export interface SubmitDirectReportIssueInput {
+  title: string;
+  description: string;
+  category?: string | null;
+  attachmentIds?: string[] | null;
+  transactionRef?: string | null;
 }
 
 export interface CreateAdminReportIssueInput {
@@ -152,6 +170,12 @@ export class ReportService {
     return reportIssueService.submitReportIssue(input);
   }
 
+  async submitDirectReportIssue(
+    input: SubmitDirectReportIssueInput,
+  ): Promise<ReportIssueEntry> {
+    return reportIssueService.submitReportIssue(input);
+  }
+
   renderReportPortal(token?: string): string {
     if (!token) {
       return REPORT_PORTAL_TEMPLATE.replace(
@@ -190,11 +214,69 @@ export class ReportService {
     return reportIssueService.listAttachmentsForReport(reportIssueId);
   }
 
+  async updateReportStatus(
+    id: string,
+    status: ReportIssueStatus,
+    options?: {
+      resolutionReason?: ReportResolutionReason;
+      resolutionNote?: string | null;
+    },
+  ): Promise<ReportIssueEntry | null> {
+    const updated = reportIssueStore.updateReportIssueStatus(
+      id,
+      status,
+      options,
+    );
+    if (!updated) return null;
+
+    const logId = randomUUID();
+    const timestamp = new Date().toISOString();
+    const type =
+      status === 'acknowledged'
+        ? 'report_acknowledged'
+        : status === 'resolved'
+          ? 'report_resolved'
+          : 'report_status_change';
+    const message = `Report ${id} status updated to ${status}${options?.resolutionReason ? ` (${options.resolutionReason})` : ''}`;
+    const metaJson = JSON.stringify({
+      reportId: id,
+      status,
+      resolutionReason: options?.resolutionReason ?? null,
+      resolutionNote: options?.resolutionNote ?? null,
+    });
+
+    getSqliteDb()
+      .prepare(
+        `INSERT INTO admin_logs (
+          id,
+          timestamp,
+          timestamp_meta_json,
+          type,
+          message,
+          meta_json,
+          is_transaction,
+          transaction_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        logId,
+        timestamp,
+        null,
+        type,
+        message,
+        metaJson,
+        0,
+        null,
+      );
+
+    return updated;
+  }
+
   async updateStatus(
     id: string,
     status: ReportIssueStatus,
   ): Promise<ReportIssueEntry | null> {
-    return reportIssueService.updateStatus(id, status);
+    return this.updateReportStatus(id, status);
   }
 
   async createByAdmin(input: CreateAdminReportIssueInput): Promise<ReportIssueEntry> {
