@@ -180,7 +180,7 @@ kiosk-shell setup from this repository.
 
 ### 2. Publish and install the hardware worker
 
-From `C:\Users\printbit\printbit-worker`:
+From `C:\Users\printbit\printbit\worker`:
 
 ```powershell
 dotnet publish .\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj `
@@ -280,7 +280,7 @@ When hosted as a standard SCM Windows Service under `LocalSystem`, it executes i
 
 Running the worker as an **Interactive Scheduled Task** under the kiosk user (`printbit`) starts the process inside **Session 1 (the interactive user session)** at logon. This matches the exact runtime behavior of `dotnet run`, giving full, unblocked access to WinRT APIs, hardware drivers, and printer queues without needing DCOM permission hacks.
 
-#### Setup via Elevated PowerShell:
+#### Setup via Elevated PowerShell
 
 ```powershell
 # 1. Stop and disable the SCM Windows service so they do not conflict
@@ -324,7 +324,7 @@ Get-ScheduledTask -TaskName "PrintBitHardwareWorker"
 Get-ScheduledTaskInfo -TaskName "PrintBitHardwareWorker"
 ```
 
-#### To Revert Back to SCM Windows Service:
+#### To Revert Back to SCM Windows Service
 
 ```powershell
 Stop-ScheduledTask -TaskName "PrintBitHardwareWorker" -ErrorAction SilentlyContinue
