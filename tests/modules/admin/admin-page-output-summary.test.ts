@@ -352,8 +352,30 @@ describe('Admin Page Output Summary API', () => {
           referenceId: 'tx-copy',
           timestamp: '2026-10-07T10:05:00Z',
         },
+        {
+          id: 'fl-f',
+          eventType: 'payment_received',
+          amount: 15,
+          referenceId: 'tx-failed',
+          timestamp: '2026-10-07T10:10:00Z',
+        },
+        {
+          id: 'fl-s',
+          eventType: 'payment_received',
+          amount: 20,
+          referenceId: 'tx-scan',
+          timestamp: '2026-10-07T10:15:00Z',
+        },
       ],
-      owedChanges: [],
+      owedChanges: [
+        {
+          id: 'oc-for-copy',
+          amount: 5,
+          status: 'open',
+          timestamp: '2026-10-07T10:05:00Z',
+          meta: { transactionId: 'tx-copy' },
+        },
+      ],
       adminLogs: [
         {
           id: 'log-p',
@@ -369,33 +391,93 @@ describe('Admin Page Output Summary API', () => {
           message: 'Copy completed',
           meta: { transactionId: 'tx-copy', mode: 'copy', totalPages: 3, pagesPrinted: 3 },
         },
+        {
+          id: 'log-f',
+          type: 'print_spooler_job_failed',
+          timestamp: '2026-10-07T10:10:00Z',
+          message: 'Print failed with jam',
+          meta: { transactionId: 'tx-failed', mode: 'print', totalPages: 4, pagesPrinted: 0 },
+        },
+        {
+          id: 'log-s',
+          type: 'scan_job_completed',
+          timestamp: '2026-10-07T10:15:00Z',
+          message: 'Scan completed',
+          meta: { transactionId: 'tx-scan', mode: 'scan', totalPages: 2 },
+        },
       ],
       pendingRefunds: [],
       recovery: { sessions: [] },
       receiptRecords: [],
       balance: 0,
-      earnings: 75,
+      earnings: 110,
     } as any;
 
+    // 1. Mode filter: print (tx-print + tx-failed)
     const resPrint = await fetch(
       `${baseUrl}/api/admin/logs/transactions/page-output-summary?mode=print`,
     );
     expect(resPrint.status).toBe(200);
     const dataPrint = await resPrint.json();
+    expect(dataPrint.scope.totalTransactions).toBe(2);
+    expect(dataPrint.financials.grossCharged).toBe(65); // 50 + 15
+    expect(dataPrint.pages.totalRequested).toBe(9); // 5 + 4
+    expect(dataPrint.pages.totalPrinted).toBe(5);
+    expect(dataPrint.pages.totalFailed).toBe(4);
+    // oc-for-copy is linked to tx-copy (mode copy), so it must not leak into mode=print
+    expect(dataPrint.financials.unresolvedOwedChange).toBe(0);
 
-    expect(dataPrint.scope.totalTransactions).toBe(1);
-    expect(dataPrint.financials.grossCharged).toBe(50);
-    expect(dataPrint.pages.totalRequested).toBe(5);
-
+    // 2. Mode filter: copy (tx-copy)
     const resCopy = await fetch(
       `${baseUrl}/api/admin/logs/transactions/page-output-summary?mode=copy`,
     );
     expect(resCopy.status).toBe(200);
     const dataCopy = await resCopy.json();
-
     expect(dataCopy.scope.totalTransactions).toBe(1);
     expect(dataCopy.financials.grossCharged).toBe(25);
     expect(dataCopy.pages.totalRequested).toBe(3);
+    expect(dataCopy.financials.unresolvedOwedChange).toBe(5);
+
+    // 3. Mode filter: scan (tx-scan) - document scanning produces 0 printed pages
+    const resScan = await fetch(
+      `${baseUrl}/api/admin/logs/transactions/page-output-summary?mode=scan`,
+    );
+    expect(resScan.status).toBe(200);
+    const dataScan = await resScan.json();
+    expect(dataScan.scope.totalTransactions).toBe(1);
+    expect(dataScan.financials.grossCharged).toBe(20);
+    expect(dataScan.pages.totalRequested).toBe(0);
+    expect(dataScan.pages.totalPrinted).toBe(0);
+    expect(dataScan.pages.totalFailed).toBe(0);
+    expect(dataScan.pages.colorPagesPrinted).toBe(0);
+    expect(dataScan.pages.bwPagesPrinted).toBe(0);
+
+    // 4. Status filter: completed (tx-print, tx-copy, tx-scan)
+    const resCompleted = await fetch(
+      `${baseUrl}/api/admin/logs/transactions/page-output-summary?status=completed`,
+    );
+    expect(resCompleted.status).toBe(200);
+    const dataCompleted = await resCompleted.json();
+    expect(dataCompleted.scope.totalTransactions).toBe(3);
+    expect(dataCompleted.financials.grossCharged).toBe(95); // 50 + 25 + 20
+    expect(dataCompleted.pages.totalRequested).toBe(8); // 5 + 3
+    expect(dataCompleted.pages.totalPrinted).toBe(8);
+    expect(dataCompleted.pages.totalFailed).toBe(0);
+
+    // 5. Status filter: failed (tx-failed)
+    const resFailed = await fetch(
+      `${baseUrl}/api/admin/logs/transactions/page-output-summary?status=failed`,
+    );
+    expect(resFailed.status).toBe(200);
+    const dataFailed = await resFailed.json();
+    expect(dataFailed.scope.totalTransactions).toBe(1);
+    expect(dataFailed.financials.grossCharged).toBe(15);
+    expect(dataFailed.pages.totalRequested).toBe(4);
+    expect(dataFailed.pages.totalPrinted).toBe(0);
+    expect(dataFailed.pages.totalFailed).toBe(4);
+    expect(dataFailed.hardwareIncidents.spoolerFailures).toBe(1);
+    // oc-for-copy is linked to tx-copy (status completed), so it must not leak into status=failed
+    expect(dataFailed.financials.unresolvedOwedChange).toBe(0);
   });
 
   it('tracks spooler failures and hopper shortfalls in hardware incidents', async () => {
@@ -569,6 +651,83 @@ describe('Admin Page Output Summary API', () => {
     expect(data.financials.cashRefundsIssued).toBe(40); // 15 + 25
     expect(data.financials.refundCount).toBe(2);
     expect(data.financials.netCashRetained).toBe(40); // 80 - 40
+  });
+
+  it('does not double count spooler failure logs without transactionId', async () => {
+    db.data = {
+      financialLedger: [],
+      owedChanges: [],
+      adminLogs: [
+        {
+          id: 'log-no-tx-fail',
+          type: 'print_spooler_job_failed',
+          timestamp: '2026-10-07T12:00:00Z',
+          message: 'Anonymous spooler worker crash',
+          meta: {}, // no transactionId
+        },
+      ],
+      pendingRefunds: [],
+      recovery: { sessions: [] },
+      receiptRecords: [],
+      balance: 0,
+      earnings: 0,
+    } as any;
+
+    const res = await fetch(
+      `${baseUrl}/api/admin/logs/transactions/page-output-summary`,
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    // Must be exactly 1, never 2
+    expect(data.hardwareIncidents.spoolerFailures).toBe(1);
+  });
+
+  it('caps color and B&W pages printed to total printed pages', async () => {
+    db.data = {
+      financialLedger: [
+        {
+          id: 'fl-cap',
+          eventType: 'payment_received',
+          amount: 25,
+          referenceId: 'tx-cap',
+          timestamp: '2026-10-07T12:00:00Z',
+        },
+      ],
+      owedChanges: [],
+      adminLogs: [
+        {
+          id: 'log-cap',
+          type: 'print_job_completed',
+          timestamp: '2026-10-07T12:00:00Z',
+          message: 'Print completed',
+          meta: {
+            transactionId: 'tx-cap',
+            mode: 'print',
+            totalPages: 5,
+            pagesPrinted: 5,
+            colorPages: 4,
+            bwPages: 4, // 4 + 4 = 8, exceeds pagesPrinted 5
+          },
+        },
+      ],
+      pendingRefunds: [],
+      recovery: { sessions: [] },
+      receiptRecords: [],
+      balance: 0,
+      earnings: 25,
+    } as any;
+
+    const res = await fetch(
+      `${baseUrl}/api/admin/logs/transactions/page-output-summary`,
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    expect(data.pages.totalPrinted).toBe(5);
+    expect(data.pages.colorPagesPrinted).toBe(4);
+    expect(data.pages.bwPagesPrinted).toBe(1); // capped: 5 - 4 = 1
+    expect(data.pages.colorPagesPrinted + data.pages.bwPagesPrinted).toBe(data.pages.totalPrinted);
   });
 
   it('registers route with requireAdminLocalAccess and requireAdminPin middleware', () => {

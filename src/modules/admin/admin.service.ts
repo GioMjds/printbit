@@ -13,6 +13,13 @@ import {
   type TrustedTimestampMeta,
 } from '@/core/database/shared.schema';
 import type { CoverageTier } from '@/core/database/models/admin.model';
+import type {
+  FinancialLedgerEntry,
+  PendingRefundEntry,
+  OwedChangeEntry,
+} from '@/core/database/models/payment.model';
+import type { RecoverySessionEntry } from '@/core/database/models/recovery.model';
+import type { ReceiptRecordEntry } from '@/core/database/models/receipt.model';
 import { db, defaultPricingEngine } from '@/services/db';
 import { getTrustedTimestamp } from '@/services/time-source';
 import { adminLogStore } from '@/core/database/sqlite-storage';
@@ -597,6 +604,90 @@ export class AdminService {
     const dateFrom = filters.dateFrom ?? null;
     const dateTo = filters.dateTo ?? null;
 
+    // ── Pre-indexing collections for O(1) lookups (avoids O(M*N) quadratic passes) ──
+    const logsByTxId = new Map<string, AdminLogEntry[]>();
+    const txModeMap = new Map<string, TransactionLogMode>();
+    const txStatusMap = new Map<string, TransactionLogStatus>();
+
+    for (const log of rawLogs) {
+      const id = this.getTransactionId(log);
+      if (id) {
+        let list = logsByTxId.get(id);
+        if (!list) {
+          list = [];
+          logsByTxId.set(id, list);
+        }
+        list.push(log);
+
+        const m = this.inferTransactionMode(log);
+        if (m && !txModeMap.has(id)) {
+          txModeMap.set(id, m);
+        }
+        const s = this.classifyTransactionStatus(log);
+        if (s && !txStatusMap.has(id)) {
+          txStatusMap.set(id, s);
+        }
+      }
+    }
+
+    const ledgerByRefId = new Map<string, FinancialLedgerEntry[]>();
+    for (const entry of db.data?.financialLedger ?? []) {
+      if (entry.referenceId) {
+        let list = ledgerByRefId.get(entry.referenceId);
+        if (!list) {
+          list = [];
+          ledgerByRefId.set(entry.referenceId, list);
+        }
+        list.push(entry);
+      }
+    }
+
+    const pendingRefundsByTxId = new Map<string, PendingRefundEntry[]>();
+    for (const p of db.data?.pendingRefunds ?? []) {
+      const txRef =
+        typeof p.jobContext?.transactionId === 'string'
+          ? p.jobContext.transactionId.trim()
+          : p.id;
+      if (txRef) {
+        let list = pendingRefundsByTxId.get(txRef);
+        if (!list) {
+          list = [];
+          pendingRefundsByTxId.set(txRef, list);
+        }
+        list.push(p);
+      }
+    }
+
+    const recoverySessionByTxId = new Map<string, RecoverySessionEntry>();
+    for (const s of db.data?.recovery?.sessions ?? []) {
+      if (s.id) {
+        recoverySessionByTxId.set(s.id, s);
+      }
+    }
+
+    const receiptRecordByTxId = new Map<string, ReceiptRecordEntry>();
+    for (const r of db.data?.receiptRecords ?? []) {
+      if (r.transactionId) {
+        receiptRecordByTxId.set(r.transactionId, r);
+      }
+    }
+
+    const owedChangesByTxId = new Map<string, OwedChangeEntry[]>();
+    for (const oc of db.data?.owedChanges ?? []) {
+      const ocTxId =
+        typeof oc.meta?.transactionId === 'string'
+          ? oc.meta.transactionId.trim()
+          : null;
+      if (ocTxId) {
+        let list = owedChangesByTxId.get(ocTxId);
+        if (!list) {
+          list = [];
+          owedChangesByTxId.set(ocTxId, list);
+        }
+        list.push(oc);
+      }
+    }
+
     let grossCharged = 0;
     let cashRefundsIssued = 0;
     let refundCount = 0;
@@ -610,39 +701,20 @@ export class AdminService {
     let spoolerFailures = 0;
     let hopperShortfalls = 0;
 
+    const countedSpoolerLogIds = new Set<string>();
     const countedSpoolerTxIds = new Set<string>();
+    const countedHopperLogIds = new Set<string>();
     const countedHopperTxIds = new Set<string>();
 
     for (const txLog of matchingTxGroups) {
       const txId = this.getTransactionId(txLog);
 
-      // Collect all logs for this specific transaction
-      const allTxLogs = txId
-        ? rawLogs.filter((l) => this.getTransactionId(l) === txId)
-        : [txLog];
-
-      // ── Financials for this transaction ──────────────────────────────────
-      const ledgerEntries = txId
-        ? (db.data?.financialLedger ?? []).filter(
-            (e) => e.referenceId === txId,
-          )
-        : [];
-
-      const pendingRefunds = txId
-        ? (db.data?.pendingRefunds ?? []).filter(
-            (p) =>
-              p.jobContext?.transactionId === txId ||
-              p.id === txId,
-          )
-        : [];
-
-      const recoverySession = txId
-        ? (db.data?.recovery?.sessions ?? []).find((s) => s.id === txId)
-        : undefined;
-
-      const receiptRecord = txId
-        ? (db.data?.receiptRecords ?? []).find((r) => r.transactionId === txId)
-        : undefined;
+      // O(1) fetch of logs and associated structures for this transaction
+      const allTxLogs = txId ? (logsByTxId.get(txId) ?? [txLog]) : [txLog];
+      const ledgerEntries = txId ? (ledgerByRefId.get(txId) ?? []) : [];
+      const pendingRefunds = txId ? (pendingRefundsByTxId.get(txId) ?? []) : [];
+      const recoverySession = txId ? recoverySessionByTxId.get(txId) : undefined;
+      const receiptRecord = txId ? receiptRecordByTxId.get(txId) : undefined;
 
       // 1. Charged Amount
       let txCharged: number | null = null;
@@ -693,16 +765,23 @@ export class AdminService {
 
       // 2. Refunds
       const pendingRefundIds = new Set(pendingRefunds.map((p) => p.id));
-      const refundLedgerEntries = (db.data?.financialLedger ?? []).filter(
-        (e) =>
-          e.eventType === 'refund_issued' &&
-          ((txId && e.referenceId === txId) ||
-            (e.referenceId && pendingRefundIds.has(e.referenceId))),
-      );
+      const refundLedgerEntries = [
+        ...ledgerEntries.filter((e) => e.eventType === 'refund_issued'),
+        ...Array.from(pendingRefundIds).flatMap(
+          (pId) =>
+            (ledgerByRefId.get(pId) ?? []).filter(
+              (e) => e.eventType === 'refund_issued',
+            ),
+        ),
+      ];
+      const uniqueRefundLedgers = new Map<string, FinancialLedgerEntry>();
+      for (const r of refundLedgerEntries) {
+        uniqueRefundLedgers.set(r.id, r);
+      }
 
       let txRefundSum = 0;
       let txRefundCount = 0;
-      for (const refEntry of refundLedgerEntries) {
+      for (const refEntry of uniqueRefundLedgers.values()) {
         if (typeof refEntry.amount === 'number' && refEntry.amount > 0) {
           txRefundSum += refEntry.amount;
           txRefundCount += 1;
@@ -801,21 +880,21 @@ export class AdminService {
           (l) => this.classifyTransactionStatus(l) === 'completed',
         );
 
-      const requested =
+      let requested =
         typeof rawReq === 'number' && Number.isFinite(rawReq)
           ? Math.max(0, Math.floor(rawReq))
           : typeof rawPrint === 'number' && Number.isFinite(rawPrint)
             ? Math.max(0, Math.floor(rawPrint))
             : 0;
 
-      const printed =
+      let printed =
         typeof rawPrint === 'number' && Number.isFinite(rawPrint)
           ? Math.max(0, Math.floor(rawPrint))
           : isCompleted && requested > 0
             ? requested
             : 0;
 
-      const failed = Math.max(0, requested - printed);
+      let failed = Math.max(0, requested - printed);
 
       let colPrinted = 0;
       let bwPrinted = 0;
@@ -847,6 +926,31 @@ export class AdminService {
         }
       }
 
+      // Check transaction mode: Document scanning produces digital scans, not printed physical pages
+      const txMode =
+        (typeof receiptRecord?.mode === 'string' ? receiptRecord.mode : null) ??
+        (typeof recoverySession?.mode === 'string'
+          ? recoverySession.mode
+          : null) ??
+        (txId ? txModeMap.get(txId) : null) ??
+        this.inferTransactionMode(txLog);
+
+      if (txMode === 'scan') {
+        requested = 0;
+        printed = 0;
+        failed = 0;
+        colPrinted = 0;
+        bwPrinted = 0;
+      } else {
+        // Invariant: Cap colPrinted and bwPrinted to total printed
+        if (colPrinted > printed) {
+          colPrinted = printed;
+        }
+        if (colPrinted + bwPrinted > printed) {
+          bwPrinted = Math.max(0, printed - colPrinted);
+        }
+      }
+
       totalRequested += requested;
       totalPrinted += printed;
       totalFailed += failed;
@@ -854,17 +958,19 @@ export class AdminService {
       bwPagesPrinted += bwPrinted;
 
       // ── Hardware incidents for this transaction ─────────────────────────
+      const spoolerLogs = allTxLogs.filter((l) => {
+        const t = l.type.toLowerCase();
+        return (
+          t === 'print_spooler_job_failed' ||
+          t === 'spooler_failed' ||
+          t === 'print_spooler_failed' ||
+          t === 'print_spooler_monitor_timeout' ||
+          (t.includes('spooler') && t.includes('fail'))
+        );
+      });
+
       const hasSpoolerFailure =
-        allTxLogs.some((l) => {
-          const t = l.type.toLowerCase();
-          return (
-            t === 'print_spooler_job_failed' ||
-            t === 'spooler_failed' ||
-            t === 'print_spooler_failed' ||
-            t === 'print_spooler_monitor_timeout' ||
-            (t.includes('spooler') && t.includes('fail'))
-          );
-        }) ||
+        spoolerLogs.length > 0 ||
         recoverySession?.phase === 'spooler_failed' ||
         pendingRefunds.some((p) =>
           p.reason?.toLowerCase().includes('spooler'),
@@ -873,32 +979,44 @@ export class AdminService {
       if (hasSpoolerFailure) {
         spoolerFailures++;
         if (txId) countedSpoolerTxIds.add(txId);
+        for (const l of spoolerLogs) {
+          countedSpoolerLogIds.add(l.id);
+        }
+        countedSpoolerLogIds.add(txLog.id);
       }
 
-      const hasHopperFailure =
-        allTxLogs.some((l) => {
-          const t = l.type.toLowerCase();
-          return (
-            t === 'hopper_dispense_failed' ||
-            t === 'hopper_dispense_shortfall' ||
-            (t.startsWith('hopper_') &&
-              (t.includes('fail') ||
-                t.includes('shortfall') ||
-                t.includes('jam')))
-          );
-        }) ||
-        (db.data?.owedChanges ?? []).some(
-          (oc) => txId && (oc.meta?.transactionId === txId || oc.id === txId),
+      const hopperLogs = allTxLogs.filter((l) => {
+        const t = l.type.toLowerCase();
+        return (
+          t === 'hopper_dispense_failed' ||
+          t === 'hopper_dispense_shortfall' ||
+          (t.startsWith('hopper_') &&
+            (t.includes('fail') ||
+              t.includes('shortfall') ||
+              t.includes('jam')))
         );
+      });
+
+      const txOwedChanges = txId ? (owedChangesByTxId.get(txId) ?? []) : [];
+      const hasHopperFailure =
+        hopperLogs.length > 0 || txOwedChanges.length > 0;
 
       if (hasHopperFailure) {
         hopperShortfalls++;
         if (txId) countedHopperTxIds.add(txId);
+        for (const l of hopperLogs) {
+          countedHopperLogIds.add(l.id);
+        }
+        countedHopperLogIds.add(txLog.id);
       }
     }
 
-    // Check any uncounted spooler failures in filtered logs
+    // Check any uncounted spooler failures in filtered logs (avoiding double counts via countedSpoolerLogIds)
     for (const l of filteredLogs) {
+      if (countedSpoolerLogIds.has(l.id)) continue;
+      const txId = this.getTransactionId(l);
+      if (txId && countedSpoolerTxIds.has(txId)) continue;
+
       const t = l.type.toLowerCase();
       const isSpoolerFail =
         t === 'print_spooler_job_failed' ||
@@ -907,11 +1025,9 @@ export class AdminService {
         t === 'print_spooler_monitor_timeout' ||
         (t.includes('spooler') && t.includes('fail'));
       if (isSpoolerFail) {
-        const txId = this.getTransactionId(l);
-        if (!txId || !countedSpoolerTxIds.has(txId)) {
-          spoolerFailures++;
-          if (txId) countedSpoolerTxIds.add(txId);
-        }
+        spoolerFailures++;
+        countedSpoolerLogIds.add(l.id);
+        if (txId) countedSpoolerTxIds.add(txId);
       }
     }
 
@@ -931,18 +1047,30 @@ export class AdminService {
       if (Number.isFinite(dateFromMs) && ocTimeMs < dateFromMs) continue;
       if (Number.isFinite(dateToMs) && ocTimeMs > dateToMs) continue;
 
-      if (filters.mode) {
-        const ocMode = oc.meta?.mode;
-        if (ocMode && ocMode !== filters.mode) continue;
-      }
-
       const ocTxId =
         typeof oc.meta?.transactionId === 'string'
           ? oc.meta.transactionId.trim()
           : null;
-      if (!ocTxId || !countedHopperTxIds.has(ocTxId)) {
-        hopperShortfalls++;
-        if (ocTxId) countedHopperTxIds.add(ocTxId);
+
+      // Filter leakage guard: resolve linked transaction mode and status
+      const linkedMode =
+        (oc.meta?.mode as TransactionLogMode | undefined) ??
+        (ocTxId ? txModeMap.get(ocTxId) : undefined);
+      if (filters.mode && linkedMode && linkedMode !== filters.mode) {
+        continue;
+      }
+
+      const linkedStatus = ocTxId ? txStatusMap.get(ocTxId) : undefined;
+      if (filters.status && linkedStatus && linkedStatus !== filters.status) {
+        continue;
+      }
+
+      if (!countedHopperLogIds.has(oc.id)) {
+        if (!ocTxId || !countedHopperTxIds.has(ocTxId)) {
+          hopperShortfalls++;
+          if (ocTxId) countedHopperTxIds.add(ocTxId);
+        }
+        countedHopperLogIds.add(oc.id);
       }
 
       if (oc.status === 'open') {
