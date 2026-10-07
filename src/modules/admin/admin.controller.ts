@@ -3028,24 +3028,24 @@ export class AdminController {
     if (typeof rawAmount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ error: 'Refund amount must be a positive number.' });
     }
+    const normalizedAmount = Number(amount.toFixed(2));
+    if (normalizedAmount <= 0) {
+      return res.status(400).json({ error: 'Refund amount must be a positive number.' });
+    }
 
-    const chargedAmount = context.chargedAmount ?? 0;
-    const previousRefunds = (db.data!.financialLedger ?? [])
-      .filter(
-        (entry) =>
-          entry.referenceId === targetTransactionId &&
-          entry.eventType === 'refund_issued',
-      )
-      .reduce((sum, entry) => sum + (entry.amount || 0), 0);
-
-    const maxRefundable = Math.max(0, chargedAmount - previousRefunds);
-    if (amount > maxRefundable) {
-      return res.status(400).json({
-        error: `Refund amount (${amount}) exceeds maximum refundable amount (${maxRefundable}).`,
-        chargedAmount,
-        previousRefunds,
-        maxRefundable,
-      });
+    const rawUnprintedPages = req.body?.unprintedPages;
+    let unprintedPages: number | undefined;
+    if (rawUnprintedPages !== undefined && rawUnprintedPages !== null) {
+      if (
+        typeof rawUnprintedPages !== 'number' ||
+        !Number.isInteger(rawUnprintedPages) ||
+        rawUnprintedPages < 0
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'unprintedPages must be a non-negative integer.' });
+      }
+      unprintedPages = rawUnprintedPages;
     }
 
     try {
@@ -3065,48 +3065,145 @@ export class AdminController {
       typeof req.body?.reason === 'string' && req.body.reason.trim()
         ? req.body.reason.trim()
         : 'Admin physical cash refund';
-    const unprintedPages =
-      typeof req.body?.unprintedPages === 'number' &&
-      Number.isFinite(req.body.unprintedPages)
-        ? req.body.unprintedPages
-        : undefined;
 
-    await withBalanceLock(async () => {
-      // 1. Machine screen balance (db.data!.balance) is NEVER modified.
-      // 2. Kiosk earnings (db.data!.earnings) are deducted in real-time.
-      db.data!.earnings = Math.max(0, db.data!.earnings - amount);
+    let refundResult:
+      | { ok: true }
+      | {
+          ok: false;
+          status: number;
+          error: string;
+          chargedAmount?: number;
+          previousRefunds?: number;
+          maxRefundable?: number;
+        };
 
-      // 3. Ledger entry
-      await financialLedgerService.append({
-        eventType: 'refund_issued',
-        amount,
-        referenceId: targetTransactionId,
-        meta: {
-          source: 'admin_cash_refund',
-          payoutType: 'cash',
-          reason,
-          unprintedPages: unprintedPages ?? null,
-        },
+    try {
+      refundResult = await withBalanceLock(async () => {
+        // 1. Gather all linked pending refund IDs for this transaction
+        const linkedPendingRefundIds = new Set(
+          (db.data!.pendingRefunds ?? [])
+            .filter((pr) => pr.jobContext?.transactionId === targetTransactionId)
+            .map((pr) => pr.id),
+        );
+
+        // 2. Sum ledger entries matching transactionId directly or linked pending refund IDs
+        const refundLedgerEntries = (db.data!.financialLedger ?? []).filter(
+          (entry) =>
+            entry.eventType === 'refund_issued' &&
+            (entry.referenceId === targetTransactionId ||
+              (typeof entry.referenceId === 'string' &&
+                linkedPendingRefundIds.has(entry.referenceId))),
+        );
+        const ledgerRefundSum = refundLedgerEntries.reduce(
+          (sum, e) => sum + (e.amount || 0),
+          0,
+        );
+
+        // 3. Any refunded pendingRefund entries not represented in ledger
+        const referencedEntryIds = new Set(
+          refundLedgerEntries.map((e) => e.referenceId).filter(Boolean),
+        );
+        const linkedRefundedEntries = (db.data!.pendingRefunds ?? []).filter(
+          (pr) =>
+            pr.jobContext?.transactionId === targetTransactionId &&
+            pr.status === 'refunded',
+        );
+        let extraPendingRefundSum = 0;
+        for (const pr of linkedRefundedEntries) {
+          if (
+            !referencedEntryIds.has(pr.id) &&
+            !referencedEntryIds.has(targetTransactionId)
+          ) {
+            extraPendingRefundSum += pr.chargedAmount || 0;
+          }
+        }
+        const previousRefunds = Number(
+          (ledgerRefundSum + extraPendingRefundSum).toFixed(2),
+        );
+
+        // 4. Calculate chargedAmount and max refundable inside the lock
+        const freshContext = this.buildTransactionContextResponse(targetTransactionId);
+        const chargedAmount = freshContext?.chargedAmount ?? context?.chargedAmount ?? 0;
+        const maxRefundable = Number(
+          Math.max(0, chargedAmount - previousRefunds).toFixed(2),
+        );
+
+        if (normalizedAmount > maxRefundable) {
+          return {
+            ok: false,
+            status: 400,
+            error: `Refund amount (${normalizedAmount}) exceeds maximum refundable amount (${maxRefundable}).`,
+            chargedAmount,
+            previousRefunds,
+            maxRefundable,
+          };
+        }
+
+        // 5. In-memory earnings mutation with rollback protection
+        const prevEarnings = db.data!.earnings;
+        try {
+          db.data!.earnings = Math.max(0, prevEarnings - normalizedAmount);
+
+          await financialLedgerService.append({
+            eventType: 'refund_issued',
+            amount: normalizedAmount,
+            referenceId: targetTransactionId,
+            meta: {
+              source: 'admin_cash_refund',
+              payoutType: 'cash',
+              reason,
+              unprintedPages: unprintedPages ?? null,
+            },
+          });
+
+          await syncCashRefundPendingEntry({
+            transactionId: targetTransactionId,
+            amount: normalizedAmount,
+            reason,
+            unprintedPages: unprintedPages ?? null,
+          });
+
+          await db.write();
+        } catch (mutationErr) {
+          db.data!.earnings = prevEarnings;
+          throw mutationErr;
+        }
+
+        return { ok: true };
       });
+    } catch (err) {
+      console.error('[ADMIN] Failed to process cash refund', err);
+      return res.status(500).json({ error: 'Failed to process cash refund.' });
+    }
 
-      // 4. Pending refund sync
-      await syncCashRefundPendingEntry({
+    if (!refundResult.ok) {
+      return res.status(refundResult.status).json({
+        error: refundResult.error,
+        chargedAmount: refundResult.chargedAmount,
+        previousRefunds: refundResult.previousRefunds,
+        maxRefundable: refundResult.maxRefundable,
+      });
+    }
+
+    try {
+      this.receiptService.updateTerminalStatus({
         transactionId: targetTransactionId,
-        amount,
-        reason,
-        unprintedPages: unprintedPages ?? null,
+        status: 'refunded',
       });
-
-      await db.write();
-    });
+    } catch (receiptErr) {
+      console.error(
+        '[ADMIN] Failed to update receipt terminal status on refund',
+        receiptErr,
+      );
+    }
 
     try {
       await this.adminService.appendAdminLog(
         'admin_cash_refund_issued',
-        `Admin issued physical cash refund ₱${amount} for transaction ${targetTransactionId}.`,
+        `Admin issued physical cash refund ₱${normalizedAmount} for transaction ${targetTransactionId}.`,
         {
           transactionId: targetTransactionId,
-          amount,
+          amount: normalizedAmount,
           reason,
           unprintedPages: unprintedPages ?? null,
           payoutType: 'cash',
@@ -3252,6 +3349,7 @@ export class AdminController {
       lifecycleRecord,
       pendingRefunds,
       logs,
+      ledgerEntries,
     );
     const settledAt =
       receiptPayload?.settledAt ??
@@ -3489,14 +3587,18 @@ export class AdminController {
     lifecycleRecord: ReturnType<typeof getSpoolerLifecycleRecord> | null,
     pendingRefunds: PendingRefundEntry[],
     logs: AdminLogEntry[],
+    ledgerEntries: Array<{ eventType: string }> = [],
   ): string | null {
-    if (receiptPayload?.status) return receiptPayload.status;
+    if (
+      pendingRefunds.some((entry) => entry.status === 'refunded') ||
+      ledgerEntries.some((entry) => entry.eventType === 'refund_issued')
+    ) {
+      return 'refunded';
+    }
     if (pendingRefunds.some((entry) => entry.status === 'open')) {
       return 'refunded_pending_review';
     }
-    if (pendingRefunds.some((entry) => entry.status === 'refunded')) {
-      return 'refunded';
-    }
+    if (receiptPayload?.status) return receiptPayload.status;
     const phase = recoverySession?.phase ?? lifecycleRecord?.currentState;
     if (phase === 'spooler_confirmed' || phase === 'printed') return 'printed';
     if (phase === 'spooler_failed' || phase === 'failed') return 'failed';

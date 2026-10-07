@@ -266,6 +266,7 @@ export async function processPendingRefund(input: {
   const payoutType = input.restoreBalance ? 'balance' : 'cash';
   entry.payoutType = payoutType;
   entry.jobContext.payoutType = payoutType;
+  entry.jobContext.refundedAmount = entry.chargedAmount;
 
   if (input.restoreBalance) {
     await withBalanceLock(async () => {
@@ -325,6 +326,7 @@ export async function syncCashRefundPendingEntry(input: {
     existingOpen.closedAt = now;
     existingOpen.payoutType = 'cash';
     existingOpen.jobContext.payoutType = 'cash';
+    existingOpen.jobContext.refundedAmount = input.amount;
     if (input.unprintedPages !== undefined) {
       existingOpen.jobContext.unprintedPages = input.unprintedPages;
     }
@@ -342,6 +344,7 @@ export async function syncCashRefundPendingEntry(input: {
     jobContext: {
       transactionId: input.transactionId,
       payoutType: 'cash',
+      refundedAmount: input.amount,
       unprintedPages: input.unprintedPages ?? null,
     },
   };
