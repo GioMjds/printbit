@@ -90,7 +90,8 @@ Cross-cutting types with no dependencies.
       "Standard": "EPSON L5290 Series",
       "High": "PrintBit - High"
     },
-    "PrintQueueDirectory": "C:\\Users\\printbit\\printbit-worker\\queue"
+    "PrintQueueDirectory": "C:\\Users\\printbit\\printbit\\worker\\queue",
+    "PdfPrintEngine": "native"
   },
   "IpcSettings": {
     "PipeName": "printbit-node-errors",
@@ -110,7 +111,8 @@ Cross-cutting types with no dependencies.
 | `PrinterName`                                    | `EPSON L5290 Series`                          | Physical printer identity used for health monitoring                                         |
 | `PrinterProfiles.Standard`                       | `EPSON L5290 Series`                          | Logical queue for Standard jobs; falls back to `PrinterName` when omitted                    |
 | `PrinterProfiles.High`                           | `PrintBit - High`                             | Logical queue with system-wide Epson Printing Defaults saved as High; required for High jobs |
-| `PrintQueueDirectory`                            | `C:\\Users\\printbit\\printbit-worker\\queue` | Directory watched for PDFs                                                                   |
+| `PrintQueueDirectory`                            | `C:\\Users\\printbit\\printbit\\worker\\queue` | Directory watched for PDFs                                                                   |
+| `PdfPrintEngine`                                 | `native`                                      | PDF print engine: `native` (Windows.Data.Pdf + PrintDocument) or `sumatra` (SumatraPDF.exe)  |
 | `IpcSettings.PipeName`                           | `printbit-node-errors`                        | Named pipe for Node error messages                                                           |
 | `IpcSettings.MaxMessageBytes`                    | `8192`                                        | Max bytes per error line                                                                     |
 | `IpcSettings.WorkerReturnPipeName`               | `printbit-worker-events`                      | Named pipe for worker return events                                                          |
