@@ -6,6 +6,9 @@ import {
   initAuth,
   updateSidebarBadges,
 } from '../shared';
+import { calculateSuggestedRefund } from './refund-calculator';
+
+export { calculateSuggestedRefund };
 
 // Topbar & Navigation
 const logsBody = document.getElementById('logsBody') as HTMLElement;
@@ -127,9 +130,6 @@ const dResolveOwedChangeBtn = document.getElementById(
   'dResolveOwedChangeBtn',
 ) as HTMLButtonElement | null;
 
-const dLedgerCard = document.getElementById(
-  'dLedgerCard',
-) as HTMLElement | null;
 const dLedgerCountBadge = document.getElementById('dLedgerCountBadge');
 const dLedgerBody = document.getElementById(
   'dLedgerBody',
@@ -878,19 +878,6 @@ function resetDrawerView(): void {
   }
 }
 
-export function calculateSuggestedRefund(
-  requestedPages: number,
-  printedPages: number,
-  chargedAmount: number,
-): number {
-  if (!Number.isFinite(requestedPages) || requestedPages <= 0) return 0;
-  if (!Number.isFinite(chargedAmount) || chargedAmount <= 0) return 0;
-  const printed = Number.isFinite(printedPages) ? Math.max(0, printedPages) : 0;
-  if (printed >= requestedPages) return 0;
-  const unprinted = requestedPages - printed;
-  return Math.round(((unprinted / requestedPages) * chargedAmount) * 100) / 100;
-}
-
 async function fetchTransactionContext(
   transactionId: string,
 ): Promise<TransactionContextPayload> {
@@ -1156,7 +1143,9 @@ function renderDrawerOwedChange(context: TransactionContextPayload): void {
           if (activeDrawerTransactionId === context.transactionId) {
             const fresh = await fetchTransactionContext(context.transactionId);
             renderDrawer(fresh);
+            reportContext = fresh;
           }
+          void loadData();
         } catch (e: unknown) {
           dResolveOwedChangeBtn.disabled = false;
           showToast(
@@ -1192,12 +1181,12 @@ function renderDrawerLedger(context: TransactionContextPayload): void {
     const row = document.createElement('tr');
     const isRefund = entry.eventType === 'refund_issued';
     const amountClass = isRefund
-      ? 'tx-amount--negative'
-      : 'tx-amount--positive';
+      ? 'tx-ledger-amount--refund'
+      : 'tx-ledger-amount--credit';
     const amountPrefix = isRefund ? '- ' : '+ ';
     row.innerHTML = `
       <td>${escapeHtml(formatDate(entry.timestamp))}</td>
-      <td><span class="tx-status-badge tx-status-badge--${escapeHtml(entry.eventType)}">${escapeHtml(entry.eventType)}</span></td>
+      <td><span class="tx-ledger-badge tx-ledger-badge--${escapeHtml(entry.eventType)}">${escapeHtml(entry.eventType.replace(/_/g, ' '))}</span></td>
       <td class="${amountClass}">${amountPrefix}${escapeHtml(formatPeso(entry.amount))}</td>
       <td>${escapeHtml(entry.source ?? 'financial_ledger')}</td>
     `;
