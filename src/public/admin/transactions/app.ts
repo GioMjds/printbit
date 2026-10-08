@@ -1828,17 +1828,15 @@ function openRefundModal(options?: {
 
   setRefundRadioType(initialMode);
 
-  let initialAmount = 0;
-  if (initialMode === 'pro_rated') {
-    initialAmount = Math.min(suggestedProRated, maxRefundable);
-  } else if (initialMode === 'full') {
-    initialAmount = maxRefundable;
-  } else {
-    initialAmount = Math.min(
-      suggestedProRated > 0 ? suggestedProRated : maxRefundable,
-      maxRefundable,
-    );
-  }
+  const initialAmount =
+    initialMode === 'pro_rated'
+      ? Math.min(suggestedProRated, maxRefundable)
+      : initialMode === 'full'
+        ? maxRefundable
+        : Math.min(
+            suggestedProRated > 0 ? suggestedProRated : maxRefundable,
+            maxRefundable,
+          );
 
   if (txRefundAmountInput) {
     txRefundAmountInput.value =

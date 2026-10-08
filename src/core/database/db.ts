@@ -1,10 +1,7 @@
-import fs from 'node:fs';
 import { finiteOr } from '@/utils';
 import { ANALYSIS_ALGORITHM_VERSION } from '@/services/document-analysis';
 import {
-  clearLowDbImportMarker,
   clearStalePricingAnalysisCache,
-  importLowDbSnapshotIfNeeded,
   initSqliteStorage,
   migrateSchemaSnapshotToRuntimeState,
   readRuntimeState,
@@ -1787,104 +1784,6 @@ function cloneDefaultData(): Schema {
   return structuredClone(DEFAULT_DATA);
 }
 
-async function readLegacyDbJson(): Promise<Partial<Schema> | undefined> {
-  const legacyPath = 'db.json';
-  if (!fs.existsSync(legacyPath)) return undefined;
-  const raw = await fs.promises.readFile(legacyPath, 'utf-8');
-  if (!raw.trim()) return undefined;
-  return JSON.parse(raw) as Partial<Schema>;
-}
-
-function buildLowDbImportSnapshot(data: Schema) {
-  return {
-    logs: data.logs.slice(),
-    feedback: data.feedback.slice(),
-    feedbackSessions: data.feedbackSessions.slice(),
-    reportIssues: data.reportIssues.slice(),
-    reportIssueSessions: data.reportIssueSessions.slice(),
-    reportIssueAttachments: data.reportIssueAttachments.slice(),
-    receiptRecords: data.receiptRecords.slice(),
-    receiptAccessTokens: data.receiptAccessTokens.slice(),
-  };
-}
-
-export async function migrateLegacyDbJsonToSqlite(options?: {
-  force?: boolean;
-}): Promise<{
-  imported: boolean;
-  source: 'db.json' | 'runtime_state' | 'none';
-  result: ReturnType<typeof importLowDbSnapshotIfNeeded>;
-}> {
-  initSqliteStorage();
-  migrateSchemaSnapshotToRuntimeState();
-
-  if (options?.force) {
-    clearLowDbImportMarker();
-  }
-
-  const legacyData = await readLegacyDbJson();
-  if (legacyData) {
-    const normalizedLegacy = normalizeSchema(legacyData);
-    const result = importLowDbSnapshotIfNeeded(
-      buildLowDbImportSnapshot(normalizedLegacy),
-      { force: options?.force },
-    );
-    return {
-      imported: !result.skipped,
-      source: 'db.json',
-      result,
-    };
-  }
-
-  const runtimeStateData = readRuntimeState<Schema>();
-  if (runtimeStateData) {
-    const normalizedSnapshot = normalizeSchema(runtimeStateData);
-    const result = importLowDbSnapshotIfNeeded(
-      buildLowDbImportSnapshot(normalizedSnapshot),
-      { force: options?.force },
-    );
-    return {
-      imported: !result.skipped,
-      source: 'runtime_state',
-      result,
-    };
-  }
-
-  return {
-    imported: false,
-    source: 'none',
-    result: {
-      skipped: true,
-      attempted: {
-        receiptRecords: 0,
-        receiptAccessTokens: 0,
-        feedbackSessions: 0,
-        feedback: 0,
-        reportIssueSessions: 0,
-        reportIssues: 0,
-        reportIssueAttachments: 0,
-        logs: 0,
-      },
-      inserted: {
-        receiptRecords: 0,
-        receiptAccessTokens: 0,
-        feedbackSessions: 0,
-        feedback: 0,
-        reportIssueSessions: 0,
-        reportIssues: 0,
-        reportIssueAttachments: 0,
-        logs: 0,
-      },
-      skippedOrphans: {
-        receiptAccessTokens: 0,
-        feedback: 0,
-        reportIssues: 0,
-        reportIssueAttachments: 0,
-      },
-    },
-  };
-}
-
 export const db: {
   data: Schema | null;
   read: () => Promise<void>;
@@ -1900,11 +1799,7 @@ export const db: {
     const runtimeState = readRuntimeState<Schema>();
     if (runtimeState) {
       db.data = normalizeSchema(runtimeState);
-      return;
     }
-
-    const legacyData = await readLegacyDbJson();
-    db.data = normalizeSchema(legacyData);
   },
   async write() {
     if (!db.data) {
@@ -1920,7 +1815,6 @@ export async function initDB() {
   } catch {
     db.data = cloneDefaultData();
     await db.write();
-    await migrateLegacyDbJsonToSqlite();
     return;
   }
 
@@ -1933,7 +1827,6 @@ export async function initDB() {
     db.data = cloneDefaultData();
   }
   await db.write();
-  await migrateLegacyDbJsonToSqlite();
 
   clearStalePricingAnalysisCache(ANALYSIS_ALGORITHM_VERSION);
 }

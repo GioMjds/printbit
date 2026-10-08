@@ -40,7 +40,7 @@ const {
   initSqliteStorage,
 } = require('../src/core/database/sqlite-storage');
 
-// Build the next lowdb state by preserving configuration while clearing runtime/operational data.
+// Build the next runtime state by preserving configuration while clearing runtime/operational data.
 function buildResetState(current) {
   return {
     ...current,
@@ -157,7 +157,7 @@ function clearSqliteOperationalTables(sqliteDb) {
 }
 
 async function main() {
-  // Initialize lowdb state before taking any reset snapshots.
+  // Initialize database state before taking any reset snapshots.
   await initDB();
   if (!db.data) {
     throw new Error('Database state is not initialized.');
@@ -188,13 +188,13 @@ async function main() {
 
   console.log('[reset-db] Current data snapshot:', before);
 
-  // Dry run reports impact only and exits without mutating lowdb or SQLite.
+  // Dry run reports impact only and exits without mutating database state or SQLite.
   if (dryRun) {
     console.log('[reset-db] Dry run complete. No data was changed.');
     return;
   }
 
-  // Apply reset: clear SQLite operational tables, replace lowdb runtime state, then persist.
+  // Apply reset: clear SQLite operational tables, replace runtime state, then persist.
   clearSqliteOperationalTables(sqliteDb);
   db.data = buildResetState(db.data);
   await db.write();
