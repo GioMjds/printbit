@@ -139,6 +139,17 @@ describe('calculatePriorRefunds', () => {
     ];
     expect(calculatePriorRefunds(ledger, pendingRefunds, txId)).toBe(15);
   });
+
+  it('avoids double-counting when ledger entries lack referenceId but transactionId is supplied', () => {
+    const txId = 'tx-legacy-456';
+    const ledger = [
+      { eventType: 'refund_issued', amount: 15 },
+    ];
+    const pendingRefunds = [
+      { id: 'pr-legacy-1', status: 'refunded', chargedAmount: 15 },
+    ];
+    expect(calculatePriorRefunds(ledger, pendingRefunds, txId)).toBe(15);
+  });
 });
 
 describe('calculateMaxRefundable', () => {

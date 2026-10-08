@@ -315,6 +315,7 @@ type TransactionContextPayload = {
     id: string;
     eventType: string;
     amount: number;
+    referenceId?: string | null;
     timestamp: string;
     source?: string | null;
   }[];
@@ -1649,7 +1650,7 @@ function validateRefundAmount(): boolean {
     return false;
   }
 
-  if (amount > max) {
+  if (Math.round(amount * 100) > Math.round(max * 100)) {
     if (txRefundMaxHint) {
       txRefundMaxHint.textContent = `Exceeds max refundable (${formatPeso(max)})`;
       txRefundMaxHint.classList.add('tx-refund-max-hint--error');
@@ -1831,7 +1832,7 @@ async function submitPhysicalCashRefund(): Promise<void> {
     return;
   }
 
-  if (amount > maxRefundable) {
+  if (Math.round(amount * 100) > Math.round(maxRefundable * 100)) {
     showToast(
       `Refund amount cannot exceed maximum refundable amount (${formatPeso(maxRefundable)}).`,
     );
@@ -1875,12 +1876,12 @@ async function submitPhysicalCashRefund(): Promise<void> {
       return;
     }
 
+    const fresh = (await res.json()) as TransactionContextPayload;
     showToast(`Physical cash refund of ${formatPeso(amount)} recorded.`);
     closeRefundModal();
 
-    transactionContextCache.delete(transactionId);
+    transactionContextCache.set(transactionId, fresh);
     if (activeDrawerTransactionId === transactionId) {
-      const fresh = await fetchTransactionContext(transactionId);
       renderDrawer(fresh);
       reportContext = fresh;
     }
@@ -2132,6 +2133,15 @@ txRefundTypeCustom?.addEventListener('change', () => {
 });
 
 txRefundAmountInput?.addEventListener('input', handleRefundAmountInput);
+
+const handleRefundInputKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    void submitPhysicalCashRefund();
+  }
+};
+txRefundAmountInput?.addEventListener('keydown', handleRefundInputKeydown);
+txRefundReasonInput?.addEventListener('keydown', handleRefundInputKeydown);
 
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {

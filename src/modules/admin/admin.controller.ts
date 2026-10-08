@@ -3302,6 +3302,7 @@ export class AdminController {
       id: string;
       eventType: string;
       amount: number;
+      referenceId?: string | null;
       timestamp: string;
     }[];
     relatedLogs: {
@@ -3586,6 +3587,7 @@ export class AdminController {
         id: entry.id,
         eventType: entry.eventType,
         amount: entry.amount,
+        referenceId: entry.referenceId ?? null,
         timestamp: entry.timestamp,
       })),
       relatedLogs: logs.slice(0, 50).map((entry) => ({

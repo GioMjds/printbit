@@ -57,11 +57,8 @@ export function calculatePriorRefunds(
   const referencedIds = new Set(
     refundLedgerEntries.map((e) => e.referenceId).filter(Boolean),
   );
-  if (transactionId) {
-    const hasTxRef = refundLedgerEntries.some((e) => e.referenceId === transactionId);
-    if (hasTxRef) {
-      referencedIds.add(transactionId);
-    }
+  if (transactionId && refundLedgerEntries.length > 0) {
+    referencedIds.add(transactionId);
   }
 
   let extraPendingSum = 0;
