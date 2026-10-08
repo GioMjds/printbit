@@ -347,6 +347,12 @@
               </svg>
               <span>Refresh</span>
             </button>
+            <button id="pageOutputReportBtn" class="topbar-btn" type="button" title="View aggregate page output and financial report">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
+                <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clip-rule="evenodd" />
+              </svg>
+              <span>Page Output Report</span>
+            </button>
             <button id="exportLogsBtn" class="topbar-btn topbar-btn--accent" type="button">
               <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path
@@ -1006,6 +1012,113 @@
                   <button id="txRefundSubmitBtn" class="topbar-btn topbar-btn--accent tx-refund-submit-btn" type="button">
                     Confirm Physical Cash Payout
                   </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Aggregate Page Output Report Modal -->
+            <div id="pageOutputReportModal" class="tx-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="pageReportHeading">
+              <div class="tx-modal tx-modal--output-report">
+                <div class="tx-modal__head">
+                  <div class="page-report-header-text">
+                    <h4 id="pageReportHeading" class="tx-modal__title">Page Output &amp; Financial Reconciliation</h4>
+                    <p id="pageReportScopeText" class="page-report-scope-text">—</p>
+                  </div>
+                  <button id="pageOutputCloseBtn" class="tx-drawer__close" type="button" aria-label="Close report modal">✕</button>
+                </div>
+                <div class="tx-modal__body page-report-modal__body">
+                  <!-- Financial Reconciliation Section -->
+                  <section class="page-report-section">
+                    <h5 class="page-report-section__title">Financial Reconciliation</h5>
+                    <div class="page-report-grid page-report-grid--2col">
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Gross Billed / Charged</span>
+                        <span id="pageReportGrossCharged" class="page-report-card__value">₱0.00</span>
+                      </div>
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Cash Refunds Issued</span>
+                        <div class="page-report-card__row">
+                          <span id="pageReportCashRefunds" class="page-report-card__value page-report-card__value--negative">₱0.00</span>
+                          <span id="pageReportRefundCount" class="page-report-card__sub-badge">0 refunds</span>
+                        </div>
+                      </div>
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Net Cash Retained</span>
+                        <span id="pageReportNetCash" class="page-report-card__value page-report-card__value--accent">₱0.00</span>
+                      </div>
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Unresolved Owed Change</span>
+                        <div class="page-report-card__row">
+                          <span id="pageReportOwedChange" class="page-report-card__value page-report-card__value--alert">₱0.00</span>
+                          <span id="pageReportOwedCount" class="page-report-card__sub-badge page-report-card__sub-badge--alert">0 incidents</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Page Output & Hardware Fulfilment Section -->
+                  <section class="page-report-section">
+                    <h5 class="page-report-section__title">Page Output &amp; Hardware Fulfilment</h5>
+                    <div class="page-report-grid page-report-grid--3col">
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Requested Pages</span>
+                        <span id="pageReportPagesRequested" class="page-report-card__value">0</span>
+                      </div>
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Printed Pages</span>
+                        <div class="page-report-card__row">
+                          <span id="pageReportPagesPrinted" class="page-report-card__value">0</span>
+                          <span id="pageReportFulfillmentRate" class="page-report-rate-badge page-report-rate-badge--good">100%</span>
+                        </div>
+                      </div>
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Failed / Jammed Pages</span>
+                        <span id="pageReportPagesFailed" class="page-report-card__value page-report-card__value--alert">0</span>
+                      </div>
+                    </div>
+                    <div class="page-report-breakdown-row">
+                      <div class="page-report-card page-report-card--sub">
+                        <span class="page-report-card__label">Color Pages</span>
+                        <span id="pageReportColorPages" class="page-report-card__value">0</span>
+                      </div>
+                      <div class="page-report-card page-report-card--sub">
+                        <span class="page-report-card__label">B&amp;W Pages</span>
+                        <span id="pageReportBwPages" class="page-report-card__value">0</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Hardware Incidents Section -->
+                  <section class="page-report-section">
+                    <h5 class="page-report-section__title">Hardware Incidents</h5>
+                    <div class="page-report-grid page-report-grid--2col">
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Spooler Print Failures</span>
+                        <span id="pageReportSpoolerFailures" class="page-report-card__value">0</span>
+                      </div>
+                      <div class="page-report-card">
+                        <span class="page-report-card__label">Coin Hopper Shortfalls</span>
+                        <span id="pageReportHopperShortfalls" class="page-report-card__value">0</span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+                <div class="tx-modal__foot page-report-modal__foot">
+                  <div class="page-report-modal__foot-left">
+                    <button id="pageOutputPrintBtn" class="topbar-btn" type="button" title="Print physical report slip">
+                      <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
+                      </svg>
+                      <span>Print Slip</span>
+                    </button>
+                    <button id="pageOutputCsvBtn" class="topbar-btn topbar-btn--accent" type="button" title="Export aggregate summary as CSV">
+                      <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                      </svg>
+                      <span>Export Summary CSV</span>
+                    </button>
+                  </div>
+                  <button id="pageOutputDismissBtn" class="topbar-btn" type="button">Close</button>
                 </div>
               </div>
             </div>

@@ -15,7 +15,12 @@ import type {
   ReportIssueSessionEntry,
 } from './models/report-issue.model';
 
-const SQLITE_FILE_PATH = path.resolve('printbit.sqlite');
+const SQLITE_FILE_PATH = path.resolve(
+  process.env.SQLITE_DB_PATH ||
+    (process.env.NODE_ENV === 'test'
+      ? 'printbit.test.sqlite'
+      : 'printbit.sqlite'),
+);
 const LOWDB_IMPORT_META_KEY = 'lowdb_import_v1';
 const SCHEMA_SNAPSHOT_META_KEY = 'schema_snapshot_v1';
 const RUNTIME_STATE_ROW_ID = 1;

@@ -11,11 +11,20 @@ import {
   calculatePriorRefunds,
   calculateMaxRefundable,
 } from './refund-calculator';
+import {
+  formatReportScope,
+  getFulfillmentBadgeClass,
+  generatePageOutputCsv,
+  PageOutputSummaryResponse,
+} from './page-output-report-helpers';
 
 export {
   calculateSuggestedRefund,
   calculatePriorRefunds,
   calculateMaxRefundable,
+  formatReportScope,
+  getFulfillmentBadgeClass,
+  generatePageOutputCsv,
 };
 
 // Topbar & Navigation
@@ -215,6 +224,61 @@ const txRefundTypeFull = document.getElementById(
 const txRefundTypeCustom = document.getElementById(
   'txRefundTypeCustom',
 ) as HTMLInputElement | null;
+
+// Page Output Summary Modal Elements
+const pageOutputReportBtn = document.getElementById(
+  'pageOutputReportBtn',
+) as HTMLButtonElement | null;
+const pageOutputReportModal = document.getElementById(
+  'pageOutputReportModal',
+) as HTMLElement | null;
+const pageReportScopeText = document.getElementById('pageReportScopeText');
+const pageOutputCloseBtn = document.getElementById(
+  'pageOutputCloseBtn',
+) as HTMLButtonElement | null;
+const pageOutputDismissBtn = document.getElementById(
+  'pageOutputDismissBtn',
+) as HTMLButtonElement | null;
+const pageOutputPrintBtn = document.getElementById(
+  'pageOutputPrintBtn',
+) as HTMLButtonElement | null;
+const pageOutputCsvBtn = document.getElementById(
+  'pageOutputCsvBtn',
+) as HTMLButtonElement | null;
+
+// Financial Reconciliation Elements
+const pageReportGrossCharged = document.getElementById(
+  'pageReportGrossCharged',
+);
+const pageReportCashRefunds = document.getElementById('pageReportCashRefunds');
+const pageReportRefundCount = document.getElementById('pageReportRefundCount');
+const pageReportNetCash = document.getElementById('pageReportNetCash');
+const pageReportOwedChange = document.getElementById('pageReportOwedChange');
+const pageReportOwedCount = document.getElementById('pageReportOwedCount');
+
+// Page Output Elements
+const pageReportPagesRequested = document.getElementById(
+  'pageReportPagesRequested',
+);
+const pageReportPagesPrinted = document.getElementById(
+  'pageReportPagesPrinted',
+);
+const pageReportFulfillmentRate = document.getElementById(
+  'pageReportFulfillmentRate',
+);
+const pageReportPagesFailed = document.getElementById('pageReportPagesFailed');
+const pageReportColorPages = document.getElementById('pageReportColorPages');
+const pageReportBwPages = document.getElementById('pageReportBwPages');
+
+// Hardware Incidents Elements
+const pageReportSpoolerFailures = document.getElementById(
+  'pageReportSpoolerFailures',
+);
+const pageReportHopperShortfalls = document.getElementById(
+  'pageReportHopperShortfalls',
+);
+
+let activePageOutputSummary: PageOutputSummaryResponse | null = null;
 
 type RefundModalState = {
   transactionId: string;
@@ -1896,6 +1960,154 @@ async function submitPhysicalCashRefund(): Promise<void> {
   }
 }
 
+async function openPageOutputReportModal(): Promise<void> {
+  if (pageOutputReportBtn) pageOutputReportBtn.disabled = true;
+  showToast('Loading page output summary…');
+
+  try {
+    const params = buildFilterParams(false);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    const res = await apiFetch(
+      `/api/admin/logs/transactions/page-output-summary${queryString}`,
+    );
+
+    if (!res.ok) {
+      const err = await resolveApiErrorMessage(
+        res,
+        'Failed to load page output summary.',
+      );
+      showToast(err);
+      if (pageOutputReportBtn) pageOutputReportBtn.disabled = false;
+      return;
+    }
+
+    const data = (await res.json()) as PageOutputSummaryResponse;
+    activePageOutputSummary = data;
+
+    // Scope
+    setField(pageReportScopeText, formatReportScope(data.scope));
+
+    // Financials
+    setField(pageReportGrossCharged, formatPeso(data.financials.grossCharged));
+    setField(
+      pageReportCashRefunds,
+      formatPeso(data.financials.cashRefundsIssued),
+    );
+    setField(
+      pageReportRefundCount,
+      `${data.financials.refundCount} ${data.financials.refundCount === 1 ? 'refund' : 'refunds'}`,
+    );
+    setField(pageReportNetCash, formatPeso(data.financials.netCashRetained));
+    setField(
+      pageReportOwedChange,
+      formatPeso(data.financials.unresolvedOwedChange),
+    );
+    setField(
+      pageReportOwedCount,
+      `${data.financials.unresolvedOwedChangeCount} ${data.financials.unresolvedOwedChangeCount === 1 ? 'incident' : 'incidents'}`,
+    );
+
+    // Page Production
+    setField(
+      pageReportPagesRequested,
+      data.pages.totalRequested.toLocaleString(),
+    );
+    setField(
+      pageReportPagesPrinted,
+      data.pages.totalPrinted.toLocaleString(),
+    );
+    setField(
+      pageReportPagesFailed,
+      data.pages.totalFailed.toLocaleString(),
+    );
+    setField(
+      pageReportColorPages,
+      data.pages.colorPagesPrinted.toLocaleString(),
+    );
+    setField(
+      pageReportBwPages,
+      data.pages.bwPagesPrinted.toLocaleString(),
+    );
+
+    if (pageReportFulfillmentRate) {
+      pageReportFulfillmentRate.textContent = `${data.pages.fulfillmentRatePercent}%`;
+      pageReportFulfillmentRate.classList.remove(
+        'page-report-rate-badge--good',
+        'page-report-rate-badge--warn',
+        'page-report-rate-badge--alert',
+      );
+      const badgeClass = getFulfillmentBadgeClass(
+        data.pages.fulfillmentRatePercent,
+      );
+      pageReportFulfillmentRate.classList.add(badgeClass);
+    }
+
+    // Incidents
+    setField(
+      pageReportSpoolerFailures,
+      data.hardwareIncidents.spoolerFailures.toLocaleString(),
+    );
+    setField(
+      pageReportHopperShortfalls,
+      data.hardwareIncidents.hopperShortfalls.toLocaleString(),
+    );
+
+    pageOutputReportModal?.classList.remove('is-leaving');
+    pageOutputReportModal?.classList.remove('hidden');
+    showToast('Page output summary loaded.');
+  } catch (error: unknown) {
+    showToast(
+      error instanceof Error
+        ? error.message
+        : 'Network error loading page output summary.',
+    );
+  } finally {
+    if (pageOutputReportBtn) pageOutputReportBtn.disabled = false;
+  }
+}
+
+function closePageOutputReportModal(): void {
+  if (
+    pageOutputReportModal &&
+    !pageOutputReportModal.classList.contains('hidden')
+  ) {
+    pageOutputReportModal.classList.add('is-leaving');
+    window.setTimeout(() => {
+      pageOutputReportModal?.classList.add('hidden');
+      pageOutputReportModal?.classList.remove('is-leaving');
+    }, 200);
+  } else {
+    pageOutputReportModal?.classList.add('hidden');
+  }
+}
+
+function exportPageOutputCsv(): void {
+  if (!activePageOutputSummary) {
+    showToast('No page output summary data available to export.');
+    return;
+  }
+  showToast('Preparing summary CSV export…');
+  try {
+    const csvContent = generatePageOutputCsv(activePageOutputSummary);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `printbit-page-output-summary-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    showToast('Page output summary CSV exported.');
+  } catch (error: unknown) {
+    showToast(
+      error instanceof Error
+        ? error.message
+        : 'Failed to export page output summary CSV.',
+    );
+  }
+}
+
 // ── Event Handlers ──────────────────────────────────────────────────────────
 
 refreshBtn.addEventListener('click', () => {
@@ -2143,9 +2355,28 @@ const handleRefundInputKeydown = (event: KeyboardEvent) => {
 txRefundAmountInput?.addEventListener('keydown', handleRefundInputKeydown);
 txRefundReasonInput?.addEventListener('keydown', handleRefundInputKeydown);
 
+// Page Output Summary Modal Listeners
+pageOutputReportBtn?.addEventListener('click', () => {
+  void openPageOutputReportModal();
+});
+pageOutputCloseBtn?.addEventListener('click', closePageOutputReportModal);
+pageOutputDismissBtn?.addEventListener('click', closePageOutputReportModal);
+pageOutputReportModal?.addEventListener('click', (event) => {
+  if (event.target === pageOutputReportModal) closePageOutputReportModal();
+});
+pageOutputPrintBtn?.addEventListener('click', () => {
+  window.print();
+});
+pageOutputCsvBtn?.addEventListener('click', exportPageOutputCsv);
+
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
-    if (txReportModal && !txReportModal.classList.contains('hidden')) {
+    if (
+      pageOutputReportModal &&
+      !pageOutputReportModal.classList.contains('hidden')
+    ) {
+      closePageOutputReportModal();
+    } else if (txReportModal && !txReportModal.classList.contains('hidden')) {
       closeReportModal();
     } else if (txRefundModal && !txRefundModal.classList.contains('hidden')) {
       closeRefundModal();

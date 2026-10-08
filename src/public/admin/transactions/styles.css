@@ -1586,4 +1586,347 @@
   .tx-grid-span-2 {
     grid-column: span 1;
   }
+
+  .page-report-grid--3col,
+  .page-report-grid--2col,
+  .page-report-breakdown-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-report-modal__foot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .page-report-modal__foot-left {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-report-modal__foot button {
+    width: 100%;
+    justify-content: center;
+  }
 }
+
+/* ── Page Output & Financial Reconciliation Modal ───────────────────────── */
+.tx-modal--output-report {
+  width: 660px;
+  max-width: 95vw;
+  max-height: 90vh;
+  border-color: rgba(105, 111, 199, 0.4);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.75), 0 0 30px var(--indigo-glow);
+}
+
+.page-report-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.page-report-scope-text {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--lavender);
+  letter-spacing: 0.02em;
+}
+
+.page-report-modal__body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 170, 225, 0.2) transparent;
+}
+
+.page-report-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.page-report-section__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lavender);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.page-report-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.page-report-grid--2col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.page-report-grid--3col {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.page-report-breakdown-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.page-report-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.page-report-card--sub {
+  background: rgba(14, 13, 30, 0.6);
+  border-style: dashed;
+}
+
+.page-report-card__label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--lavender);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.page-report-card__value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--white);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.page-report-card__value--negative {
+  color: var(--status-failed-text);
+}
+
+.page-report-card__value--accent {
+  color: #34d399;
+}
+
+.page-report-card__value--alert {
+  color: var(--status-alert-text);
+}
+
+.page-report-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.page-report-card__sub-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--lavender);
+  background: rgba(167, 170, 225, 0.15);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-variant-numeric: tabular-nums;
+}
+
+.page-report-card__sub-badge--alert {
+  color: var(--status-alert-text);
+  background: var(--status-alert-bg);
+  border-color: var(--status-alert-border);
+}
+
+/* Rate Badges */
+.page-report-rate-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.page-report-rate-badge--good {
+  background: var(--status-completed-bg);
+  color: var(--status-completed-text);
+  border: 1px solid var(--status-completed-border);
+}
+
+.page-report-rate-badge--warn {
+  background: var(--status-alert-bg);
+  color: var(--status-alert-text);
+  border: 1px solid var(--status-alert-border);
+}
+
+.page-report-rate-badge--alert {
+  background: var(--status-failed-bg);
+  color: var(--status-failed-text);
+  border: 1px solid var(--status-failed-border);
+}
+
+.page-report-modal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-report-modal__foot-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Media Print: Clean High-Contrast Thermal / A4 Print Slip ─────────────── */
+@media print {
+  body,
+  html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .auth-gate,
+  #adminAuthView,
+  .sidebar,
+  .topbar,
+  .tx-kpi-ribbon,
+  .tx-content-order,
+  .tx-filters-panel,
+  .logs-panel,
+  .tx-drawer-backdrop,
+  #txDrawerBackdrop,
+  #txDetailDrawer,
+  #txReportModal,
+  #txRefundModal,
+  #txToast {
+    display: none !important;
+  }
+
+  /* Isolate modal and remove backdrop masking */
+  #pageOutputReportModal.tx-modal-backdrop {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+  }
+
+  .tx-modal.tx-modal--output-report {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  .tx-modal__head {
+    background: #ffffff !important;
+    border-bottom: 2px solid #000000 !important;
+    padding: 12px 14px !important;
+  }
+
+  .tx-modal__title {
+    color: #000000 !important;
+    font-size: 16pt !important;
+    font-weight: 900 !important;
+  }
+
+  .page-report-scope-text {
+    color: #333333 !important;
+    font-size: 9pt !important;
+  }
+
+  .page-report-modal__body {
+    background: #ffffff !important;
+    padding: 12px 14px !important;
+    overflow: visible !important;
+    max-height: none !important;
+    gap: 12px !important;
+  }
+
+  .page-report-section__title {
+    color: #000000 !important;
+    font-size: 10pt !important;
+    font-weight: 800 !important;
+    border-bottom: 1px solid #666666 !important;
+    padding-bottom: 2px !important;
+  }
+
+  .page-report-card {
+    background: #ffffff !important;
+    border: 1px solid #000000 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 8px 10px !important;
+    color: #000000 !important;
+  }
+
+  .page-report-card--sub {
+    background: #ffffff !important;
+    border: 1px dashed #444444 !important;
+  }
+
+  .page-report-card__label {
+    color: #222222 !important;
+    font-size: 8pt !important;
+    font-weight: 700 !important;
+  }
+
+  .page-report-card__value,
+  .page-report-card__value--negative,
+  .page-report-card__value--accent,
+  .page-report-card__value--alert {
+    color: #000000 !important;
+    font-size: 13pt !important;
+    font-weight: 900 !important;
+  }
+
+  .page-report-card__sub-badge,
+  .page-report-card__sub-badge--alert,
+  .page-report-rate-badge,
+  .page-report-rate-badge--good,
+  .page-report-rate-badge--warn,
+  .page-report-rate-badge--alert {
+    background: transparent !important;
+    color: #000000 !important;
+    border: 1px solid #000000 !important;
+    font-weight: 800 !important;
+  }
+
+  /* Hide interactive buttons during print */
+  #pageOutputCloseBtn,
+  #pageOutputPrintBtn,
+  #pageOutputCsvBtn,
+  #pageOutputDismissBtn,
+  .tx-modal__foot,
+  .page-report-modal__foot {
+    display: none !important;
+  }
+}
+
