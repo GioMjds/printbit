@@ -6,9 +6,17 @@ import {
   initAuth,
   updateSidebarBadges,
 } from '../shared';
-import { calculateSuggestedRefund } from './refund-calculator';
+import {
+  calculateSuggestedRefund,
+  calculatePriorRefunds,
+  calculateMaxRefundable,
+} from './refund-calculator';
 
-export { calculateSuggestedRefund };
+export {
+  calculateSuggestedRefund,
+  calculatePriorRefunds,
+  calculateMaxRefundable,
+};
 
 // Topbar & Navigation
 const logsBody = document.getElementById('logsBody') as HTMLElement;
@@ -157,6 +165,67 @@ const txReportCategoryInput = document.getElementById(
 const txReportDescriptionInput = document.getElementById(
   'txReportDescriptionInput',
 ) as HTMLTextAreaElement | null;
+
+// Pending Refund Banner Elements
+const dPendingRefundBanner = document.getElementById(
+  'dPendingRefundBanner',
+) as HTMLElement | null;
+const dPendingRefundAmount = document.getElementById('dPendingRefundAmount');
+const dPendingRefundReason = document.getElementById('dPendingRefundReason');
+const dConfirmPendingRefundBtn = document.getElementById(
+  'dConfirmPendingRefundBtn',
+) as HTMLButtonElement | null;
+const dDismissPendingRefundBtn = document.getElementById(
+  'dDismissPendingRefundBtn',
+) as HTMLButtonElement | null;
+
+// Cash Refund Action & Modal Elements
+const txIssueRefundBtn = document.getElementById(
+  'txIssueRefundBtn',
+) as HTMLButtonElement | null;
+const txIssueRefundBtnText = document.getElementById('txIssueRefundBtnText');
+
+const txRefundModal = document.getElementById(
+  'txRefundModal',
+) as HTMLElement | null;
+const txRefundCloseBtn = document.getElementById(
+  'txRefundCloseBtn',
+) as HTMLButtonElement | null;
+const txRefundCancelBtn = document.getElementById(
+  'txRefundCancelBtn',
+) as HTMLButtonElement | null;
+const txRefundSubmitBtn = document.getElementById(
+  'txRefundSubmitBtn',
+) as HTMLButtonElement | null;
+const txRefundAmountInput = document.getElementById(
+  'txRefundAmountInput',
+) as HTMLInputElement | null;
+const txRefundReasonInput = document.getElementById(
+  'txRefundReasonInput',
+) as HTMLInputElement | null;
+const txRefundMaxHint = document.getElementById('txRefundMaxHint');
+const txRefundProRatedDesc = document.getElementById('txRefundProRatedDesc');
+const txRefundFullDesc = document.getElementById('txRefundFullDesc');
+const txRefundTypeProRated = document.getElementById(
+  'txRefundTypeProRated',
+) as HTMLInputElement | null;
+const txRefundTypeFull = document.getElementById(
+  'txRefundTypeFull',
+) as HTMLInputElement | null;
+const txRefundTypeCustom = document.getElementById(
+  'txRefundTypeCustom',
+) as HTMLInputElement | null;
+
+type RefundModalState = {
+  transactionId: string;
+  chargedAmount: number;
+  maxRefundable: number;
+  suggestedProRated: number;
+  unprintedPages?: number;
+  selectedType: 'pro_rated' | 'full' | 'custom';
+};
+
+let activeRefundState: RefundModalState | null = null;
 
 const PAGE_SIZE = 20;
 let refreshTimer: number | null = null;
@@ -867,6 +936,24 @@ function resetDrawerView(): void {
 
   if (dPageAuditCard) dPageAuditCard.classList.add('hidden');
   if (dOwedChangeCard) dOwedChangeCard.classList.add('hidden');
+  if (dPendingRefundBanner) dPendingRefundBanner.classList.add('hidden');
+  if (dConfirmPendingRefundBtn) {
+    dConfirmPendingRefundBtn.disabled = false;
+    dConfirmPendingRefundBtn.onclick = null;
+  }
+  if (dDismissPendingRefundBtn) {
+    dDismissPendingRefundBtn.disabled = false;
+    dDismissPendingRefundBtn.onclick = null;
+  }
+  if (txIssueRefundBtn) {
+    txIssueRefundBtn.disabled = true;
+    if (txIssueRefundBtnText) {
+      txIssueRefundBtnText.textContent = 'Issue Cash Refund';
+    } else {
+      txIssueRefundBtn.textContent = 'Issue Cash Refund';
+    }
+    txIssueRefundBtn.title = '';
+  }
   if (dLedgerBody) dLedgerBody.innerHTML = '';
   if (dLedgerCountBadge) dLedgerCountBadge.textContent = '0';
   if (dResolveOwedChangeBtn) {
@@ -1031,10 +1118,173 @@ function renderDrawer(context: TransactionContextPayload): void {
     }
   }
 
+  renderDrawerPendingRefund(context);
+  renderDrawerRefundAction(context);
   renderDrawerPageAudit(context, pagesPrinted, totalPages);
   renderDrawerOwedChange(context);
   renderDrawerLedger(context);
   renderDrawerRelatedLogs(context);
+}
+
+function renderDrawerPendingRefund(context: TransactionContextPayload): void {
+  if (!dPendingRefundBanner) return;
+
+  const openRefund = (context.pendingRefunds ?? []).find(
+    (entry) => entry.status === 'open',
+  );
+
+  if (openRefund) {
+    setField(dPendingRefundAmount, formatPeso(openRefund.chargedAmount));
+    setField(
+      dPendingRefundReason,
+      openRefund.reason || 'Customer refund requested',
+    );
+    dPendingRefundBanner.classList.remove('hidden');
+
+    if (dConfirmPendingRefundBtn) {
+      dConfirmPendingRefundBtn.disabled = false;
+      dConfirmPendingRefundBtn.onclick = async () => {
+        dConfirmPendingRefundBtn.disabled = true;
+        if (dDismissPendingRefundBtn) dDismissPendingRefundBtn.disabled = true;
+        showToast('Confirming physical cash handed to customer…');
+
+        try {
+          const res = await apiFetch(
+            `/api/admin/pending-refunds/${encodeURIComponent(openRefund.id)}/refund`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ restoreBalance: false }),
+            },
+          );
+
+          if (!res.ok) {
+            const err = await resolveApiErrorMessage(
+              res,
+              'Failed to process pending refund.',
+            );
+            showToast(err);
+            dConfirmPendingRefundBtn.disabled = false;
+            if (dDismissPendingRefundBtn) {
+              dDismissPendingRefundBtn.disabled = false;
+            }
+            return;
+          }
+
+          showToast(
+            `Physical cash refund of ${formatPeso(openRefund.chargedAmount)} confirmed.`,
+          );
+          transactionContextCache.delete(context.transactionId);
+          if (activeDrawerTransactionId === context.transactionId) {
+            const fresh = await fetchTransactionContext(context.transactionId);
+            renderDrawer(fresh);
+            reportContext = fresh;
+          }
+          void loadData();
+        } catch (e: unknown) {
+          dConfirmPendingRefundBtn.disabled = false;
+          if (dDismissPendingRefundBtn) {
+            dDismissPendingRefundBtn.disabled = false;
+          }
+          showToast(
+            e instanceof Error
+              ? e.message
+              : 'Network error processing pending refund.',
+          );
+        }
+      };
+    }
+
+    if (dDismissPendingRefundBtn) {
+      dDismissPendingRefundBtn.disabled = false;
+      dDismissPendingRefundBtn.onclick = async () => {
+        if (dConfirmPendingRefundBtn) dConfirmPendingRefundBtn.disabled = true;
+        dDismissPendingRefundBtn.disabled = true;
+        showToast('Dismissing customer refund request…');
+
+        try {
+          const res = await apiFetch(
+            `/api/admin/pending-refunds/${encodeURIComponent(openRefund.id)}/dismiss`,
+            { method: 'POST' },
+          );
+
+          if (!res.ok) {
+            const err = await resolveApiErrorMessage(
+              res,
+              'Failed to dismiss pending refund.',
+            );
+            showToast(err);
+            if (dConfirmPendingRefundBtn) {
+              dConfirmPendingRefundBtn.disabled = false;
+            }
+            dDismissPendingRefundBtn.disabled = false;
+            return;
+          }
+
+          showToast('Customer refund request dismissed.');
+          transactionContextCache.delete(context.transactionId);
+          if (activeDrawerTransactionId === context.transactionId) {
+            const fresh = await fetchTransactionContext(context.transactionId);
+            renderDrawer(fresh);
+            reportContext = fresh;
+          }
+          void loadData();
+        } catch (e: unknown) {
+          if (dConfirmPendingRefundBtn) {
+            dConfirmPendingRefundBtn.disabled = false;
+          }
+          dDismissPendingRefundBtn.disabled = false;
+          showToast(
+            e instanceof Error
+              ? e.message
+              : 'Network error dismissing pending refund.',
+          );
+        }
+      };
+    }
+  } else {
+    dPendingRefundBanner.classList.add('hidden');
+    if (dConfirmPendingRefundBtn) dConfirmPendingRefundBtn.onclick = null;
+    if (dDismissPendingRefundBtn) dDismissPendingRefundBtn.onclick = null;
+  }
+}
+
+function renderDrawerRefundAction(context: TransactionContextPayload): void {
+  if (!txIssueRefundBtn) return;
+
+  const maxRefundable = calculateMaxRefundable(
+    context.chargedAmount,
+    context.ledgerEntries,
+    context.pendingRefunds,
+    context.transactionId,
+  );
+
+  const charged = context.chargedAmount ?? 0;
+
+  if (charged > 0 && maxRefundable <= 0) {
+    if (txIssueRefundBtnText) {
+      txIssueRefundBtnText.textContent = 'Fully Refunded';
+    } else {
+      txIssueRefundBtn.textContent = 'Fully Refunded';
+    }
+    txIssueRefundBtn.disabled = true;
+    txIssueRefundBtn.title = 'This transaction has been fully refunded';
+  } else if (charged <= 0 || !context.transactionId) {
+    if (txIssueRefundBtnText) {
+      txIssueRefundBtnText.textContent = 'Issue Cash Refund';
+    } else {
+      txIssueRefundBtn.textContent = 'Issue Cash Refund';
+    }
+    txIssueRefundBtn.disabled = true;
+    txIssueRefundBtn.title = 'No refundable amount charged';
+  } else {
+    if (txIssueRefundBtnText) {
+      txIssueRefundBtnText.textContent = 'Issue Cash Refund';
+    } else {
+      txIssueRefundBtn.textContent = 'Issue Cash Refund';
+    }
+    txIssueRefundBtn.disabled = false;
+    txIssueRefundBtn.title = `Issue physical cash refund (Up to ${formatPeso(maxRefundable)})`;
+  }
 }
 
 function renderDrawerPageAudit(
@@ -1067,6 +1317,12 @@ function renderDrawerPageAudit(
       printed,
       context.chargedAmount,
     );
+    const maxRefundable = calculateMaxRefundable(
+      context.chargedAmount,
+      context.ledgerEntries,
+      context.pendingRefunds,
+      context.transactionId,
+    );
 
     setField(dAuditRequestedPages, String(requested));
     setField(dAuditPrintedPages, String(printed));
@@ -1082,18 +1338,26 @@ function renderDrawerPageAudit(
     dPageAuditCard.classList.remove('hidden');
 
     if (dAuditRefundActionBtn) {
-      dAuditRefundActionBtn.onclick = () => {
-        window.dispatchEvent(
-          new CustomEvent('printbit:initiate-refund', {
-            detail: {
-              transactionId: context.transactionId,
-              suggestedAmount: suggestedRefund,
-              unprintedPages: unprinted,
-              reason: `Print shortfall: ${unprinted} of ${requested} pages unprinted`,
-            },
-          }),
-        );
-      };
+      if (maxRefundable <= 0) {
+        dAuditRefundActionBtn.disabled = true;
+        dAuditRefundActionBtn.textContent = 'Fully Refunded';
+        dAuditRefundActionBtn.onclick = null;
+      } else {
+        dAuditRefundActionBtn.disabled = false;
+        dAuditRefundActionBtn.textContent = 'Issue Pro-Rated Refund';
+        dAuditRefundActionBtn.onclick = () => {
+          window.dispatchEvent(
+            new CustomEvent('printbit:initiate-refund', {
+              detail: {
+                transactionId: context.transactionId,
+                suggestedAmount: suggestedRefund,
+                unprintedPages: unprinted,
+                reason: `Print shortfall: ${unprinted} of ${requested} pages unprinted`,
+              },
+            }),
+          );
+        };
+      }
     }
   } else {
     dPageAuditCard.classList.add('hidden');
@@ -1311,6 +1575,326 @@ async function submitQuickReport(): Promise<void> {
   }
 }
 
+function setRefundRadioType(type: 'pro_rated' | 'full' | 'custom'): void {
+  if (txRefundTypeProRated) txRefundTypeProRated.checked = type === 'pro_rated';
+  if (txRefundTypeFull) txRefundTypeFull.checked = type === 'full';
+  if (txRefundTypeCustom) txRefundTypeCustom.checked = type === 'custom';
+  if (activeRefundState) {
+    activeRefundState.selectedType = type;
+  }
+}
+
+function handleRefundRadioChange(type: 'pro_rated' | 'full' | 'custom'): void {
+  if (!activeRefundState) return;
+  activeRefundState.selectedType = type;
+  const max = activeRefundState.maxRefundable;
+
+  if (type === 'pro_rated') {
+    const amount = Math.min(activeRefundState.suggestedProRated, max);
+    if (txRefundAmountInput) txRefundAmountInput.value = amount.toFixed(2);
+    if (txRefundReasonInput) {
+      txRefundReasonInput.value = activeRefundState.unprintedPages
+        ? `Print shortfall: ${activeRefundState.unprintedPages} pages unprinted`
+        : 'Print shortfall cash refund';
+    }
+    validateRefundAmount();
+  } else if (type === 'full') {
+    if (txRefundAmountInput) txRefundAmountInput.value = max.toFixed(2);
+    if (txRefundReasonInput) {
+      txRefundReasonInput.value = 'Full cash refund';
+    }
+    validateRefundAmount();
+  } else if (type === 'custom') {
+    if (txRefundAmountInput) {
+      txRefundAmountInput.focus();
+      txRefundAmountInput.select();
+    }
+    validateRefundAmount();
+  }
+}
+
+function handleRefundAmountInput(): void {
+  if (!activeRefundState) return;
+  const val = parseFloat(txRefundAmountInput?.value ?? '');
+  const max = activeRefundState.maxRefundable;
+  const proRated = Math.min(activeRefundState.suggestedProRated, max);
+
+  if (Number.isFinite(val)) {
+    if (Math.abs(val - max) < 0.001) {
+      setRefundRadioType('full');
+    } else if (
+      activeRefundState.suggestedProRated > 0 &&
+      Math.abs(val - proRated) < 0.001
+    ) {
+      setRefundRadioType('pro_rated');
+    } else {
+      setRefundRadioType('custom');
+    }
+  }
+  validateRefundAmount();
+}
+
+function validateRefundAmount(): boolean {
+  if (!activeRefundState) return false;
+  const max = activeRefundState.maxRefundable;
+  const raw = txRefundAmountInput?.value ?? '';
+  const amount = parseFloat(raw);
+
+  if (!raw || !Number.isFinite(amount) || amount <= 0) {
+    if (txRefundMaxHint) {
+      txRefundMaxHint.textContent = `Max refundable: ${formatPeso(max)}`;
+      txRefundMaxHint.classList.remove('tx-refund-max-hint--error');
+    }
+    if (txRefundSubmitBtn) txRefundSubmitBtn.disabled = true;
+    return false;
+  }
+
+  if (amount > max) {
+    if (txRefundMaxHint) {
+      txRefundMaxHint.textContent = `Exceeds max refundable (${formatPeso(max)})`;
+      txRefundMaxHint.classList.add('tx-refund-max-hint--error');
+    }
+    if (txRefundSubmitBtn) txRefundSubmitBtn.disabled = true;
+    return false;
+  }
+
+  if (txRefundMaxHint) {
+    txRefundMaxHint.textContent = `Max refundable: ${formatPeso(max)}`;
+    txRefundMaxHint.classList.remove('tx-refund-max-hint--error');
+  }
+  if (txRefundSubmitBtn) txRefundSubmitBtn.disabled = false;
+  return true;
+}
+
+function openRefundModal(options?: {
+  suggestedAmount?: number;
+  unprintedPages?: number;
+  reason?: string;
+  mode?: 'pro_rated' | 'full' | 'custom';
+}): void {
+  if (!reportContext) {
+    showToast('No transaction context loaded for refund.');
+    return;
+  }
+  const tx = reportContext;
+  const maxRefundable = calculateMaxRefundable(
+    tx.chargedAmount,
+    tx.ledgerEntries,
+    tx.pendingRefunds,
+    tx.transactionId,
+  );
+
+  if (maxRefundable <= 0) {
+    showToast('This transaction is already fully refunded.');
+    return;
+  }
+
+  // Determine suggested pro-rated amount and unprinted pages if shortfall
+  const { pagesPrinted, totalPages } = resolveSpoolerPagesPrinted(tx);
+  const colorPages = tx.colorPages ?? 0;
+  const bwPages = tx.bwPages ?? 0;
+  const configCopies = tx.printConfiguration?.copies ?? 1;
+  const requestedFromConfig =
+    colorPages + bwPages > 0 ? (colorPages + bwPages) * configCopies : null;
+  const requested = totalPages ?? requestedFromConfig ?? null;
+  const printed = pagesPrinted;
+
+  let suggestedProRated = options?.suggestedAmount ?? 0;
+  let unprintedPages = options?.unprintedPages;
+
+  if (
+    suggestedProRated <= 0 &&
+    requested != null &&
+    requested > 0 &&
+    printed != null &&
+    printed < requested &&
+    tx.chargedAmount != null &&
+    tx.chargedAmount > 0
+  ) {
+    unprintedPages = Math.max(0, requested - printed);
+    suggestedProRated = calculateSuggestedRefund(
+      requested,
+      printed,
+      tx.chargedAmount,
+    );
+  }
+
+  // Determine default mode
+  let initialMode: 'pro_rated' | 'full' | 'custom' = options?.mode ?? 'custom';
+  if (!options?.mode) {
+    if (suggestedProRated > 0 && suggestedProRated <= maxRefundable) {
+      initialMode = 'pro_rated';
+    } else {
+      initialMode = 'full';
+    }
+  }
+
+  activeRefundState = {
+    transactionId: tx.transactionId,
+    chargedAmount: tx.chargedAmount ?? 0,
+    maxRefundable,
+    suggestedProRated,
+    unprintedPages,
+    selectedType: initialMode,
+  };
+
+  // Configure UI hints and labels
+  if (txRefundMaxHint) {
+    txRefundMaxHint.textContent = `Max refundable: ${formatPeso(maxRefundable)}`;
+    txRefundMaxHint.classList.remove('tx-refund-max-hint--error');
+  }
+
+  if (txRefundFullDesc) {
+    txRefundFullDesc.textContent = formatPeso(maxRefundable);
+  }
+
+  if (txRefundProRatedDesc) {
+    if (suggestedProRated > 0) {
+      txRefundProRatedDesc.textContent = `${formatPeso(Math.min(suggestedProRated, maxRefundable))} (${unprintedPages ?? 0} unprinted)`;
+      if (txRefundTypeProRated) txRefundTypeProRated.disabled = false;
+    } else {
+      txRefundProRatedDesc.textContent = 'No page shortfall';
+      if (txRefundTypeProRated) {
+        txRefundTypeProRated.disabled = true;
+        if (initialMode === 'pro_rated') initialMode = 'full';
+      }
+    }
+  }
+
+  setRefundRadioType(initialMode);
+
+  let initialAmount = 0;
+  if (initialMode === 'pro_rated') {
+    initialAmount = Math.min(suggestedProRated, maxRefundable);
+  } else if (initialMode === 'full') {
+    initialAmount = maxRefundable;
+  } else {
+    initialAmount = Math.min(
+      suggestedProRated > 0 ? suggestedProRated : maxRefundable,
+      maxRefundable,
+    );
+  }
+
+  if (txRefundAmountInput) {
+    txRefundAmountInput.value =
+      initialAmount > 0 ? initialAmount.toFixed(2) : '';
+  }
+
+  if (txRefundReasonInput) {
+    if (options?.reason) {
+      txRefundReasonInput.value = options.reason;
+    } else if (initialMode === 'pro_rated') {
+      txRefundReasonInput.value = unprintedPages
+        ? `Print shortfall: ${unprintedPages} of ${requested ?? unprintedPages} pages unprinted`
+        : 'Print shortfall cash refund';
+    } else if (initialMode === 'full') {
+      txRefundReasonInput.value = 'Full cash refund';
+    } else {
+      txRefundReasonInput.value = '';
+    }
+  }
+
+  if (txRefundSubmitBtn) {
+    txRefundSubmitBtn.disabled =
+      initialAmount <= 0 || initialAmount > maxRefundable;
+  }
+
+  txRefundModal?.classList.remove('is-leaving');
+  txRefundModal?.classList.remove('hidden');
+}
+
+function closeRefundModal(): void {
+  activeRefundState = null;
+  if (txRefundModal && !txRefundModal.classList.contains('hidden')) {
+    txRefundModal.classList.add('is-leaving');
+    window.setTimeout(() => {
+      txRefundModal?.classList.add('hidden');
+      txRefundModal?.classList.remove('is-leaving');
+    }, 200);
+  } else {
+    txRefundModal?.classList.add('hidden');
+  }
+}
+
+async function submitPhysicalCashRefund(): Promise<void> {
+  if (!activeRefundState) {
+    showToast('No active refund state.');
+    return;
+  }
+  const { transactionId, maxRefundable, selectedType, unprintedPages } =
+    activeRefundState;
+  const rawAmount = txRefundAmountInput?.value ?? '';
+  const amount = Math.round(parseFloat(rawAmount) * 100) / 100;
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    showToast('Please enter a valid refund amount greater than 0.');
+    return;
+  }
+
+  if (amount > maxRefundable) {
+    showToast(
+      `Refund amount cannot exceed maximum refundable amount (${formatPeso(maxRefundable)}).`,
+    );
+    return;
+  }
+
+  const reason =
+    txRefundReasonInput?.value.trim() || 'Admin physical cash refund';
+
+  const body: { amount: number; reason: string; unprintedPages?: number } = {
+    amount,
+    reason,
+  };
+  if (
+    selectedType === 'pro_rated' &&
+    typeof unprintedPages === 'number' &&
+    unprintedPages >= 0
+  ) {
+    body.unprintedPages = unprintedPages;
+  }
+
+  if (txRefundSubmitBtn) txRefundSubmitBtn.disabled = true;
+  showToast('Processing physical cash refund…');
+
+  try {
+    const res = await apiFetch(
+      `/api/admin/transactions/${encodeURIComponent(transactionId)}/refund`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!res.ok) {
+      const err = await resolveApiErrorMessage(
+        res,
+        'Failed to process cash refund.',
+      );
+      showToast(err);
+      if (txRefundSubmitBtn) txRefundSubmitBtn.disabled = false;
+      return;
+    }
+
+    showToast(`Physical cash refund of ${formatPeso(amount)} recorded.`);
+    closeRefundModal();
+
+    transactionContextCache.delete(transactionId);
+    if (activeDrawerTransactionId === transactionId) {
+      const fresh = await fetchTransactionContext(transactionId);
+      renderDrawer(fresh);
+      reportContext = fresh;
+    }
+    void loadData();
+  } catch (error: unknown) {
+    if (txRefundSubmitBtn) txRefundSubmitBtn.disabled = false;
+    showToast(
+      error instanceof Error
+        ? error.message
+        : 'Network error processing cash refund.',
+    );
+  }
+}
+
 // ── Event Handlers ──────────────────────────────────────────────────────────
 
 refreshBtn.addEventListener('click', () => {
@@ -1484,7 +2068,44 @@ txReportIssueBtn?.addEventListener('click', () => {
   openReportModal();
 });
 
-// Modal Listeners
+txIssueRefundBtn?.addEventListener('click', () => {
+  openRefundModal();
+});
+
+window.addEventListener('printbit:initiate-refund', ((event: CustomEvent) => {
+  const detail = event.detail as
+    | {
+        transactionId?: string;
+        suggestedAmount?: number;
+        unprintedPages?: number;
+        reason?: string;
+      }
+    | undefined;
+
+  if (
+    detail?.transactionId &&
+    reportContext?.transactionId !== detail.transactionId
+  ) {
+    void openTransactionDrawer(detail.transactionId).then(() => {
+      openRefundModal({
+        suggestedAmount: detail?.suggestedAmount,
+        unprintedPages: detail?.unprintedPages,
+        reason: detail?.reason,
+        mode: detail?.suggestedAmount ? 'pro_rated' : 'full',
+      });
+    });
+    return;
+  }
+
+  openRefundModal({
+    suggestedAmount: detail?.suggestedAmount,
+    unprintedPages: detail?.unprintedPages,
+    reason: detail?.reason,
+    mode: detail?.suggestedAmount ? 'pro_rated' : 'full',
+  });
+}) as EventListener);
+
+// Incident Report Modal Listeners
 txReportCloseBtn?.addEventListener('click', closeReportModal);
 txReportCancelBtn?.addEventListener('click', closeReportModal);
 txReportModal?.addEventListener('click', (event) => {
@@ -1492,10 +2113,32 @@ txReportModal?.addEventListener('click', (event) => {
 });
 txReportSubmitBtn?.addEventListener('click', () => void submitQuickReport());
 
+// Physical Cash Refund Modal Listeners
+txRefundCloseBtn?.addEventListener('click', closeRefundModal);
+txRefundCancelBtn?.addEventListener('click', closeRefundModal);
+txRefundModal?.addEventListener('click', (event) => {
+  if (event.target === txRefundModal) closeRefundModal();
+});
+txRefundSubmitBtn?.addEventListener('click', () => void submitPhysicalCashRefund());
+
+txRefundTypeProRated?.addEventListener('change', () => {
+  if (txRefundTypeProRated.checked) handleRefundRadioChange('pro_rated');
+});
+txRefundTypeFull?.addEventListener('change', () => {
+  if (txRefundTypeFull.checked) handleRefundRadioChange('full');
+});
+txRefundTypeCustom?.addEventListener('change', () => {
+  if (txRefundTypeCustom.checked) handleRefundRadioChange('custom');
+});
+
+txRefundAmountInput?.addEventListener('input', handleRefundAmountInput);
+
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     if (txReportModal && !txReportModal.classList.contains('hidden')) {
       closeReportModal();
+    } else if (txRefundModal && !txRefundModal.classList.contains('hidden')) {
+      closeRefundModal();
     } else if (
       txDrawerBackdrop &&
       !txDrawerBackdrop.classList.contains('hidden')

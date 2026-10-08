@@ -1,4 +1,8 @@
-import { calculateSuggestedRefund } from '../../src/public/admin/transactions/refund-calculator';
+import {
+  calculateSuggestedRefund,
+  calculatePriorRefunds,
+  calculateMaxRefundable,
+} from '../../src/public/admin/transactions/refund-calculator';
 
 describe('calculateSuggestedRefund', () => {
   describe('K < N: pro-rated refund rounding', () => {
@@ -90,3 +94,78 @@ describe('calculateSuggestedRefund', () => {
     });
   });
 });
+
+describe('calculatePriorRefunds', () => {
+  it('returns 0 when there are no ledger entries or pending refunds', () => {
+    expect(calculatePriorRefunds([], [])).toBe(0);
+    expect(calculatePriorRefunds(undefined, undefined)).toBe(0);
+  });
+
+  it('sums refund_issued ledger entries', () => {
+    const ledger = [
+      { eventType: 'refund_issued', amount: 5.5 },
+      { eventType: 'job_completed', amount: 20 },
+      { eventType: 'refund_issued', amount: 2.25 },
+    ];
+    expect(calculatePriorRefunds(ledger, [])).toBe(7.75);
+  });
+
+  it('includes refunded pendingRefunds if not referenced in ledger', () => {
+    const pendingRefunds = [
+      { id: 'pr-1', status: 'refunded', chargedAmount: 10 },
+      { id: 'pr-2', status: 'open', chargedAmount: 5 },
+      { id: 'pr-3', status: 'dismissed', chargedAmount: 8 },
+    ];
+    expect(calculatePriorRefunds([], pendingRefunds)).toBe(10);
+  });
+
+  it('avoids double-counting when pending refund id is referenced in ledger', () => {
+    const ledger = [
+      { eventType: 'refund_issued', amount: 10, referenceId: 'pr-1' },
+    ];
+    const pendingRefunds = [
+      { id: 'pr-1', status: 'refunded', chargedAmount: 10 },
+    ];
+    expect(calculatePriorRefunds(ledger, pendingRefunds)).toBe(10);
+  });
+
+  it('avoids double-counting when transactionId is referenced in ledger', () => {
+    const txId = 'tx-test-123';
+    const ledger = [
+      { eventType: 'refund_issued', amount: 15, referenceId: txId },
+    ];
+    const pendingRefunds = [
+      { id: 'pr-1', status: 'refunded', chargedAmount: 15 },
+    ];
+    expect(calculatePriorRefunds(ledger, pendingRefunds, txId)).toBe(15);
+  });
+});
+
+describe('calculateMaxRefundable', () => {
+  it('returns 0 when chargedAmount is null, 0, or negative', () => {
+    expect(calculateMaxRefundable(null)).toBe(0);
+    expect(calculateMaxRefundable(0)).toBe(0);
+    expect(calculateMaxRefundable(-10)).toBe(0);
+    expect(calculateMaxRefundable(Number.NaN)).toBe(0);
+  });
+
+  it('returns full chargedAmount when no prior refunds exist', () => {
+    expect(calculateMaxRefundable(25.5, [], [])).toBe(25.5);
+  });
+
+  it('deducts prior refunds from chargedAmount', () => {
+    const ledger = [
+      { eventType: 'refund_issued', amount: 10.25 },
+    ];
+    expect(calculateMaxRefundable(30, ledger, [])).toBe(19.75);
+  });
+
+  it('clamps to 0 when prior refunds meet or exceed charged amount', () => {
+    const ledger = [
+      { eventType: 'refund_issued', amount: 20 },
+    ];
+    expect(calculateMaxRefundable(20, ledger, [])).toBe(0);
+    expect(calculateMaxRefundable(15, ledger, [])).toBe(0);
+  });
+});
+

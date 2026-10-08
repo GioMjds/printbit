@@ -577,6 +577,37 @@
                   Select a transaction to inspect details.
                 </p>
 
+                <!-- Customer Pending Refund Alert Banner -->
+                <aside id="dPendingRefundBanner" class="tx-pending-refund-banner hidden" aria-label="Open customer refund request">
+                  <div class="tx-pending-refund-banner__head">
+                    <div class="tx-pending-refund-banner__content">
+                      <div class="tx-pending-refund-banner__title-row">
+                        <span id="dPendingRefundTitle" class="tx-pending-refund-banner__title">⚠️ Open Customer Refund Request: <strong id="dPendingRefundAmount">₱0.00</strong></span>
+                      </div>
+                      <p id="dPendingRefundReason" class="tx-pending-refund-banner__reason">—</p>
+                    </div>
+                  </div>
+                  <div class="tx-pending-refund-banner__actions">
+                    <button
+                      id="dConfirmPendingRefundBtn"
+                      type="button"
+                      class="topbar-btn topbar-btn--accent tx-pending-refund-btn tx-pending-refund-btn--confirm"
+                    >
+                      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="15" height="15">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                      </svg>
+                      <span>Confirm Cash Handed to Customer</span>
+                    </button>
+                    <button
+                      id="dDismissPendingRefundBtn"
+                      type="button"
+                      class="topbar-btn tx-pending-refund-btn tx-pending-refund-btn--dismiss"
+                    >
+                      <span>Dismiss Request</span>
+                    </button>
+                  </div>
+                </aside>
+
                 <div class="tx-drawer-cards">
                   <!-- Print Output Discrepancy Card (Shown if K < N and N > 0) -->
                   <section id="dPageAuditCard" class="tx-drawer-card tx-audit-card hidden">
@@ -842,6 +873,12 @@
                   </svg>
                   <span>View E-Receipt PDF</span>
                 </button>
+                <button id="txIssueRefundBtn" type="button" class="topbar-btn tx-issue-refund-btn" disabled>
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="16" height="16">
+                    <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                  </svg>
+                  <span id="txIssueRefundBtnText">Issue Cash Refund</span>
+                </button>
                 <button id="txReportIssueBtn" type="button" class="topbar-btn">
                   <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="16" height="16">
                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
@@ -892,6 +929,83 @@
                 <div class="tx-modal__foot">
                   <button id="txReportCancelBtn" class="topbar-btn" type="button">Cancel</button>
                   <button id="txReportSubmitBtn" class="topbar-btn topbar-btn--accent" type="button">Submit Escalation</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Physical Cash Refund Modal -->
+            <div id="txRefundModal" class="tx-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="txRefundHeading">
+              <div class="tx-modal tx-refund-modal">
+                <div class="tx-modal__head">
+                  <h4 id="txRefundHeading" class="tx-modal__title">Issue Physical Cash Refund</h4>
+                  <button id="txRefundCloseBtn" class="tx-drawer__close" type="button" aria-label="Close modal">✕</button>
+                </div>
+                <div class="tx-modal__body">
+                  <div class="tx-refund-notice">
+                    <span class="tx-refund-notice__icon" aria-hidden="true">💵</span>
+                    <p class="tx-modal__desc">
+                      Physical cash payout only. Deducts kiosk earnings and appends an audit ledger record. Kiosk screen balance is never modified.
+                    </p>
+                  </div>
+
+                  <div class="tx-refund-type-group" role="radiogroup" aria-label="Refund calculation type">
+                    <label class="tx-refund-type-option">
+                      <input type="radio" name="txRefundRadio" value="pro_rated" id="txRefundTypeProRated" />
+                      <div class="tx-refund-type-card">
+                        <span class="tx-refund-type-title">Pro-Rated</span>
+                        <span id="txRefundProRatedDesc" class="tx-refund-type-desc">Shortfall pages</span>
+                      </div>
+                    </label>
+                    <label class="tx-refund-type-option">
+                      <input type="radio" name="txRefundRadio" value="full" id="txRefundTypeFull" />
+                      <div class="tx-refund-type-card">
+                        <span class="tx-refund-type-title">Full</span>
+                        <span id="txRefundFullDesc" class="tx-refund-type-desc">Remaining balance</span>
+                      </div>
+                    </label>
+                    <label class="tx-refund-type-option">
+                      <input type="radio" name="txRefundRadio" value="custom" id="txRefundTypeCustom" />
+                      <div class="tx-refund-type-card">
+                        <span class="tx-refund-type-title">Custom</span>
+                        <span class="tx-refund-type-desc">Manual amount</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div class="tx-modal__fields">
+                    <label class="tx-filter-field">
+                      <div class="tx-refund-field-head">
+                        <span>Refund Amount (₱)</span>
+                        <span id="txRefundMaxHint" class="tx-refund-max-hint">Max refundable: ₱0.00</span>
+                      </div>
+                      <input
+                        id="txRefundAmountInput"
+                        class="tx-input"
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="0.00"
+                        required
+                      />
+                    </label>
+
+                    <label class="tx-filter-field">
+                      <span>Reason / Note</span>
+                      <input
+                        id="txRefundReasonInput"
+                        class="tx-input"
+                        type="text"
+                        placeholder="e.g. Paper jam - partial refund handed to customer"
+                        required
+                      />
+                    </label>
+                  </div>
+                </div>
+                <div class="tx-modal__foot">
+                  <button id="txRefundCancelBtn" class="topbar-btn" type="button">Cancel</button>
+                  <button id="txRefundSubmitBtn" class="topbar-btn topbar-btn--accent tx-refund-submit-btn" type="button">
+                    Confirm Physical Cash Payout
+                  </button>
                 </div>
               </div>
             </div>
