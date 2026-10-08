@@ -1819,7 +1819,11 @@
   }
 
   /* Isolate modal and remove backdrop masking */
-  #pageOutputReportModal.tx-modal-backdrop {
+  #pageOutputReportModal.hidden {
+    display: none !important;
+  }
+
+  #pageOutputReportModal.tx-modal-backdrop:not(.hidden) {
     position: static !important;
     inset: auto !important;
     background: transparent !important;

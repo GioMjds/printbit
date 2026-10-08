@@ -1977,7 +1977,6 @@ async function openPageOutputReportModal(): Promise<void> {
         'Failed to load page output summary.',
       );
       showToast(err);
-      if (pageOutputReportBtn) pageOutputReportBtn.disabled = false;
       return;
     }
 
@@ -2097,7 +2096,7 @@ function exportPageOutputCsv(): void {
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     showToast('Page output summary CSV exported.');
   } catch (error: unknown) {
     showToast(
