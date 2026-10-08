@@ -103,6 +103,38 @@ const dContextHint = document.getElementById('dContextHint');
 const dMissingReasons = document.getElementById('dMissingReasons');
 const dRelatedLogsBody = document.getElementById('dRelatedLogsBody');
 
+// Drawer Enhanced Cards Elements
+const dPageAuditCard = document.getElementById(
+  'dPageAuditCard',
+) as HTMLElement | null;
+const dAuditRequestedPages = document.getElementById('dAuditRequestedPages');
+const dAuditPrintedPages = document.getElementById('dAuditPrintedPages');
+const dAuditUnprintedPages = document.getElementById('dAuditUnprintedPages');
+const dAuditChargedAmount = document.getElementById('dAuditChargedAmount');
+const dAuditSuggestedRefund = document.getElementById('dAuditSuggestedRefund');
+const dAuditRefundActionBtn = document.getElementById(
+  'dAuditRefundActionBtn',
+) as HTMLButtonElement | null;
+
+const dOwedChangeCard = document.getElementById(
+  'dOwedChangeCard',
+) as HTMLElement | null;
+const dOwedChangeCardAmount = document.getElementById('dOwedChangeCardAmount');
+const dOwedChangeCardId = document.getElementById('dOwedChangeCardId');
+const dOwedChangeCardState = document.getElementById('dOwedChangeCardState');
+const dOwedChangeCardReason = document.getElementById('dOwedChangeCardReason');
+const dResolveOwedChangeBtn = document.getElementById(
+  'dResolveOwedChangeBtn',
+) as HTMLButtonElement | null;
+
+const dLedgerCard = document.getElementById(
+  'dLedgerCard',
+) as HTMLElement | null;
+const dLedgerCountBadge = document.getElementById('dLedgerCountBadge');
+const dLedgerBody = document.getElementById(
+  'dLedgerBody',
+) as HTMLElement | null;
+
 // Incident Report Modal Elements
 const txReportModal = document.getElementById(
   'txReportModal',
@@ -215,6 +247,7 @@ type TransactionContextPayload = {
     eventType: string;
     amount: number;
     timestamp: string;
+    source?: string | null;
   }[];
   relatedLogs: {
     id: string;
@@ -831,6 +864,31 @@ function resetDrawerView(): void {
   if (txReceiptPdfBtn) txReceiptPdfBtn.disabled = true;
   if (dMissingReasons) dMissingReasons.innerHTML = '';
   if (dRelatedLogsBody) dRelatedLogsBody.innerHTML = '';
+
+  if (dPageAuditCard) dPageAuditCard.classList.add('hidden');
+  if (dOwedChangeCard) dOwedChangeCard.classList.add('hidden');
+  if (dLedgerBody) dLedgerBody.innerHTML = '';
+  if (dLedgerCountBadge) dLedgerCountBadge.textContent = '0';
+  if (dResolveOwedChangeBtn) {
+    dResolveOwedChangeBtn.disabled = false;
+    dResolveOwedChangeBtn.onclick = null;
+  }
+  if (dAuditRefundActionBtn) {
+    dAuditRefundActionBtn.onclick = null;
+  }
+}
+
+export function calculateSuggestedRefund(
+  requestedPages: number,
+  printedPages: number,
+  chargedAmount: number,
+): number {
+  if (!Number.isFinite(requestedPages) || requestedPages <= 0) return 0;
+  if (!Number.isFinite(chargedAmount) || chargedAmount <= 0) return 0;
+  const printed = Number.isFinite(printedPages) ? Math.max(0, printedPages) : 0;
+  if (printed >= requestedPages) return 0;
+  const unprinted = requestedPages - printed;
+  return Math.round(((unprinted / requestedPages) * chargedAmount) * 100) / 100;
 }
 
 async function fetchTransactionContext(
@@ -862,10 +920,28 @@ function resolveSpoolerPagesPrinted(context: TransactionContextPayload): {
   const transitions = context.spoolerLifecycle?.transitions ?? [];
   const lastPrinted = [...transitions]
     .reverse()
+    .find((t) => t.state === 'printed' && (t.pagesPrinted != null || t.totalPages != null));
+  if (lastPrinted) {
+    return {
+      pagesPrinted: lastPrinted.pagesPrinted ?? null,
+      totalPages: lastPrinted.totalPages ?? null,
+    };
+  }
+  const lastWithCounts = [...transitions]
+    .reverse()
+    .find((t) => t.pagesPrinted != null || t.totalPages != null);
+  if (lastWithCounts) {
+    return {
+      pagesPrinted: lastWithCounts.pagesPrinted ?? null,
+      totalPages: lastWithCounts.totalPages ?? null,
+    };
+  }
+  const anyPrinted = [...transitions]
+    .reverse()
     .find((t) => t.state === 'printed');
   return {
-    pagesPrinted: lastPrinted?.pagesPrinted ?? null,
-    totalPages: lastPrinted?.totalPages ?? null,
+    pagesPrinted: anyPrinted?.pagesPrinted ?? null,
+    totalPages: anyPrinted?.totalPages ?? null,
   };
 }
 
@@ -968,7 +1044,165 @@ function renderDrawer(context: TransactionContextPayload): void {
     }
   }
 
+  renderDrawerPageAudit(context, pagesPrinted, totalPages);
+  renderDrawerOwedChange(context);
+  renderDrawerLedger(context);
   renderDrawerRelatedLogs(context);
+}
+
+function renderDrawerPageAudit(
+  context: TransactionContextPayload,
+  pagesPrinted: number | null,
+  totalPages: number | null,
+): void {
+  if (!dPageAuditCard) return;
+
+  const colorPages = context.colorPages ?? 0;
+  const bwPages = context.bwPages ?? 0;
+  const configCopies = context.printConfiguration?.copies ?? 1;
+  const requestedFromConfig =
+    colorPages + bwPages > 0 ? (colorPages + bwPages) * configCopies : null;
+
+  const requested = totalPages ?? requestedFromConfig ?? null;
+  const printed = pagesPrinted;
+
+  if (
+    requested != null &&
+    requested > 0 &&
+    printed != null &&
+    printed < requested &&
+    context.chargedAmount != null &&
+    context.chargedAmount > 0
+  ) {
+    const unprinted = Math.max(0, requested - printed);
+    const suggestedRefund = calculateSuggestedRefund(
+      requested,
+      printed,
+      context.chargedAmount,
+    );
+
+    setField(dAuditRequestedPages, String(requested));
+    setField(dAuditPrintedPages, String(printed));
+    setField(
+      dAuditUnprintedPages,
+      `${unprinted} page${unprinted === 1 ? '' : 's'}`,
+    );
+    setField(dAuditChargedAmount, formatPeso(context.chargedAmount));
+    setField(dAuditSuggestedRefund, formatPeso(suggestedRefund));
+
+    dPageAuditCard.dataset.suggestedRefund = String(suggestedRefund);
+    dPageAuditCard.dataset.unprintedPages = String(unprinted);
+    dPageAuditCard.classList.remove('hidden');
+
+    if (dAuditRefundActionBtn) {
+      dAuditRefundActionBtn.onclick = () => {
+        window.dispatchEvent(
+          new CustomEvent('printbit:initiate-refund', {
+            detail: {
+              transactionId: context.transactionId,
+              suggestedAmount: suggestedRefund,
+              unprintedPages: unprinted,
+              reason: `Print shortfall: ${unprinted} of ${requested} pages unprinted`,
+            },
+          }),
+        );
+      };
+    }
+  } else {
+    dPageAuditCard.classList.add('hidden');
+    if (dAuditRefundActionBtn) dAuditRefundActionBtn.onclick = null;
+  }
+}
+
+function renderDrawerOwedChange(context: TransactionContextPayload): void {
+  if (!dOwedChangeCard) return;
+
+  const remaining = context.change.remaining ?? 0;
+  const owedChangeId = context.change.owedChangeId;
+
+  if (remaining > 0 && owedChangeId) {
+    setField(dOwedChangeCardAmount, formatPeso(remaining));
+    setField(dOwedChangeCardId, owedChangeId);
+    setField(dOwedChangeCardState, formatChangeState(context.change.state));
+    setField(
+      dOwedChangeCardReason,
+      context.change.message ?? 'Coin hopper shortfall',
+    );
+    dOwedChangeCard.classList.remove('hidden');
+
+    if (dResolveOwedChangeBtn) {
+      dResolveOwedChangeBtn.disabled = false;
+      dResolveOwedChangeBtn.onclick = async () => {
+        dResolveOwedChangeBtn.disabled = true;
+        showToast('Resolving owed change…');
+        try {
+          const res = await apiFetch(
+            `/api/admin/owed-changes/${encodeURIComponent(owedChangeId)}/resolve`,
+            { method: 'POST' },
+          );
+          if (!res.ok) {
+            const err = await resolveApiErrorMessage(
+              res,
+              'Failed to resolve owed change.',
+            );
+            showToast(err);
+            dResolveOwedChangeBtn.disabled = false;
+            return;
+          }
+          showToast(
+            `Owed change of ${formatPeso(remaining)} marked as handed to customer.`,
+          );
+          transactionContextCache.delete(context.transactionId);
+          if (activeDrawerTransactionId === context.transactionId) {
+            const fresh = await fetchTransactionContext(context.transactionId);
+            renderDrawer(fresh);
+          }
+        } catch (e: unknown) {
+          dResolveOwedChangeBtn.disabled = false;
+          showToast(
+            e instanceof Error
+              ? e.message
+              : 'Network error while resolving owed change.',
+          );
+        }
+      };
+    }
+  } else {
+    dOwedChangeCard.classList.add('hidden');
+    if (dResolveOwedChangeBtn) dResolveOwedChangeBtn.onclick = null;
+  }
+}
+
+function renderDrawerLedger(context: TransactionContextPayload): void {
+  if (!dLedgerBody) return;
+  dLedgerBody.innerHTML = '';
+  const entries = context.ledgerEntries ?? [];
+  if (dLedgerCountBadge) {
+    dLedgerCountBadge.textContent = String(entries.length);
+  }
+
+  if (entries.length === 0) {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td colspan="4" style="color:var(--ink-muted);padding:9px;text-align:center">No financial ledger entries recorded for this transaction.</td>`;
+    dLedgerBody.appendChild(row);
+    return;
+  }
+
+  for (const entry of entries) {
+    const row = document.createElement('tr');
+    const isRefund = entry.eventType === 'refund_issued';
+    const amountClass = isRefund
+      ? 'tx-amount--negative'
+      : 'tx-amount--positive';
+    const amountPrefix = isRefund ? '- ' : '+ ';
+    row.innerHTML = `
+      <td>${escapeHtml(formatDate(entry.timestamp))}</td>
+      <td><span class="tx-status-badge tx-status-badge--${escapeHtml(entry.eventType)}">${escapeHtml(entry.eventType)}</span></td>
+      <td class="${amountClass}">${amountPrefix}${escapeHtml(formatPeso(entry.amount))}</td>
+      <td>${escapeHtml(entry.source ?? 'financial_ledger')}</td>
+    `;
+    dLedgerBody.appendChild(row);
+  }
 }
 
 async function openTransactionDrawer(transactionId: string): Promise<void> {

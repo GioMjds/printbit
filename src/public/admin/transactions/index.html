@@ -578,6 +578,99 @@
                 </p>
 
                 <div class="tx-drawer-cards">
+                  <!-- Print Output Discrepancy Card (Shown if K < N and N > 0) -->
+                  <section id="dPageAuditCard" class="tx-drawer-card tx-audit-card hidden">
+                    <div class="tx-audit-card__head">
+                      <div class="tx-audit-card__title-wrap">
+                        <span class="tx-audit-icon" aria-hidden="true">⚠️</span>
+                        <h5 class="tx-drawer-card__title tx-audit-title">Print Output Discrepancy</h5>
+                      </div>
+                      <span class="tx-discrepancy-badge">Page Shortfall</span>
+                    </div>
+                    <p class="tx-audit-description">
+                      The print spooler recorded fewer printed pages than requested. A pro-rated cash refund is suggested.
+                    </p>
+                    <dl class="tx-drawer-card__grid tx-audit-grid">
+                      <div>
+                        <dt>Pages Requested (N)</dt>
+                        <dd id="dAuditRequestedPages">--</dd>
+                      </div>
+                      <div>
+                        <dt>Delivered Pages (K)</dt>
+                        <dd id="dAuditPrintedPages">--</dd>
+                      </div>
+                      <div>
+                        <dt>Unprinted Pages (N - K)</dt>
+                        <dd id="dAuditUnprintedPages" class="tx-audit-unprinted">--</dd>
+                      </div>
+                      <div>
+                        <dt>Charged Amount</dt>
+                        <dd id="dAuditChargedAmount">--</dd>
+                      </div>
+                      <div class="tx-grid-span-2 tx-audit-refund-box">
+                        <dt>Suggested Pro-Rated Refund</dt>
+                        <dd>
+                          <span id="dAuditSuggestedRefund" class="tx-refund-suggested-val">--</span>
+                          <span class="tx-audit-refund-formula">((N - K) / N × Charged)</span>
+                        </dd>
+                      </div>
+                    </dl>
+                    <div class="tx-audit-actions">
+                      <button
+                        id="dAuditRefundActionBtn"
+                        type="button"
+                        class="tx-action-btn tx-audit-action-btn"
+                        title="Initiate refund for unprinted pages"
+                      >
+                        Issue Pro-Rated Refund
+                      </button>
+                    </div>
+                  </section>
+
+                  <!-- Inline Owed-Change Resolution Card (Shown if remaining > 0 and owedChangeId present) -->
+                  <section id="dOwedChangeCard" class="tx-drawer-card tx-owed-card hidden">
+                    <div class="tx-owed-card__head">
+                      <div class="tx-owed-card__title-wrap">
+                        <span class="tx-owed-icon" aria-hidden="true">🪙</span>
+                        <h5 class="tx-drawer-card__title tx-owed-title">Unresolved Owed Change</h5>
+                      </div>
+                      <span class="tx-discrepancy-badge tx-discrepancy-badge--danger">Shortfall</span>
+                    </div>
+                    <p class="tx-owed-card__desc">
+                      Coin hopper shortfall left cash change unpaid to customer. Hand physical cash to the customer, then confirm below.
+                    </p>
+                    <div class="tx-drawer-financial-hero tx-owed-hero">
+                      <span class="tx-drawer-financial-hero__label">Remaining Owed Change</span>
+                      <span id="dOwedChangeCardAmount" class="tx-drawer-financial-hero__val tx-owed-highlight">--</span>
+                    </div>
+                    <dl class="tx-drawer-card__grid">
+                      <div>
+                        <dt>Owed Change ID</dt>
+                        <dd id="dOwedChangeCardId" class="tx-mono-id">--</dd>
+                      </div>
+                      <div>
+                        <dt>Dispense State</dt>
+                        <dd id="dOwedChangeCardState">--</dd>
+                      </div>
+                      <div class="tx-grid-span-2">
+                        <dt>Hopper Message</dt>
+                        <dd id="dOwedChangeCardReason">--</dd>
+                      </div>
+                    </dl>
+                    <div class="tx-owed-actions">
+                      <button
+                        id="dResolveOwedChangeBtn"
+                        type="button"
+                        class="topbar-btn topbar-btn--accent tx-resolve-owed-btn"
+                      >
+                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="16" height="16">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>Confirm Cash Change Handed to Customer</span>
+                      </button>
+                    </div>
+                  </section>
+
                   <!-- Card 1: Financial Settlement & Cash Flow -->
                   <section class="tx-drawer-card">
                     <h5 class="tx-drawer-card__title">Financial Settlement</h5>
@@ -611,6 +704,27 @@
                         <dd id="dSettledAt">--</dd>
                       </div>
                     </dl>
+                  </section>
+
+                  <!-- Financial Ledger History Card -->
+                  <section id="dLedgerCard" class="tx-drawer-card">
+                    <div class="tx-ledger-card__head">
+                      <h5 class="tx-drawer-card__title">Financial Ledger History</h5>
+                      <span id="dLedgerCountBadge" class="tx-ledger-count-badge">0</span>
+                    </div>
+                    <div class="tx-detail-log-scroll tx-ledger-scroll">
+                      <table class="tx-detail-log-table tx-ledger-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Timestamp</th>
+                            <th scope="col">Event Type</th>
+                            <th scope="col">Amount</th>
+                            <th scope="col">Source</th>
+                          </tr>
+                        </thead>
+                        <tbody id="dLedgerBody"></tbody>
+                      </table>
+                    </div>
                   </section>
 
                   <!-- Card 2: Hardware & Print Execution -->
