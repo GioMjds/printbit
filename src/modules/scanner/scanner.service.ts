@@ -431,7 +431,9 @@ export class ScannerService {
       },
     );
 
-    await adminService.incrementJobStats('scan');
+    if (!db.data?.settings?.developerMode?.enabled) {
+      await adminService.incrementJobStats('scan');
+    }
 
     return {
       pages: [`/api/scan/preview/${encodeURIComponent(filename)}`],
@@ -504,6 +506,9 @@ export class ScannerService {
       };
     }
 
+    const isTestEnvironment =
+      db.data?.settings?.developerMode?.enabled === true;
+
     await financialLedgerService.append({
       eventType: 'job_started',
       amount: requiredAmount,
@@ -511,13 +516,18 @@ export class ScannerService {
       meta: {
         mode: 'scan',
         filename,
+        ...(isTestEnvironment ? { environment: 'test' } : {}),
       },
     });
 
     const settlement = await settlementService.settle({
       requiredAmount,
       io,
-      jobContext: { mode: 'scan', filename },
+      jobContext: {
+        mode: 'scan',
+        filename,
+        environment: isTestEnvironment ? 'test' : undefined,
+      },
     });
 
     if (!settlement.ok) {
@@ -528,6 +538,7 @@ export class ScannerService {
           filename,
           requiredAmount,
           balance: settlement.remainingBalance,
+          ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       );
 
@@ -555,6 +566,7 @@ export class ScannerService {
         changeState: settlement.change.state,
         changeRequested: settlement.change.requested,
         changeDispensed: settlement.change.dispensed,
+        ...(isTestEnvironment ? { environment: 'test' } : {}),
       },
     });
 
@@ -567,6 +579,7 @@ export class ScannerService {
         changeState: settlement.change.state,
         changeRequested: settlement.change.requested,
         changeDispensed: settlement.change.dispensed,
+        ...(isTestEnvironment ? { environment: 'test' } : {}),
       })
       .catch(() => {});
 

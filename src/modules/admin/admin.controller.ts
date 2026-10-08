@@ -2928,6 +2928,14 @@ export class AdminController {
       return { error: 'dateFrom must be earlier than or equal to dateTo.' };
     }
 
+    let environment: 'production' | 'test' | 'all' | undefined;
+    if (typeof req.query.environment === 'string') {
+      const envRaw = req.query.environment.trim().toLowerCase();
+      if (envRaw === 'production' || envRaw === 'test' || envRaw === 'all') {
+        environment = envRaw;
+      }
+    }
+
     const filters: TransactionLogFilters = {};
     if (transactionId) filters.transactionId = transactionId;
     if (mode) filters.mode = mode;
@@ -2935,6 +2943,7 @@ export class AdminController {
     if (eventType) filters.eventType = eventType;
     if (dateFrom.value) filters.dateFrom = dateFrom.value;
     if (dateTo.value) filters.dateTo = dateTo.value;
+    if (environment) filters.environment = environment;
 
     return { filters };
   }

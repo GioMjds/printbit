@@ -65,6 +65,9 @@ const modeFilter = document.getElementById('modeFilter') as HTMLSelectElement;
 const statusFilter = document.getElementById(
   'statusFilter',
 ) as HTMLSelectElement;
+const environmentFilter = document.getElementById(
+  'environmentFilter',
+) as HTMLSelectElement | null;
 const eventTypeInput = document.getElementById(
   'eventTypeInput',
 ) as HTMLInputElement;
@@ -397,6 +400,7 @@ type FilterState = {
   mode: '' | 'print' | 'copy' | 'scan';
   status: '' | 'created' | 'processing' | 'completed' | 'failed' | 'refund';
   eventType: string;
+  environment: '' | 'production' | 'test' | 'all';
   dateFrom: string;
   dateTo: string;
   quickFilter: 'all' | 'attention' | 'print' | 'copy' | 'scan';
@@ -417,6 +421,7 @@ const filterState = {
   mode: '',
   status: '',
   eventType: '',
+  environment: '',
   dateFrom: '',
   dateTo: '',
   quickFilter: 'all',
@@ -861,6 +866,7 @@ function buildFilterParams(includeLimit: boolean): URLSearchParams {
   if (filterState.mode) params.set('mode', filterState.mode);
   if (filterState.status) params.set('status', filterState.status);
   if (filterState.eventType) params.set('eventType', filterState.eventType);
+  if (filterState.environment) params.set('environment', filterState.environment);
 
   const isoFrom = toIso(filterState.dateFrom);
   if (isoFrom) params.set('dateFrom', isoFrom);
@@ -876,6 +882,7 @@ function applyFilterStateFromInputs(): void {
   filterState.mode = modeFilter.value as FilterState['mode'];
   filterState.status = statusFilter.value as FilterState['status'];
   filterState.eventType = eventTypeInput.value.trim();
+  filterState.environment = (environmentFilter?.value ?? '') as FilterState['environment'];
   filterState.dateFrom = dateFromInput.value;
   filterState.dateTo = dateToInput.value;
 }
@@ -885,6 +892,7 @@ function resetFilterState(): void {
   filterState.mode = '';
   filterState.status = '';
   filterState.eventType = '';
+  filterState.environment = '';
   filterState.dateFrom = '';
   filterState.dateTo = '';
   filterState.quickFilter = 'all';
@@ -893,6 +901,7 @@ function resetFilterState(): void {
   modeFilter.value = '';
   statusFilter.value = '';
   eventTypeInput.value = '';
+  if (environmentFilter) environmentFilter.value = '';
   dateFromInput.value = '';
   dateToInput.value = '';
 
@@ -2179,6 +2188,7 @@ transactionIdInput.addEventListener('input', debouncedApplyFilters);
 eventTypeInput.addEventListener('input', debouncedApplyFilters);
 modeFilter.addEventListener('change', () => applyFilters());
 statusFilter.addEventListener('change', () => applyFilters());
+environmentFilter?.addEventListener('change', () => applyFilters());
 dateFromInput.addEventListener('change', () => applyFilters());
 dateToInput.addEventListener('change', () => applyFilters());
 

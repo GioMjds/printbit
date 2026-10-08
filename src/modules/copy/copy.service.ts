@@ -560,6 +560,9 @@ export class CopyService {
       };
     }
 
+    const isTestEnvironment =
+      db.data?.settings?.developerMode?.enabled === true;
+
     try {
       await financialLedgerService.append({
         eventType: 'job_started',
@@ -575,6 +578,7 @@ export class CopyService {
           selectedPages: quote.selectedPages,
           billableColorPages: quote.billableColorPages,
           billableBwPages: quote.billableBwPages,
+          ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       });
     } catch (ledgerError) {
@@ -593,6 +597,7 @@ export class CopyService {
         copies: quote.copies,
         colorMode: quote.effectiveColorMode,
         rotationDeg: normalized.rotationDeg,
+        environment: isTestEnvironment ? 'test' : undefined,
       },
     });
 
@@ -618,6 +623,7 @@ export class CopyService {
           changeRequested: settlement.change.requested,
           changeDispensed: settlement.change.dispensed,
           remainingBalance: settlement.remainingBalance,
+          ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       });
     } catch (ledgerError) {
@@ -755,10 +761,12 @@ export class CopyService {
 
       await getJobProcessor().enqueue(payload);
 
-      try {
-        await adminService.incrementJobStats('copy');
-      } catch (statsError) {
-        console.error('[COPY] Failed to increment copy job stats:', statsError);
+      if (!isTestEnvironment) {
+        try {
+          await adminService.incrementJobStats('copy');
+        } catch (statsError) {
+          console.error('[COPY] Failed to increment copy job stats:', statsError);
+        }
       }
 
       void adminService.appendAdminLog(
@@ -773,6 +781,7 @@ export class CopyService {
           colorMode: quote.effectiveColorMode,
           billableColorPages: quote.billableColorPages * quote.copies,
           billableBwPages: quote.billableBwPages * quote.copies,
+          ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       );
 
@@ -791,6 +800,7 @@ export class CopyService {
           selectedPages: quote.selectedPages,
           billableColorPages: quote.billableColorPages * quote.copies,
           billableBwPages: quote.billableBwPages * quote.copies,
+          ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       );
     } catch (error) {

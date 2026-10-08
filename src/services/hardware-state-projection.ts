@@ -257,20 +257,27 @@ export class HardwareStateProjection {
       if (evt.simulated) throw new Error('Balance storage unavailable');
       return db.data?.balance ?? 0;
     }
+    const isTest =
+      evt.simulated === true ||
+      db.data.settings?.developerMode?.enabled === true;
     db.data.balance += value;
     const balance = db.data.balance;
     await db.write?.();
-    await adminService.incrementCoinStats(value);
+    if (!isTest) {
+      await adminService.incrementCoinStats(value);
+    }
     await adminService.appendAdminLog('coin_accepted',
       `${evt.simulated ? 'Simulated' : 'Accepted'} coin: ${value}`, {
         coinValue: value, balance,
         ...(evt.simulated ? { simulated: true, requestId: evt.requestId } : {}),
+        ...(isTest ? { environment: 'test' } : {}),
       });
     await financialLedgerService.append({
       eventType: 'coin_inserted', amount: value,
       meta: {
         source: evt.simulated ? 'worker-simulation' : 'worker', balance,
         ...(evt.simulated ? { simulated: true, requestId: evt.requestId } : {}),
+        ...(isTest ? { environment: 'test' } : {}),
       },
     });
     this.io?.emit('balance', db.data.balance);

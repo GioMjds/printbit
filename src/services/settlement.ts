@@ -73,7 +73,12 @@ class SettlementService {
       const previousBalance = db.data!.balance;
       const changeAmount = previousBalance - requiredAmount;
       db.data!.balance = 0;
-      db.data!.earnings += requiredAmount;
+      const isTest =
+        jobContext.environment === 'test' ||
+        db.data?.settings?.developerMode?.enabled === true;
+      if (!isTest) {
+        db.data!.earnings += requiredAmount;
+      }
       await db.write();
       io.emit('balance', 0);
 

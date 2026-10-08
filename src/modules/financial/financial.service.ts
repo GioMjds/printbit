@@ -40,6 +40,7 @@ import {
   consumablesStore,
   readRuntimeState,
   writeRuntimeState,
+  ADMIN_TEST_PAGE_USAGE_SOURCE,
 } from '@/core/database/sqlite-storage';
 import { adminService } from '@/services/admin';
 import { financialLedgerService } from '@/services/financial-ledger';
@@ -346,9 +347,13 @@ export class FinancialService {
     const amount = Number.isFinite(coinValue)
       ? Number(coinValue.toFixed(2))
       : 0;
+    const isTest =
+      source === 'test-ui' ||
+      state.settings?.developerMode?.enabled === true;
     const meta = {
       source,
       balance: state.balance,
+      ...(isTest ? { environment: 'test' } : {}),
     };
     const hashPayload = serializeLedgerHashPayload({
       id,
@@ -449,7 +454,12 @@ export class FinancialService {
         throw new Error('Runtime state unavailable while crediting coin.');
       }
       nextRuntimeState = structuredClone(runtimeState);
-      this.incrementCoinStats(nextRuntimeState, coinValue);
+      const isTestCoin =
+        source === 'test-ui' ||
+        nextRuntimeState.settings?.developerMode?.enabled === true;
+      if (!isTestCoin) {
+        this.incrementCoinStats(nextRuntimeState, coinValue);
+      }
       nextRuntimeState.balance += coinValue;
       balanceAfterCredit = nextRuntimeState.balance;
       const ledgerEntry = this.buildCoinLedgerEntry(
@@ -481,6 +491,9 @@ export class FinancialService {
     }
     db.data = nextRuntimeState;
 
+    const isTestLog =
+      source === 'test-ui' ||
+      db.data?.settings?.developerMode?.enabled === true;
     await adminService.appendAdminLog(
       'coin_accepted',
       `${source === 'esp32-http' ? 'ESP32 bridge' : 'Test'} coin inserted: ${coinValue}`,
@@ -488,6 +501,7 @@ export class FinancialService {
         coinValue,
         balance: balanceAfterCredit,
         source,
+        ...(isTestLog ? { environment: 'test' } : {}),
       },
     );
     this.deps.io.emit('balance', balanceAfterCredit);
@@ -1082,6 +1096,8 @@ export class FinancialService {
       return res.status(500).json({ error: 'Print failed' });
     }
 
+    const isTest = db.data?.settings?.developerMode?.enabled === true;
+
     await financialLedgerService.append({
       eventType: 'job_started',
       amount: minimumAmount,
@@ -1090,11 +1106,14 @@ export class FinancialService {
         mode: 'print',
         source: 'legacy',
         filename,
+        ...(isTest ? { environment: 'test' } : {}),
       },
     });
 
     const chargedAmount = db.data!.balance;
-    db.data!.earnings += chargedAmount;
+    if (!isTest) {
+      db.data!.earnings += chargedAmount;
+    }
     db.data!.balance = 0;
     await db.write();
     await financialLedgerService.append({
@@ -1105,6 +1124,7 @@ export class FinancialService {
         mode: 'print',
         source: 'legacy',
         filename,
+        ...(isTest ? { environment: 'test' } : {}),
       },
     });
     await adminService.appendAdminLog(
@@ -1113,9 +1133,12 @@ export class FinancialService {
       {
         filename,
         chargedAmount,
+        ...(isTest ? { environment: 'test' } : {}),
       },
     );
-    await adminService.incrementJobStats('print');
+    if (!isTest) {
+      await adminService.incrementJobStats('print');
+    }
 
     const legacyCleanup = await deleteUploadByStoredFilename(filename);
     if (legacyCleanup.deleted) {
@@ -1639,6 +1662,9 @@ export class FinancialService {
       // before the local JobProcessor prepares the PDF and hands it to the C# worker.
     }
 
+    const isTestEnvironment =
+      db.data?.settings?.developerMode?.enabled === true;
+
     try {
       await financialLedgerService.append({
         eventType: 'job_started',
@@ -1649,6 +1675,7 @@ export class FinancialService {
           sessionId: sessionId ?? null,
           documentId: targetDocumentId ?? null,
           filename: serverFilename ?? null,
+          ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       });
     } catch (error) {
@@ -1677,6 +1704,7 @@ export class FinancialService {
         sessionId: sessionId ?? null,
         documentId: targetDocumentId ?? null,
         filename: serverFilename ?? null,
+        environment: isTestEnvironment ? 'test' : undefined,
       },
     });
 
@@ -1846,6 +1874,7 @@ export class FinancialService {
           changeRequested: settlement.change.requested,
           changeDispensed: settlement.change.dispensed,
           remainingBalance: settlement.remainingBalance,
+          ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       });
     } catch (error) {
@@ -1908,7 +1937,9 @@ export class FinancialService {
         billableBwPages,
         estimatedSheetsUsed,
         estimatedInkUnits,
-        source: 'confirm-payment',
+        source: isTestEnvironment
+          ? ADMIN_TEST_PAGE_USAGE_SOURCE
+          : 'confirm-payment',
         billingPageDetection,
         analysisConfidence,
       });
@@ -2074,9 +2105,11 @@ export class FinancialService {
         }
       };
 
-      await runAuditStep('increment_job_stats', () =>
-        adminService.incrementJobStats(mode),
-      );
+      if (!isTestEnvironment) {
+        await runAuditStep('increment_job_stats', () =>
+          adminService.incrementJobStats(mode),
+        );
+      }
 
       await runAuditStep('payment_confirmed', () =>
         adminService.appendAdminLog('payment_confirmed', 'Payment confirmed.', {
@@ -2111,6 +2144,7 @@ export class FinancialService {
           changeState: settledChangeState,
           changeRequested: settledChangeRequested,
           changeDispensed: settledChangeDispensed,
+          ...(isTestEnvironment ? { environment: 'test' } : {}),
         }),
       );
 

@@ -52,6 +52,7 @@ export interface TransactionLogFilters {
   dateTo?: string;
   eventType?: string;
   status?: TransactionLogStatus;
+  environment?: 'production' | 'test' | 'all';
 }
 
 export interface PageOutputSummaryResult {
@@ -478,6 +479,12 @@ export class AdminService {
       if (exactTxId) {
         const entryTxId = this.getTransactionId(entry);
         if (entryTxId !== exactTxId) return false;
+      } else {
+        if (filters.environment === 'test') {
+          if (entry.meta?.environment !== 'test') return false;
+        } else if (filters.environment !== 'all') {
+          if (entry.meta?.environment === 'test') return false;
+        }
       }
 
       if (query) {
@@ -1189,6 +1196,7 @@ export class AdminService {
   }
 
   async incrementCoinStats(coinValue: number): Promise<void> {
+    if (db.data?.settings?.developerMode?.enabled) return;
     switch (coinValue) {
       case 1:
         db.data!.coinStats.one += 1;
@@ -1210,6 +1218,7 @@ export class AdminService {
   }
 
   async incrementJobStats(mode: PrintMode): Promise<void> {
+    if (db.data?.settings?.developerMode?.enabled) return;
     db.data!.jobStats.total += 1;
     switch (mode) {
       case 'print':
@@ -1249,6 +1258,7 @@ export class AdminService {
       ],
       weekTimestamp,
     )) {
+      if (log.meta?.environment === 'test') continue;
       const txId =
         (typeof log.meta?.transactionId === 'string' &&
           log.meta.transactionId) ||
@@ -1301,6 +1311,7 @@ export class AdminService {
     >();
 
     for (const log of allLogs) {
+      if (log.meta?.environment === 'test') continue;
       const type = log.type.toLowerCase();
       const txId = this.getTransactionId(log);
       if (!txId) continue;
@@ -1630,6 +1641,10 @@ export class AdminService {
     const completedReferenceIds = new Set<string>();
 
     for (const entry of db.data!.financialLedger) {
+      if (entry.meta?.environment === 'test') {
+        continue;
+      }
+
       if (entry.eventType === 'job_completed') {
         if (
           typeof entry.referenceId === 'string' &&
