@@ -10,7 +10,12 @@ import { initIdleScreen } from './shared/idle-screen';
 import { isMobileViewport } from './shared/device-mode';
 import { attachPowerSafetyOverlay } from './shared/power-safety-overlay';
 import { attachUiBlockingOverlay } from './shared/ui-blocking-overlay';
-import { fetchPublicPricing, formatPricingGuide } from './shared/pricing-guide';
+import {
+  fetchPublicPricing,
+  formatPricingGuide,
+  formatCopyPricingGuide,
+  formatScanPricingGuide,
+} from './shared/pricing-guide';
 
 type SocketLike = {
   on: (event: string, cb: (...args: unknown[]) => void) => void;
@@ -124,27 +129,124 @@ const openPrint = document.getElementById('openPrintBtn');
 const openCopy = document.getElementById('openCopyBtn');
 const openScan = document.getElementById('openScanBtn');
 const powerOff = document.getElementById('powerOffBtn');
+type PricingMethod = 'print' | 'copy' | 'scan';
+
 const openPricingBtn = document.getElementById('openPricingBtn');
+const openCopyPricingBtn = document.getElementById('openCopyPricingBtn');
+const openScanPricingBtn = document.getElementById('openScanPricingBtn');
 const closePricingBtn = document.getElementById('closePricingBtn');
 const pricingOverlay = document.getElementById('pricingOverlay');
+const pricingEyebrow = document.getElementById('pricingEyebrow');
+const pricingTitle = document.getElementById('pricingTitle');
 const pricingGuideContent = document.getElementById('pricingGuideContent');
+const copyPricingGuideContent = document.getElementById('copyPricingGuideContent');
+const scanPricingGuideContent = document.getElementById('scanPricingGuideContent');
 
-function setPricingModalOpen(open: boolean): void {
+let activePricingTrigger: HTMLElement | null = null;
+
+const PRICING_METHOD_META: Record<PricingMethod, { title: string; eyebrow: string }> = {
+  print: {
+    title: 'Print pricing',
+    eyebrow: 'PRINT METHOD ONLY',
+  },
+  copy: {
+    title: 'Photocopy pricing',
+    eyebrow: 'COPY METHOD ONLY',
+  },
+  scan: {
+    title: 'Scanning pricing',
+    eyebrow: 'SCAN METHOD ONLY',
+  },
+};
+
+function switchPricingTab(method: PricingMethod): void {
+  const methods: PricingMethod[] = ['print', 'copy', 'scan'];
+  methods.forEach((m) => {
+    const tab = document.getElementById(`pricingTab-${m}`);
+    const panel = document.getElementById(`pricingPanel-${m}`);
+    const isActive = m === method;
+
+    if (tab) {
+      tab.classList.toggle('is-active', isActive);
+      tab.setAttribute('aria-selected', String(isActive));
+      tab.tabIndex = isActive ? 0 : -1;
+    }
+    if (panel) {
+      panel.classList.toggle('is-active', isActive);
+      panel.style.display = isActive ? 'block' : 'none';
+      panel.setAttribute('aria-hidden', String(!isActive));
+    }
+  });
+
+  const meta = PRICING_METHOD_META[method];
+  if (meta) {
+    if (pricingEyebrow) pricingEyebrow.textContent = meta.eyebrow;
+    if (pricingTitle) pricingTitle.textContent = meta.title;
+  }
+}
+
+function setPricingModalOpen(
+  open: boolean,
+  method: PricingMethod = 'print',
+  trigger?: HTMLElement | null,
+): void {
   if (!pricingOverlay) return;
+  if (open) {
+    activePricingTrigger = trigger ?? null;
+    switchPricingTab(method);
+  }
   pricingOverlay.classList.toggle('is-open', open);
   pricingOverlay.setAttribute('aria-hidden', String(!open));
   syncFabVisibility();
-  if (open) closePricingBtn?.focus();
-  else openPricingBtn?.focus();
+  if (open) {
+    closePricingBtn?.focus();
+  } else {
+    activePricingTrigger?.focus();
+  }
 }
 
-// The pricing pill lives inside the Print card <button>, so stop the click from
-// bubbling up to the card's /print navigation (same pattern as .action-card__help).
+const pricingTabs = document.querySelectorAll<HTMLButtonElement>('.pricing-tab');
+pricingTabs.forEach((tab) => {
+  tab.addEventListener('click', () => {
+    const method = tab.getAttribute('data-tab') as PricingMethod | null;
+    if (method) switchPricingTab(method);
+  });
+  tab.addEventListener('keydown', (event) => {
+    const methods: PricingMethod[] = ['print', 'copy', 'scan'];
+    const currentMethod = tab.getAttribute('data-tab') as PricingMethod;
+    const currentIndex = methods.indexOf(currentMethod);
+    let nextIndex = -1;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % methods.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + methods.length) % methods.length;
+    }
+    if (nextIndex >= 0) {
+      event.preventDefault();
+      const nextMethod = methods[nextIndex];
+      const nextTab = document.getElementById(`pricingTab-${nextMethod}`);
+      switchPricingTab(nextMethod);
+      nextTab?.focus();
+    }
+  });
+});
+
 openPricingBtn?.addEventListener('click', (event) => {
   event.stopPropagation();
   event.preventDefault();
-  setPricingModalOpen(true);
+  setPricingModalOpen(true, 'print', openPricingBtn);
 });
+openCopyPricingBtn?.addEventListener('click', (event) => {
+  event.stopPropagation();
+  event.preventDefault();
+  setPricingModalOpen(true, 'copy', openCopyPricingBtn);
+});
+openScanPricingBtn?.addEventListener('click', (event) => {
+  event.stopPropagation();
+  event.preventDefault();
+  setPricingModalOpen(true, 'scan', openScanPricingBtn);
+});
+
 closePricingBtn?.addEventListener('click', () => setPricingModalOpen(false));
 pricingOverlay?.addEventListener('click', (event) => {
   if (event.target === pricingOverlay) setPricingModalOpen(false);
@@ -157,11 +259,21 @@ void fetchPublicPricing()
   .then((pricing) => {
     if (pricingGuideContent)
       pricingGuideContent.innerHTML = formatPricingGuide(pricing);
+    if (copyPricingGuideContent)
+      copyPricingGuideContent.innerHTML = formatCopyPricingGuide(pricing);
+    if (scanPricingGuideContent)
+      scanPricingGuideContent.innerHTML = formatScanPricingGuide(pricing);
   })
   .catch(() => {
     if (pricingGuideContent)
       pricingGuideContent.textContent =
         'Printing prices are unavailable right now.';
+    if (copyPricingGuideContent)
+      copyPricingGuideContent.textContent =
+        'Photocopy prices are unavailable right now.';
+    if (scanPricingGuideContent)
+      scanPricingGuideContent.textContent =
+        'Scanning prices are unavailable right now.';
   });
 
 const homePrintAnimation = document.getElementById('homePrintAnimation');

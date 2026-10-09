@@ -417,7 +417,7 @@ export function buildPrintQuote(input: {
   const duplexAllowed = Boolean(
     db.data?.settings?.pricingEngine?.duplexEnabled,
   );
-  const duplex = duplexAllowed && Boolean(input.duplex);
+  const duplex = duplexAllowed && Boolean(input.duplex) && selectedCount > 1;
   const physicalSheetsPerCopy = duplex
     ? Math.ceil(selectedCount / 2)
     : selectedCount;

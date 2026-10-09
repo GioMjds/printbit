@@ -165,7 +165,7 @@ body {
   border-radius: 40px;
   border: 1.5px solid rgba(167, 170, 225, 0.18);
   background: rgba(167, 170, 225, 0.07);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   transition:
     background 300ms,
@@ -280,7 +280,7 @@ body {
   flex-shrink: 0;
 }
 .preview-panel__eyebrow {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -288,7 +288,7 @@ body {
   opacity: 0.6;
 }
 .preview-hint {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--ink-muted);
   transition: color 300ms;
@@ -326,14 +326,14 @@ body {
 .scan-error-notice__title {
   margin: 0;
   color: #fecaca;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
 }
 
 .scan-error-notice__summary {
   margin: 4px 0 0;
   color: #ffe4e6;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
 }
 
@@ -344,8 +344,8 @@ body {
   margin: 0;
   padding-left: 17px;
   color: #ffe4e6;
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 13.5px;
+  line-height: 1.4;
 }
 
 /* All states overlap */
@@ -434,13 +434,13 @@ body {
   color: #f9aaaa;
 }
 .preview-state__sub {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--ink-muted);
-  opacity: 0.7;
+  opacity: 0.85;
   text-align: center;
 }
 .topbar-actions { display: flex; justify-content: flex-end; }
-.document-care-fab { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 8px 13px; border: 1px solid rgba(251,191,36,.4); border-radius: 999px; background: rgba(251,191,36,.12); color: #fff3c4; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.document-care-fab { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 8px 13px; border: 1px solid rgba(251,191,36,.4); border-radius: 999px; background: rgba(251,191,36,.12); color: #fff3c4; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .document-care-fab span:first-child, .document-care-modal__icon { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fbbf24; color: #0e0d1f; font-weight: 800; }
 .document-care-modal { position: fixed; inset: 0; z-index: 100; display: none; place-items: center; padding: 24px; background: rgba(5,4,15,.78); }
 .document-care-modal.is-open { display: grid; }
@@ -460,11 +460,11 @@ body {
   border-radius: 14px;
   background: rgba(251, 191, 36, 0.09);
   color: #fce8a8;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.5;
 }
 .document-care-notice__icon { display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px; border-radius: 50%; background: #fbbf24; color: #0e0d1f; font-size: 13px; font-weight: 800; }
-.document-care-notice__title { display: block; margin-bottom: 2px; color: #fff3c4; font-size: 12px; }
+.document-care-notice__title { display: block; margin-bottom: 2px; color: #fff3c4; font-size: 14px; }
 .document-care-notice p { margin: 0; }
 
 /* ── Scan bed illustration (idle) ── */
@@ -1545,7 +1545,7 @@ body {
 
 .scan-troubleshoot__summary {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.5;
   color: #fecaca;
@@ -1560,7 +1560,7 @@ body {
 
 .scan-troubleshoot__label {
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.2px;
   color: #fca5a5;
@@ -1573,9 +1573,9 @@ body {
   padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   color: #ffe4e6;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -1605,7 +1605,7 @@ body {
 }
 
 .source-size-card__hint {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--ink-muted);
 }
@@ -1677,7 +1677,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .format-option-icon {

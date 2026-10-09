@@ -13,10 +13,12 @@ public interface IDocumentPreprocessor
 public sealed class PreparedDocument(
     string filePath,
     int pageCount,
-    IReadOnlyList<string> cleanupPaths) : IDisposable
+    IReadOnlyList<string> cleanupPaths,
+    bool isPassThrough = false) : IDisposable
 {
     public string FilePath { get; } = filePath;
     public int PageCount { get; } = pageCount;
+    public bool IsPassThrough { get; } = isPassThrough;
 
     public void Dispose()
     {

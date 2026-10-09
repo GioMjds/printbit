@@ -2736,7 +2736,11 @@ printAnotherBtn?.addEventListener('click', () => {
   sessionStorage.removeItem('printbit.copyPreviewReleaseToken');
 
   if (config.mode === 'print') {
-    // Keep sessionId, sessionToken, uploadedFile, etc. for remaining files
+    sessionStorage.removeItem('printbit.uploadedFile');
+    sessionStorage.removeItem('printbit.uploadedDocumentId');
+    sessionStorage.removeItem('printbit.uploadedFiles');
+    sessionStorage.removeItem('printbit.activeDocumentId');
+    sessionStorage.removeItem('printbit.printSettings');
     navigateWithKioskMotion('/print');
   } else if (config.mode === 'copy') {
     sessionStorage.removeItem('printbit.uploadedFile');
@@ -2745,8 +2749,6 @@ printAnotherBtn?.addEventListener('click', () => {
     sessionStorage.removeItem('printbit.sessionToken');
     navigateWithKioskMotion('/copy');
   } else if (config.mode === 'scan') {
-    sessionStorage.removeItem('printbit.uploadedFile');
-    sessionStorage.removeItem('printbit.uploadedDocumentId');
     sessionStorage.removeItem('printbit.sessionId');
     sessionStorage.removeItem('printbit.sessionToken');
     navigateWithKioskMotion('/scan');

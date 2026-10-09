@@ -526,16 +526,20 @@ export class FinancialService {
 
   getPricingConfig = (_req: Request, res: Response): void => {
     const config = db.data?.settings?.pricingEngine;
+    const pricing = db.data?.settings?.pricing;
     res.json({
       paperProfiles:
         config?.paperProfiles ?? defaultPricingEngine.paperProfiles,
       highQualitySurcharge:
         config?.highQualitySurcharge ??
-        db.data?.settings?.pricing?.highQualitySurcharge ??
+        pricing?.highQualitySurcharge ??
         2,
       duplexEnabled: config?.duplexEnabled ?? false,
       bulkDiscountTiers: config?.bulkDiscountTiers ?? [],
       rounding: config?.rounding ?? 'whole_peso_total_only',
+      copyBwPerPage: pricing?.copyBwPerPage ?? pricing?.copyPerPage ?? 3,
+      copyColorPerPage: pricing?.copyColorPerPage ?? 5,
+      scanDocument: pricing?.scanDocument ?? 5,
     });
   };
 

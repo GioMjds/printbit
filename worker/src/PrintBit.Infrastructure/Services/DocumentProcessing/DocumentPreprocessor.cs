@@ -60,15 +60,15 @@ public sealed class DocumentPreprocessor : IDocumentPreprocessor
                 }
             }
 
-            var pageCount = extension == ".pdf"
+            var (pageCount, isPassThrough) = extension == ".pdf"
                 ? PreparePdf(effectivePdfPath, outputPath, settings, cancellationToken)
-                : PrepareImage(sourcePath, outputPath, settings);
+                : (PrepareImage(sourcePath, outputPath, settings), false);
 
             var cleanupList = tempConvertedPdf != null
                 ? new[] { outputPath, tempConvertedPdf }
-                : new[] { outputPath };
+                : [outputPath];
 
-            return new PreparedDocument(outputPath, pageCount, cleanupList);
+            return new PreparedDocument(outputPath, pageCount, cleanupList, isPassThrough);
         }
         catch
         {
@@ -78,7 +78,7 @@ public sealed class DocumentPreprocessor : IDocumentPreprocessor
         }
     }
 
-    private int PreparePdf(
+    private (int PageCount, bool IsPassThrough) PreparePdf(
         string sourcePath,
         string outputPath,
         PrintJobSettings settings,
@@ -116,9 +116,8 @@ public sealed class DocumentPreprocessor : IDocumentPreprocessor
 
                 if (form == null)
                 {
-                    // Fallback: pass-through original file if PDFsharp cannot parse it
                     File.Copy(sourcePath, outputPath, true);
-                    return PdfPageCounter.Count(sourcePath, _qpdfPath) ?? 1;
+                    return (PdfPageCounter.Count(sourcePath, _qpdfPath) ?? 1, true);
                 }
             }
 
@@ -157,7 +156,7 @@ public sealed class DocumentPreprocessor : IDocumentPreprocessor
                         }
                     }
 
-                    if (settings.Duplex && output.PageCount % 2 == 1)
+                    if (settings.Duplex && output.PageCount > 1 && output.PageCount % 2 == 1)
                     {
                         var blank = output.AddPage();
                         SetPaperGeometry(blank, settings.PaperSize, settings.Orientation);
@@ -165,7 +164,7 @@ public sealed class DocumentPreprocessor : IDocumentPreprocessor
 
                     var outputPageCount = output.PageCount;
                     output.Save(outputPath);
-                    return outputPageCount;
+                    return (outputPageCount, false);
                 }
             }
             catch (OperationCanceledException)
@@ -174,10 +173,8 @@ public sealed class DocumentPreprocessor : IDocumentPreprocessor
             }
             catch
             {
-                // ponytail: pass-through original file if PDFsharp rendering or saving fails
-                // on complex Canva/Skia elements. SumatraPDF/MuPDF prints them natively.
                 File.Copy(sourcePath, outputPath, true);
-                return PdfPageCounter.Count(sourcePath, _qpdfPath) ?? 1;
+                return (PdfPageCounter.Count(sourcePath, _qpdfPath) ?? 1, true);
             }
         }
         finally

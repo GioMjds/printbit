@@ -13,9 +13,6 @@ namespace PrintBit.Infrastructure.Services.DocumentConversion;
 /// </summary>
 public static class ImageToPdfConverter
 {
-    private const double PageWidth = 595.28;   // Standard A4 width in points (72 pt/inch)
-    private const double PageHeight = 841.89;  // Standard A4 height in points (72 pt/inch)
-    private const double Margin = 20.0;        // 20 pt safe margins
 
     /// <summary>
     /// Converts an image file to a single-page PDF document.
@@ -113,24 +110,17 @@ public static class ImageToPdfConverter
 
     private static byte[] BuildPdf(byte[] jpegBytes, int imgWidth, int imgHeight)
     {
-        // Calculate scaling to fit proportionally inside printable area
-        double maxW = PageWidth - 2.0 * Margin;
-        double maxH = PageHeight - 2.0 * Margin;
-        double scale = Math.Min(maxW / imgWidth, maxH / imgHeight);
-
-        double drawW = imgWidth * scale;
-        double drawH = imgHeight * scale;
-        double posX = (PageWidth - drawW) / 2.0;
-        double posY = (PageHeight - drawH) / 2.0;
+        // Intermediate PDF holds full-bleed image at native aspect ratio.
+        // Downstream DocumentPreprocessor and PrintLayout are the single source of truth for printable margins.
+        double pageWidth = imgWidth;
+        double pageHeight = imgHeight;
 
         var culture = CultureInfo.InvariantCulture;
         string contentStream = string.Format(
             culture,
-            "q {0:F2} 0 0 {1:F2} {2:F2} {3:F2} cm\n/Im1 Do\nQ\n",
-            drawW,
-            drawH,
-            posX,
-            posY);
+            "q {0:F2} 0 0 {1:F2} 0.00 0.00 cm\n/Im1 Do\nQ\n",
+            pageWidth,
+            pageHeight);
         byte[] contentBytes = Encoding.ASCII.GetBytes(contentStream);
 
         using var ms = new MemoryStream();
@@ -179,8 +169,8 @@ public static class ImageToPdfConverter
             "  >>\n" +
             ">>\n" +
             "endobj\n",
-            PageWidth,
-            PageHeight);
+            pageWidth,
+            pageHeight);
         writer.Write(Encoding.ASCII.GetBytes(pageObj));
 
         // Object 4: Contents

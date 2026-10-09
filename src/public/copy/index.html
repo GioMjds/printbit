@@ -209,6 +209,70 @@
               </p>
             </div>
           </div>
+
+          <!-- Error banner — hidden until scan fails -->
+          <!-- app.ts sets style.display="" to show, style.display="none" to hide -->
+          <div
+            id="errorBanner"
+            class="error-banner"
+            style="display: none"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div class="error-banner__icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486
+                0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53
+                0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0
+                012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </div>
+            <p class="error-banner__text" id="errorText">
+              No document detected.
+            </p>
+            <button id="retryBtn" type="button" class="retry-btn">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0
+                0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0
+                010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002
+                5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2
+                0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              Retry
+            </button>
+          </div>
+
+          <section
+            id="copyTroubleshootingPanel"
+            class="copy-troubleshoot"
+            style="display: none"
+            aria-live="polite"
+          >
+            <h3 class="copy-troubleshoot__title">Troubleshoot scanner issue</h3>
+            <p class="copy-troubleshoot__summary" id="copyTroubleshootSummary"></p>
+            <div class="copy-troubleshoot__group">
+              <p class="copy-troubleshoot__label">Possible reasons</p>
+              <ul
+                class="copy-troubleshoot__list"
+                id="copyTroubleshootCauses"
+              ></ul>
+            </div>
+            <div class="copy-troubleshoot__group">
+              <p class="copy-troubleshoot__label">How to fix it on the machine</p>
+              <ol
+                class="copy-troubleshoot__steps"
+                id="copyTroubleshootSteps"
+              ></ol>
+            </div>
+          </section>
         </section>
 
         <!-- RIGHT — steps + error -->
@@ -426,70 +490,6 @@
               </li>
             </ol>
           </div>
-
-          <!-- Error banner — hidden until scan fails -->
-          <!-- app.ts sets style.display="" to show, style.display="none" to hide -->
-          <div
-            id="errorBanner"
-            class="error-banner"
-            style="display: none"
-            role="alert"
-            aria-live="assertive"
-          >
-            <div class="error-banner__icon" aria-hidden="true">
-              <svg viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fill-rule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486
-                0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53
-                0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0
-                012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </div>
-            <p class="error-banner__text" id="errorText">
-              No document detected.
-            </p>
-            <button id="retryBtn" type="button" class="retry-btn">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                  fill-rule="evenodd"
-                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0
-                0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0
-                010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002
-                5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2
-                0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              Retry
-            </button>
-          </div>
-
-          <section
-            id="copyTroubleshootingPanel"
-            class="copy-troubleshoot"
-            style="display: none"
-            aria-live="polite"
-          >
-            <h3 class="copy-troubleshoot__title">Troubleshoot scanner issue</h3>
-            <p class="copy-troubleshoot__summary" id="copyTroubleshootSummary"></p>
-            <div class="copy-troubleshoot__group">
-              <p class="copy-troubleshoot__label">Possible reasons</p>
-              <ul
-                class="copy-troubleshoot__list"
-                id="copyTroubleshootCauses"
-              ></ul>
-            </div>
-            <div class="copy-troubleshoot__group">
-              <p class="copy-troubleshoot__label">How to fix it on the machine</p>
-              <ol
-                class="copy-troubleshoot__steps"
-                id="copyTroubleshootSteps"
-              ></ol>
-            </div>
-          </section>
         </section>
       </main>
       <div class="modal-overlay document-care-modal" id="documentCareModal" role="dialog" aria-modal="true" aria-labelledby="documentCareTitle" aria-hidden="true"><div class="modal-card document-care-modal__card"><div class="document-care-modal__icon" aria-hidden="true">!</div><h2 class="modal-title" id="documentCareTitle">Prepare your document</h2><p class="modal-subtitle">To avoid paper jams and keep your preview clear:</p><ul><li>Use clean, flat, undamaged bond paper.</li><li>Remove staples, clips, tape, folded areas, and torn edges.</li><li>For the ADF, align pages straight. On the glass, place the document flat.</li></ul><div class="modal-actions"><button type="button" class="modal-btn modal-btn--primary document-care-modal__close" id="documentCareClose">Got it</button></div></div></div>

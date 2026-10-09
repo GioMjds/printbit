@@ -95,10 +95,14 @@ internal static class NativePdfPrinter
                     using var page = pdf.GetPage((uint)(pageNumber - 1));
                     using var stream = new InMemoryRandomAccessStream();
 
-                    var targetWidth = page.Size.Width > 0 ? Math.Round(page.Size.Width / 72.0 * RenderDpi) : MinRasterDimension;
+                    // WinRT PdfPage.Size is reported in 96 DPI DIPs (device-independent pixels, 1/96 in).
+                    var widthInInches = page.Size.Width > 0 ? page.Size.Width / 96.0 : 8.5;
+                    var heightInInches = page.Size.Height > 0 ? page.Size.Height / 96.0 : 11.0;
+
+                    var targetWidth = Math.Round(widthInInches * RenderDpi);
                     var destWidth = (uint)Math.Clamp(targetWidth, MinRasterDimension, MaxRasterDimension);
 
-                    var targetHeight = page.Size.Height > 0 ? Math.Round(page.Size.Height / 72.0 * RenderDpi) : MinRasterDimension;
+                    var targetHeight = Math.Round(heightInInches * RenderDpi);
                     var destHeight = (uint)Math.Clamp(targetHeight, MinRasterDimension, MaxRasterDimension);
 
                     page.RenderToStreamAsync(stream, new PdfPageRenderOptions
@@ -112,7 +116,9 @@ internal static class NativePdfPrinter
                     // not just the printable area, so output matches the preview.
                     var hm = e.PageSettings.HardMarginX;
                     var vm = e.PageSettings.HardMarginY;
-                    e.Graphics!.DrawImage(image, -hm, -vm, e.PageBounds.Width, e.PageBounds.Height);
+                    var drawW = (float)(widthInInches * 100.0);
+                    var drawH = (float)(heightInInches * 100.0);
+                    e.Graphics!.DrawImage(image, -hm, -vm, drawW, drawH);
                     e.HasMorePages = ++index < pages.Count;
                 }
                 catch (Exception ex)
@@ -137,10 +143,20 @@ internal static class NativePdfPrinter
             _ => PaperKind.A4
         };
 
-    private static PaperSize? FindPaper(PrinterSettings printer, string? paperSize)
+    internal static PaperSize? FindPaper(PrinterSettings printer, string? paperSize)
     {
         var kind = MapPaperKind(paperSize);
-        return printer.PaperSizes.Cast<PaperSize>().FirstOrDefault(p =>
-            p.Kind == kind || (kind == PaperKind.Folio && p.RawKind == 14));
+        var paper = printer.PaperSizes.Cast<PaperSize>().FirstOrDefault(p =>
+            p.Kind == kind || (kind == PaperKind.Folio && (p.RawKind == 14 || (p.Width == 850 && p.Height == 1300) || (p.Width == 1300 && p.Height == 850) || p.PaperName.Contains("8.5 x 13", StringComparison.OrdinalIgnoreCase) || p.PaperName.Contains("Folio", StringComparison.OrdinalIgnoreCase))));
+
+        if (paper is null && kind == PaperKind.Folio)
+        {
+            // Drivers without explicit Folio/8.5x13 (e.g. Microsoft Print to PDF) fall back to Legal (8.5x14)
+            // so the 13-inch height is not truncated or forced into an 11-inch Letter sheet.
+            paper = printer.PaperSizes.Cast<PaperSize>().FirstOrDefault(p =>
+                p.Kind == PaperKind.Legal || p.RawKind == 5);
+        }
+
+        return paper;
     }
 }

@@ -85,6 +85,7 @@
             <span
               class="action-card__price"
               id="openPricingBtn"
+              data-pricing-method="print"
               role="button"
               aria-label="View printing prices"
             >
@@ -153,6 +154,18 @@
             id="openCopyBtn"
             aria-label="Photocopy: copy your paper document"
           >
+            <span
+              class="action-card__price"
+              id="openCopyPricingBtn"
+              data-pricing-method="copy"
+              role="button"
+              aria-label="View photocopy prices"
+            >
+              <span class="action-card__pill-icon" aria-hidden="true"
+                >&#8369;</span
+              >
+              <span class="action-card__pill-label">Copy prices</span>
+            </span>
             <span
               class="action-card__help"
               data-guide="copy"
@@ -227,6 +240,18 @@
             id="openScanBtn"
             aria-label="Scan: turn your paper document into a soft copy on your phone"
           >
+            <span
+              class="action-card__price"
+              id="openScanPricingBtn"
+              data-pricing-method="scan"
+              role="button"
+              aria-label="View scanning prices"
+            >
+              <span class="action-card__pill-icon" aria-hidden="true"
+                >&#8369;</span
+              >
+              <span class="action-card__pill-label">Scan prices</span>
+            </span>
             <span
               class="action-card__help"
               data-guide="scan"
@@ -355,15 +380,105 @@
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
-        <p class="pricing-modal__eyebrow">PRINT WITH CONFIDENCE</p>
-        <h2 id="pricingTitle">Printing prices</h2>
-        <p class="pricing-modal__intro">
-          Prices consist of physical bond paper per sheet + metered ink coverage
-          per printed page. Your total updates automatically after choosing your
-          document and settings.
-        </p>
-        <div id="pricingGuideContent" aria-live="polite">
-          Loading printing prices…
+        <p class="pricing-modal__eyebrow" id="pricingEyebrow">TRANSPARENT KIOSK RATES</p>
+        <h2 id="pricingTitle">Service pricing</h2>
+
+        <div class="pricing-tabs" role="tablist" aria-label="Print method pricing">
+          <button
+            class="pricing-tab is-active"
+            id="pricingTab-print"
+            data-tab="print"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="pricingPanel-print"
+          >
+            <svg class="pricing-tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9V2h12v7"></path>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            <span>Print</span>
+          </button>
+          <button
+            class="pricing-tab"
+            id="pricingTab-copy"
+            data-tab="copy"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="pricingPanel-copy"
+          >
+            <svg class="pricing-tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy</span>
+          </button>
+          <button
+            class="pricing-tab"
+            id="pricingTab-scan"
+            data-tab="scan"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="pricingPanel-scan"
+          >
+            <svg class="pricing-tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+              <line x1="7" y1="12" x2="17" y2="12"></line>
+            </svg>
+            <span>Scan</span>
+          </button>
+        </div>
+
+        <!-- Print Method Panel -->
+        <div
+          class="pricing-panel is-active"
+          id="pricingPanel-print"
+          role="tabpanel"
+          aria-labelledby="pricingTab-print"
+        >
+          <p class="pricing-modal__intro">
+            Prices consist of physical bond paper per sheet + metered ink coverage
+            per printed page. Your total updates automatically after choosing your
+            document and settings.
+          </p>
+          <div id="pricingGuideContent" aria-live="polite">
+            Loading printing prices…
+          </div>
+        </div>
+
+        <!-- Copy Method Panel -->
+        <div
+          class="pricing-panel"
+          id="pricingPanel-copy"
+          role="tabpanel"
+          aria-labelledby="pricingTab-copy"
+          style="display: none"
+        >
+          <p class="pricing-modal__intro">
+            Photocopies are charged at a transparent flat rate per page with bond paper included. Place your document on the scanner glass or feeder to begin.
+          </p>
+          <div id="copyPricingGuideContent" aria-live="polite">
+            Loading photocopy prices…
+          </div>
+        </div>
+
+        <!-- Scan Method Panel -->
+        <div
+          class="pricing-panel"
+          id="pricingPanel-scan"
+          role="tabpanel"
+          aria-labelledby="pricingTab-scan"
+          style="display: none"
+        >
+          <p class="pricing-modal__intro">
+            Turn physical paper documents into high-resolution digital soft copies (PDF) sent directly to your phone via local Wi-Fi.
+          </p>
+          <div id="scanPricingGuideContent" aria-live="polite">
+            Loading scanning prices…
+          </div>
         </div>
       </section>
     </div>

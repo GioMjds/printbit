@@ -12,6 +12,9 @@ export interface PublicPricingConfig {
   paperProfiles: Record<PaperProfileKey, PublicPaperPricingProfile>;
   highQualitySurcharge: number;
   duplexEnabled?: boolean;
+  copyBwPerPage?: number;
+  copyColorPerPage?: number;
+  scanDocument?: number;
 }
 
 const DEFAULT_PRICING = {
@@ -34,6 +37,9 @@ const DEFAULT_PRICING = {
   },
   highQualitySurcharge: 2,
   duplexEnabled: false,
+  copyBwPerPage: 3,
+  copyColorPerPage: 5,
+  scanDocument: 5,
 } satisfies PublicPricingConfig;
 
 const PAPER_LABELS = {
@@ -135,6 +141,18 @@ export function normalizePricingConfig(raw: unknown): PublicPricingConfig {
       typeof candidate?.duplexEnabled === 'boolean'
         ? candidate.duplexEnabled
         : DEFAULT_PRICING.duplexEnabled ?? false,
+    copyBwPerPage: safeAmount(
+      candidate?.copyBwPerPage ?? candidate?.copyPerPage,
+      DEFAULT_PRICING.copyBwPerPage,
+    ),
+    copyColorPerPage: safeAmount(
+      candidate?.copyColorPerPage,
+      DEFAULT_PRICING.copyColorPerPage,
+    ),
+    scanDocument: safeAmount(
+      candidate?.scanDocument,
+      DEFAULT_PRICING.scanDocument,
+    ),
   };
 }
 
@@ -162,7 +180,24 @@ export function formatPricingGuide(pricing: PublicPricingConfig): string {
     ? `${formatPeso(p?.a4?.paperCost ?? 1)}/sheet for all sizes`
     : `Short ${formatPeso(p?.shortBond?.paperCost ?? 1)} · A4 ${formatPeso(p?.a4?.paperCost ?? 1)} · Long ${formatPeso(p?.longBond?.paperCost ?? 1)}/sheet`;
 
-  return `<div class="pricing-table-wrap"><table class="pricing-table"><caption>Paper &amp; Print Pricing per Page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">Bond Paper (sheet)</th><th scope="col">Print Mode</th><th scope="col">Low</th><th scope="col">Medium</th><th scope="col">High</th><th scope="col">Max</th></tr></thead><tbody>${rows}</tbody></table></div><div class="pricing-guide-footer"><div class="pricing-tier-strip"><span class="pricing-tier-tag pricing-tier-tag--low"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--low"></span><strong>Low (0% - 10%)</strong>: Text, forms</span><span class="pricing-tier-tag pricing-tier-tag--med"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--med"></span><strong>Medium (11% - 40%)</strong>: Diagrams</span><span class="pricing-tier-tag pricing-tier-tag--high"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--high"></span><strong>High (41% - 70%)</strong>: Charts</span><span class="pricing-tier-tag pricing-tier-tag--max"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--max"></span><strong>Max (71% - 100%)</strong>: Photos</span></div><div class="pricing-notes-bar"><span class="pricing-note-pill pricing-paper-note"><strong>Bond Paper:</strong> ${paperCostText}</span>${duplexNote}<span class="pricing-note-pill pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span></span></div></div>`;
+  return `<div class="pricing-table-wrap"><table class="pricing-table"><caption>Print Method Only — Paper &amp; Metered Ink Pricing per Page</caption><thead><tr><th scope="col">Paper size</th><th scope="col">Bond Paper (sheet)</th><th scope="col">Print Mode</th><th scope="col">Low</th><th scope="col">Medium</th><th scope="col">High</th><th scope="col">Max</th></tr></thead><tbody>${rows}</tbody></table></div><div class="pricing-guide-footer"><div class="pricing-tier-strip"><span class="pricing-tier-tag pricing-tier-tag--low"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--low"></span><strong>Low (0% - 10%)</strong>: Text, forms</span><span class="pricing-tier-tag pricing-tier-tag--med"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--med"></span><strong>Medium (11% - 40%)</strong>: Diagrams</span><span class="pricing-tier-tag pricing-tier-tag--high"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--high"></span><strong>High (41% - 70%)</strong>: Charts</span><span class="pricing-tier-tag pricing-tier-tag--max"><span class="pricing-tier-tag__dot pricing-tier-tag__dot--max"></span><strong>Max (71% - 100%)</strong>: Photos</span></div><div class="pricing-notes-bar"><span class="pricing-note-pill pricing-paper-note"><strong>Bond Paper:</strong> ${paperCostText}</span>${duplexNote}<span class="pricing-note-pill pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${formatPeso(pricing.highQualitySurcharge)} <span class="pricing-quality-note__unit">per page</span></span></div></div>`;
+}
+
+export function formatCopyPricingGuide(pricing: PublicPricingConfig): string {
+  const bwPrice = formatPeso(pricing.copyBwPerPage ?? 3);
+  const colorPrice = formatPeso(pricing.copyColorPerPage ?? 5);
+  const hqSurcharge = formatPeso(pricing.highQualitySurcharge ?? 2);
+  const duplexNote = pricing.duplexEnabled
+    ? `<span class="pricing-note-pill pricing-duplex-note"><strong>Duplex Savings:</strong> 2-sided copy saves 1 sheet per 2 pages!</span>`
+    : '';
+
+  return `<div class="pricing-method-cards"><div class="pricing-rate-card"><div class="pricing-rate-card__header"><span class="pricing-mode-pill pricing-mode-pill--bw">B&amp;W Photocopy</span><span class="pricing-rate-card__badge">Standard</span></div><div class="pricing-rate-card__price"><span class="pricing-rate-card__amount">${bwPrice}</span><span class="pricing-rate-card__unit">/ page</span></div><p class="pricing-rate-card__desc">Black &amp; white document photocopy for forms, school handouts, notes, and IDs.</p><ul class="pricing-rate-card__features"><li>Bond paper included (Short, A4, Long)</li><li>Flat rate per page (no ink coverage metering)</li><li>Scanner glass or multi-page feeder</li></ul></div><div class="pricing-rate-card pricing-rate-card--highlight"><div class="pricing-rate-card__header"><span class="pricing-mode-pill pricing-mode-pill--color">Color Photocopy</span><span class="pricing-rate-card__badge pricing-rate-card__badge--color">Vibrant</span></div><div class="pricing-rate-card__price"><span class="pricing-rate-card__amount">${colorPrice}</span><span class="pricing-rate-card__unit">/ page</span></div><p class="pricing-rate-card__desc">Full-color photocopy for colored certificates, illustrations, and presentations.</p><ul class="pricing-rate-card__features"><li>Bond paper included (Short, A4, Long)</li><li>Flat rate per page (no ink coverage metering)</li><li>High-fidelity color reproduction</li></ul></div></div><div class="pricing-guide-footer"><div class="pricing-notes-bar"><span class="pricing-note-pill pricing-paper-note"><strong>Bond Paper:</strong> Included in rate for all supported paper sizes</span>${duplexNote}<span class="pricing-note-pill pricing-quality-note"><span class="pricing-quality-note__label">High quality</span>: +${hqSurcharge} <span class="pricing-quality-note__unit">per page</span></span></div></div>`;
+}
+
+export function formatScanPricingGuide(pricing: PublicPricingConfig): string {
+  const scanFee = formatPeso(pricing.scanDocument ?? 5);
+
+  return `<div class="pricing-method-cards pricing-method-cards--single"><div class="pricing-rate-card pricing-rate-card--scan"><div class="pricing-rate-card__header"><span class="pricing-mode-pill pricing-mode-pill--scan">Digital Soft Copy</span><span class="pricing-rate-card__badge pricing-rate-card__badge--scan">Paperless</span></div><div class="pricing-rate-card__price"><span class="pricing-rate-card__amount">${scanFee}</span><span class="pricing-rate-card__unit">/ document</span></div><p class="pricing-rate-card__desc">Digitize your physical paper documents into a clear, high-resolution PDF and download straight to your mobile phone.</p><div class="pricing-scan-highlights"><div class="pricing-scan-item"><span class="pricing-scan-item__icon">&#10003;</span><div class="pricing-scan-item__text"><strong>Direct Mobile Download</strong><span>Connect to PrintBit Wi-Fi to download via QR code on your phone</span></div></div><div class="pricing-scan-item"><span class="pricing-scan-item__icon">&#10003;</span><div class="pricing-scan-item__text"><strong>Feeder &amp; Glass Support</strong><span>Scan single sheets or multi-page documents seamlessly</span></div></div><div class="pricing-scan-item"><span class="pricing-scan-item__icon">&#10003;</span><div class="pricing-scan-item__text"><strong>Zero Paper or Ink Costs</strong><span>100% digital soft copy with zero consumable printing fees</span></div></div></div></div></div><div class="pricing-guide-footer"><div class="pricing-notes-bar"><span class="pricing-note-pill pricing-paper-note"><strong>Delivery:</strong> Instant Wi-Fi QR download to iOS and Android</span><span class="pricing-note-pill pricing-quality-note"><span class="pricing-quality-note__label">Format</span>: Searchable High-Resolution PDF</span></div></div>`;
 }
 
 export const buildPricingTableHtml = formatPricingGuide;

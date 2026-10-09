@@ -159,6 +159,16 @@ function getSelectedCopyPaperSize(): CopyPaperSize {
   return 'A4';
 }
 
+function getSelectedCopySource(): 'feeder' | 'glass' {
+  const checked = document.querySelector<HTMLInputElement>(
+    'input[name="copySource"]:checked, input[name="source"]:checked, input[name="copySourceType"]:checked',
+  );
+  if (checked?.value === 'feeder' || checked?.value === 'adf') {
+    return 'feeder';
+  }
+  return 'glass';
+}
+
 function updateCopySourceInstructions(paperSize: CopyPaperSize): void {
   const isAdf = paperSize === 'Long';
   if (copyStep1Desc) {
@@ -735,16 +745,18 @@ async function checkForDocument(): Promise<void> {
       await showPreview(data.previewPath);
     } else {
       setCopySourceRadiosDisabled(false);
+      const isUsingAdf = getSelectedCopySource() === 'feeder';
       showError(
         data.error ??
           'No document detected. Place your document face-down on the scanner glass and try again.',
-        paperSize === 'Long',
+        isUsingAdf,
       );
     }
   } catch {
     showOverlay(false);
     setCopySourceRadiosDisabled(false);
-    showError('Could not reach the scanner. Please try again.', paperSize === 'Long');
+    const isUsingAdf = getSelectedCopySource() === 'feeder';
+    showError('Could not reach the scanner. Please try again.', isUsingAdf);
   } finally {
     setBackNavigationLocked(false);
     if (checkDocBtn) checkDocBtn.disabled = false;

@@ -425,8 +425,9 @@ function hideScanTroubleshooting(): void {
 function showScanTroubleshooting(
   rawMessage: string,
   showInlineNotice: boolean,
+  source: ScanSource = getSelectedScanSource(),
 ): string {
-  const guide = getScanTroubleshootingGuide(rawMessage);
+  const guide = getScanTroubleshootingGuide(rawMessage, source);
   const userFriendlyTitle = guide.title;
 
   if (errorSubtext) {

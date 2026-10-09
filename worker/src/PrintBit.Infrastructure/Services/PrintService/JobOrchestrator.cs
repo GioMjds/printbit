@@ -92,6 +92,7 @@ public sealed class JobOrchestrator : IJobOrchestrator
 
         using var preparedScope = prepared;
         var totalCopies = Math.Max(1, request.Settings.Copies);
+        var effectivePageRange = prepared.IsPassThrough ? request.Settings.PageRange : null;
         var dispatchSettings = new PrintJobSettings
         {
             Copies = totalCopies,
@@ -104,7 +105,7 @@ public sealed class JobOrchestrator : IJobOrchestrator
             // fits the page to the printer's printable margins (matching driver "Fit to Page")
             // and avoids physical hardware border cutouts.
             Scaling = request.Settings.Scaling,
-            PageRange = null,
+            PageRange = effectivePageRange,
             Duplex = false
         };
 
@@ -121,7 +122,7 @@ public sealed class JobOrchestrator : IJobOrchestrator
 
         var pagesToPrint = GetPagesInRange(
             pdfPageCount,
-            null);
+            effectivePageRange);
         if (pagesToPrint.Count == 0)
         {
             return PrintJobResult.Failed(

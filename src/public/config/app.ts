@@ -143,14 +143,14 @@ interface PrintQuote {
   meteredCoveragePercentage?: number;
   isEntirelyBlank?: boolean;
   blankPageCount?: number;
-  pageBreakdown?: Array<{
+  pageBreakdown?: {
     pageNumber: number;
     isColor: boolean;
     coverage: number;
     coverageTier: string;
     printCost: number;
     isBlank?: boolean;
-  }>;
+  }[];
 }
 
 interface PreviewConfig {
@@ -1697,6 +1697,7 @@ function applyDuplexAvailability(enabled: boolean): void {
 
 function getIsDuplex(): boolean {
   if (!duplexPrintingEnabled) return false;
+  if (pageModeSingle?.checked) return false;
   return (
     document.querySelector<HTMLInputElement>(
       'input[name="duplex"][value="duplex"]:checked',

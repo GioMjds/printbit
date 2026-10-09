@@ -439,6 +439,8 @@ public sealed class Naps2ScannerService : IScannerService
         sb.Append(colorMode.Equals("grayscale", StringComparison.OrdinalIgnoreCase)
             ? "--bitdepth gray "
             : "--bitdepth color ");
+        sb.Append("-- jpegquality 75 ");
+        sb.Append("-- disableocr ");
         sb.Append("--force --verbose ");
 
         var isFeeder = source.Equals("adf", StringComparison.OrdinalIgnoreCase)

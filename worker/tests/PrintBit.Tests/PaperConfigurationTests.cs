@@ -102,4 +102,18 @@ public class PaperConfigurationTests
         var result = NativePdfPrinter.MapPaperKind(paperSize);
         Assert.Equal(expectedKind, result);
     }
+
+    [Fact]
+    public void FindPaper_WhenFolioMissing_FallsBackToLegal()
+    {
+        var settings = new PrinterSettings();
+        // Microsoft Print to PDF has Legal (RawKind 5) but lacks Folio (RawKind 14)
+        if (PrinterSettings.InstalledPrinters.Cast<string>().Any(p => p.Contains("PDF", StringComparison.OrdinalIgnoreCase)))
+        {
+            settings.PrinterName = "Microsoft Print to PDF";
+            var paper = NativePdfPrinter.FindPaper(settings, "Long");
+            Assert.NotNull(paper);
+            Assert.True(paper.Kind == PaperKind.Legal || paper.RawKind == 5);
+        }
+    }
 }

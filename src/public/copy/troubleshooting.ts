@@ -17,10 +17,17 @@ const ADF_PAPER_JAM_GUIDE = {
   ],
 } satisfies CopyTroubleshootingGuide;
 
-const NON_FEEDER_FAILURE_GUIDE = {
-  summary: 'Could not complete scanner check. Please try again.',
-  causes: [],
-  steps: [],
+const FLATBED_FAILURE_GUIDE = {
+  summary: 'Could not detect or scan document on the glass.',
+  causes: [
+    'Document is not placed flat on the scanner glass.',
+    'Scanner lid may be open or scanner is busy.',
+  ],
+  steps: [
+    'Place your document face-down flat against the top-left corner of the glass.',
+    'Close the scanner lid completely.',
+    'Tap Retry.',
+  ],
 } satisfies CopyTroubleshootingGuide;
 
 export function isAdfPaperJam(rawMessage: string, usesAdf: boolean): boolean {
@@ -35,5 +42,5 @@ export function getCopyTroubleshootingGuide(
 ): CopyTroubleshootingGuide {
   return isAdfPaperJam(rawMessage, usesAdf)
     ? ADF_PAPER_JAM_GUIDE
-    : NON_FEEDER_FAILURE_GUIDE;
+    : FLATBED_FAILURE_GUIDE;
 }

@@ -69,6 +69,45 @@ const GUIDES = {
   },
 } satisfies Record<ScanFailureCause, ScanTroubleshootingGuide>;
 
+const GLASS_GUIDES: Partial<Record<ScanFailureCause, ScanTroubleshootingGuide>> = {
+  paper_jam: {
+    title: 'Scanner check needed',
+    summary: 'Check the scanner glass and lid, then try again.',
+    checks: [
+      'Make sure the scanner lid is completely closed.',
+      'Ensure the document is lying flat on the glass.',
+      'Tap Scan to try again.',
+    ],
+  },
+  empty_feeder: {
+    title: 'No document detected',
+    summary: 'Place your document face-down on the glass, then try again.',
+    checks: [
+      'Place your document face-down on the scanner glass.',
+      'Align it with the top-left corner marks.',
+      'Close the scanner lid completely, then try again.',
+    ],
+  },
+  multi_feed: {
+    title: 'Scanner check needed',
+    summary: 'Check the document on the glass, then try again.',
+    checks: [
+      'Ensure only one sheet is placed on the scanner glass.',
+      'Make sure the document is flat and smooth.',
+      'Tap Scan to try again.',
+    ],
+  },
+  unknown: {
+    title: 'Let’s try that again',
+    summary: 'Check your document on the scanner glass, then try again.',
+    checks: [
+      'Place the document face-down flat on the glass.',
+      'Make sure the scanner lid is closed.',
+      'Tap Scan to try again.',
+    ],
+  },
+};
+
 function classifyScanFailure(rawMessage: string): ScanFailureCause {
   const message = rawMessage.toLowerCase();
 
@@ -117,6 +156,11 @@ function classifyScanFailure(rawMessage: string): ScanFailureCause {
 
 export function getScanTroubleshootingGuide(
   rawMessage: string,
+  source: 'feeder' | 'glass' = 'feeder',
 ): ScanTroubleshootingGuide {
-  return GUIDES[classifyScanFailure(rawMessage)];
+  const cause = classifyScanFailure(rawMessage);
+  if (source === 'glass' && GLASS_GUIDES[cause]) {
+    return GLASS_GUIDES[cause]!;
+  }
+  return GUIDES[cause];
 }
