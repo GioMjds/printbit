@@ -10,6 +10,7 @@ import {
   ESP32_KIOSK_SUBNET_PREFIX,
   ESP32_KIOSK_IP,
   PORT,
+  NETWORK_PROVIDER,
 } from '@/config/http.config';
 import { findMatchingIpv4ForSubnet, getLocalIPv4 } from '@/utils/network';
 import { sendKioskIpAnnouncement } from './hardware-state-projection';
@@ -109,6 +110,9 @@ export function detectEsp32KioskIp(
 export async function registerKioskWithEsp32(
   targetIp?: string,
 ): Promise<boolean> {
+  if (NETWORK_PROVIDER !== 'esp32') {
+    return true;
+  }
   const kioskIp = targetIp?.trim() || detectEsp32KioskIp();
 
   if (!kioskIp) {
@@ -295,13 +299,17 @@ export class HotspotService {
     }
 
     this.running = true;
-    this.deps.logger.log('[HOTSPOT] ESP32 provider enabled');
-    void this.startEsp32RegistrationLoop().catch((error) => {
-      this.deps.logger.warn(
-        `[HOTSPOT] Initial registration attempt failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    });
-    markWatchdogHeartbeat('hotspot', { running: true, provider: 'esp32' });
+    if (NETWORK_PROVIDER === 'esp32') {
+      this.deps.logger.log('[HOTSPOT] ESP32 provider enabled');
+      void this.startEsp32RegistrationLoop().catch((error) => {
+        this.deps.logger.warn(
+          `[HOTSPOT] Initial registration attempt failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    } else {
+      this.deps.logger.log(`[HOTSPOT] Provider active: ${NETWORK_PROVIDER} (ESP32 HTTP registration bypassed)`);
+    }
+    markWatchdogHeartbeat('hotspot', { running: true, provider: NETWORK_PROVIDER === 'esp32' ? 'esp32' : 'windows' });
     setWatchdogComponentState(
       'hotspot',
       'healthy',
