@@ -141,6 +141,50 @@ describe('printer-guard', () => {
     expect(titleEl?.textContent).toContain('Bukas ang Takip ng Printer');
   });
 
+  it('filters out non-fatal errors in kiosk_wide_only mode, but shows fatal errors', async () => {
+    // In kiosk_wide_only mode, on-load E_COVER_OPEN is filtered out
+    await initPrinterGuard(mockSocket, { mode: 'kiosk_wide_only' });
+    const overlay = document.querySelector('.printer-error-guide-overlay');
+    expect(overlay?.hasAttribute('hidden')).toBe(true);
+
+    // Socket sending E_OUTPUT_TRAY is also filtered out
+    socketHandlers['printer:error-guide-update']({
+      activeError: {
+        code: 'E_OUTPUT_TRAY',
+        tier: 'Customer',
+        autoClear: true,
+        locksCoinSlot: true,
+        lookAtPrinterScreen: true,
+        jobId: null,
+        jobRequiresStaff: false,
+        firstSeenAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+        occurrences: 1,
+        status: 'active',
+      },
+    });
+    expect(overlay?.hasAttribute('hidden')).toBe(true);
+
+    // Socket sending E_INK_OUT is rendered
+    socketHandlers['printer:error-guide-update']({
+      activeError: {
+        code: 'E_INK_OUT',
+        tier: 'Staff',
+        autoClear: false,
+        locksCoinSlot: true,
+        lookAtPrinterScreen: false,
+        jobId: null,
+        jobRequiresStaff: false,
+        firstSeenAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+        occurrences: 1,
+        status: 'active',
+      },
+    });
+    expect(overlay?.hasAttribute('hidden')).toBe(false);
+    expect(document.querySelector('.printer-error-guide-title')?.textContent).toContain('Ink Tank Empty');
+  });
+
   it('cleans up socket listeners and removes modal on destroyPrinterGuard', async () => {
     await initPrinterGuard(mockSocket);
     expect(mockSocket.on).toHaveBeenCalledWith('printer:error-guide-update', expect.any(Function));

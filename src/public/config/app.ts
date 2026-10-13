@@ -23,6 +23,7 @@ import {
   formatPricingGuide,
 } from '../shared/pricing-guide';
 import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
+import { initPrinterGuard } from '@/guards/printer-guard';
 import { CustomRangeBuilder } from './custom-range-builder';
 import { buildColorDetectionEvidence } from './detection-evidence';
 import {
@@ -38,6 +39,7 @@ export { };
 
 void initKioskLocalization();
 attachUiBlockingOverlay();
+void initPrinterGuard(null, { mode: 'kiosk_wide_only' });
 
 void initializePageIdleTimeout({
   showWarningModal: true,

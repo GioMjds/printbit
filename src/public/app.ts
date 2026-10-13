@@ -16,6 +16,7 @@ import {
   formatCopyPricingGuide,
   formatScanPricingGuide,
 } from './shared/pricing-guide';
+import { initPrinterGuard } from '@/guards/printer-guard';
 
 type SocketLike = {
   on: (event: string, cb: (...args: unknown[]) => void) => void;
@@ -89,7 +90,9 @@ function syncFabVisibility(): void {
   document.body?.setAttribute('data-modal-open', String(shouldHide));
   if (typeof document.querySelectorAll === 'function') {
     document
-      .querySelectorAll<HTMLElement>('.kiosk-fab, .printbit-language-fab, .home-low-ink-fab')
+      .querySelectorAll<HTMLElement>(
+        '.kiosk-fab, .printbit-language-fab, .home-low-ink-fab, .home-ink-out-fab',
+      )
       .forEach((fab) => {
         fab.classList.toggle('is-hidden', shouldHide);
         fab.setAttribute('aria-hidden', String(shouldHide));
@@ -111,13 +114,21 @@ const ioFactory = (
 const homeSocket = typeof ioFactory === 'function' ? ioFactory() : null;
 attachPowerSafetyOverlay({ socket: homeSocket });
 attachUiBlockingOverlay({ socket: homeSocket });
+void initPrinterGuard(homeSocket, { mode: 'kiosk_wide_only' });
 
 const homeLowInkWarning = document.getElementById('homeLowInkWarning');
+const homeInkOutWarning = document.getElementById('homeInkOutWarning');
 
 function setHomeLowInkWarningVisible(visible: boolean): void {
   if (!homeLowInkWarning) return;
   homeLowInkWarning.classList.toggle('hidden', !visible);
   homeLowInkWarning.setAttribute('aria-hidden', String(!visible));
+}
+
+function setHomeInkOutWarningVisible(visible: boolean): void {
+  if (!homeInkOutWarning) return;
+  homeInkOutWarning.classList.toggle('hidden', !visible);
+  homeInkOutWarning.setAttribute('aria-hidden', String(!visible));
 }
 
 if (homeSocket) {
@@ -135,21 +146,32 @@ if (homeSocket) {
     setHomeLowInkWarningVisible(active);
   });
 
-  homeSocket.on('printer:simulation-state', (payload: unknown) => {
+  homeSocket.on('printer:ink-out-warning', (payload: unknown) => {
     const active = Boolean(
       payload &&
         typeof payload === 'object' &&
-        (payload as { activeError?: string | null }).activeError === 'low_ink',
+        (payload as { active?: boolean }).active,
     );
-    setHomeLowInkWarningVisible(active);
+    setHomeInkOutWarningVisible(active);
+  });
+
+  homeSocket.on('printer:simulation-state', (payload: unknown) => {
+    const activeError =
+      payload && typeof payload === 'object'
+        ? (payload as { activeError?: string | null }).activeError
+        : null;
+    setHomeLowInkWarningVisible(activeError === 'low_ink');
+    setHomeInkOutWarningVisible(activeError === 'ink_out');
   });
 
   homeSocket.on('printer:simulation-cleared', () => {
     setHomeLowInkWarningVisible(false);
+    setHomeInkOutWarningVisible(false);
   });
 
   homeSocket.on('printerStatusRestored', () => {
     setHomeLowInkWarningVisible(false);
+    setHomeInkOutWarningVisible(false);
   });
 }
 
@@ -158,6 +180,9 @@ void fetch('/api/printer/simulation-status')
   .then((data: { activeError?: string | null } | null) => {
     if (data?.activeError === 'low_ink') {
       setHomeLowInkWarningVisible(true);
+    }
+    if (data?.activeError === 'ink_out') {
+      setHomeInkOutWarningVisible(true);
     }
   })
   .catch(() => {});

@@ -66,8 +66,20 @@ interface RecoveredPayload {
   timestamp?: string;
 }
 
+export interface PrinterGuardOptions {
+  /**
+   * Filter mode for active error display:
+   * - 'all' (default): displays all errors (e.g. Confirm page)
+   * - 'kiosk_wide_only': displays only fatal kiosk-wide errors ('E_INK_OUT', 'E_OFFLINE', 'E_SERVICE')
+   */
+  mode?: 'all' | 'kiosk_wide_only';
+}
+
+const KIOSK_WIDE_ERROR_CODES = new Set(['E_INK_OUT', 'E_OFFLINE', 'E_SERVICE']);
+
 // ── Module-level state ────────────────────────────────────────────────────────
 
+let _guardOptions: PrinterGuardOptions = { mode: 'all' };
 let _socket: SocketLike | null = null;
 let _malfunctionHandler: ((p: unknown) => void) | null = null;
 let _recoveredHandler: ((p: unknown) => void) | null = null;
@@ -166,6 +178,13 @@ async function checkStatusOnLoad(): Promise<void> {
   }
 }
 
+function shouldDisplayError(code: string): boolean {
+  if (_guardOptions.mode === 'kiosk_wide_only') {
+    return KIOSK_WIDE_ERROR_CODES.has(code);
+  }
+  return true;
+}
+
 async function checkActiveErrorOnLoad(): Promise<void> {
   try {
     const res = await fetch('/api/printer/active-error');
@@ -178,7 +197,7 @@ async function checkActiveErrorOnLoad(): Promise<void> {
     }
 
     const data = (await res.json()) as ActiveErrorResponse;
-    if (data.activeError) {
+    if (data.activeError && shouldDisplayError(data.activeError.code)) {
       _errorGuideModal?.render(data.activeError);
       applyState(true, data.activeError.code);
     } else {
@@ -211,7 +230,7 @@ function onRecovered(raw: unknown): void {
 function onErrorGuideUpdate(raw: unknown): void {
   const payload = raw as { activeError: ActivePrinterErrorState | null } | null;
   const activeError = payload?.activeError;
-  if (activeError) {
+  if (activeError && shouldDisplayError(activeError.code)) {
     _errorGuideModal?.render(activeError);
     applyState(true, activeError.code);
   } else {
@@ -235,25 +254,35 @@ function onErrorGuideUpdate(raw: unknown): void {
  *   const socket = io();
  *   initPrinterGuard(socket);
  */
-export async function initPrinterGuard(socket: SocketLike): Promise<void> {
+export async function initPrinterGuard(
+  socket?: SocketLike | null,
+  options?: PrinterGuardOptions,
+): Promise<void> {
   // Tear down any previous bindings (guards against double-init / hot reload)
   destroyPrinterGuard();
 
-  _socket = socket;
+  _guardOptions = options ?? { mode: 'all' };
 
-  _errorGuideModal = new PrinterErrorGuideModalController({
-    container: document.body,
-    getLanguage: getCurrentLanguage,
-  });
+  const ioFactory = (window as unknown as { io?: () => SocketLike }).io;
+  _socket = socket ?? (typeof ioFactory === 'function' ? ioFactory() : null);
 
-  // Store bound handlers so they can be removed later
-  _malfunctionHandler = (raw: unknown) => onMalfunction(raw);
-  _recoveredHandler = (raw: unknown) => onRecovered(raw);
-  _errorGuideUpdateHandler = (raw: unknown) => onErrorGuideUpdate(raw);
+  if (typeof document !== 'undefined' && document.body) {
+    _errorGuideModal = new PrinterErrorGuideModalController({
+      container: document.body,
+      getLanguage: getCurrentLanguage,
+    });
+  }
 
-  socket.on('printerMalfunction', _malfunctionHandler);
-  socket.on('printerRecovered', _recoveredHandler);
-  socket.on('printer:error-guide-update', _errorGuideUpdateHandler);
+  if (_socket) {
+    // Store bound handlers so they can be removed later
+    _malfunctionHandler = (raw: unknown) => onMalfunction(raw);
+    _recoveredHandler = (raw: unknown) => onRecovered(raw);
+    _errorGuideUpdateHandler = (raw: unknown) => onErrorGuideUpdate(raw);
+
+    _socket.on('printerMalfunction', _malfunctionHandler);
+    _socket.on('printerRecovered', _recoveredHandler);
+    _socket.on('printer:error-guide-update', _errorGuideUpdateHandler);
+  }
 
   // Block the UI immediately while the fetch is in-flight — the overlay
   // starts hidden by default so we briefly show "checking..." state by
@@ -263,7 +292,7 @@ export async function initPrinterGuard(socket: SocketLike): Promise<void> {
 
   await Promise.all([checkStatusOnLoad(), checkActiveErrorOnLoad()]);
 
-  console.log('[printer-guard] initialized');
+  console.log('[printer-guard] initialized, mode=' + _guardOptions.mode);
 }
 
 /**

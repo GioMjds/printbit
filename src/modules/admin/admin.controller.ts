@@ -2837,9 +2837,14 @@ export class AdminController {
     const errorType = req.body?.errorType as SimulatedPrinterError | undefined;
     const validErrors: SimulatedPrinterError[] = [
       'low_ink',
+      'ink_out',
       'out_of_paper',
       'adf_error',
       'paper_jam',
+      'cover_open',
+      'offline',
+      'service_required',
+      'output_tray',
     ];
     if (!errorType || !validErrors.includes(errorType)) {
       return res.status(400).json({

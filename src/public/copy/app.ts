@@ -15,11 +15,13 @@ import {
   isAdfPaperJam,
 } from './troubleshooting';
 import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
+import { initPrinterGuard } from '@/guards/printer-guard';
 
 export {};
 
 void initKioskLocalization();
 attachUiBlockingOverlay();
+void initPrinterGuard(null, { mode: 'kiosk_wide_only' });
 
 // ── Idle Timeout with Warning Modal (Copy Page) ───────────────────────────────────────────────
 

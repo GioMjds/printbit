@@ -505,6 +505,7 @@
                     </div>
                   </header>
                   <div class="system-panel__body">
+                    <p class="system-panel__group-label">Customer Printer Errors</p>
                     <div class="sim-grid">
                       <button id="simLowInkBtn" type="button" class="sim-card-btn sim-card-btn--amber">
                         <div class="sim-card-btn__top">
@@ -540,6 +541,54 @@
                         </div>
                         <span class="sim-card-btn__title">Paper Jam</span>
                         <span class="sim-card-btn__desc">Jam in confirm during print (no buttons; admin clear only)</span>
+                      </button>
+
+                      <button id="simCoverOpenBtn" type="button" class="sim-card-btn sim-card-btn--amber">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">Confirm &amp; Print</span>
+                          <span class="sim-card-btn__num">5</span>
+                        </div>
+                        <span class="sim-card-btn__title">Cover Open</span>
+                        <span class="sim-card-btn__desc">Printer cover is open; customer must close it to continue</span>
+                      </button>
+
+                      <button id="simOutputTrayBtn" type="button" class="sim-card-btn sim-card-btn--amber">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">Confirm &amp; Print</span>
+                          <span class="sim-card-btn__num">6</span>
+                        </div>
+                        <span class="sim-card-btn__title">Output Tray</span>
+                        <span class="sim-card-btn__desc">Output tray closed or full; customer must open or clear it</span>
+                      </button>
+                    </div>
+
+                    <p class="system-panel__group-label system-panel__group-label--staff" style="margin-top: 16px;">Staff / Technician Errors</p>
+                    <div class="sim-grid">
+                      <button id="simInkOutBtn" type="button" class="sim-card-btn sim-card-btn--danger">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">Confirm &amp; Print</span>
+                          <span class="sim-card-btn__num">7</span>
+                        </div>
+                        <span class="sim-card-btn__title">Ink Out (Empty)</span>
+                        <span class="sim-card-btn__desc">Ink tank empty — staff must refill; blocks printing</span>
+                      </button>
+
+                      <button id="simOfflineBtn" type="button" class="sim-card-btn sim-card-btn--danger">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">All Pages</span>
+                          <span class="sim-card-btn__num">8</span>
+                        </div>
+                        <span class="sim-card-btn__title">Printer Offline</span>
+                        <span class="sim-card-btn__desc">Printer disconnected; staff must check power and cables</span>
+                      </button>
+
+                      <button id="simServiceBtn" type="button" class="sim-card-btn sim-card-btn--danger">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">All Pages</span>
+                          <span class="sim-card-btn__num">9</span>
+                        </div>
+                        <span class="sim-card-btn__title">Service Required</span>
+                        <span class="sim-card-btn__desc">Waste ink pad full or fatal error; technician needed</span>
                       </button>
                     </div>
 

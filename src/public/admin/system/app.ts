@@ -93,6 +93,21 @@ const simAdfErrorBtn = document.getElementById(
 const simPaperJamBtn = document.getElementById(
   'simPaperJamBtn',
 ) as HTMLButtonElement | null;
+const simInkOutBtn = document.getElementById(
+  'simInkOutBtn',
+) as HTMLButtonElement | null;
+const simCoverOpenBtn = document.getElementById(
+  'simCoverOpenBtn',
+) as HTMLButtonElement | null;
+const simOfflineBtn = document.getElementById(
+  'simOfflineBtn',
+) as HTMLButtonElement | null;
+const simServiceBtn = document.getElementById(
+  'simServiceBtn',
+) as HTMLButtonElement | null;
+const simOutputTrayBtn = document.getElementById(
+  'simOutputTrayBtn',
+) as HTMLButtonElement | null;
 const clearPrinterErrorsBtn = document.getElementById(
   'clearPrinterErrorsBtn',
 ) as HTMLButtonElement | null;
@@ -667,10 +682,14 @@ function updateSimulationBadge(activeError: string | null): void {
 
   const labels: Record<string, { label: string; danger?: boolean }> = {
     low_ink: { label: 'Simulated: Low Ink' },
+    ink_out: { label: 'Simulated: Ink Out (Empty)', danger: true },
     out_of_paper: { label: 'Simulated: Out of Paper' },
     adf_error: { label: 'Simulated: ADF Error' },
     paper_jam: { label: 'Simulated: Paper Jam', danger: true },
-    // Add more printer errors if needed in the future
+    cover_open: { label: 'Simulated: Cover Open' },
+    offline: { label: 'Simulated: Printer Offline', danger: true },
+    service_required: { label: 'Simulated: Service Required', danger: true },
+    output_tray: { label: 'Simulated: Output Tray' },
   };
 
   const item = labels[activeError] || { label: `Simulated: ${activeError}` };
@@ -743,6 +762,11 @@ simLowInkBtn?.addEventListener('click', () => void triggerSimulation('low_ink'))
 simOutOfPaperBtn?.addEventListener('click', () => void triggerSimulation('out_of_paper'));
 simAdfErrorBtn?.addEventListener('click', () => void triggerSimulation('adf_error'));
 simPaperJamBtn?.addEventListener('click', () => void triggerSimulation('paper_jam'));
+simInkOutBtn?.addEventListener('click', () => void triggerSimulation('ink_out'));
+simCoverOpenBtn?.addEventListener('click', () => void triggerSimulation('cover_open'));
+simOfflineBtn?.addEventListener('click', () => void triggerSimulation('offline'));
+simServiceBtn?.addEventListener('click', () => void triggerSimulation('service_required'));
+simOutputTrayBtn?.addEventListener('click', () => void triggerSimulation('output_tray'));
 clearPrinterErrorsBtn?.addEventListener('click', () => void triggerClearPrinterErrors());
 
 // ── Socket.IO — live printer updates ─────────────────────────────────────────

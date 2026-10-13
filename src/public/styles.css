@@ -2448,3 +2448,81 @@ html[data-high-contrast='true'] .home-low-ink-fab {
   box-shadow: none !important;
 }
 
+/* ── Homepage Ink Out Floating FAB Pill (non-button, danger — printing blocked) ─ */
+.home-ink-out-fab {
+  position: fixed;
+  top: 16px;
+  right: 106px; /* Same slot as Low Ink — mutually exclusive */
+  z-index: 90;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 84px;
+  min-height: 76px;
+  padding: 8px 4px;
+  border-radius: 22px;
+  background: rgba(100, 10, 10, 0.92);
+  border: 1px solid rgba(239, 68, 68, 0.65);
+  color: #f87171;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.42),
+    0 0 24px rgba(239, 68, 68, 0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none; /* Strictly a non-button status notice */
+  user-select: none;
+  transition:
+    opacity 240ms ease,
+    visibility 240ms ease,
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: inkOutPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes inkOutPulse {
+  0%, 100% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42), 0 0 24px rgba(239, 68, 68, 0.22); }
+  50%       { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42), 0 0 32px rgba(239, 68, 68, 0.50); }
+}
+
+.home-ink-out-fab.hidden {
+  display: none !important;
+}
+
+.home-ink-out-fab.is-hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.home-ink-out-fab__icon {
+  width: 24px;
+  height: 24px;
+  color: #f87171;
+  flex-shrink: 0;
+}
+
+.home-ink-out-fab__label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #fca5a5;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .home-ink-out-fab {
+    top: 12px;
+    right: 104px;
+  }
+}
+
+html[data-high-contrast='true'] .home-ink-out-fab {
+  background: #000 !important;
+  border: 2px solid #ef4444 !important;
+  color: #ef4444 !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+

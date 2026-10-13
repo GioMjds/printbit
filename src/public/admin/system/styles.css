@@ -677,6 +677,19 @@
   width: 100%;
 }
 
+.system-panel__group-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: rgba(167, 170, 225, 0.55);
+  margin: 0 0 10px 2px;
+}
+
+.system-panel__group-label--staff {
+  color: rgba(248, 113, 113, 0.65);
+}
+
 @media (max-width: 600px) {
   .sim-grid {
     grid-template-columns: 1fr;

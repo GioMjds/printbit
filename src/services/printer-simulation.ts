@@ -8,9 +8,14 @@ import { unlockOwnedCoinSlot, lockCoinSlot } from './hardware-state-projection';
 
 export type SimulatedPrinterError =
   | 'low_ink'
+  | 'ink_out'
   | 'out_of_paper'
   | 'adf_error'
-  | 'paper_jam';
+  | 'paper_jam'
+  | 'cover_open'
+  | 'offline'
+  | 'service_required'
+  | 'output_tray';
 
 export interface PrinterSimulationState {
   activeError: SimulatedPrinterError | null;
@@ -130,6 +135,140 @@ export function simulatePrinterError(
       });
       break;
     }
+
+    case 'ink_out': {
+      currentSimulation.message =
+        'Ink tank empty; printing locked until staff refills ink';
+      handlePrinterStatusUpdate('ink empty', '5');
+      io?.emit('printer:simulation-state', {
+        activeError: 'ink_out',
+        message: currentSimulation.message,
+      });
+      io?.emit('printer:ink-out-warning', { active: true });
+      io?.emit('printerStatusChanged', {
+        connected: true,
+        status: 'Ink Empty',
+        isLowOnToner: true,
+        inkTelemetryAvailable: true,
+        ink: [{ name: 'Black', level: 0, status: 'empty' }],
+      });
+      io?.emit('printerMalfunction', {
+        status: 'Ink Empty',
+        printError: {
+          code: 'E_INK_OUT',
+          severity: 'fatal',
+          userMessage: 'Printer ink tank is empty.',
+          hint: 'Please call staff to refill the ink.',
+          canRetry: false,
+          canDismiss: false,
+        },
+      });
+      break;
+    }
+
+    case 'cover_open': {
+      currentSimulation.message =
+        'Printer cover is open; customer must close it';
+      handlePrinterStatusUpdate('cover open', '7');
+      io?.emit('printer:simulation-state', {
+        activeError: 'cover_open',
+        message: currentSimulation.message,
+      });
+      io?.emit('printerStatusChanged', {
+        connected: true,
+        status: 'Cover Open',
+      });
+      io?.emit('printerMalfunction', {
+        status: 'Cover Open',
+        printError: {
+          code: 'E_COVER_OPEN',
+          severity: 'recoverable',
+          userMessage: 'The printer cover is open.',
+          hint: 'Please close the printer cover, then press OK on the printer screen if prompted.',
+          canRetry: true,
+          canDismiss: false,
+        },
+      });
+      break;
+    }
+
+    case 'offline': {
+      currentSimulation.message =
+        'Printer offline or disconnected; staff must check cables/power';
+      handlePrinterStatusUpdate('printer offline', '9');
+      io?.emit('printer:simulation-state', {
+        activeError: 'offline',
+        message: currentSimulation.message,
+      });
+      io?.emit('printerStatusChanged', {
+        connected: false,
+        status: 'Offline',
+      });
+      io?.emit('printerMalfunction', {
+        status: 'Offline',
+        printError: {
+          code: 'E_OFFLINE',
+          severity: 'fatal',
+          userMessage: 'Printer is offline or disconnected.',
+          hint: 'Please call staff to check printer power and cable connections.',
+          canRetry: false,
+          canDismiss: false,
+        },
+      });
+      break;
+    }
+
+    case 'service_required': {
+      currentSimulation.message =
+        'Printer service required; technician must be called';
+      handlePrinterStatusUpdate('service required', '10');
+      io?.emit('printer:simulation-state', {
+        activeError: 'service_required',
+        message: currentSimulation.message,
+      });
+      io?.emit('printerStatusChanged', {
+        connected: true,
+        status: 'Service Required',
+      });
+      io?.emit('printerMalfunction', {
+        status: 'Service Required',
+        printError: {
+          code: 'E_SERVICE',
+          severity: 'fatal',
+          userMessage: 'Printer requires service or maintenance.',
+          hint: 'Please call staff for technical assistance.',
+          canRetry: false,
+          canDismiss: false,
+        },
+      });
+      break;
+    }
+
+    case 'output_tray': {
+      currentSimulation.message =
+        'Output tray closed or full; customer must open or clear it';
+      handlePrinterStatusUpdate('output bin full', '11');
+      io?.emit('printer:simulation-state', {
+        activeError: 'output_tray',
+        message: currentSimulation.message,
+      });
+      io?.emit('printerStatusChanged', {
+        connected: true,
+        status: 'Output Tray',
+      });
+      io?.emit('printerMalfunction', {
+        status: 'Output Tray',
+        printError: {
+          code: 'E_OUTPUT_TRAY',
+          severity: 'recoverable',
+          userMessage: 'The output tray is closed or full.',
+          hint: 'Open or clear the output tray, then press OK on the printer screen if prompted.',
+          canRetry: true,
+          canDismiss: false,
+        },
+      });
+      break;
+    }
   }
 
   return { ...currentSimulation };
@@ -156,6 +295,7 @@ export function clearPrinterSimulation(): PrinterSimulationState {
   io?.emit('printer:simulation-state', { activeError: null, message: null });
   io?.emit('printer:simulation-cleared', {});
   io?.emit('printer:low-ink-warning', { active: false });
+  io?.emit('printer:ink-out-warning', { active: false });
   io?.emit('printerStatusRestored', { status: 'Ready' });
   io?.emit('printerRecovered', { connected: true, status: 'Idle' });
   io?.emit('printerStatusChanged', { connected: true, status: 'Idle' });

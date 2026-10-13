@@ -7,6 +7,7 @@ import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import { attachPowerSafetyOverlay } from '../shared/power-safety-overlay';
 import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
+import { initPrinterGuard } from '@/guards/printer-guard';
 import { resolveWifiTroubleshootingDetails } from '../shared/wifi-troubleshooting';
 import {
   mountLoadingAnimation,
@@ -15,6 +16,7 @@ import {
 
 attachPowerSafetyOverlay();
 attachUiBlockingOverlay();
+void initPrinterGuard(null, { mode: 'kiosk_wide_only' });
 
 type UploadedFile = {
   documentId?: string;

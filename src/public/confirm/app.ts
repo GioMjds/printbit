@@ -3158,6 +3158,20 @@ if (typeof ioFactory !== 'function') {
     handleErrorGuideUpdate(data?.activeError ?? null);
   });
 
+  connectedSocket.on('printer:simulation-state', (payload: unknown) => {
+    const data = payload as { activeError?: string | null } | null;
+    if (data?.activeError === 'paper_jam') {
+      renderPrinterError({
+        code: 'PAPER_JAM_PRINT',
+        severity: 'fatal',
+        userMessage: 'Paper jam detected in the printer.',
+        hint: 'A sheet of paper got stuck inside the printer during printing. Removable via admin control only.',
+        canRetry: false,
+        canDismiss: false,
+      });
+    }
+  });
+
   // Re-sync on printer malfunction or spooler failure
   connectedSocket.on('printerMalfunction', (payload: unknown) => {
     const status = payload as PrinterStatusPayload | null;
@@ -3395,12 +3409,30 @@ async function loadPrinterStatus(): Promise<void> {
 async function loadActivePrinterError(): Promise<void> {
   try {
     const res = await fetch('/api/printer/active-error');
-    if (!res.ok) return;
-    const data = (await res.json()) as {
-      activeError: ActivePrinterErrorState | null;
-    };
-    if (data.activeError) {
-      handleErrorGuideUpdate(data.activeError);
+    if (res.ok) {
+      const data = (await res.json()) as {
+        activeError: ActivePrinterErrorState | null;
+      };
+      if (data.activeError) {
+        handleErrorGuideUpdate(data.activeError);
+      }
+    }
+
+    const simRes = await fetch('/api/printer/simulation-status');
+    if (simRes.ok) {
+      const simData = (await simRes.json()) as {
+        activeError?: string | null;
+      };
+      if (simData.activeError === 'paper_jam') {
+        renderPrinterError({
+          code: 'PAPER_JAM_PRINT',
+          severity: 'fatal',
+          userMessage: 'Paper jam detected in the printer.',
+          hint: 'A sheet of paper got stuck inside the printer during printing. Removable via admin control only.',
+          canRetry: false,
+          canDismiss: false,
+        });
+      }
     }
   } catch {
     /* fallback */
