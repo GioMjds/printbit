@@ -442,6 +442,28 @@ body[data-idle-active='true'] :is(.kiosk-fab, .printbit-language-fab),
   transform: scale(0.85) !important;
 }
 
+/* ── Auto-hide Low Ink FAB when any modal/idle/overlay appears ─────────────── */
+body:has(.pricing-overlay.is-open) .home-low-ink-fab,
+body:has(.guide-overlay.is-visible) .home-low-ink-fab,
+body:has(.report-overlay.is-visible) .home-low-ink-fab,
+body:has(.feedback-overlay.is-visible) .home-low-ink-fab,
+body:has(.wifi-overlay.is-visible) .home-low-ink-fab,
+body:has(.admin-overlay.is-visible) .home-low-ink-fab,
+body:has(.modal.is-visible) .home-low-ink-fab,
+body:has(.modal-overlay.is-visible) .home-low-ink-fab,
+body:has(.onboarding-overlay.is-visible) .home-low-ink-fab,
+body:has(.printer-error-modal-overlay:not([hidden])) .home-low-ink-fab,
+body:has(.idle-overlay.is-visible) .home-low-ink-fab,
+body:has(.idle-warning-overlay[style*='display: flex']) .home-low-ink-fab,
+body:has(.idle-warning-overlay.is-visible) .home-low-ink-fab,
+body:has(.idle-warning-overlay:not([hidden]):not([style*='display: none'])) .home-low-ink-fab,
+body:has(.power-safety-overlay.is-visible) .home-low-ink-fab,
+body[data-modal-open='true'] .home-low-ink-fab,
+body[data-idle-active='true'] .home-low-ink-fab {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
 /* ── Idle Warning Overlay (Pure Typography Fullscreen) ────────────────────── */
 
 .idle-warning-overlay {

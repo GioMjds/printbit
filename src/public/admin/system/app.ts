@@ -79,6 +79,27 @@ const printerSelectionHint = document.getElementById(
   'printerSelectionHint',
 ) as HTMLElement | null;
 
+// ── Error simulation refs ────────────────────────────────────────────────────
+
+const simLowInkBtn = document.getElementById(
+  'simLowInkBtn',
+) as HTMLButtonElement | null;
+const simOutOfPaperBtn = document.getElementById(
+  'simOutOfPaperBtn',
+) as HTMLButtonElement | null;
+const simAdfErrorBtn = document.getElementById(
+  'simAdfErrorBtn',
+) as HTMLButtonElement | null;
+const simPaperJamBtn = document.getElementById(
+  'simPaperJamBtn',
+) as HTMLButtonElement | null;
+const clearPrinterErrorsBtn = document.getElementById(
+  'clearPrinterErrorsBtn',
+) as HTMLButtonElement | null;
+const simStatusBadge = document.getElementById(
+  'simStatusBadge',
+) as HTMLElement | null;
+
 // ── Spooler alert refs ────────────────────────────────────────────────────────
 
 const spoolerAlert = document.getElementById(
@@ -634,6 +655,96 @@ spoolerAlertDismiss?.addEventListener('click', () => {
   if (spoolerAlertMsg) spoolerAlertMsg.textContent = '';
 });
 
+// ── Error simulation actions ─────────────────────────────────────────────────
+
+function updateSimulationBadge(activeError: string | null): void {
+  if (!simStatusBadge) return;
+  if (!activeError) {
+    simStatusBadge.textContent = 'Normal · No Error';
+    simStatusBadge.className = 'sim-status-badge sim-status-badge--idle';
+    return;
+  }
+
+  const labels: Record<string, { label: string; danger?: boolean }> = {
+    low_ink: { label: 'Simulated: Low Ink' },
+    out_of_paper: { label: 'Simulated: Out of Paper' },
+    adf_error: { label: 'Simulated: ADF Error' },
+    paper_jam: { label: 'Simulated: Paper Jam', danger: true },
+    // Add more printer errors if needed in the future
+  };
+
+  const item = labels[activeError] || { label: `Simulated: ${activeError}` };
+  simStatusBadge.textContent = item.label;
+  simStatusBadge.className = item.danger
+    ? 'sim-status-badge sim-status-badge--danger'
+    : 'sim-status-badge sim-status-badge--active';
+}
+
+async function triggerSimulation(errorType: string): Promise<void> {
+  setMessage(`Simulating ${errorType.replace('_', ' ')}...`);
+  try {
+    const res = await apiFetch('/api/admin/printer/simulate-error', {
+      method: 'POST',
+      body: JSON.stringify({ errorType }),
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      error?: string;
+      message?: string;
+      simulation?: { activeError?: string | null };
+    };
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error ?? 'Simulation failed.');
+    }
+    updateSimulationBadge(data.simulation?.activeError ?? errorType);
+    setMessage(data.message ?? `Simulated ${errorType} successfully.`);
+    void loadData().catch(showRefreshError);
+  } catch (err) {
+    setMessage(err instanceof Error ? err.message : 'Simulation failed.');
+  }
+}
+
+async function triggerClearPrinterErrors(): Promise<void> {
+  setMessage('Clearing printer error messages...');
+  try {
+    const res = await apiFetch('/api/admin/printer/clear-errors', {
+      method: 'POST',
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      error?: string;
+      message?: string;
+    };
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error ?? 'Failed to clear errors.');
+    }
+    updateSimulationBadge(null);
+    setMessage(data.message ?? 'Printer errors cleared successfully.');
+    void loadData().catch(showRefreshError);
+  } catch (err) {
+    setMessage(err instanceof Error ? err.message : 'Failed to clear errors.');
+  }
+}
+
+async function loadSimulationStatus(): Promise<void> {
+  try {
+    const res = await apiFetch('/api/admin/printer/simulation-status');
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      simulation?: { activeError?: string | null };
+    };
+    updateSimulationBadge(data.simulation?.activeError ?? null);
+  } catch {
+    // Ignore fetch error
+  }
+}
+
+simLowInkBtn?.addEventListener('click', () => void triggerSimulation('low_ink'));
+simOutOfPaperBtn?.addEventListener('click', () => void triggerSimulation('out_of_paper'));
+simAdfErrorBtn?.addEventListener('click', () => void triggerSimulation('adf_error'));
+simPaperJamBtn?.addEventListener('click', () => void triggerSimulation('paper_jam'));
+clearPrinterErrorsBtn?.addEventListener('click', () => void triggerClearPrinterErrors());
+
 // ── Socket.IO — live printer updates ─────────────────────────────────────────
 
 // socket.io client is loaded via <script src="/socket.io/socket.io.js">
@@ -718,6 +829,15 @@ function connectSocket(): void {
     }
     spoolerAlert?.classList.remove('hidden');
   });
+
+  socket.on('printer:simulation-state', (payload: unknown) => {
+    const p = payload as { activeError?: string | null } | null;
+    updateSimulationBadge(p?.activeError ?? null);
+  });
+
+  socket.on('printer:simulation-cleared', () => {
+    updateSimulationBadge(null);
+  });
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -732,6 +852,8 @@ initAuth(async (signal) => {
   await loadData();
   if (signal.aborted) return;
   await loadPrinterSelection();
+  if (signal.aborted) return;
+  await loadSimulationStatus();
   if (signal.aborted) return;
   connectSocket();
 

@@ -42,6 +42,12 @@ import {
   runInkTelemetryDiagnostics,
 } from '@/services/printer-state-projection';
 import {
+  getPrinterSimulationState,
+  simulatePrinterError,
+  clearPrinterSimulation,
+  type SimulatedPrinterError,
+} from '@/services/printer-simulation';
+import {
   checkpointRecoverySession,
   getRecoveryStatusSnapshot,
   getSpoolerLifecycleRecord,
@@ -623,6 +629,24 @@ export class AdminController {
       requireAdminPin,
       adminTestPrintRateLimit,
       this.handleTestPrint,
+    );
+    this.router.get(
+      '/printer/simulation-status',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleGetPrinterSimulationStatus,
+    );
+    this.router.post(
+      '/printer/simulate-error',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleSimulatePrinterError,
+    );
+    this.router.post(
+      '/printer/clear-errors',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleClearPrinterErrors,
     );
 
     // ── Anomaly incidents routes ───────────────────────────────────────────────
@@ -2800,6 +2824,59 @@ export class AdminController {
         /* ignore — file may not exist if writeFileSync itself failed */
       }
     }
+  };
+
+  private handleGetPrinterSimulationStatus = (_req: Request, res: Response) => {
+    res.json({
+      ok: true,
+      simulation: getPrinterSimulationState(),
+    });
+  };
+
+  private handleSimulatePrinterError = async (req: Request, res: Response) => {
+    const errorType = req.body?.errorType as SimulatedPrinterError | undefined;
+    const validErrors: SimulatedPrinterError[] = [
+      'low_ink',
+      'out_of_paper',
+      'adf_error',
+      'paper_jam',
+    ];
+    if (!errorType || !validErrors.includes(errorType)) {
+      return res.status(400).json({
+        ok: false,
+        error: `Invalid errorType. Must be one of: ${validErrors.join(', ')}`,
+      });
+    }
+
+    const state = simulatePrinterError(errorType);
+
+    await this.adminService.appendAdminLog(
+      'admin_printer_simulated_error',
+      `Admin simulated printer error: "${errorType}".`,
+      { errorType, timestamp: state.timestamp },
+    );
+
+    res.json({
+      ok: true,
+      simulation: state,
+      message: `Simulated error "${errorType}" triggered successfully.`,
+    });
+  };
+
+  private handleClearPrinterErrors = async (_req: Request, res: Response) => {
+    const state = clearPrinterSimulation();
+
+    await this.adminService.appendAdminLog(
+      'admin_printer_errors_cleared',
+      'Admin cleared all printer error messages and restored ready state.',
+      { timestamp: new Date().toISOString() },
+    );
+
+    res.json({
+      ok: true,
+      simulation: state,
+      message: 'Printer error messages cleared successfully. Normal readiness restored.',
+    });
   };
 
   // ── Anomaly incidents handlers ─────────────────────────────────────────────

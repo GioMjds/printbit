@@ -554,3 +554,132 @@
     grid-column: span 1;
   }
 }
+
+/* ── Error Message Simulation ──────────────────────────────────────────────── */
+.sim-panel__header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.sim-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sim-status-badge--idle {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.sim-status-badge--active {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
+}
+
+.sim-status-badge--danger {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+
+.sim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sim-card-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--white);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  font-family: inherit;
+}
+
+.sim-card-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.sim-card-btn:active {
+  transform: translateY(0);
+}
+
+.sim-card-btn--amber:hover {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.sim-card-btn--danger:hover {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.sim-card-btn__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.sim-card-btn__badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--lavender);
+}
+
+.sim-card-btn__num {
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(167, 170, 225, 0.6);
+}
+
+.sim-card-btn__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sim-card-btn__desc {
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(167, 170, 225, 0.8);
+}
+
+.sim-actions-bar {
+  display: flex;
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .sim-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

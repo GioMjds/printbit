@@ -5,6 +5,7 @@ export interface ScanTroubleshootingGuide {
 }
 
 type ScanFailureCause =
+  | 'adf_error'
   | 'paper_jam'
   | 'empty_feeder'
   | 'multi_feed'
@@ -13,6 +14,16 @@ type ScanFailureCause =
   | 'unknown';
 
 const GUIDES = {
+  adf_error: {
+    title: 'Printer ADF Error Detected',
+    summary:
+      'Clear the printer ADF error first, then proceed with scanning on this kiosk screen.',
+    checks: [
+      'Go to the printer first to clear out the paper jam or error from the ADF feeder.',
+      'Check that the printer error indicator or screen is cleared and the printer is ready.',
+      'Proceed with scanning using this kiosk screen in PrintBit.',
+    ],
+  },
   paper_jam: {
     title: 'Paper jam in the feeder',
     summary: 'Remove the paper, clear the feeder, then try again.',
@@ -70,6 +81,16 @@ const GUIDES = {
 } satisfies Record<ScanFailureCause, ScanTroubleshootingGuide>;
 
 const GLASS_GUIDES: Partial<Record<ScanFailureCause, ScanTroubleshootingGuide>> = {
+  adf_error: {
+    title: 'Printer ADF Error Detected',
+    summary:
+      'Clear the printer ADF error first, then proceed with scanning on this kiosk screen.',
+    checks: [
+      'Go to the printer first to clear out the printer error and jammed paper from the ADF feeder.',
+      'Check that the printer screen is cleared and the printer is ready.',
+      'Proceed with scanning using this kiosk screen in PrintBit.',
+    ],
+  },
   paper_jam: {
     title: 'Scanner check needed',
     summary: 'Check the scanner glass and lid, then try again.',
@@ -111,6 +132,14 @@ const GLASS_GUIDES: Partial<Record<ScanFailureCause, ScanTroubleshootingGuide>> 
 function classifyScanFailure(rawMessage: string): ScanFailureCause {
   const message = rawMessage.toLowerCase();
 
+  if (
+    message.includes('adf') ||
+    message.includes('feeder error') ||
+    message.includes('feeder jam') ||
+    message.includes('automatic document feeder')
+  ) {
+    return 'adf_error';
+  }
   if (message.includes('jam') || message.includes('stuck')) return 'paper_jam';
   if (
     message.includes('multi-feed') ||

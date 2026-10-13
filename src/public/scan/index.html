@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="google" content="notranslate" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <link rel="stylesheet" href="/globals.css" />
     <link rel="stylesheet" href="/shared/kiosk-transition.css" />
     <title>Scan · PrintBit</title>
@@ -81,7 +84,17 @@
           </svg>
           <h1>Scan</h1>
         </div>
-        <div class="topbar-actions"><button type="button" class="document-care-fab" id="documentCareBtn" aria-haspopup="dialog" aria-controls="documentCareModal"><span aria-hidden="true">!</span></button></div>
+        <div class="topbar-actions">
+          <button
+            type="button"
+            class="document-care-fab"
+            id="documentCareBtn"
+            aria-haspopup="dialog"
+            aria-controls="documentCareModal"
+          >
+            <span aria-hidden="true">!</span>
+          </button>
+        </div>
       </header>
 
       <!-- ── Main two-column layout ── -->
@@ -184,8 +197,13 @@
                 </div>
               </div>
 
-              <!-- Error state -->
-              <div class="preview-state hidden" id="stateError">
+              <!-- Error state: one card that replaces the whole preview panel -->
+              <div
+                class="preview-state scan-error-card hidden"
+                id="stateError"
+                role="alert"
+                aria-live="assertive"
+              >
                 <div class="error-icon" aria-hidden="true">
                   <svg viewBox="0 0 48 48" fill="none">
                     <circle
@@ -210,23 +228,41 @@
                 >
                   Scanner not connected
                 </p>
-                <p class="preview-state__sub">
-                  Follow the steps below to resolve the issue
-                </p>
+                <p class="preview-state__sub"></p>
 
-              </div>
-              <section
-                class="scan-error-notice hidden"
-                id="scanErrorNotice"
-                role="alert"
-                aria-live="assertive"
-              >
-                <div>
-                  <h3 class="scan-error-notice__title" id="scanErrorNoticeTitle"></h3>
-                  <p class="scan-error-notice__summary" id="scanErrorNoticeSummary"></p>
+                <div class="scan-error-card__fix">
+                  <p class="scan-error-card__label">How to fix it</p>
+                  <ol
+                    class="scan-error-card__steps"
+                    id="scanErrorNoticeChecks"
+                  ></ol>
                 </div>
-                <ul class="scan-error-notice__checks" id="scanErrorNoticeChecks"></ul>
-              </section>
+
+                <div class="scan-error-card__actions">
+                  <button id="scanRetryBtn" type="button" class="retry-btn">
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                    Try again
+                  </button>
+                  <!-- Only shown when an earlier scan is still available -->
+                  <button
+                    id="scanKeepPrevBtn"
+                    type="button"
+                    class="retry-btn retry-btn--ghost hidden"
+                  >
+                    View previous scan
+                  </button>
+                </div>
+              </div>
             </div>
             <!-- /preview-area -->
 
@@ -238,14 +274,22 @@
               role="toolbar"
               aria-label="Preview controls"
             >
-              <div class="preview-controls__pager" id="pagerGroup" style="display: none">
+              <div
+                class="preview-controls__pager"
+                id="pagerGroup"
+                style="display: none"
+              >
                 <button
                   class="pager-btn"
                   id="pagePrev"
                   aria-label="Previous page"
                   disabled
                 >
-                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
                     <path
                       fill-rule="evenodd"
                       d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0
@@ -263,7 +307,11 @@
                   aria-label="Next page"
                   disabled
                 >
-                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
                     <path
                       fill-rule="evenodd"
                       d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0
@@ -280,7 +328,15 @@
                 aria-label="Rotate document 90 degrees"
                 title="Rotate document 90 degrees"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
                   <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24" />
                   <path d="M21 3v6h-6" />
                 </svg>
@@ -298,7 +354,11 @@
               <span class="source-size-card__title">Document Size</span>
               <span class="source-size-card__hint">Feeder paper size</span>
             </div>
-            <div class="source-size-options" role="radiogroup" aria-label="Original document size">
+            <div
+              class="source-size-options"
+              role="radiogroup"
+              aria-label="Original document size"
+            >
               <label class="source-size-option">
                 <input
                   type="radio"
@@ -309,19 +369,11 @@
                 <span class="source-size-option__label">A4</span>
               </label>
               <label class="source-size-option">
-                <input
-                  type="radio"
-                  name="scanSourcePaperSize"
-                  value="Short"
-                />
+                <input type="radio" name="scanSourcePaperSize" value="Short" />
                 <span class="source-size-option__label">Short Bond</span>
               </label>
               <label class="source-size-option">
-                <input
-                  type="radio"
-                  name="scanSourcePaperSize"
-                  value="Long"
-                />
+                <input type="radio" name="scanSourcePaperSize" value="Long" />
                 <span class="source-size-option__label">Long Bond</span>
               </label>
             </div>
@@ -333,7 +385,11 @@
               <span class="source-size-card__title">File Format</span>
               <span class="source-size-card__hint">Soft copy output type</span>
             </div>
-            <div class="source-size-options source-size-options--formats" role="radiogroup" aria-label="Soft copy export format">
+            <div
+              class="source-size-options source-size-options--formats"
+              role="radiogroup"
+              aria-label="Soft copy export format"
+            >
               <label class="source-size-option">
                 <input
                   type="radio"
@@ -341,35 +397,58 @@
                   value="pdf"
                   checked
                 />
-                <span class="source-size-option__label source-size-option__label--format">
-                  <svg class="format-option-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                <span
+                  class="source-size-option__label source-size-option__label--format"
+                >
+                  <svg
+                    class="format-option-icon"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                    />
                   </svg>
                   <span>PDF</span>
                 </span>
               </label>
               <label class="source-size-option">
-                <input
-                  type="radio"
-                  name="scanExportFormat"
-                  value="jpg"
-                />
-                <span class="source-size-option__label source-size-option__label--format">
-                  <svg class="format-option-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                <input type="radio" name="scanExportFormat" value="jpg" />
+                <span
+                  class="source-size-option__label source-size-option__label--format"
+                >
+                  <svg
+                    class="format-option-icon"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                   <span>JPG</span>
                 </span>
               </label>
               <label class="source-size-option">
-                <input
-                  type="radio"
-                  name="scanExportFormat"
-                  value="png"
-                />
-                <span class="source-size-option__label source-size-option__label--format">
-                  <svg class="format-option-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                <input type="radio" name="scanExportFormat" value="png" />
+                <span
+                  class="source-size-option__label source-size-option__label--format"
+                >
+                  <svg
+                    class="format-option-icon"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                   <span>PNG</span>
                 </span>
@@ -437,7 +516,41 @@
         </section>
         <!-- /controls-col -->
       </main>
-      <div class="modal-overlay document-care-modal" id="documentCareModal" role="dialog" aria-modal="true" aria-labelledby="documentCareTitle" aria-hidden="true"><div class="modal-card document-care-modal__card"><div class="document-care-modal__icon" aria-hidden="true">!</div><h2 class="modal-title" id="documentCareTitle">Prepare your document</h2><p class="modal-subtitle">To avoid paper jams and keep your preview clear:</p><ul><li>Use clean, flat, undamaged bond paper.</li><li>Remove staples, clips, tape, folded areas, and torn edges.</li><li>For the ADF, align pages straight. On the glass, place the document flat.</li></ul><div class="modal-actions"><button type="button" class="modal-btn modal-btn--primary document-care-modal__close" id="documentCareClose">Got it</button></div></div></div>
+      <div
+        class="modal-overlay document-care-modal"
+        id="documentCareModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="documentCareTitle"
+        aria-hidden="true"
+      >
+        <div class="modal-card document-care-modal__card">
+          <div class="document-care-modal__icon" aria-hidden="true">!</div>
+          <h2 class="modal-title" id="documentCareTitle">
+            Prepare your document
+          </h2>
+          <p class="modal-subtitle">
+            To avoid paper jams and keep your preview clear:
+          </p>
+          <ul>
+            <li>Use clean, flat, undamaged bond paper.</li>
+            <li>Remove staples, clips, tape, folded areas, and torn edges.</li>
+            <li>
+              For the ADF, align pages straight. On the glass, place the
+              document flat.
+            </li>
+          </ul>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="modal-btn modal-btn--primary document-care-modal__close"
+              id="documentCareClose"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- ── Footer: action buttons ── -->
       <footer class="scan-footer">
@@ -544,12 +657,17 @@
       <div class="idle-warning-content">
         <div class="idle-warning-countdown-number" id="idleCountdown">20</div>
         <div class="idle-warning-countdown-label">seconds remaining</div>
-        <h2 id="idleWarningTitle" class="idle-warning-title">Session Timeout</h2>
-        <p class="idle-warning-subtitle">No activity detected. Your session will close soon.</p>
+        <h2 id="idleWarningTitle" class="idle-warning-title">
+          Session Timeout
+        </h2>
+        <p class="idle-warning-subtitle">
+          No activity detected. Your session will close soon.
+        </p>
         <div class="idle-warning-tap-hint">Tap anywhere to continue</div>
       </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/scan/app.js"></script>
   </body>
 </html>

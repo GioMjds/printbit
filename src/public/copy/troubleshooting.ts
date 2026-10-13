@@ -17,6 +17,20 @@ const ADF_PAPER_JAM_GUIDE = {
   ],
 } satisfies CopyTroubleshootingGuide;
 
+export const ADF_NO_DOCUMENT_GUIDE = {
+  summary: 'No page was detected in the feeder.',
+  causes: [
+    'No page is loaded in the top feeder tray.',
+    'Page is face-down instead of face-up in the feeder.',
+    'Page was not pushed in far enough for the feeder to grab it.',
+  ],
+  steps: [
+    'Place one page face-up in the feeder tray, short edge first.',
+    'Slide it in until the feeder grips the page.',
+    'Tap Check Document again.',
+  ],
+} satisfies CopyTroubleshootingGuide;
+
 const FLATBED_FAILURE_GUIDE = {
   summary: 'Could not detect or scan document on the glass.',
   causes: [

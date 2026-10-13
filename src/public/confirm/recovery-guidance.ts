@@ -68,9 +68,9 @@ export function getMaintenanceGuidance(
       actionSteps: [
         'Keep this screen open and notify kiosk staff.',
         'Staff will clear any jammed sheets from the printer feed.',
-        'Scan your transaction receipt QR code for staff verification.',
+        'This screen will automatically unlock once staff clears the error in Admin Control.',
       ],
-      hint: 'Show your transaction ID and receipt to staff for assistance or a refund.',
+      hint: 'Admin control unlock required. No dismissal buttons available on this screen.',
       technicalDetails: raw.includes('|') || raw.length > 70 ? raw : null,
     };
   }

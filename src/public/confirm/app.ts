@@ -746,6 +746,28 @@ function renderPrinterError(err: PrintError): void {
       maintenanceResolution,
       doneButton: maintenanceDoneBtn,
     });
+
+    const isPaperJam =
+      err.code === 'PAPER_JAM_PRINT' ||
+      Boolean(
+        err.userMessage && err.userMessage.toLowerCase().includes('paper jam'),
+      );
+
+    if (isPaperJam) {
+      if (maintenanceDoneBtn) {
+        maintenanceDoneBtn.style.display = 'none';
+        maintenanceDoneBtn.setAttribute('hidden', '');
+      }
+      if (errorCloseBtn) {
+        errorCloseBtn.style.display = 'none';
+        errorCloseBtn.setAttribute('hidden', '');
+      }
+    } else {
+      if (maintenanceDoneBtn) {
+        maintenanceDoneBtn.style.display = '';
+        maintenanceDoneBtn.removeAttribute('hidden');
+      }
+    }
   } else {
     printerErrorBlock.classList.remove('printer-error-modal--wide');
     printerErrorBlock.classList.remove('printer-error-modal-overlay--wide');
@@ -3100,9 +3122,29 @@ if (typeof ioFactory !== 'function') {
     if (
       !isJobInterruptedState &&
       (!currentPrinterError ||
-      !isMaintenancePrintFailure(currentPrinterError.code))
+      !isMaintenancePrintFailure(currentPrinterError.code) ||
+      currentPrinterError.code === 'PAPER_JAM_PRINT')
     ) {
       clearPrinterError();
+      if (maintenanceDoneBtn) {
+        maintenanceDoneBtn.style.display = '';
+        maintenanceDoneBtn.removeAttribute('hidden');
+      }
+    }
+    applyConfirmGate();
+    syncPaymentLeaseState();
+  });
+
+  connectedSocket.on('printer:simulation-cleared', () => {
+    isJobInterruptedState = false;
+    currentPrinterError = null;
+    printerReady = true;
+    latestPrinterStatusLabel = 'Ready';
+    clearPrinterError();
+    confirmErrorGuideModal.clear();
+    if (maintenanceDoneBtn) {
+      maintenanceDoneBtn.style.display = '';
+      maintenanceDoneBtn.removeAttribute('hidden');
     }
     applyConfirmGate();
     syncPaymentLeaseState();
@@ -3121,7 +3163,12 @@ if (typeof ioFactory !== 'function') {
     const status = payload as PrinterStatusPayload | null;
     printerReady = false;
     latestPrinterStatusLabel = status?.status || 'Error';
-    if (hasActiveJob() && status?.printError) {
+    if (status?.printError) {
+      if (hasActiveJob()) {
+        hideOverlay(printingOverlay);
+        isProcessingPayment = false;
+        powerSafetyOverlay?.notifyPrintCompleted();
+      }
       renderPrinterError(status.printError);
     }
     void releasePaymentLease('printer_failure', true);

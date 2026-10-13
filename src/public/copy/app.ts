@@ -10,6 +10,7 @@ import {
   type PdfLoadingTask,
 } from '../shared/pdfjs-loading-task-cleanup';
 import {
+  ADF_NO_DOCUMENT_GUIDE,
   getCopyTroubleshootingGuide,
   isAdfPaperJam,
 } from './troubleshooting';
@@ -123,9 +124,6 @@ const previewStatusText = document.getElementById(
 const copyTroubleshootingPanel = document.getElementById(
   'copyTroubleshootingPanel',
 ) as HTMLElement | null;
-const copyTroubleshootSummary = document.getElementById(
-  'copyTroubleshootSummary',
-) as HTMLElement | null;
 const copyTroubleshootCauses = document.getElementById(
   'copyTroubleshootCauses',
 ) as HTMLUListElement | null;
@@ -134,10 +132,22 @@ const copyTroubleshootSteps = document.getElementById(
 ) as HTMLOListElement | null;
 const backBtn = document.querySelector<HTMLAnchorElement>('a.back-btn');
 const documentCareModal = document.getElementById('documentCareModal');
-document.getElementById('documentCareBtn')?.addEventListener('click', () => { documentCareModal?.classList.add('is-open'); documentCareModal?.setAttribute('aria-hidden', 'false'); });
-document.getElementById('documentCareClose')?.addEventListener('click', () => { documentCareModal?.classList.remove('is-open'); documentCareModal?.setAttribute('aria-hidden', 'true'); });
-documentCareModal?.addEventListener('click', (event) => { if (event.target === documentCareModal) document.getElementById('documentCareClose')?.click(); });
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape') document.getElementById('documentCareClose')?.click(); });
+document.getElementById('documentCareBtn')?.addEventListener('click', () => {
+  documentCareModal?.classList.add('is-open');
+  documentCareModal?.setAttribute('aria-hidden', 'false');
+});
+document.getElementById('documentCareClose')?.addEventListener('click', () => {
+  documentCareModal?.classList.remove('is-open');
+  documentCareModal?.setAttribute('aria-hidden', 'true');
+});
+documentCareModal?.addEventListener('click', (event) => {
+  if (event.target === documentCareModal)
+    document.getElementById('documentCareClose')?.click();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape')
+    document.getElementById('documentCareClose')?.click();
+});
 
 type CopyPaperSize = 'A4' | 'Short' | 'Long';
 
@@ -403,20 +413,18 @@ function hideCopyTroubleshooting(): void {
   if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = 'none';
 }
 
-function showCopyTroubleshooting(
-  rawMessage: string,
-  usesAdf: boolean,
-): string {
+function showCopyTroubleshooting(rawMessage: string, usesAdf: boolean): string {
   const isPaperJam = isAdfPaperJam(rawMessage, usesAdf);
   const paperJamGuide = getCopyTroubleshootingGuide(rawMessage, usesAdf);
   const safeMessage = sanitizeUserFacingError(rawMessage);
   const cause = classifyCopyFailure(rawMessage);
-  const guide = isPaperJam ? paperJamGuide : COPY_FAILURE_GUIDES[cause];
+  const guide = isPaperJam
+    ? paperJamGuide
+    : usesAdf && cause === 'no_document'
+      ? ADF_NO_DOCUMENT_GUIDE
+      : COPY_FAILURE_GUIDES[cause];
   const userFacingMessage = isPaperJam ? paperJamGuide.summary : safeMessage;
 
-  if (copyTroubleshootSummary) {
-    copyTroubleshootSummary.textContent = userFacingMessage;
-  }
   replaceListItems(copyTroubleshootCauses, guide.causes);
   replaceListItems(copyTroubleshootSteps, guide.steps);
   if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = '';
@@ -517,8 +525,13 @@ function resetPreviewSurfaces(): void {
   clearPreviewImageUrl();
 }
 
+function setPreviewBlockedByError(blocked: boolean): void {
+  errorBanner?.closest('.preview-col')?.classList.toggle('has-error', blocked);
+}
+
 function showError(msg: string, usesAdf = false): void {
   const safeMessage = showCopyTroubleshooting(msg, usesAdf);
+  setPreviewBlockedByError(true);
   if (errorBanner) errorBanner.style.display = '';
   if (errorText) errorText.textContent = safeMessage;
   if (checkDocBtn) checkDocBtn.style.display = '';
@@ -537,6 +550,7 @@ function showError(msg: string, usesAdf = false): void {
 }
 
 function hideError(): void {
+  setPreviewBlockedByError(false);
   if (errorBanner) errorBanner.style.display = 'none';
   hideCopyTroubleshooting();
 }
@@ -746,11 +760,7 @@ async function checkForDocument(): Promise<void> {
     } else {
       setCopySourceRadiosDisabled(false);
       const isUsingAdf = getSelectedCopySource() === 'feeder';
-      showError(
-        data.error ??
-          'No document detected. Place your document face-down on the scanner glass and try again.',
-        isUsingAdf,
-      );
+      showError(data.error ?? 'No document detected.', isUsingAdf);
     }
   } catch {
     showOverlay(false);
@@ -788,8 +798,14 @@ continueBtn?.addEventListener('click', () => {
 window.addEventListener('beforeunload', clearPreviewImageUrl);
 
 async function initializeCopyPage(): Promise<void> {
-  const savedSourceSize = sessionStorage.getItem('printbit.copySourcePaperSize');
-  if (savedSourceSize === 'A4' || savedSourceSize === 'Short' || savedSourceSize === 'Long') {
+  const savedSourceSize = sessionStorage.getItem(
+    'printbit.copySourcePaperSize',
+  );
+  if (
+    savedSourceSize === 'A4' ||
+    savedSourceSize === 'Short' ||
+    savedSourceSize === 'Long'
+  ) {
     setCopySourcePaperSize(savedSourceSize);
   } else if (savedSourceSize === 'Letter') {
     setCopySourcePaperSize('Short');

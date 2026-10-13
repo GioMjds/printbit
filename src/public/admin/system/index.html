@@ -491,6 +491,71 @@
                     </button>
                   </div>
                 </section>
+
+                <section class="system-panel" id="errorSimulationPanel">
+                  <header class="system-panel__head">
+                    <div class="sim-panel__header-row">
+                      <div>
+                        <h3 class="system-panel__title">Error Message Simulation</h3>
+                        <p class="system-panel__desc">
+                          Simulate how each error acts up across the kiosk and test recovery.
+                        </p>
+                      </div>
+                      <span class="sim-status-badge sim-status-badge--idle" id="simStatusBadge">Normal · No Error</span>
+                    </div>
+                  </header>
+                  <div class="system-panel__body">
+                    <div class="sim-grid">
+                      <button id="simLowInkBtn" type="button" class="sim-card-btn sim-card-btn--amber">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">Homepage</span>
+                          <span class="sim-card-btn__num">1</span>
+                        </div>
+                        <span class="sim-card-btn__title">Low Ink</span>
+                        <span class="sim-card-btn__desc">Displays Low Ink warning non-button pill at homepage start</span>
+                      </button>
+
+                      <button id="simOutOfPaperBtn" type="button" class="sim-card-btn sim-card-btn--amber">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">Confirm &amp; Print</span>
+                          <span class="sim-card-btn__num">2</span>
+                        </div>
+                        <span class="sim-card-btn__title">Out of Paper</span>
+                        <span class="sim-card-btn__desc">Simulates empty paper tray in confirm during printing</span>
+                      </button>
+
+                      <button id="simAdfErrorBtn" type="button" class="sim-card-btn sim-card-btn--amber">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">Scan</span>
+                          <span class="sim-card-btn__num">3</span>
+                        </div>
+                        <span class="sim-card-btn__title">ADF Error</span>
+                        <span class="sim-card-btn__desc">Instructs user to clear printer first, then proceed on kiosk</span>
+                      </button>
+
+                      <button id="simPaperJamBtn" type="button" class="sim-card-btn sim-card-btn--danger">
+                        <div class="sim-card-btn__top">
+                          <span class="sim-card-btn__badge">Confirm Lockout</span>
+                          <span class="sim-card-btn__num">4</span>
+                        </div>
+                        <span class="sim-card-btn__title">Paper Jam</span>
+                        <span class="sim-card-btn__desc">Jam in confirm during print (no buttons; admin clear only)</span>
+                      </button>
+                    </div>
+
+                    <div class="sim-actions-bar">
+                      <button id="clearPrinterErrorsBtn" type="button" class="ctrl-btn ctrl-btn--green">
+                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>
+                          Clear Printer Errors
+                          <span class="ctrl-btn__sub">Get rid of error messages &amp; restore normal readiness</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </section>
               </div>
               <aside class="system-side-stack">
                 <section class="system-panel">

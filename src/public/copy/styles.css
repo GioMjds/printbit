@@ -11,7 +11,7 @@ body {
   height: 100%;
   background: #0e0d1f;
   color: var(--white);
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
@@ -168,7 +168,7 @@ body {
 
 .preview-panel {
   flex: 1;
-  min-height: 0;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.03);
@@ -199,10 +199,10 @@ body {
   color: var(--ink-muted);
   transition: color 300ms;
 }
-.preview-panel__status[data-status="loading"] {
+.preview-panel__status[data-status='loading'] {
   color: var(--lavender);
 }
-.preview-panel__status[data-status="ready"] {
+.preview-panel__status[data-status='ready'] {
   color: #4ade80;
 }
 
@@ -215,9 +215,11 @@ body {
   justify-content: center;
   gap: 20px;
   padding: 24px;
-  transition: opacity 300ms ease, transform 300ms ease;
+  transition:
+    opacity 300ms ease,
+    transform 300ms ease;
 }
-.preview-placeholder[style*="display: none"] {
+.preview-placeholder[style*='display: none'] {
   opacity: 0;
   transform: scale(0.96);
 }
@@ -435,16 +437,82 @@ body {
   color: var(--ink-muted);
   line-height: 1.55;
 }
-.topbar-actions { display: flex; justify-content: flex-end; }
-.document-care-fab { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 8px 13px; border: 1px solid rgba(251,191,36,.4); border-radius: 999px; background: rgba(251,191,36,.12); color: #fff3c4; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.document-care-fab span:first-child, .document-care-modal__icon { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fbbf24; color: #0e0d1f; font-weight: 800; }
-.document-care-modal { position: fixed; inset: 0; z-index: 100; display: none; place-items: center; padding: 24px; background: rgba(5,4,15,.78); }
-.document-care-modal.is-open { display: grid; }
-.document-care-modal__card { width: min(440px, 100%); padding: 26px; border: 1px solid rgba(251,191,36,.35); border-radius: 22px; background: #19172d; color: var(--white); box-shadow: 0 24px 70px rgba(0,0,0,.45); }
-.document-care-modal__card h2 { margin: 14px 0 8px; font-size: 21px; }
-.document-care-modal__card p, .document-care-modal__card li { color: var(--ink-muted); font-size: 13px; line-height: 1.6; }
-.document-care-modal__card ul { margin: 10px 0 20px; padding-left: 20px; }
-.document-care-modal__close { width: 100%; min-height: 44px; border: 0; border-radius: 12px; background: #fbbf24; color: #0e0d1f; font: inherit; font-weight: 800; cursor: pointer; }
+.topbar-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.document-care-fab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.12);
+  color: #fff3c4;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.document-care-fab span:first-child,
+.document-care-modal__icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fbbf24;
+  color: #0e0d1f;
+  font-weight: 800;
+}
+.document-care-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 4, 15, 0.78);
+}
+.document-care-modal.is-open {
+  display: grid;
+}
+.document-care-modal__card {
+  width: min(440px, 100%);
+  padding: 26px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 22px;
+  background: #19172d;
+  color: var(--white);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+}
+.document-care-modal__card h2 {
+  margin: 14px 0 8px;
+  font-size: 21px;
+}
+.document-care-modal__card p,
+.document-care-modal__card li {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.document-care-modal__card ul {
+  margin: 10px 0 20px;
+  padding-left: 20px;
+}
+.document-care-modal__close {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #fbbf24;
+  color: #0e0d1f;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
 
 .document-care-notice {
   display: flex;
@@ -458,9 +526,27 @@ body {
   font-size: 13px;
   line-height: 1.5;
 }
-.document-care-notice__icon { display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px; border-radius: 50%; background: #fbbf24; color: #0e0d1f; font-size: 13px; font-weight: 800; }
-.document-care-notice__title { display: block; margin-bottom: 2px; color: #fff3c4; font-size: 14px; }
-.document-care-notice p { margin: 0; }
+.document-care-notice__icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 50%;
+  background: #fbbf24;
+  color: #0e0d1f;
+  font-size: 13px;
+  font-weight: 800;
+}
+.document-care-notice__title {
+  display: block;
+  margin-bottom: 2px;
+  color: #fff3c4;
+  font-size: 14px;
+}
+.document-care-notice p {
+  margin: 0;
+}
 
 .steps {
   list-style: none;
@@ -566,13 +652,13 @@ body {
   line-height: 1.55;
 }
 
-/* ── Error banner ─────────────────────────────────────────── */
+/* ── Error card (banner + troubleshooting in one) ─────────── */
 /* app.ts toggles style.display on this; animation plays on reveal */
 .error-banner {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 16px;
   border-radius: 16px;
   background: rgba(54, 24, 43, 0.95);
   border: 1.5px solid rgba(248, 113, 113, 0.5);
@@ -591,9 +677,15 @@ body {
   }
 }
 
+.error-banner__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .error-banner__icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   color: #f87171;
 }
@@ -604,24 +696,27 @@ body {
 
 .error-banner__text {
   flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-  color: #fca5a5;
-  line-height: 1.5;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fecaca;
+  line-height: 1.4;
 }
 
 .retry-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 9px 14px;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
   border-radius: 12px;
   flex-shrink: 0;
-  border: 1.5px solid rgba(248, 113, 113, 0.3);
-  background: rgba(248, 113, 113, 0.1);
-  color: #fca5a5;
-  font-family: "Plus Jakarta Sans", sans-serif;
-  font-size: 14px;
+  border: 1.5px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.14);
+  color: #fecaca;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -630,70 +725,126 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .retry-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 .retry-btn:hover {
-  background: rgba(248, 113, 113, 0.18);
-  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.22);
+  border-color: rgba(248, 113, 113, 0.6);
 }
 .retry-btn:active {
   transform: scale(0.97);
 }
 
+/* Troubleshooting details: two columns, shown inside the error card */
 .copy-troubleshoot {
-  margin-top: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  border: 1.5px solid rgba(248, 113, 113, 0.5);
-  background: rgba(54, 24, 43, 0.95);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
-}
-
-.copy-troubleshoot__title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 800;
-  color: #fecaca;
-}
-
-.copy-troubleshoot__summary {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
-  color: #fecaca;
+  padding-top: 14px;
+  border-top: 1px solid rgba(248, 113, 113, 0.2);
 }
 
 .copy-troubleshoot__group {
-  padding: 10px 11px;
+  padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(248, 113, 113, 0.24);
-  background: rgba(14, 13, 31, 0.22);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  background: rgba(14, 13, 31, 0.28);
 }
 
 .copy-troubleshoot__label {
-  margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  color: #fca5a5;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
   text-transform: uppercase;
+  color: #fca5a5;
 }
 
 .copy-troubleshoot__list,
 .copy-troubleshoot__steps {
   margin: 0;
-  padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   color: #ffe4e6;
   font-size: 14px;
   line-height: 1.5;
+}
+.copy-troubleshoot__list {
+  padding-left: 18px;
+}
+
+/* Numbered badges for the fix steps (matches the steps panel on the right) */
+.copy-troubleshoot__steps {
+  padding: 0;
+  list-style: none;
+  counter-reset: fix-step;
+}
+.copy-troubleshoot__steps li {
+  position: relative;
+  padding-left: 30px;
+  counter-increment: fix-step;
+}
+.copy-troubleshoot__steps li::before {
+  content: counter(fix-step);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.2);
+}
+
+/* On error the card replaces the Document Preview entirely */
+.preview-col.has-error .preview-panel {
+  display: none;
+}
+.preview-col.has-error .error-banner {
+  flex: 1;
+  justify-content: center;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 22px;
+}
+.preview-col.has-error .error-banner__head {
+  flex-direction: column;
+  text-align: center;
+  gap: 14px;
+}
+.preview-col.has-error .error-banner__icon {
+  width: 56px;
+  height: 56px;
+}
+.preview-col.has-error .error-banner__text {
+  flex: none;
+  font-size: 22px;
+}
+.preview-col.has-error .copy-troubleshoot {
+  padding-top: 24px;
+}
+.preview-col.has-error .copy-troubleshoot__group {
+  padding: 16px 18px;
+}
+.preview-col.has-error .copy-troubleshoot__label {
+  font-size: 13px;
+}
+.preview-col.has-error .copy-troubleshoot__list,
+.preview-col.has-error .copy-troubleshoot__steps {
+  font-size: 16px;
+}
+
+@media (max-width: 1000px) {
+  .copy-troubleshoot {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* =============================================================
@@ -732,7 +883,7 @@ body {
   background: rgba(167, 170, 225, 0.1);
   border: 1.5px solid rgba(167, 170, 225, 0.22);
   color: var(--lavender);
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -771,7 +922,7 @@ body {
   background: rgba(250, 128, 114, 0.08);
   border: 1.5px solid rgba(250, 128, 114, 0.22);
   color: rgba(250, 160, 150, 0.9);
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -805,7 +956,7 @@ body {
   border-radius: 16px;
   background: #3a9e52;
   color: var(--white);
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -1037,7 +1188,10 @@ body {
   background: rgba(167, 170, 225, 0.06);
   border: 1.5px solid rgba(167, 170, 225, 0.16);
   cursor: pointer;
-  transition: background 150ms, border-color 150ms, transform 120ms;
+  transition:
+    background 150ms,
+    border-color 150ms,
+    transform 120ms;
   -webkit-tap-highlight-color: transparent;
 }
 

@@ -18,6 +18,10 @@ export function setPrinterGuideSocketIo(io: SocketIoEmitter | null): void {
   printerGuideSocketIo = io;
 }
 
+export function getPrinterGuideSocketIo(): SocketIoEmitter | null {
+  return printerGuideSocketIo;
+}
+
 export function handlePrinterStatusUpdate(
   statusText: string,
   errorCode?: string | null,

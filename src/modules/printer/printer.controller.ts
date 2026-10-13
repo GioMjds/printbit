@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrinterService } from './printer.service';
+import { getPrinterSimulationState } from '@/services/printer-simulation';
 
 export class PrinterController {
   public readonly router: Router;
@@ -12,11 +13,16 @@ export class PrinterController {
   private initializeRoutes(): void {
     this.router.get('/status', this.getStatus);
     this.router.get('/active-error', this.getActiveError);
+    this.router.get('/simulation-status', this.getSimulationStatus);
     this.router.post('/preflight', this.preflight);
     this.router.post('/pause', this.pauseJob);
     this.router.post('/resume', this.resumeJob);
     this.router.post('/cancel-remaining', this.cancelRemainingJob);
   }
+
+  public getSimulationStatus = (_req: Request, res: Response): void => {
+    res.json(getPrinterSimulationState());
+  };
 
   public getActiveError = (_req: Request, res: Response): void => {
     try {

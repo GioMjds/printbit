@@ -136,7 +136,9 @@ const rotateScanLabel = document.getElementById(
 const scanBtn = document.getElementById('scanBtn') as HTMLButtonElement;
 const scanBtnLabel = document.getElementById('scanBtnLabel') as HTMLElement;
 const rescanBtn = document.getElementById('rescanBtn') as HTMLButtonElement;
-const clearBtn = document.getElementById('clearBtn') as HTMLButtonElement | null;
+const clearBtn = document.getElementById(
+  'clearBtn',
+) as HTMLButtonElement | null;
 const proceedBtn = document.getElementById('proceedBtn') as HTMLButtonElement;
 const proceedBtnLabel = document.getElementById(
   'proceedBtnLabel',
@@ -144,18 +146,15 @@ const proceedBtnLabel = document.getElementById(
 const softCopyFeeText = document.getElementById(
   'softCopyFeeText',
 ) as HTMLElement;
-const scanErrorNotice = document.getElementById(
-  'scanErrorNotice',
-) as HTMLElement | null;
-const scanErrorNoticeTitle = document.getElementById(
-  'scanErrorNoticeTitle',
-) as HTMLElement | null;
-const scanErrorNoticeSummary = document.getElementById(
-  'scanErrorNoticeSummary',
-) as HTMLElement | null;
 const scanErrorNoticeChecks = document.getElementById(
   'scanErrorNoticeChecks',
-) as HTMLUListElement | null;
+) as HTMLOListElement | null;
+const scanRetryBtn = document.getElementById(
+  'scanRetryBtn',
+) as HTMLButtonElement | null;
+const scanKeepPrevBtn = document.getElementById(
+  'scanKeepPrevBtn',
+) as HTMLButtonElement | null;
 
 const errorSubtext = stateError?.querySelector(
   '.preview-state__sub',
@@ -163,10 +162,22 @@ const errorSubtext = stateError?.querySelector(
 
 const backBtn = document.querySelector<HTMLAnchorElement>('a.back-btn');
 const documentCareModal = document.getElementById('documentCareModal');
-document.getElementById('documentCareBtn')?.addEventListener('click', () => { documentCareModal?.classList.add('is-open'); documentCareModal?.setAttribute('aria-hidden', 'false'); });
-document.getElementById('documentCareClose')?.addEventListener('click', () => { documentCareModal?.classList.remove('is-open'); documentCareModal?.setAttribute('aria-hidden', 'true'); });
-documentCareModal?.addEventListener('click', (event) => { if (event.target === documentCareModal) document.getElementById('documentCareClose')?.click(); });
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape') document.getElementById('documentCareClose')?.click(); });
+document.getElementById('documentCareBtn')?.addEventListener('click', () => {
+  documentCareModal?.classList.add('is-open');
+  documentCareModal?.setAttribute('aria-hidden', 'false');
+});
+document.getElementById('documentCareClose')?.addEventListener('click', () => {
+  documentCareModal?.classList.remove('is-open');
+  documentCareModal?.setAttribute('aria-hidden', 'true');
+});
+documentCareModal?.addEventListener('click', (event) => {
+  if (event.target === documentCareModal)
+    document.getElementById('documentCareClose')?.click();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape')
+    document.getElementById('documentCareClose')?.click();
+});
 
 const scanLoadingController =
   scanLoadingAnimation && scanLoadingCanvas
@@ -254,13 +265,15 @@ async function loadScannerSettings(): Promise<void> {
 
 void loadScannerSettings();
 
-document.querySelectorAll<HTMLInputElement>(
-  'input[name="scanSource"], input[name="source"], input[name="scanSourceType"]',
-).forEach((radio) => {
-  radio.addEventListener('change', () => {
-    SCAN_DPI = resolveScanDpi();
+document
+  .querySelectorAll<HTMLInputElement>(
+    'input[name="scanSource"], input[name="source"], input[name="scanSourceType"]',
+  )
+  .forEach((radio) => {
+    radio.addEventListener('change', () => {
+      SCAN_DPI = resolveScanDpi();
+    });
   });
-});
 
 const scanSourcePaperSizeRadios = document.querySelectorAll<HTMLInputElement>(
   'input[name="scanSourcePaperSize"]',
@@ -330,7 +343,10 @@ let currentPdfDoc: {
 } | null = null;
 let pdfPageCount = 0;
 
-async function loadAndDisplayPdf(previewUrl: string, targetPage = 0): Promise<void> {
+async function loadAndDisplayPdf(
+  previewUrl: string,
+  targetPage = 0,
+): Promise<void> {
   const dynImport = new Function('u', 'return import(u)') as (
     u: string,
   ) => Promise<Record<string, unknown>>;
@@ -368,10 +384,11 @@ async function renderPdfPage(n: number): Promise<void> {
   const targetHeight = Math.max((container?.clientHeight ?? 600) - 16, 260);
 
   const dpr = window.devicePixelRatio || 1;
-  const scale = Math.min(
-    targetWidth / baseViewport.width,
-    targetHeight / baseViewport.height,
-  ) * dpr;
+  const scale =
+    Math.min(
+      targetWidth / baseViewport.width,
+      targetHeight / baseViewport.height,
+    ) * dpr;
 
   const viewport = page.getViewport({ scale: Math.max(scale, 0.5) });
   scannedPdfCanvas.width = Math.floor(viewport.width);
@@ -416,15 +433,14 @@ function replaceListItems(
 }
 
 function hideScanTroubleshooting(): void {
-  scanErrorNotice?.classList.add('hidden');
-  if (scanErrorNoticeTitle) scanErrorNoticeTitle.textContent = '';
-  if (scanErrorNoticeSummary) scanErrorNoticeSummary.textContent = '';
+  if (errorSubtext) errorSubtext.textContent = '';
+  scanKeepPrevBtn?.classList.add('hidden');
   replaceListItems(scanErrorNoticeChecks, []);
 }
 
 function showScanTroubleshooting(
   rawMessage: string,
-  showInlineNotice: boolean,
+  hasPreviousPreview: boolean,
   source: ScanSource = getSelectedScanSource(),
 ): string {
   const guide = getScanTroubleshootingGuide(rawMessage, source);
@@ -434,12 +450,10 @@ function showScanTroubleshooting(
     errorSubtext.textContent = guide.summary;
   }
 
-  if (showInlineNotice) {
-    if (scanErrorNoticeTitle) scanErrorNoticeTitle.textContent = userFriendlyTitle;
-    if (scanErrorNoticeSummary) scanErrorNoticeSummary.textContent = guide.summary;
-    replaceListItems(scanErrorNoticeChecks, guide.checks);
-    scanErrorNotice?.classList.remove('hidden');
-  }
+  // The checks always show inside the error card; the "previous scan"
+  // button only exists when there is an earlier scan to go back to.
+  replaceListItems(scanErrorNoticeChecks, guide.checks);
+  scanKeepPrevBtn?.classList.toggle('hidden', !hasPreviousPreview);
 
   return userFriendlyTitle;
 }
@@ -519,11 +533,11 @@ function applyScanRotation(): void {
       ? Math.min(w / h, h / w)
       : 1;
 
-  scannedResult.style.setProperty('--preview-rotation', `${scanRotationDeg}deg`);
   scannedResult.style.setProperty(
-    '--preview-rotation-scale',
-    scale.toFixed(4),
+    '--preview-rotation',
+    `${scanRotationDeg}deg`,
   );
+  scannedResult.style.setProperty('--preview-rotation-scale', scale.toFixed(4));
   if (rotateScanLabel) {
     rotateScanLabel.textContent =
       scanRotationDeg === 0 ? 'Rotate 90°' : `Rotate (${scanRotationDeg}°)`;
@@ -538,6 +552,9 @@ function showPreview(
   for (const [key, el] of Object.entries(PREVIEW_STATES)) {
     el.classList.toggle('hidden', key !== name);
   }
+  stateError
+    .closest('.preview-panel')
+    ?.classList.toggle('has-error', name === 'error');
   if (hint !== undefined) previewHint.textContent = hint;
   if (name === 'result') {
     previewControls.style.display = 'flex';
@@ -669,7 +686,10 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
     return false;
   }
 
-  if (Array.isArray(storedConfig.scannedPages) && storedConfig.scannedPages.length > 0) {
+  if (
+    Array.isArray(storedConfig.scannedPages) &&
+    storedConfig.scannedPages.length > 0
+  ) {
     scannedPages = storedConfig.scannedPages;
   } else {
     scannedPages = [previewUrl];
@@ -681,7 +701,8 @@ async function restoreScanPreviewFromSession(): Promise<boolean> {
     storedConfig.scanReleaseToken.trim().length > 0
       ? storedConfig.scanReleaseToken.trim()
       : null;
-  currentPage = typeof storedConfig.currentPage === 'number' ? storedConfig.currentPage : 0;
+  currentPage =
+    typeof storedConfig.currentPage === 'number' ? storedConfig.currentPage : 0;
   currentPage = Math.max(0, Math.min(scannedPages.length - 1, currentPage));
 
   if (
@@ -862,17 +883,15 @@ async function startScan(): Promise<void> {
         Math.min(previousPage, previousPages.length - 1),
       );
 
-      showPreview(
-        'result',
-        `Previous scan kept. New scan failed: ${userFriendlyTitle}`,
-      );
-      updatePager();
-      updateSoftCopyPricingUi();
-      if (clearBtn) clearBtn.style.display = 'flex';
-      rescanBtn.style.display = 'flex';
-      proceedBtn.style.display = 'flex';
-      proceedBtn.disabled = false;
-      proceedBtn.setAttribute('aria-disabled', 'false');
+      // The error card replaces the preview; the earlier scan stays in memory
+      // and comes back via "View previous scan".
+      setScanSourceRadiosDisabled(false);
+      setScanFormatRadiosDisabled(false);
+      errorText.textContent = userFriendlyTitle;
+      showPreview('error', 'Scan failed');
+      if (clearBtn) clearBtn.style.display = 'none';
+      rescanBtn.style.display = 'none';
+      proceedBtn.style.display = 'none';
       scanBtn.disabled = false;
       scanBtn.setAttribute('aria-disabled', 'false');
       return;
@@ -881,7 +900,7 @@ async function startScan(): Promise<void> {
     setScanSourceRadiosDisabled(false);
     setScanFormatRadiosDisabled(false);
     errorText.textContent = userFriendlyTitle;
-    showPreview('error', userFriendlyTitle);
+    showPreview('error', 'Scan failed');
     scanBtn.disabled = false;
     scanBtn.setAttribute('aria-disabled', 'false');
     rescanBtn.style.display = 'none';
@@ -890,6 +909,23 @@ async function startScan(): Promise<void> {
     setBackNavigationLocked(false);
   }
 }
+
+scanRetryBtn?.addEventListener('click', () => {
+  if (!scanBtn.disabled) void startScan();
+});
+
+scanKeepPrevBtn?.addEventListener('click', () => {
+  if (!scannedPages.length) return;
+  hideScanTroubleshooting();
+  showPreview('result', 'Previous scan kept');
+  updatePager();
+  updateSoftCopyPricingUi();
+  if (clearBtn) clearBtn.style.display = 'flex';
+  rescanBtn.style.display = 'flex';
+  proceedBtn.style.display = 'flex';
+  proceedBtn.disabled = false;
+  proceedBtn.setAttribute('aria-disabled', 'false');
+});
 
 pagePrev.addEventListener('click', () => goToPage(currentPage - 1));
 pageNext.addEventListener('click', () => goToPage(currentPage + 1));
@@ -948,7 +984,7 @@ clearBtn?.addEventListener('click', () => {
 });
 
 rotateScanBtn?.addEventListener('click', () => {
-  scanRotationDeg = (((scanRotationDeg + 90) % 360) as RotationDeg);
+  scanRotationDeg = ((scanRotationDeg + 90) % 360) as RotationDeg;
   applyScanRotation();
   saveScanStateToSession();
 });
@@ -967,7 +1003,61 @@ proceedBtn.addEventListener('click', () => {
   navigateWithKioskMotion('/confirm');
 });
 
+declare const io: (opts?: {
+  auth?: Record<string, string>;
+  reconnectionDelay?: number;
+}) => {
+  on(event: string, cb: (...args: unknown[]) => void): void;
+  disconnect(): void;
+};
+
+function setupScanSocket(): void {
+  if (typeof io !== 'function') return;
+  const socket = io({ reconnectionDelay: 2000 });
+
+  socket.on('scan:adf-error', (payload: unknown) => {
+    const errorMsg =
+      payload && typeof payload === 'object' && 'error' in payload
+        ? String((payload as { error: unknown }).error)
+        : 'ADF feeder error on printer.';
+    showScanTroubleshooting(errorMsg, true, 'feeder');
+    errorText.textContent = 'Printer ADF Error Detected';
+    showPreview('error', 'Printer ADF Error Detected');
+    setScanSourceRadiosDisabled(false);
+    setScanFormatRadiosDisabled(false);
+    scanBtn.disabled = false;
+    scanBtn.setAttribute('aria-disabled', 'false');
+  });
+
+  socket.on('printer:simulation-state', (payload: unknown) => {
+    const p = payload as { activeError?: string | null } | null;
+    if (p?.activeError === 'adf_error') {
+      showScanTroubleshooting('ADF feeder error on printer', true, 'feeder');
+      errorText.textContent = 'Printer ADF Error Detected';
+      showPreview('error', 'Printer ADF Error Detected');
+      setScanSourceRadiosDisabled(false);
+      setScanFormatRadiosDisabled(false);
+      scanBtn.disabled = false;
+      scanBtn.setAttribute('aria-disabled', 'false');
+    } else if (!p?.activeError) {
+      hideScanTroubleshooting();
+      showPreview('idle', 'Insert document into the feeder and press Scan');
+    }
+  });
+
+  socket.on('printer:simulation-cleared', () => {
+    hideScanTroubleshooting();
+    showPreview('idle', 'Insert document into the feeder and press Scan');
+  });
+
+  socket.on('printerStatusRestored', () => {
+    hideScanTroubleshooting();
+    showPreview('idle', 'Insert document into the feeder and press Scan');
+  });
+}
+
 async function initializeScanPage(): Promise<void> {
+  setupScanSocket();
   await Promise.all([loadPricing(), loadScannerSettings()]);
   const restored = await restoreScanPreviewFromSession();
   if (restored) return;
@@ -976,6 +1066,17 @@ async function initializeScanPage(): Promise<void> {
   showPreview('idle', 'Insert document into the feeder and press Scan');
   scanBtn.disabled = false;
   scanBtn.setAttribute('aria-disabled', 'false');
+
+  void fetch('/api/printer/simulation-status')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data: { activeError?: string | null } | null) => {
+      if (data?.activeError === 'adf_error') {
+        showScanTroubleshooting('ADF feeder error on printer', true, 'feeder');
+        errorText.textContent = 'Printer ADF Error Detected';
+        showPreview('error', 'Printer ADF Error Detected');
+      }
+    })
+    .catch(() => {});
 }
 
 void initializeScanPage();

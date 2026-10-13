@@ -89,7 +89,7 @@ function syncFabVisibility(): void {
   document.body?.setAttribute('data-modal-open', String(shouldHide));
   if (typeof document.querySelectorAll === 'function') {
     document
-      .querySelectorAll<HTMLElement>('.kiosk-fab, .printbit-language-fab')
+      .querySelectorAll<HTMLElement>('.kiosk-fab, .printbit-language-fab, .home-low-ink-fab')
       .forEach((fab) => {
         fab.classList.toggle('is-hidden', shouldHide);
         fab.setAttribute('aria-hidden', String(shouldHide));
@@ -112,12 +112,55 @@ const homeSocket = typeof ioFactory === 'function' ? ioFactory() : null;
 attachPowerSafetyOverlay({ socket: homeSocket });
 attachUiBlockingOverlay({ socket: homeSocket });
 
+const homeLowInkWarning = document.getElementById('homeLowInkWarning');
+
+function setHomeLowInkWarningVisible(visible: boolean): void {
+  if (!homeLowInkWarning) return;
+  homeLowInkWarning.classList.toggle('hidden', !visible);
+  homeLowInkWarning.setAttribute('aria-hidden', String(!visible));
+}
+
 if (homeSocket) {
   homeSocket.on('balance', (amount: unknown) => {
     const el = document.getElementById('balance');
     if (el && typeof amount === 'number') el.textContent = String(amount);
   });
+
+  homeSocket.on('printer:low-ink-warning', (payload: unknown) => {
+    const active = Boolean(
+      payload &&
+        typeof payload === 'object' &&
+        (payload as { active?: boolean }).active,
+    );
+    setHomeLowInkWarningVisible(active);
+  });
+
+  homeSocket.on('printer:simulation-state', (payload: unknown) => {
+    const active = Boolean(
+      payload &&
+        typeof payload === 'object' &&
+        (payload as { activeError?: string | null }).activeError === 'low_ink',
+    );
+    setHomeLowInkWarningVisible(active);
+  });
+
+  homeSocket.on('printer:simulation-cleared', () => {
+    setHomeLowInkWarningVisible(false);
+  });
+
+  homeSocket.on('printerStatusRestored', () => {
+    setHomeLowInkWarningVisible(false);
+  });
 }
+
+void fetch('/api/printer/simulation-status')
+  .then((res) => (res.ok ? res.json() : null))
+  .then((data: { activeError?: string | null } | null) => {
+    if (data?.activeError === 'low_ink') {
+      setHomeLowInkWarningVisible(true);
+    }
+  })
+  .catch(() => {});
 
 function navigateTo(path: string) {
   navigateWithKioskMotion(path);

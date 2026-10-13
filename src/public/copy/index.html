@@ -210,7 +210,7 @@
             </div>
           </div>
 
-          <!-- Error banner — hidden until scan fails -->
+          <!-- Error card — hidden until scan fails -->
           <!-- app.ts sets style.display="" to show, style.display="none" to hide -->
           <div
             id="errorBanner"
@@ -219,7 +219,8 @@
             role="alert"
             aria-live="assertive"
           >
-            <div class="error-banner__icon" aria-hidden="true">
+            <div class="error-banner__head">
+              <div class="error-banner__icon" aria-hidden="true">
               <svg viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fill-rule="evenodd"
@@ -231,10 +232,10 @@
                 />
               </svg>
             </div>
-            <p class="error-banner__text" id="errorText">
-              No document detected.
-            </p>
-            <button id="retryBtn" type="button" class="retry-btn">
+              <p class="error-banner__text" id="errorText">
+                No document detected.
+              </p>
+              <button id="retryBtn" type="button" class="retry-btn">
               <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path
                   fill-rule="evenodd"
@@ -248,31 +249,30 @@
               </svg>
               Retry
             </button>
-          </div>
+            </div>
 
-          <section
-            id="copyTroubleshootingPanel"
-            class="copy-troubleshoot"
-            style="display: none"
-            aria-live="polite"
-          >
-            <h3 class="copy-troubleshoot__title">Troubleshoot scanner issue</h3>
-            <p class="copy-troubleshoot__summary" id="copyTroubleshootSummary"></p>
-            <div class="copy-troubleshoot__group">
-              <p class="copy-troubleshoot__label">Possible reasons</p>
-              <ul
-                class="copy-troubleshoot__list"
-                id="copyTroubleshootCauses"
-              ></ul>
+            <!-- Troubleshooting details live inside the error card -->
+            <div
+              id="copyTroubleshootingPanel"
+              class="copy-troubleshoot"
+              style="display: none"
+            >
+              <div class="copy-troubleshoot__group">
+                <p class="copy-troubleshoot__label">Possible reasons</p>
+                <ul
+                  class="copy-troubleshoot__list"
+                  id="copyTroubleshootCauses"
+                ></ul>
+              </div>
+              <div class="copy-troubleshoot__group">
+                <p class="copy-troubleshoot__label">How to fix it</p>
+                <ol
+                  class="copy-troubleshoot__steps"
+                  id="copyTroubleshootSteps"
+                ></ol>
+              </div>
             </div>
-            <div class="copy-troubleshoot__group">
-              <p class="copy-troubleshoot__label">How to fix it on the machine</p>
-              <ol
-                class="copy-troubleshoot__steps"
-                id="copyTroubleshootSteps"
-              ></ol>
-            </div>
-          </section>
+          </div>
         </section>
 
         <!-- RIGHT — steps + error -->
