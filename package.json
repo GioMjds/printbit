@@ -98,6 +98,7 @@
     "eslint-plugin-promise": "^7.3.0",
     "husky": "^9.1.7",
     "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.5.2",
     "lint-staged": "^16.4.0",
     "supertest": "^7.3.1",
     "ts-jest": "^29.4.9",

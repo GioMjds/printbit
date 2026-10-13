@@ -387,8 +387,8 @@ const DEFAULT_DATA: Schema = {
     scannerDpi: {
       copyGlass: 300,
       copyAdf: 300,
-      scanGlass: 300,
-      scanAdf: 300,
+      scanGlass: 150,
+      scanAdf: 150,
     },
     developerMode: {
       enabled: false,
@@ -478,7 +478,13 @@ function wholePeso(value: number): number {
 
 function normalizeTargetPrinterName(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const sanitized = value.replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  const sanitized = [...value]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return !(code <= 0x1f || code === 0x7f);
+    })
+    .join('')
+    .trim();
   return sanitized ? sanitized : null;
 }
 

@@ -1,11 +1,11 @@
 import {
+  PaperPricingProfile,
   SettingsResponse,
   SummaryResponse,
-  PaperPricingProfile,
   apiFetch,
-  setMessage,
   initAuth,
   setAdminPin,
+  setMessage,
   updateSidebarBadges,
 } from '../shared';
 
@@ -43,36 +43,6 @@ const settingColorDetection = document.getElementById(
   'settingColorDetection',
 ) as HTMLInputElement | null;
 
-// ── Pricing Engine settings ──────────────────
-const settingA4PaperCost = document.getElementById('settingA4PaperCost') as HTMLInputElement | null;
-const settingA4BwLow = document.getElementById('settingA4BwLow') as HTMLInputElement | null;
-const settingA4BwMedium = document.getElementById('settingA4BwMedium') as HTMLInputElement | null;
-const settingA4BwHigh = document.getElementById('settingA4BwHigh') as HTMLInputElement | null;
-const settingA4BwVeryHigh = document.getElementById('settingA4BwVeryHigh') as HTMLInputElement | null;
-const settingA4ColorLow = document.getElementById('settingA4ColorLow') as HTMLInputElement | null;
-const settingA4ColorMedium = document.getElementById('settingA4ColorMedium') as HTMLInputElement | null;
-const settingA4ColorHigh = document.getElementById('settingA4ColorHigh') as HTMLInputElement | null;
-const settingA4ColorVeryHigh = document.getElementById('settingA4ColorVeryHigh') as HTMLInputElement | null;
-
-const settingShortBondPaperCost = document.getElementById('settingShortBondPaperCost') as HTMLInputElement | null;
-const settingShortBondBwLow = document.getElementById('settingShortBondBwLow') as HTMLInputElement | null;
-const settingShortBondBwMedium = document.getElementById('settingShortBondBwMedium') as HTMLInputElement | null;
-const settingShortBondBwHigh = document.getElementById('settingShortBondBwHigh') as HTMLInputElement | null;
-const settingShortBondBwVeryHigh = document.getElementById('settingShortBondBwVeryHigh') as HTMLInputElement | null;
-const settingShortBondColorLow = document.getElementById('settingShortBondColorLow') as HTMLInputElement | null;
-const settingShortBondColorMedium = document.getElementById('settingShortBondColorMedium') as HTMLInputElement | null;
-const settingShortBondColorHigh = document.getElementById('settingShortBondColorHigh') as HTMLInputElement | null;
-const settingShortBondColorVeryHigh = document.getElementById('settingShortBondColorVeryHigh') as HTMLInputElement | null;
-
-const settingLongBondPaperCost = document.getElementById('settingLongBondPaperCost') as HTMLInputElement | null;
-const settingLongBondBwLow = document.getElementById('settingLongBondBwLow') as HTMLInputElement | null;
-const settingLongBondBwMedium = document.getElementById('settingLongBondBwMedium') as HTMLInputElement | null;
-const settingLongBondBwHigh = document.getElementById('settingLongBondBwHigh') as HTMLInputElement | null;
-const settingLongBondBwVeryHigh = document.getElementById('settingLongBondBwVeryHigh') as HTMLInputElement | null;
-const settingLongBondColorLow = document.getElementById('settingLongBondColorLow') as HTMLInputElement | null;
-const settingLongBondColorMedium = document.getElementById('settingLongBondColorMedium') as HTMLInputElement | null;
-const settingLongBondColorHigh = document.getElementById('settingLongBondColorHigh') as HTMLInputElement | null;
-const settingLongBondColorVeryHigh = document.getElementById('settingLongBondColorVeryHigh') as HTMLInputElement | null;
 const settingCopyBwPerPage = document.getElementById(
   'settingCopyBwPerPage',
 ) as HTMLInputElement | null;
@@ -263,7 +233,10 @@ function renderScanFilenamePreview(): void {
   }
 
   const cleaned = baseName
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+    .replace(/[<>:"/\\|?*]/g, '-')
+    .split('')
+    .map((char) => (char.charCodeAt(0) <= 0x1f ? '-' : char))
+    .join('')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -357,8 +330,6 @@ document.querySelectorAll('.token-tag').forEach((tag) => {
 
 syncScanFilenameUI();
 
-
-
 function applySettings(settings: SettingsResponse): void {
   settingAdminPin.value = '';
   loadedAdminLocalOnly = settings.adminLocalOnly;
@@ -434,15 +405,33 @@ function applySettings(settings: SettingsResponse): void {
     key: 'a4' | 'shortBond' | 'longBond',
   ) => {
     const p = settings.pricingEngine?.paperProfiles?.[key];
-    const costEl = document.getElementById(`setting${prefix}PaperCost`) as HTMLInputElement | null;
-    const bwLowEl = document.getElementById(`setting${prefix}BwLow`) as HTMLInputElement | null;
-    const bwMedEl = document.getElementById(`setting${prefix}BwMedium`) as HTMLInputElement | null;
-    const bwHighEl = document.getElementById(`setting${prefix}BwHigh`) as HTMLInputElement | null;
-    const bwVHighEl = document.getElementById(`setting${prefix}BwVeryHigh`) as HTMLInputElement | null;
-    const colLowEl = document.getElementById(`setting${prefix}ColorLow`) as HTMLInputElement | null;
-    const colMedEl = document.getElementById(`setting${prefix}ColorMedium`) as HTMLInputElement | null;
-    const colHighEl = document.getElementById(`setting${prefix}ColorHigh`) as HTMLInputElement | null;
-    const colVHighEl = document.getElementById(`setting${prefix}ColorVeryHigh`) as HTMLInputElement | null;
+    const costEl = document.getElementById(
+      `setting${prefix}PaperCost`,
+    ) as HTMLInputElement | null;
+    const bwLowEl = document.getElementById(
+      `setting${prefix}BwLow`,
+    ) as HTMLInputElement | null;
+    const bwMedEl = document.getElementById(
+      `setting${prefix}BwMedium`,
+    ) as HTMLInputElement | null;
+    const bwHighEl = document.getElementById(
+      `setting${prefix}BwHigh`,
+    ) as HTMLInputElement | null;
+    const bwVHighEl = document.getElementById(
+      `setting${prefix}BwVeryHigh`,
+    ) as HTMLInputElement | null;
+    const colLowEl = document.getElementById(
+      `setting${prefix}ColorLow`,
+    ) as HTMLInputElement | null;
+    const colMedEl = document.getElementById(
+      `setting${prefix}ColorMedium`,
+    ) as HTMLInputElement | null;
+    const colHighEl = document.getElementById(
+      `setting${prefix}ColorHigh`,
+    ) as HTMLInputElement | null;
+    const colVHighEl = document.getElementById(
+      `setting${prefix}ColorVeryHigh`,
+    ) as HTMLInputElement | null;
 
     if (costEl && p) costEl.value = String(p.paperCost ?? 1);
     if (bwLowEl && p) bwLowEl.value = String(p.bwPrint?.low ?? 2);
@@ -452,7 +441,8 @@ function applySettings(settings: SettingsResponse): void {
     if (colLowEl && p) colLowEl.value = String(p.colorPrint?.low ?? 17);
     if (colMedEl && p) colMedEl.value = String(p.colorPrint?.medium ?? 19);
     if (colHighEl && p) colHighEl.value = String(p.colorPrint?.high ?? 24);
-    if (colVHighEl && p) colVHighEl.value = String(p.colorPrint?.very_high ?? 29);
+    if (colVHighEl && p)
+      colVHighEl.value = String(p.colorPrint?.very_high ?? 29);
   };
   populateProfile('A4', 'a4');
   populateProfile('ShortBond', 'shortBond');
@@ -481,7 +471,9 @@ function applySettings(settings: SettingsResponse): void {
     'settingDuplexEnabled',
   ) as HTMLInputElement | null;
   if (settingDuplexEnabled) {
-    settingDuplexEnabled.checked = Boolean(settings.pricingEngine?.duplexEnabled);
+    settingDuplexEnabled.checked = Boolean(
+      settings.pricingEngine?.duplexEnabled,
+    );
   }
 
   // Admin Alerts (optional)
@@ -554,10 +546,10 @@ function applySettings(settings: SettingsResponse): void {
     settingCopyAdfDpi.value = String(settings.scannerDpi?.copyAdf ?? 300);
   }
   if (settingScanGlassDpi) {
-    settingScanGlassDpi.value = String(settings.scannerDpi?.scanGlass ?? 300);
+    settingScanGlassDpi.value = String(settings.scannerDpi?.scanGlass ?? 150);
   }
   if (settingScanAdfDpi) {
-    settingScanAdfDpi.value = String(settings.scannerDpi?.scanAdf ?? 300);
+    settingScanAdfDpi.value = String(settings.scannerDpi?.scanAdf ?? 150);
   }
 
   // Developer Testing Mode
@@ -567,7 +559,6 @@ function applySettings(settings: SettingsResponse): void {
     );
   }
   currentDeveloperModeEnabled = Boolean(settings.developerMode?.enabled);
-
 }
 
 export function populateForm(settings: SettingsResponse): void {
@@ -706,15 +697,33 @@ settingsForm.addEventListener('submit', (e) => {
     prefix: 'A4' | 'ShortBond' | 'LongBond',
     label: string,
   ): PaperPricingProfile | null => {
-    const costEl = document.getElementById(`setting${prefix}PaperCost`) as HTMLInputElement | null;
-    const bwLowEl = document.getElementById(`setting${prefix}BwLow`) as HTMLInputElement | null;
-    const bwMedEl = document.getElementById(`setting${prefix}BwMedium`) as HTMLInputElement | null;
-    const bwHighEl = document.getElementById(`setting${prefix}BwHigh`) as HTMLInputElement | null;
-    const bwVHighEl = document.getElementById(`setting${prefix}BwVeryHigh`) as HTMLInputElement | null;
-    const colLowEl = document.getElementById(`setting${prefix}ColorLow`) as HTMLInputElement | null;
-    const colMedEl = document.getElementById(`setting${prefix}ColorMedium`) as HTMLInputElement | null;
-    const colHighEl = document.getElementById(`setting${prefix}ColorHigh`) as HTMLInputElement | null;
-    const colVHighEl = document.getElementById(`setting${prefix}ColorVeryHigh`) as HTMLInputElement | null;
+    const costEl = document.getElementById(
+      `setting${prefix}PaperCost`,
+    ) as HTMLInputElement | null;
+    const bwLowEl = document.getElementById(
+      `setting${prefix}BwLow`,
+    ) as HTMLInputElement | null;
+    const bwMedEl = document.getElementById(
+      `setting${prefix}BwMedium`,
+    ) as HTMLInputElement | null;
+    const bwHighEl = document.getElementById(
+      `setting${prefix}BwHigh`,
+    ) as HTMLInputElement | null;
+    const bwVHighEl = document.getElementById(
+      `setting${prefix}BwVeryHigh`,
+    ) as HTMLInputElement | null;
+    const colLowEl = document.getElementById(
+      `setting${prefix}ColorLow`,
+    ) as HTMLInputElement | null;
+    const colMedEl = document.getElementById(
+      `setting${prefix}ColorMedium`,
+    ) as HTMLInputElement | null;
+    const colHighEl = document.getElementById(
+      `setting${prefix}ColorHigh`,
+    ) as HTMLInputElement | null;
+    const colVHighEl = document.getElementById(
+      `setting${prefix}ColorVeryHigh`,
+    ) as HTMLInputElement | null;
 
     const paperCost = Number(costEl?.value ?? 0);
     const bwLow = Number(bwLowEl?.value ?? 0);
@@ -726,31 +735,59 @@ settingsForm.addEventListener('submit', (e) => {
     const colHigh = Number(colHighEl?.value ?? 0);
     const colVHigh = Number(colVHighEl?.value ?? 0);
 
-    const values = [paperCost, bwLow, bwMed, bwHigh, bwVHigh, colLow, colMed, colHigh, colVHigh];
+    const values = [
+      paperCost,
+      bwLow,
+      bwMed,
+      bwHigh,
+      bwVHigh,
+      colLow,
+      colMed,
+      colHigh,
+      colVHigh,
+    ];
     if (values.some((v) => !isWholePeso(v))) {
-      setMessage(`${label} prices must be whole peso values >= 0 (no decimals).`);
+      setMessage(
+        `${label} prices must be whole peso values >= 0 (no decimals).`,
+      );
       return null;
     }
 
     if (bwMed < bwLow || bwHigh < bwMed || bwVHigh < bwHigh) {
-      setMessage(`${label} B&W tier rates must be non-decreasing (Low <= Med <= High <= Max).`);
+      setMessage(
+        `${label} B&W tier rates must be non-decreasing (Low <= Med <= High <= Max).`,
+      );
       return null;
     }
 
     if (colMed < colLow || colHigh < colMed || colVHigh < colHigh) {
-      setMessage(`${label} Color tier rates must be non-decreasing (Low <= Med <= High <= Max).`);
+      setMessage(
+        `${label} Color tier rates must be non-decreasing (Low <= Med <= High <= Max).`,
+      );
       return null;
     }
 
-    if (colLow < bwLow || colMed < bwMed || colHigh < bwHigh || colVHigh < bwVHigh) {
-      setMessage(`${label} Color rates cannot be less than B&W rates for the same tier.`);
+    if (
+      colLow < bwLow ||
+      colMed < bwMed ||
+      colHigh < bwHigh ||
+      colVHigh < bwVHigh
+    ) {
+      setMessage(
+        `${label} Color rates cannot be less than B&W rates for the same tier.`,
+      );
       return null;
     }
 
     return {
       paperCost,
       bwPrint: { low: bwLow, medium: bwMed, high: bwHigh, very_high: bwVHigh },
-      colorPrint: { low: colLow, medium: colMed, high: colHigh, very_high: colVHigh },
+      colorPrint: {
+        low: colLow,
+        medium: colMed,
+        high: colHigh,
+        very_high: colVHigh,
+      },
     };
   };
 
@@ -777,11 +814,17 @@ settingsForm.addEventListener('submit', (e) => {
     setMessage('Copy Color rate must be a whole peso value (no decimals).');
     return;
   }
-  if (settingScanDocument && (!isWholePeso(scanDocumentPrice) || scanDocumentPrice < 0)) {
+  if (
+    settingScanDocument &&
+    (!isWholePeso(scanDocumentPrice) || scanDocumentPrice < 0)
+  ) {
     setMessage('Scan document rate must be a whole peso value (no decimals).');
     return;
   }
-  if (settingHighQualitySurcharge && (!isWholePeso(highQualitySurcharge) || highQualitySurcharge < 0)) {
+  if (
+    settingHighQualitySurcharge &&
+    (!isWholePeso(highQualitySurcharge) || highQualitySurcharge < 0)
+  ) {
     setMessage(
       'High quality surcharge must be a whole peso value (no decimals).',
     );
@@ -795,7 +838,8 @@ settingsForm.addEventListener('submit', (e) => {
       copyBwPerPage: copyBwPrice,
       copyColorPerPage: copyColorPrice,
       scanDocument: scanDocumentPrice,
-      colorSurcharge: shortBondProfile.colorPrint.low - shortBondProfile.bwPrint.low,
+      colorSurcharge:
+        shortBondProfile.colorPrint.low - shortBondProfile.bwPrint.low,
       highQualitySurcharge,
     },
     pricingEngine: {
@@ -806,7 +850,11 @@ settingsForm.addEventListener('submit', (e) => {
       },
       highQualitySurcharge,
       duplexEnabled: Boolean(
-        (document.getElementById('settingDuplexEnabled') as HTMLInputElement | null)?.checked,
+        (
+          document.getElementById(
+            'settingDuplexEnabled',
+          ) as HTMLInputElement | null
+        )?.checked,
       ),
     },
     adminLocalOnly: settingAdminLocalOnly
@@ -980,7 +1028,6 @@ settingsForm.addEventListener('submit', (e) => {
       enabled: devModeEnabled,
     };
   }
-
 
   const alertPayload =
     alertSeverityThreshold !== null ? buildAlertPayload() : null;
