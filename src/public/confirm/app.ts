@@ -34,6 +34,8 @@ import {
   type HotspotConfig,
 } from '../shared/wifi-troubleshooting';
 import { buildPhysicalPrintSettings } from './print-settings';
+import { PrinterErrorGuideModalController } from '../shared/printer-error-guide-modal';
+import type { ActivePrinterErrorState } from '@/services/printer-error-state';
 
 export {};
 
@@ -47,8 +49,14 @@ void initializePageIdleTimeout({
   // A paid or queued job must stay visible until the worker reports a terminal
   // result. Resume a full normal idle period after that result instead of
   // cancelling the customer's active work in the background.
-  deferWhile: () => hasActiveJob(),
+  deferWhile: () => hasActiveJob() || isJobInterrupted(),
   onTimeout: async () => {
+    if (isJobInterrupted()) {
+      console.log(
+        '[PAGE IDLE] Confirm page timeout deferred - job is interrupted awaiting staff',
+      );
+      return;
+    }
     console.log(
       '[PAGE IDLE] Confirm page timeout reached, redirecting to home',
     );
@@ -544,6 +552,24 @@ let lastKnownPagesPrinted = 0;
 let lastKnownTotalPages = 0;
 let displayedPrintPages = 0;
 let confirmationOutcome = createConfirmationOutcomeState();
+
+let isJobInterruptedState = false;
+function isJobInterrupted(): boolean {
+  return isJobInterruptedState;
+}
+
+const confirmErrorGuideModal = new PrinterErrorGuideModalController({
+  container: document.body,
+  getLanguage: () => {
+    try {
+      return window.localStorage.getItem('printbit.kiosk.language') === 'fil'
+        ? 'fil'
+        : 'en';
+    } catch {
+      return 'en';
+    }
+  },
+});
 
 function hasActiveJob(): boolean {
   return (
@@ -2720,6 +2746,7 @@ thankYouDoneBtn?.addEventListener('click', () => {
 });
 
 maintenanceDoneBtn?.addEventListener('click', () => {
+  isJobInterruptedState = false;
   clearConfirmSessionStorage();
   navigateWithKioskMotion('/');
 });
@@ -2754,6 +2781,69 @@ printAnotherBtn?.addEventListener('click', () => {
     navigateWithKioskMotion('/scan');
   }
 });
+
+function handleErrorGuideUpdate(
+  activeError: ActivePrinterErrorState | null,
+): void {
+  if (activeError) {
+    const isMidJob =
+      hasActiveJob() ||
+      Boolean(activeError.jobRequiresStaff) ||
+      Boolean(activeError.jobId);
+
+    if (isMidJob) {
+      isJobInterruptedState = true;
+      hideOverlay(printingOverlay);
+      isProcessingPayment = false;
+      powerSafetyOverlay?.notifyPrintCompleted();
+
+      const rawRef =
+        activeError.jobId ||
+        currentTransactionId ||
+        (paymentSpoolerCorrelationKey
+          ? `PB-${paymentSpoolerCorrelationKey}`
+          : null);
+      const effectiveJobId = rawRef
+        ? rawRef.startsWith('PB-')
+          ? rawRef
+          : `PB-${rawRef}`
+        : 'PB-JOB';
+
+      setTransactionReference(effectiveJobId);
+
+      recordConfirmationTerminalFailure({
+        transactionId: effectiveJobId,
+        spoolerCorrelationKey:
+          activeError.jobId ?? paymentSpoolerCorrelationKey,
+      });
+
+      confirmErrorGuideModal.render({
+        ...activeError,
+        jobId: effectiveJobId,
+        jobRequiresStaff: true,
+      });
+    } else {
+      confirmErrorGuideModal.render(activeError);
+    }
+  } else {
+    confirmErrorGuideModal.clear();
+    if (isJobInterruptedState) {
+      // Auto-clear of printer error must NOT navigate back to idle home when mid-job was interrupted!
+      // Keep customer on the maintenance / staff assistance screen.
+      renderPrinterError({
+        code: 'WORKER_HARDWARE_ERROR',
+        severity: 'recoverable',
+        userMessage:
+          'Printing was interrupted due to a printer issue. Please call staff for assistance.',
+        hint: 'Please show your reference ID to staff for verification or assistance.',
+        canRetry: false,
+        canDismiss: false,
+        spoolerCorrelationKey:
+          paymentSpoolerCorrelationKey ?? activeSpoolerCorrelationKey,
+      });
+    }
+  }
+}
 
 const ioFactory = (window as unknown as { io?: SocketIoFactory }).io;
 if (typeof ioFactory !== 'function') {
@@ -2988,8 +3078,9 @@ if (typeof ioFactory !== 'function') {
     printerReady = true;
     latestPrinterStatusLabel = status?.status || 'Idle';
     if (
-      !currentPrinterError ||
-      !isMaintenancePrintFailure(currentPrinterError.code)
+      !isJobInterruptedState &&
+      (!currentPrinterError ||
+      !isMaintenancePrintFailure(currentPrinterError.code))
     ) {
       clearPrinterError();
     }
@@ -3001,13 +3092,22 @@ if (typeof ioFactory !== 'function') {
     printerReady = true;
     latestPrinterStatusLabel = 'Ready';
     if (
-      !currentPrinterError ||
-      !isMaintenancePrintFailure(currentPrinterError.code)
+      !isJobInterruptedState &&
+      (!currentPrinterError ||
+      !isMaintenancePrintFailure(currentPrinterError.code))
     ) {
       clearPrinterError();
     }
     applyConfirmGate();
     syncPaymentLeaseState();
+  });
+
+  // Customer printer error guide update (pre-flight and mid-job)
+  connectedSocket.on('printer:error-guide-update', (payload: unknown) => {
+    const data = payload as {
+      activeError: ActivePrinterErrorState | null;
+    } | null;
+    handleErrorGuideUpdate(data?.activeError ?? null);
   });
 
   // Re-sync on printer malfunction or spooler failure
@@ -3239,10 +3339,26 @@ async function loadPrinterStatus(): Promise<void> {
   }
 }
 
+async function loadActivePrinterError(): Promise<void> {
+  try {
+    const res = await fetch('/api/printer/active-error');
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      activeError: ActivePrinterErrorState | null;
+    };
+    if (data.activeError) {
+      handleErrorGuideUpdate(data.activeError);
+    }
+  } catch {
+    /* fallback */
+  }
+}
+
 async function boot(): Promise<void> {
   initCoinLottieAnimation();
   await Promise.all([
     loadPrinterStatus(),
+    loadActivePrinterError(),
     loadPricing(),
     fetchInitialBalance(),
   ]);

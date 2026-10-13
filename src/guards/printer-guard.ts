@@ -16,16 +16,24 @@
  * WHAT IT DOES:
  *   1. On init    → GET /api/printer/status → applies current state before any user
  *                   interaction is possible (fail-safe: blocks on network error).
+ *                 → GET /api/printer/active-error → renders customer error guide modal
+ *                   if active blocking hardware fault exists.
  *   2. Runtime    → listens to `printerMalfunction` socket event → blocks UI.
+ *                 → listens to `printer:error-guide-update` socket event → mounts or
+ *                   clears customer error guide modal without buttons.
  *   3. Recovery   → listens to `printerRecovered` socket event   → restores UI.
  *   4. Always     → dispatches `printer:block` CustomEvent on window so the coin
  *                   acceptor controller can gate coin input without coupling to
  *                   this module.
  *
  * SOCKET EVENTS consumed (emitted by printer-monitor.ts on the server):
- *   printerMalfunction   → { status, statusFlags, printerName, timestamp }
- *   printerRecovered     → { status, printerName, timestamp }
+ *   printerMalfunction         → { status, statusFlags, printerName, timestamp }
+ *   printerRecovered           → { status, printerName, timestamp }
+ *   printer:error-guide-update → { activeError: ActivePrinterErrorState | null }
  */
+
+import { PrinterErrorGuideModalController } from '../public/shared/printer-error-guide-modal';
+import type { ActivePrinterErrorState } from '@/services/printer-error-state';
 
 interface SocketLike {
   on(event: string, handler: (...args: unknown[]) => void): void;
@@ -38,6 +46,11 @@ interface PrinterStatusResponse {
   status: string;
   printerName: string | null;
   lastCheckedAt: string;
+}
+
+interface ActiveErrorResponse {
+  activeError: ActivePrinterErrorState | null;
+  outOfService?: boolean;
 }
 
 interface MalfunctionPayload {
@@ -58,6 +71,8 @@ interface RecoveredPayload {
 let _socket: SocketLike | null = null;
 let _malfunctionHandler: ((p: unknown) => void) | null = null;
 let _recoveredHandler: ((p: unknown) => void) | null = null;
+let _errorGuideUpdateHandler: ((p: unknown) => void) | null = null;
+let _errorGuideModal: PrinterErrorGuideModalController | null = null;
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
 
@@ -69,6 +84,16 @@ function getIdleScreen(): HTMLElement | null {
   // Matches the existing #kiosk-idle wrapper used on the home/idle page.
   // Adjust this selector if your idle container has a different id.
   return document.getElementById('kiosk-idle');
+}
+
+function getCurrentLanguage(): 'en' | 'fil' {
+  try {
+    return window.localStorage.getItem('printbit.kiosk.language') === 'fil'
+      ? 'fil'
+      : 'en';
+  } catch {
+    return 'en';
+  }
 }
 
 // ── Core state application ────────────────────────────────────────────────────
@@ -112,7 +137,7 @@ function applyState(
   console.log(`[printer-guard] blocked=${blocked} status="${status}"`);
 }
 
-// ── Initial REST check ────────────────────────────────────────────────────────
+// ── Initial REST checks ───────────────────────────────────────────────────────
 
 async function checkStatusOnLoad(): Promise<void> {
   try {
@@ -135,6 +160,31 @@ async function checkStatusOnLoad(): Promise<void> {
   }
 }
 
+async function checkActiveErrorOnLoad(): Promise<void> {
+  try {
+    const res = await fetch('/api/printer/active-error');
+
+    if (!res.ok) {
+      console.warn(
+        `[printer-guard] /api/printer/active-error returned ${res.status}`,
+      );
+      return;
+    }
+
+    const data = (await res.json()) as ActiveErrorResponse;
+    if (data.activeError) {
+      _errorGuideModal?.render(data.activeError);
+    } else {
+      _errorGuideModal?.clear();
+    }
+  } catch (err) {
+    console.error(
+      '[printer-guard] Failed to reach /api/printer/active-error:',
+      err,
+    );
+  }
+}
+
 // ── Socket event handlers ─────────────────────────────────────────────────────
 
 function onMalfunction(raw: unknown): void {
@@ -149,6 +199,16 @@ function onRecovered(raw: unknown): void {
   const payload = raw as RecoveredPayload;
   console.log(`[printer-guard] printerRecovered received: "${payload.status}"`);
   applyState(false, payload.status, payload.printerName);
+}
+
+function onErrorGuideUpdate(raw: unknown): void {
+  const payload = raw as { activeError: ActivePrinterErrorState | null } | null;
+  const activeError = payload?.activeError;
+  if (activeError) {
+    _errorGuideModal?.render(activeError);
+  } else {
+    _errorGuideModal?.clear();
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -170,12 +230,19 @@ export async function initPrinterGuard(socket: SocketLike): Promise<void> {
 
   _socket = socket;
 
+  _errorGuideModal = new PrinterErrorGuideModalController({
+    container: document.body,
+    getLanguage: getCurrentLanguage,
+  });
+
   // Store bound handlers so they can be removed later
   _malfunctionHandler = (raw: unknown) => onMalfunction(raw);
   _recoveredHandler = (raw: unknown) => onRecovered(raw);
+  _errorGuideUpdateHandler = (raw: unknown) => onErrorGuideUpdate(raw);
 
   socket.on('printerMalfunction', _malfunctionHandler);
   socket.on('printerRecovered', _recoveredHandler);
+  socket.on('printer:error-guide-update', _errorGuideUpdateHandler);
 
   // Block the UI immediately while the fetch is in-flight — the overlay
   // starts hidden by default so we briefly show "checking..." state by
@@ -183,7 +250,7 @@ export async function initPrinterGuard(socket: SocketLike): Promise<void> {
   // if you prefer the UI to remain visible while checking.
   applyState(true, 'Checking…');
 
-  await checkStatusOnLoad();
+  await Promise.all([checkStatusOnLoad(), checkActiveErrorOnLoad()]);
 
   console.log('[printer-guard] initialized');
 }
@@ -197,10 +264,20 @@ export function destroyPrinterGuard(): void {
     if (_malfunctionHandler)
       _socket.off('printerMalfunction', _malfunctionHandler);
     if (_recoveredHandler) _socket.off('printerRecovered', _recoveredHandler);
+    if (_errorGuideUpdateHandler)
+      _socket.off('printer:error-guide-update', _errorGuideUpdateHandler);
   }
   _socket = null;
   _malfunctionHandler = null;
   _recoveredHandler = null;
+  _errorGuideUpdateHandler = null;
+
+  if (_errorGuideModal) {
+    _errorGuideModal.clear();
+    const overlay = document.querySelector('.printer-error-guide-overlay');
+    overlay?.remove();
+    _errorGuideModal = null;
+  }
 }
 
 /**
@@ -209,5 +286,13 @@ export function destroyPrinterGuard(): void {
  */
 export function isPrinterBlocked(): boolean {
   const overlay = getOverlay();
-  return overlay ? overlay.style.display === 'flex' : false;
+  const modalVisible = _errorGuideModal ? _errorGuideModal.isVisible() : false;
+  return (overlay ? overlay.style.display === 'flex' : false) || modalVisible;
+}
+
+/**
+ * Returns the current modal controller instance if initialized.
+ */
+export function getPrinterErrorGuideModal(): PrinterErrorGuideModalController | null {
+  return _errorGuideModal;
 }
