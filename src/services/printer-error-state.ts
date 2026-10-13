@@ -101,9 +101,15 @@ export class PrinterErrorStateManager {
         ...this.active,
         status: 'cleared' as const,
       };
-      this.active = null;
+      // If error occurred mid-job, staff intervention is required: retain active state so
+      // reload safety and coin lock persist across subsequent polls until staff resolution!
+      if (this.active.jobRequiresStaff) {
+        this.active = finishedState;
+      } else {
+        this.active = null;
+      }
       this.consecutiveHealthyPolls = 0;
-      return { cleared: true, state: finishedState };
+      return { cleared: true, state: { ...finishedState } };
     }
 
     return { cleared: false, state: { ...this.active } };

@@ -30,9 +30,9 @@ export function handlePrinterStatusUpdate(
     const { cleared, state } = printerErrorStateManager.recordHealthyPoll();
     const active = printerErrorStateManager.getActiveError();
     if (cleared || (isCoinSlotLockedBy('printer-error-guide') && !active)) {
-      if (state?.jobRequiresStaff) {
+      if (state?.jobRequiresStaff || active?.jobRequiresStaff) {
         printerGuideSocketIo?.emit('printer:error-guide-update', {
-          activeError: { ...state, status: 'interrupted' },
+          activeError: { ...(state ?? active), status: 'interrupted' },
         });
       } else {
         unlockCoinSlot('printer-error-guide');

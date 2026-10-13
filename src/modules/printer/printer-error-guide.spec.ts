@@ -144,7 +144,7 @@ describe('Printer Error Guide', () => {
       });
     });
 
-    it('preserves coin slot lock and notifies interrupted state when mid-job customer error clears debounce', () => {
+    it('preserves coin slot lock and notifies interrupted state across subsequent polls until staff resolves', async () => {
       // Customer tier error during an active job
       handlePrinterStatusUpdate('Cover open', '7', 'PB-JOB-42');
       const active = printerErrorStateManager.getActiveError();
@@ -165,6 +165,26 @@ describe('Printer Error Guide', () => {
           jobRequiresStaff: true,
           status: 'interrupted',
         }),
+      });
+
+      // 3rd and 4th healthy polls must NOT clear the lock or dismiss the interrupted error
+      handlePrinterStatusUpdate('ready');
+      handlePrinterStatusUpdate('ready');
+      expect(isCoinSlotLockedBy('printer-error-guide')).toBe(true);
+      expect(printerErrorStateManager.getActiveError()?.jobRequiresStaff).toBe(true);
+
+      // Reload safety: GET /api/printer/active-error retains the interrupted error
+      const reloadRes = await request(app).get('/api/printer/active-error');
+      expect(reloadRes.status).toBe(200);
+      expect(reloadRes.body.activeError.jobId).toBe('PB-JOB-42');
+      expect(reloadRes.body.activeError.jobRequiresStaff).toBe(true);
+
+      // Once staff resolves, subsequent healthy poll unlocks coin slot and clears modal
+      printerErrorStateManager.clearStaffResolution('staff-1');
+      handlePrinterStatusUpdate('ready');
+      expect(isCoinSlotLockedBy('printer-error-guide')).toBe(false);
+      expect(mockIo.emit).toHaveBeenLastCalledWith('printer:error-guide-update', {
+        activeError: null,
       });
     });
 
