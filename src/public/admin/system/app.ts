@@ -111,6 +111,9 @@ const simOutputTrayBtn = document.getElementById(
 const clearPrinterErrorsBtn = document.getElementById(
   'clearPrinterErrorsBtn',
 ) as HTMLButtonElement | null;
+const clearPaperJamBtn = document.getElementById(
+  'clearPaperJamBtn',
+) as HTMLButtonElement | null;
 const simStatusBadge = document.getElementById(
   'simStatusBadge',
 ) as HTMLElement | null;
@@ -745,6 +748,28 @@ async function triggerClearPrinterErrors(): Promise<void> {
   }
 }
 
+async function triggerClearPaperJam(): Promise<void> {
+  setMessage('Clearing Paper Jam error and redirecting kiosk to homepage...');
+  try {
+    const res = await apiFetch('/api/admin/printer/clear-paper-jam', {
+      method: 'POST',
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      error?: string;
+      message?: string;
+    };
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error ?? 'Failed to clear paper jam.');
+    }
+    updateSimulationBadge(null);
+    setMessage(data.message ?? 'Paper jam cleared successfully. Kiosk redirected to home.');
+    void loadData().catch(showRefreshError);
+  } catch (err) {
+    setMessage(err instanceof Error ? err.message : 'Failed to clear paper jam.');
+  }
+}
+
 async function loadSimulationStatus(): Promise<void> {
   try {
     const res = await apiFetch('/api/admin/printer/simulation-status');
@@ -768,6 +793,7 @@ simOfflineBtn?.addEventListener('click', () => void triggerSimulation('offline')
 simServiceBtn?.addEventListener('click', () => void triggerSimulation('service_required'));
 simOutputTrayBtn?.addEventListener('click', () => void triggerSimulation('output_tray'));
 clearPrinterErrorsBtn?.addEventListener('click', () => void triggerClearPrinterErrors());
+clearPaperJamBtn?.addEventListener('click', () => void triggerClearPaperJam());
 
 // ── Socket.IO — live printer updates ─────────────────────────────────────────
 

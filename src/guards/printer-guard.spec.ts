@@ -130,7 +130,7 @@ describe('printer-guard', () => {
 
     const badge = document.querySelector('.printer-error-guide-badge--ref');
     expect(badge?.textContent).toBe('PB-8888');
-    expect(document.querySelector('.printer-error-guide-title')?.textContent).toContain('Needs Paper');
+    expect(document.querySelector('.printer-error-guide-title')?.textContent).toContain('Paper');
   });
 
   it('renders Filipino copy when language is set to fil in localStorage', async () => {

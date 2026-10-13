@@ -84,6 +84,7 @@ let _socket: SocketLike | null = null;
 let _malfunctionHandler: ((p: unknown) => void) | null = null;
 let _recoveredHandler: ((p: unknown) => void) | null = null;
 let _errorGuideUpdateHandler: ((p: unknown) => void) | null = null;
+let _paperJamClearedHandler: (() => void) | null = null;
 let _errorGuideModal: PrinterErrorGuideModalController | null = null;
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
@@ -270,6 +271,12 @@ export async function initPrinterGuard(
     _errorGuideModal = new PrinterErrorGuideModalController({
       container: document.body,
       getLanguage: getCurrentLanguage,
+      onCancelJob: () => {
+        _errorGuideModal?.clear();
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          window.location.href = '/';
+        }
+      },
     });
   }
 
@@ -278,10 +285,17 @@ export async function initPrinterGuard(
     _malfunctionHandler = (raw: unknown) => onMalfunction(raw);
     _recoveredHandler = (raw: unknown) => onRecovered(raw);
     _errorGuideUpdateHandler = (raw: unknown) => onErrorGuideUpdate(raw);
+    _paperJamClearedHandler = () => {
+      _errorGuideModal?.clear();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+    };
 
     _socket.on('printerMalfunction', _malfunctionHandler);
     _socket.on('printerRecovered', _recoveredHandler);
     _socket.on('printer:error-guide-update', _errorGuideUpdateHandler);
+    _socket.on('printer:paper-jam-cleared', _paperJamClearedHandler);
   }
 
   // Block the UI immediately while the fetch is in-flight — the overlay
@@ -306,11 +320,14 @@ export function destroyPrinterGuard(): void {
     if (_recoveredHandler) _socket.off('printerRecovered', _recoveredHandler);
     if (_errorGuideUpdateHandler)
       _socket.off('printer:error-guide-update', _errorGuideUpdateHandler);
+    if (_paperJamClearedHandler)
+      _socket.off('printer:paper-jam-cleared', _paperJamClearedHandler);
   }
   _socket = null;
   _malfunctionHandler = null;
   _recoveredHandler = null;
   _errorGuideUpdateHandler = null;
+  _paperJamClearedHandler = null;
 
   if (_errorGuideModal) {
     _errorGuideModal.clear();

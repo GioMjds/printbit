@@ -30,14 +30,14 @@ describe('PrinterErrorStateManager', () => {
   });
 
   it('does NOT auto-clear staff tier errors on healthy poll', () => {
-    manager.recordError('E_NO_PAPER');
+    manager.recordError('E_PAPER_SETUP');
 
     manager.recordHealthyPoll();
     manager.recordHealthyPoll();
     manager.recordHealthyPoll();
 
     expect(manager.getActiveError()?.status).toBe('active');
-    expect(manager.getActiveError()?.code).toBe('E_NO_PAPER');
+    expect(manager.getActiveError()?.code).toBe('E_PAPER_SETUP');
 
     manager.clearStaffResolution('staff_user');
     expect(manager.getActiveError()).toBeNull();

@@ -32,22 +32,22 @@ export interface PrinterErrorDefinition {
 export const PRINTER_ERROR_CATALOG: Record<PrinterErrorCode, PrinterErrorDefinition> = {
   E_NO_PAPER: {
     code: 'E_NO_PAPER',
-    tier: 'Staff',
+    tier: 'Customer',
     triggerRule: 'out_of_paper|detectederrorstate_4',
-    autoClear: false,
+    autoClear: true,
     locksCoinSlot: true,
-    lookAtPrinterScreen: false,
+    lookAtPrinterScreen: true,
     title: {
-      en: 'Printer Needs Paper',
-      fil: 'Kailangan ng Papel ang Printer',
+      en: 'Printer Out of Paper',
+      fil: 'Naubusan ng Papel ang Printer',
     },
     what: {
-      en: 'Printer is out of paper.',
-      fil: 'Naubos na ang papel ng printer.',
+      en: 'The printer is out of paper.',
+      fil: 'Naubusan ng papel ang printer.',
     },
     action: {
-      en: 'Please call staff to load paper.',
-      fil: 'Pakitawag ang staff para maglagay ng papel.',
+      en: 'Load paper into the printer tray. Resume on the printer to continue printing, or cancel your print job.',
+      fil: 'Maglagay ng papel sa tray ng printer. Magpatuloy sa printer para ituloy ang print, o kanselahin ang iyong print job.',
     },
   },
   E_COVER_OPEN: {

@@ -41,8 +41,11 @@ describe('printer-error-catalog', () => {
   });
 
   it('verifies staff and technician tiers require staff clearing', () => {
-    expect(PRINTER_ERROR_CATALOG.E_NO_PAPER.tier).toBe('Staff');
-    expect(PRINTER_ERROR_CATALOG.E_NO_PAPER.autoClear).toBe(false);
+    expect(PRINTER_ERROR_CATALOG.E_NO_PAPER.tier).toBe('Customer');
+    expect(PRINTER_ERROR_CATALOG.E_NO_PAPER.autoClear).toBe(true);
+
+    expect(PRINTER_ERROR_CATALOG.E_PAPER_SETUP.tier).toBe('Staff');
+    expect(PRINTER_ERROR_CATALOG.E_PAPER_SETUP.autoClear).toBe(false);
 
     expect(PRINTER_ERROR_CATALOG.E_SERVICE.tier).toBe('Technician');
     expect(PRINTER_ERROR_CATALOG.E_SERVICE.autoClear).toBe(false);

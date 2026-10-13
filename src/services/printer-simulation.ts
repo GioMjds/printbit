@@ -303,3 +303,34 @@ export function clearPrinterSimulation(): PrinterSimulationState {
 
   return { ...currentSimulation };
 }
+
+export function clearPaperJamSimulation(): PrinterSimulationState {
+  const io = getPrinterGuideSocketIo();
+
+  currentSimulation = {
+    activeError: null,
+    timestamp: null,
+    message: null,
+  };
+
+  printerErrorStateManager.clearStaffResolution();
+  unlockOwnedCoinSlot('printer-error-guide');
+
+  printerStateProjection.applyEvent({
+    type: 'PrinterOnline',
+    printerName: printerStateProjection.getSnapshot().name ?? 'Default',
+    timestampUtc: new Date().toISOString(),
+  });
+
+  io?.emit('printer:simulation-state', { activeError: null, message: null });
+  io?.emit('printer:simulation-cleared', { redirectHome: true });
+  io?.emit('printer:paper-jam-cleared', { redirectHome: true });
+  io?.emit('printer:low-ink-warning', { active: false });
+  io?.emit('printer:ink-out-warning', { active: false });
+  io?.emit('printerStatusRestored', { status: 'Ready' });
+  io?.emit('printerRecovered', { connected: true, status: 'Idle' });
+  io?.emit('printerStatusChanged', { connected: true, status: 'Idle' });
+  io?.emit('printer:error-guide-update', { activeError: null });
+
+  return { ...currentSimulation };
+}

@@ -34,7 +34,6 @@ import {
   type HotspotConfig,
 } from '../shared/wifi-troubleshooting';
 import { buildPhysicalPrintSettings } from './print-settings';
-import { PrinterErrorGuideModalController } from '../shared/printer-error-guide-modal';
 import type { ActivePrinterErrorState } from '@/services/printer-error-state';
 
 export {};
@@ -557,19 +556,6 @@ let isJobInterruptedState = false;
 function isJobInterrupted(): boolean {
   return isJobInterruptedState;
 }
-
-const confirmErrorGuideModal = new PrinterErrorGuideModalController({
-  container: document.body,
-  getLanguage: () => {
-    try {
-      return window.localStorage.getItem('printbit.kiosk.language') === 'fil'
-        ? 'fil'
-        : 'en';
-    } catch {
-      return 'en';
-    }
-  },
-});
 
 function hasActiveJob(): boolean {
   return (
@@ -2840,18 +2826,27 @@ function handleErrorGuideUpdate(
           activeError.jobId ?? paymentSpoolerCorrelationKey,
       });
 
-      confirmErrorGuideModal.render({
-        ...activeError,
-        jobId: effectiveJobId,
-        jobRequiresStaff: true,
+      renderPrinterError({
+        code: activeError.code,
+        severity: 'recoverable',
+        userMessage: activeError.code,
+        spoolerCorrelationKey: effectiveJobId,
+        canRetry: false,
+        canDismiss: false,
       });
     } else {
-      confirmErrorGuideModal.render(activeError);
+      renderPrinterError({
+        code: activeError.code,
+        severity: 'recoverable',
+        userMessage: activeError.code,
+        canRetry: true,
+        canDismiss: false,
+      });
       applyConfirmGate();
       syncPaymentLeaseState();
     }
   } else {
-    confirmErrorGuideModal.clear();
+    clearPrinterError();
     if (isJobInterruptedState) {
       // Auto-clear of printer error must NOT navigate back to idle home when mid-job was interrupted!
       // Keep customer on the maintenance / staff assistance screen.
@@ -3135,19 +3130,33 @@ if (typeof ioFactory !== 'function') {
     syncPaymentLeaseState();
   });
 
-  connectedSocket.on('printer:simulation-cleared', () => {
+  connectedSocket.on('printer:simulation-cleared', (payload: unknown) => {
+    const data = payload as { redirectHome?: boolean } | null;
     isJobInterruptedState = false;
     currentPrinterError = null;
     printerReady = true;
     latestPrinterStatusLabel = 'Ready';
     clearPrinterError();
-    confirmErrorGuideModal.clear();
     if (maintenanceDoneBtn) {
       maintenanceDoneBtn.style.display = '';
       maintenanceDoneBtn.removeAttribute('hidden');
     }
     applyConfirmGate();
     syncPaymentLeaseState();
+    if (data?.redirectHome) {
+      clearConfirmSessionStorage();
+      navigateWithKioskMotion('/', 'replace');
+    }
+  });
+
+  connectedSocket.on('printer:paper-jam-cleared', () => {
+    isJobInterruptedState = false;
+    currentPrinterError = null;
+    printerReady = true;
+    latestPrinterStatusLabel = 'Ready';
+    clearPrinterError();
+    clearConfirmSessionStorage();
+    navigateWithKioskMotion('/', 'replace');
   });
 
   // Customer printer error guide update (pre-flight and mid-job)

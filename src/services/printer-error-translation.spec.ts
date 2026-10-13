@@ -13,9 +13,8 @@ describe('translateHardwarePrinterError', () => {
   it('maps paper empty to E_NO_PAPER', () => {
     const res = translateHardwarePrinterError({ message: 'Paper out', errorCode: '4' });
     expect(res.code).toBe('E_NO_PAPER');
-    expect(res.tier).toBe('Staff');
-    expect(res.autoClear).toBe(false);
-    expect(res.userMessage).not.toContain('Resume');
+    expect(res.tier).toBe('Customer');
+    expect(res.autoClear).toBe(true);
   });
 
   it('maps output tray to E_OUTPUT_TRAY', () => {

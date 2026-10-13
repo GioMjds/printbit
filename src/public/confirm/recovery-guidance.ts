@@ -29,6 +29,7 @@ export function getMaintenanceGuidance(
   // Check for paper out / loading errors (e.g. Epson popup: Paper out or incorrect loading)
   if (
     code === 'PAPER_TRAY_EMPTY' ||
+    code === 'E_NO_PAPER' ||
     lower.includes('paper out') ||
     lower.includes('paper_out') ||
     lower.includes('incorrect loading') ||
@@ -41,13 +42,35 @@ export function getMaintenanceGuidance(
       subtitle: 'The printer ran out of paper or paper was loaded incorrectly.',
       badge: 'Paper Issue',
       message:
-        'The printer detected that the paper tray is empty or the paper was not loaded properly into the feed.',
+        'The printer detected that the paper tray is empty. Load paper to continue printing.',
       actionSteps: [
-        'Keep this screen open and inform kiosk staff.',
-        'Staff will load paper into the rear feed and check printer settings.',
-        'Scan your transaction receipt QR code to save verification proof.',
+        'Load paper into the printer paper tray.',
+        'Press Resume on the printer to continue printing, or cancel your print job.',
+        'Scan your transaction receipt QR code for verification proof if needed.',
       ],
-      hint: 'Show your transaction ID and receipt to staff for assistance or a refund.',
+      hint: 'You can resume interactively on the printer or cancel your print job.',
+      technicalDetails: raw.includes('|') || raw.length > 70 ? raw : null,
+    };
+  }
+
+  // Check for output tray closed or full
+  if (
+    code === 'E_OUTPUT_TRAY' ||
+    lower.includes('output tray') ||
+    lower.includes('output bin') ||
+    lower.includes('tray closed')
+  ) {
+    return {
+      title: 'Output Tray Needs Attention',
+      subtitle: 'The output tray is closed or full.',
+      badge: 'Output Tray',
+      message:
+        'Printing paused because the output tray is closed or full.',
+      actionSteps: [
+        'Pull out the output tray on the printer.',
+        'Press OK on the printer screen if prompted to continue.',
+      ],
+      hint: 'The printer will resume automatically once the tray is opened.',
       technicalDetails: raw.includes('|') || raw.length > 70 ? raw : null,
     };
   }
@@ -78,6 +101,7 @@ export function getMaintenanceGuidance(
   // Check for cover / door open
   if (
     code === 'PRINTER_DOOR_OPEN' ||
+    code === 'E_COVER_OPEN' ||
     lower.includes('door open') ||
     lower.includes('door_open') ||
     lower.includes('cover open')
@@ -89,10 +113,10 @@ export function getMaintenanceGuidance(
       message:
         'Printing paused because the printer cover or access door is open.',
       actionSteps: [
-        'Ask kiosk staff to firmly close the printer cover.',
-        'Keep this screen open and scan your receipt QR code below.',
+        'Close the printer cover or door firmly on the printer.',
+        'Check the printer screen to resume.',
       ],
-      hint: 'Show your transaction ID and receipt to staff for assistance.',
+      hint: 'Closing the cover will resume printing automatically.',
       technicalDetails: raw.includes('|') || raw.length > 70 ? raw : null,
     };
   }

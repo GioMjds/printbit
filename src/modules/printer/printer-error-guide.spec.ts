@@ -71,9 +71,9 @@ describe('Printer Error Guide', () => {
 
     it('reports anomaly once on initial Staff tier error and dedupes repetitive polls', async () => {
       const reportSpy = jest.spyOn(anomalyService, 'report').mockResolvedValue({} as any);
-      handlePrinterStatusUpdate('No paper', '4');
+      handlePrinterStatusUpdate('Paper setup prompt');
       const active = printerErrorStateManager.getActiveError();
-      expect(active?.code).toBe('E_NO_PAPER');
+      expect(active?.code).toBe('E_PAPER_SETUP');
       expect(active?.tier).toBe('Staff');
       expect(isCoinSlotLockedBy('printer-error-guide')).toBe(true);
       expect(reportSpy).toHaveBeenCalledTimes(1);
@@ -81,18 +81,18 @@ describe('Printer Error Guide', () => {
         expect.objectContaining({
           category: 'printer',
           severity: 'warning',
-          fingerprint: 'printer-E_NO_PAPER',
+          fingerprint: 'printer-E_PAPER_SETUP',
         }),
       );
       expect(mockIo.emit).toHaveBeenCalledWith(
         'printer:staff-alert',
         expect.objectContaining({
-          activeError: expect.objectContaining({ code: 'E_NO_PAPER' }),
+          activeError: expect.objectContaining({ code: 'E_PAPER_SETUP' }),
         }),
       );
 
       // Subsequent identical poll should not re-trigger anomaly report or staff alert
-      handlePrinterStatusUpdate('No paper', '4');
+      handlePrinterStatusUpdate('Paper setup prompt');
       expect(reportSpy).toHaveBeenCalledTimes(1);
     });
 

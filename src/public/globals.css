@@ -981,9 +981,10 @@ html[data-kiosk-static='true']
 }
 
 .printer-error-guide-card {
-  background: #ffffff;
+  background: #181730;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 1.25rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
   max-width: 32rem;
   width: 100%;
   padding: 2rem;
@@ -995,8 +996,8 @@ html[data-kiosk-static='true']
   width: 4rem;
   height: 4rem;
   border-radius: 9999px;
-  background: #fee2e2;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1005,20 +1006,20 @@ html[data-kiosk-static='true']
 .printer-error-guide-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1e293b;
+  color: #ffffff;
   margin-bottom: 0.5rem;
 }
 
 .printer-error-guide-what {
   font-size: 1.125rem;
-  color: #475569;
+  color: #94a3b8;
   margin-bottom: 0.75rem;
 }
 
 .printer-error-guide-action {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #0f172a;
+  color: #f1f5f9;
   margin-bottom: 0.75rem;
   line-height: 1.4;
 }
@@ -1026,19 +1027,19 @@ html[data-kiosk-static='true']
 .printer-error-guide-screen {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #2563eb;
+  color: #60a5fa;
   margin-bottom: 1.5rem;
 }
 
 .printer-error-guide-footer {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 1.25rem;
 }
 
 .printer-error-guide-warning {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #b91c1c;
+  color: #f87171;
   margin-bottom: 0.75rem;
 }
 
@@ -1053,11 +1054,39 @@ html[data-kiosk-static='true']
   font-weight: 600;
   padding: 0.25rem 0.625rem;
   border-radius: 9999px;
-  background: #f1f5f9;
-  color: #475569;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
 }
 
 .printer-error-guide-badge--ref {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.printer-error-guide-actions {
+  margin: 1.25rem 0 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.printer-error-guide-btn--cancel {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  color: #e2e8f0;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.625rem 1.5rem;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.printer-error-guide-btn--cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.printer-error-guide-btn--cancel:active {
+  transform: scale(0.98);
 }

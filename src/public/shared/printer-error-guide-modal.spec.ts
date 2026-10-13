@@ -98,10 +98,10 @@ describe('PrinterErrorGuideModalController', () => {
 
     filController.render({
       code: 'E_NO_PAPER',
-      tier: 'Staff',
-      autoClear: false,
+      tier: 'Customer',
+      autoClear: true,
       locksCoinSlot: true,
-      lookAtPrinterScreen: false,
+      lookAtPrinterScreen: true,
       jobId: null,
       jobRequiresStaff: false,
       firstSeenAt: new Date().toISOString(),
@@ -110,13 +110,41 @@ describe('PrinterErrorGuideModalController', () => {
       status: 'active',
     });
 
-    expect(container.textContent).toContain('Naubos na ang papel ng printer');
-    expect(container.textContent).toContain('Pakitawag ang staff');
-    expect(container.textContent).toContain('Huwag pindutin ang Cancel sa printer');
-    // Does not render screen note when lookAtPrinterScreen is false
-    expect(container.textContent).not.toContain('Tingnan ang screen ng printer');
+    expect(container.textContent).toContain('Naubusan ng papel ang printer');
+    expect(container.textContent).toContain('Maglagay ng papel sa tray ng printer');
+    expect(container.textContent).toContain('Maaaring magpatuloy sa printer');
     // Does not render job badge when jobId is null
     expect(container.querySelector('.printer-error-guide-badge--ref')).toBeNull();
+  });
+
+  it('renders cancel job button for E_NO_PAPER and triggers onCancelJob callback', () => {
+    const onCancelJob = jest.fn();
+    const paperOutController = new PrinterErrorGuideModalController({
+      container,
+      getLanguage: () => 'en',
+      onCancelJob,
+    });
+
+    paperOutController.render({
+      code: 'E_NO_PAPER',
+      tier: 'Customer',
+      autoClear: true,
+      locksCoinSlot: true,
+      lookAtPrinterScreen: true,
+      jobId: 'PB-1234',
+      jobRequiresStaff: false,
+      firstSeenAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString(),
+      occurrences: 1,
+      status: 'active',
+    });
+
+    const cancelBtn = container.querySelector('#printerErrorGuideCancelBtn') as HTMLButtonElement | null;
+    expect(cancelBtn).not.toBeNull();
+    expect(cancelBtn?.textContent).toContain('Cancel Print Job');
+
+    cancelBtn?.click();
+    expect(onCancelJob).toHaveBeenCalledTimes(1);
   });
 
   it('renders Filipino screen prompt when lookAtPrinterScreen is true', () => {

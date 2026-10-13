@@ -45,6 +45,7 @@ import {
   getPrinterSimulationState,
   simulatePrinterError,
   clearPrinterSimulation,
+  clearPaperJamSimulation,
   type SimulatedPrinterError,
 } from '@/services/printer-simulation';
 import {
@@ -647,6 +648,12 @@ export class AdminController {
       requireAdminLocalAccess,
       requireAdminPin,
       this.handleClearPrinterErrors,
+    );
+    this.router.post(
+      '/printer/clear-paper-jam',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleClearPaperJam,
     );
 
     // ── Anomaly incidents routes ───────────────────────────────────────────────
@@ -2881,6 +2888,22 @@ export class AdminController {
       ok: true,
       simulation: state,
       message: 'Printer error messages cleared successfully. Normal readiness restored.',
+    });
+  };
+
+  private handleClearPaperJam = async (_req: Request, res: Response) => {
+    const state = clearPaperJamSimulation();
+
+    await this.adminService.appendAdminLog(
+      'admin_paper_jam_cleared',
+      'Admin verified and cleared paper jam error. Kiosk redirected to homepage.',
+      { timestamp: new Date().toISOString() },
+    );
+
+    res.json({
+      ok: true,
+      simulation: state,
+      message: 'Paper jam cleared successfully. Kiosk redirected to homepage.',
     });
   };
 

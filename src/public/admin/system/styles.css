@@ -674,6 +674,8 @@
 
 .sim-actions-bar {
   display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
   width: 100%;
 }
 

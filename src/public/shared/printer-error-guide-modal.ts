@@ -20,6 +20,7 @@ function escapeHtml(str: string): string {
 export interface ErrorGuideModalOptions {
   container: HTMLElement;
   getLanguage?: () => 'en' | 'fil';
+  onCancelJob?: () => void;
 }
 
 export class PrinterErrorGuideModalController {
@@ -64,13 +65,28 @@ export class PrinterErrorGuideModalController {
     }
 
     const cancelWarning =
-      lang === 'fil'
-        ? 'Huwag pindutin ang Cancel sa printer.'
-        : 'Do not press Cancel on the printer.';
+      errorState.code === 'E_NO_PAPER'
+        ? lang === 'fil'
+          ? 'Maaaring magpatuloy sa printer pagkalagay ng papel, o kanselahin ang print job.'
+          : 'Interact with the printer to resume, or cancel your print job.'
+        : lang === 'fil'
+          ? 'Huwag pindutin ang Cancel sa printer.'
+          : 'Do not press Cancel on the printer.';
 
     const jobBadge = errorState.jobId
       ? `<span class="printer-error-guide-badge printer-error-guide-badge--ref">${escapeHtml(errorState.jobId)}</span>`
       : '';
+
+    const cancelJobBtnHtml =
+      errorState.code === 'E_NO_PAPER'
+        ? `
+          <div class="printer-error-guide-actions">
+            <button type="button" class="printer-error-guide-btn printer-error-guide-btn--cancel" id="printerErrorGuideCancelBtn">
+              ${escapeHtml(lang === 'fil' ? 'Kanselahin ang Print Job' : 'Cancel Print Job')}
+            </button>
+          </div>
+        `
+        : '';
 
     this.card.innerHTML = `
       <div class="printer-error-guide-header">
@@ -86,6 +102,7 @@ export class PrinterErrorGuideModalController {
         <p class="printer-error-guide-what">${escapeHtml(whatText)}</p>
         <p class="printer-error-guide-action">${escapeHtml(actionText)}</p>
         ${screenPrompt}
+        ${cancelJobBtnHtml}
       </div>
 
       <div class="printer-error-guide-footer">
@@ -96,6 +113,13 @@ export class PrinterErrorGuideModalController {
         </div>
       </div>
     `;
+
+    if (errorState.code === 'E_NO_PAPER') {
+      const cancelBtn = this.card.querySelector('#printerErrorGuideCancelBtn');
+      cancelBtn?.addEventListener('click', () => {
+        this.options.onCancelJob?.();
+      });
+    }
 
     this.overlay.removeAttribute('hidden');
     this.visible = true;
