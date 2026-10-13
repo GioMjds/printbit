@@ -14,10 +14,7 @@ export {};
 
 void initKioskLocalization();
 attachUiBlockingOverlay();
-void initPrinterGuard(null, {
-  mode: 'kiosk_wide_only',
-  excludeErrors: ['E_INK_OUT'],
-});
+void initPrinterGuard(null, { mode: 'kiosk_wide_only' });
 
 // ── Idle Timeout with Warning Modal (Scan Page) ───────────────────────────────────────────────
 

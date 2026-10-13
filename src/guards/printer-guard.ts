@@ -37,7 +37,7 @@ import type { ActivePrinterErrorState } from '@/services/printer-error-state';
 
 interface SocketLike {
   on(event: string, handler: (...args: unknown[]) => void): void;
-  off(event: string, handler: (...args: unknown[]) => void): void;
+  off?(event: string, handler: (...args: unknown[]) => void): void;
 }
 
 interface PrinterStatusResponse {
@@ -58,9 +58,6 @@ interface MalfunctionPayload {
   statusFlags?: string[];
   printerName?: string | null;
   timestamp?: string;
-  printError?: {
-    code?: string;
-  };
 }
 
 interface RecoveredPayload {
@@ -76,11 +73,6 @@ export interface PrinterGuardOptions {
    * - 'kiosk_wide_only': displays only fatal kiosk-wide errors ('E_INK_OUT', 'E_OFFLINE', 'E_SERVICE')
    */
   mode?: 'all' | 'kiosk_wide_only';
-  /**
-   * Specific error codes to exclude from blocking on this page.
-   * e.g., ['E_INK_OUT'] on home and scan pages, since scan does not require ink.
-   */
-  excludeErrors?: string[];
 }
 
 const KIOSK_WIDE_ERROR_CODES = new Set(['E_INK_OUT', 'E_OFFLINE', 'E_SERVICE']);
@@ -188,9 +180,6 @@ async function checkStatusOnLoad(): Promise<void> {
 }
 
 function shouldDisplayError(code: string): boolean {
-  if (_guardOptions.excludeErrors?.includes(code)) {
-    return false;
-  }
   if (_guardOptions.mode === 'kiosk_wide_only') {
     return KIOSK_WIDE_ERROR_CODES.has(code);
   }
@@ -227,12 +216,6 @@ async function checkActiveErrorOnLoad(): Promise<void> {
 
 function onMalfunction(raw: unknown): void {
   const payload = raw as MalfunctionPayload;
-  if (
-    payload.printError?.code &&
-    _guardOptions.excludeErrors?.includes(payload.printError.code)
-  ) {
-    return;
-  }
   console.warn(
     `[printer-guard] printerMalfunction received: "${payload.status}"`,
   );
@@ -331,7 +314,7 @@ export async function initPrinterGuard(
  * Called automatically on re-init; call manually on page teardown if needed.
  */
 export function destroyPrinterGuard(): void {
-  if (_socket) {
+  if (_socket && typeof _socket.off === 'function') {
     if (_malfunctionHandler)
       _socket.off('printerMalfunction', _malfunctionHandler);
     if (_recoveredHandler) _socket.off('printerRecovered', _recoveredHandler);

@@ -1,22 +1,41 @@
 /* ── Idle / Attractor Screen Overlay ──────────────────────────────────────── */
 /*
- * Full-screen overlay shown on the homepage after the configured idle timeout,
- * and immediately after booting (loading → idle → homepage flow).
+ * Full-screen overlay shown on the homepage after the idle timeout and right
+ * after boot (loading → idle → homepage).
  *
- * Visual style: aurora-glow blobs + pulsing concentric rings — matches the
- * loading screen aesthetic (#0e0d1f dark base, indigo primary, pink accent).
+ * Concept: the PrintBit machine is the character. It sits on a stage and
+ * "performs" what each service does, looping Print → Photocopy → Scan
+ * (6s each, 18s cycle). Copy on the left changes in sync with the stage.
+ *
+ * JS contract is unchanged: #idleOverlay toggles .is-visible / .is-leaving,
+ * and html.kiosk-boot-idle covers the homepage before first render.
+ *
+ * Timing: every scene is a 6s slot inside an 18s cycle. Each scene sets --d
+ * (0s / 6s / 12s) and every animated element offsets its own events from it.
+ * All animated content lives inside .idle-live, which is display:none while
+ * the overlay is hidden, so animations cost nothing when idle is not showing
+ * and always restart from the top when the overlay appears.
  */
 
-/* ── CSS custom properties (mirrors loading/styles.css tokens) ─────────────── */
+/* ── Tokens (mirror globals.css) ───────────────────────────────────────────── */
 .idle-overlay {
   --idle-bg: #0c0b1e;
   --idle-primary: #696fc7;
   --idle-primary-soft: #a7aae1;
   --idle-accent: #f2aebb;
-  --idle-success: #8de5bc;
+  --idle-peach: #f5d3c4;
+  --idle-mint: #8de5bc;
   --idle-text: #ffffff;
   --idle-text-muted: #c9c9dc;
   --idle-text-soft: #a6a5b9;
+  --idle-cycle: 18s;
+  font-synthesis: none;
+  font-family:
+    'Plus Jakarta Sans',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
 }
 
 /* ── Immediate boot coverage (blocks homepage before first render) ────────── */
@@ -36,257 +55,552 @@ html.kiosk-boot-idle .kiosk-shell {
   position: fixed;
   inset: 0;
   z-index: 9000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background:
     radial-gradient(
-      ellipse at 20% 15%,
-      rgba(105, 111, 199, 0.22),
-      transparent 52%
+      ellipse at 15% 10%,
+      rgba(105, 111, 199, 0.24),
+      transparent 55%
     ),
     radial-gradient(
-      ellipse at 82% 85%,
-      rgba(242, 174, 187, 0.15),
-      transparent 46%
+      ellipse at 85% 90%,
+      rgba(242, 174, 187, 0.14),
+      transparent 48%
     ),
     linear-gradient(160deg, #0e0d1f 0%, #100f22 50%, #0c0b1c 100%);
-
-  /* Hidden by default: 0% opacity, click-through */
+  color: var(--idle-text);
   opacity: 0;
   pointer-events: none;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 
-/* Shown state — guaranteed, smooth 600ms fade-in */
 .idle-overlay.is-visible {
   opacity: 1;
   pointer-events: auto;
   animation: idle-overlay-fade-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Exit/leaving state — fast, responsive 260ms fade-out transition */
 .idle-overlay.is-leaving {
   pointer-events: none !important;
   animation: idle-overlay-fade-out 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
 }
 
-/* ── Aurora blobs ──────────────────────────────────────────────────────────── */
+/* Everything animated is hidden (and therefore stopped) until the overlay is live */
+.idle-overlay .idle-live {
+  display: none;
+}
+
+.idle-overlay.is-visible .idle-live,
+.idle-overlay.is-leaving .idle-live,
+html.kiosk-boot-idle .idle-overlay .idle-live {
+  display: grid;
+}
+
+/* ── Soft glow backdrop (gradients, no blur filters: light on a tablet GPU) ── */
 .idle-backdrop {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  will-change: transform, opacity;
 }
 
 .idle-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(100px);
 }
 
 .idle-blob--1 {
-  width: 50vw;
-  height: 50vw;
-  top: -12%;
-  right: -10%;
-  background: rgba(105, 111, 199, 0.3);
-  animation: idle-blob-drift-1 20s ease-in-out infinite alternate;
+  width: 60vw;
+  height: 60vw;
+  top: -20%;
+  right: -14%;
+  background: radial-gradient(
+    circle,
+    rgba(105, 111, 199, 0.34),
+    transparent 66%
+  );
+  animation: idle-blob-drift-1 22s ease-in-out infinite alternate;
 }
 
 .idle-blob--2 {
-  width: 44vw;
-  height: 44vw;
-  bottom: -14%;
-  left: -8%;
-  background: rgba(242, 174, 187, 0.2);
-  animation: idle-blob-drift-2 26s ease-in-out infinite alternate;
+  width: 52vw;
+  height: 52vw;
+  bottom: -24%;
+  left: -12%;
+  background: radial-gradient(
+    circle,
+    rgba(242, 174, 187, 0.22),
+    transparent 66%
+  );
+  animation: idle-blob-drift-2 28s ease-in-out infinite alternate;
 }
 
 .idle-blob--3 {
-  width: 30vw;
-  height: 30vw;
-  top: 35%;
-  left: 35%;
-  background: rgba(141, 229, 188, 0.1);
-  animation: idle-blob-drift-3 18s ease-in-out infinite alternate;
+  width: 34vw;
+  height: 34vw;
+  top: 38%;
+  left: 40%;
+  background: radial-gradient(
+    circle,
+    rgba(141, 229, 188, 0.1),
+    transparent 66%
+  );
+  animation: idle-blob-drift-3 20s ease-in-out infinite alternate;
 }
 
-/* ── Concentric rings ──────────────────────────────────────────────────────── */
+/* ── Layout ────────────────────────────────────────────────────────────────── */
+/*
+ * Reading path: brand → headline → stage → the one action.
+ *
+ *   ┌────────────────────────────────────────┐
+ *   │ [logo] PrintBit                        │  header
+ *   │ Headline            ┌──────────────┐   │
+ *   │ sub-line            │    stage     │   │  copy | stage (vertically centred together)
+ *   │ ▬▬ ▬▬ ▬▬            └──────────────┘   │
+ *   │        ( ● Tap anywhere to start )     │  footer: CTA + hint, centred
+ *   └────────────────────────────────────────┘
+ *
+ * Spacing uses an 8px scale: 8 / 16 / 24 / 32 / 48 / 64.
+ */
+.idle-live {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  box-sizing: border-box;
+  padding: clamp(24px, 4vw, 64px) clamp(24px, 5vw, 96px);
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'header header'
+    'copy stage'
+    'footer footer';
+  column-gap: clamp(24px, 3.4vw, 72px);
+  row-gap: clamp(16px, 2.2vw, 40px);
+  animation: idle-live-arrive 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.idle-overlay.is-leaving .idle-live {
+  animation: idle-live-depart 260ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+.idle-header {
+  grid-area: header;
+}
+
+.idle-copy-block {
+  grid-area: copy;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 3vw, 48px);
+  min-width: 0;
+}
+
+.idle-footer {
+  grid-area: footer;
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ── Brand ─────────────────────────────────────────────────────────────────── */
+.idle-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.idle-brand__mark {
+  width: clamp(48px, 4.4vw, 72px);
+  height: clamp(48px, 4.4vw, 72px);
+  background: url('/assets/logo.png') center / contain no-repeat;
+}
+
+.idle-brand__name {
+  font-size: clamp(24px, 2.4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+/* ── Rotating copy (3 blocks stacked in one grid cell) ─────────────────────── */
+.idle-copy-stack {
+  display: grid;
+}
+
+.idle-copy {
+  grid-area: 1 / 1;
+  opacity: 0;
+  animation: idle-slot-text var(--idle-cycle) var(--d, 0s) linear infinite both;
+}
+
+/* Every headline wraps to exactly two lines and every sub-line reserves three,
+   so the progress bars below never jump between scenes. */
+.idle-copy__title {
+  margin: 0 0 16px;
+  max-width: 11ch;
+  min-height: 1.96em;
+  font-size: clamp(40px, 4.4vw, 84px);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.idle-copy__sub {
+  margin: 0;
+  max-width: 30ch;
+  min-height: 4.2em;
+  color: var(--idle-text-muted);
+  font-size: clamp(18px, 1.5vw, 28px);
+  font-weight: 500;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+/* ── Scene progress: indicator only (looks passive on purpose) ─────────────── */
+.idle-tabs {
+  display: flex;
+  gap: clamp(8px, 1vw, 16px);
+  width: 100%;
+  max-width: 30ch;
+  font-size: clamp(18px, 1.5vw, 28px);
+}
+
+.idle-tab {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.idle-tab__bar {
+  display: block;
+  height: 4px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: rgba(167, 170, 225, 0.2);
+  overflow: hidden;
+}
+
+.idle-tab__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--idle-primary-soft),
+    var(--idle-accent)
+  );
+  transform-origin: left center;
+  animation: idle-tab-progress var(--idle-cycle) var(--d, 0s) linear infinite
+    both;
+}
+
+.idle-tab__label {
+  display: block;
+  color: var(--idle-text-soft);
+  font-size: clamp(13px, 1vw, 17px);
+  font-weight: 600;
+  white-space: nowrap;
+  animation: idle-tab-label var(--idle-cycle) var(--d, 0s) linear infinite both;
+}
+
+/* CTA: the single filled element; everything else stays quiet around it */
+.idle-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: clamp(16px, 1.5vw, 24px) clamp(32px, 3vw, 56px)
+    clamp(16px, 1.5vw, 24px) clamp(24px, 2.4vw, 40px);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #696fc7 0%, #8489df 100%);
+  box-shadow:
+    0 10px 40px rgba(105, 111, 199, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  animation: idle-cta-breathe 3.2s ease-in-out infinite;
+}
+
+.idle-cta__pulse {
+  position: relative;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.idle-cta__pulse::before,
+.idle-cta__pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  animation: idle-cta-ripple 2.4s ease-out infinite;
+}
+
+.idle-cta__pulse::after {
+  animation-delay: 1.2s;
+}
+
+.idle-cta__label {
+  font-size: clamp(20px, 1.7vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.idle-hint {
+  margin: 0;
+  color: var(--idle-text-soft);
+  font-size: clamp(14px, 1.1vw, 18px);
+  font-weight: 500;
+}
+
+/* ── Stage ─────────────────────────────────────────────────────────────────── */
+.idle-stage {
+  grid-area: stage;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.idle-stage__inner {
+  position: absolute;
+  inset: 0;
+  animation: idle-stage-bob 6s ease-in-out infinite;
+}
+
 .idle-rings {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   pointer-events: none;
-  will-change: transform, opacity;
 }
 
 .idle-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1px solid;
-}
-
-.idle-ring--1 {
-  width: min(240px, 36vw);
-  height: min(240px, 36vw);
-  border-color: rgba(167, 170, 225, 0.22);
+  border: 1px solid rgba(167, 170, 225, 0.2);
   animation: idle-ring-pulse 5s ease-in-out infinite;
 }
 
+.idle-ring--1 {
+  width: 56%;
+  aspect-ratio: 1;
+}
+
 .idle-ring--2 {
-  width: min(380px, 55vw);
-  height: min(380px, 55vw);
-  border-color: rgba(167, 170, 225, 0.14);
-  animation: idle-ring-pulse 5s ease-in-out 0.7s infinite;
+  width: 76%;
+  aspect-ratio: 1;
+  border-color: rgba(167, 170, 225, 0.12);
+  animation-delay: 0.8s;
 }
 
 .idle-ring--3 {
-  width: min(540px, 75vw);
-  height: min(540px, 75vw);
-  border-color: rgba(167, 170, 225, 0.08);
-  animation: idle-ring-pulse 5s ease-in-out 1.4s infinite;
+  width: 96%;
+  aspect-ratio: 1;
+  border-color: rgba(167, 170, 225, 0.07);
+  animation-delay: 1.6s;
 }
 
-.idle-ring--4 {
-  width: min(720px, 96vw);
-  height: min(720px, 96vw);
-  border-color: rgba(167, 170, 225, 0.05);
-  animation: idle-ring-pulse 5s ease-in-out 2.1s infinite;
+.idle-machine,
+.idle-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-/* ── Content ───────────────────────────────────────────────────────────────── */
-.idle-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  text-align: center;
-  padding: clamp(24px, 5vw, 60px);
-  will-change: transform, opacity;
+/* Scenes cross-fade in their own 6s slot */
+.idle-scene {
+  opacity: 0;
+  animation: idle-slot var(--idle-cycle) var(--d, 0s) linear infinite both;
 }
 
-/* Fluid arrive animation when idle screen appears */
-.idle-overlay.is-visible .idle-content {
-  animation: idle-content-arrive 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+/* Every moving part in the scenes scales/rotates around its own centre */
+.idle-scene g,
+.idle-scene circle,
+.idle-scene rect,
+.idle-scene path,
+.idle-machine g,
+.idle-machine rect {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
-.idle-overlay.is-visible .idle-backdrop,
-.idle-overlay.is-visible .idle-rings {
-  animation: idle-backdrop-arrive 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+/* Machine: pixel sparkles echo the logo's pixel trail */
+.idle-spark {
+  animation: idle-spark 7s ease-in-out infinite;
 }
 
-/* Fast, modern depart animation when dismissed on tap */
-.idle-overlay.is-leaving .idle-content {
-  animation: idle-content-depart 260ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+.idle-spark--2 {
+  animation-duration: 9s;
+  animation-delay: -3s;
 }
 
-.idle-overlay.is-leaving .idle-backdrop,
-.idle-overlay.is-leaving .idle-rings {
-  animation: idle-backdrop-depart 260ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+.idle-spark--3 {
+  animation-duration: 8s;
+  animation-delay: -5s;
 }
 
-/* Brand lockup */
-.idle-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: clamp(24px, 4vw, 42px);
+.idle-spark--4 {
+  animation-duration: 10s;
+  animation-delay: -1s;
 }
 
-.idle-brand__mark {
-  width: clamp(44px, 6vw, 64px);
-  height: clamp(44px, 6vw, 64px);
-  display: grid;
-  place-items: center;
-  background: url("/assets/logo.png") center / contain no-repeat;
+/* Phone: dims during Photocopy because that service doesn't use it */
+.idle-phone {
+  animation: idle-phone-dim var(--idle-cycle) linear infinite both;
 }
 
-.idle-brand__mark svg {
-  display: none;
+/* Eyes: glance toward the action of each scene, blink every few seconds */
+.idle-eyes {
+  animation: idle-eyes-look var(--idle-cycle) linear infinite both;
 }
 
-.idle-brand__name {
-  font-size: clamp(26px, 4vw, 40px);
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  color: var(--idle-text);
+.idle-eye {
+  animation: idle-eye-blink 5.5s ease-in-out infinite;
 }
 
-/* Eyebrow */
-.idle-eyebrow {
-  margin: 0 0 clamp(16px, 2.5vw, 26px);
-  color: var(--idle-primary-soft);
-  font-size: clamp(11px, 1.4vw, 14px);
-  font-weight: 700;
-  letter-spacing: 0.16em;
+.idle-eye--r {
+  animation-delay: 0.02s;
 }
 
-/* Headline */
-.idle-headline {
-  margin: 0 0 clamp(32px, 5vw, 56px);
-  color: var(--idle-text);
-  font-size: clamp(52px, 10vw, 112px);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.05em;
-  text-wrap: balance;
+/* ── Scene events ─────────────────────────────────────────────────────────── */
+/* Each event's start offset inside the scene's 6s slot is baked into its generated
+   keyframes (@keyframes idle-<event>-<offset in 0.1s>), and every event shares the
+   scene's --d delay. That way the whole scene snaps back to its starting state
+   exactly when the 18s cycle restarts, while the scene itself is invisible. */
+.ev {
+  animation-duration: var(--idle-cycle);
+  animation-delay: var(--d, 0s);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-timing-function: ease-in-out;
 }
 
-/* ── Tap-to-start CTA ──────────────────────────────────────────────────────── */
-.idle-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  padding: clamp(14px, 2vw, 18px) clamp(28px, 4vw, 44px);
-  border: 1px solid rgba(167, 170, 225, 0.3);
-  border-radius: 999px;
-  background: rgba(105, 111, 199, 0.12);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  animation: idle-cta-breathe 3.5s ease-in-out infinite;
+.idle-scene .ev-wifi {
+  animation-delay:
+    calc(var(--d, 0s) + var(--a, 0s)), calc(var(--d, 0s) + var(--a, 0s));
 }
 
-.idle-cta__pulse {
-  flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--idle-primary-soft);
-  animation: idle-cta-pulse 2.2s ease-out infinite;
+.idle-scene--print .ev-select {
+  animation-name: idle-select-5;
 }
-
-.idle-cta__label {
-  color: #e8e8fc;
-  font-size: clamp(15px, 2.2vw, 22px);
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
+.idle-scene--print .ev-tap {
+  animation-name: idle-tap-10;
+}
+.idle-scene--print .ev-fly-out {
+  animation-name: idle-flyout-12;
+}
+.idle-scene--print .ev-coin {
+  animation-name: idle-coin-25;
+}
+.idle-scene--print .ev-ding {
+  animation-name: idle-ding-32;
+}
+.idle-scene--print .ev-paper {
+  animation-name: idle-paper-35;
+  animation-timing-function: linear;
+}
+.idle-scene--print .ev-wifi {
+  animation-name: idle-wifi-12, idle-wifi-17;
+}
+.idle-scene--copy .ev-coin {
+  animation-name: idle-coin-2;
+}
+.idle-scene--copy .ev-ding {
+  animation-name: idle-ding-9;
+}
+.idle-scene--copy .ev-drop {
+  animation-name: idle-drop-10;
+  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.idle-scene--copy .ev-sweep {
+  animation-name: idle-sweep-20;
+  animation-timing-function: linear;
+}
+.idle-scene--copy .ev-paper {
+  animation-name: idle-paper-33;
+  animation-timing-function: linear;
+}
+.idle-scene--copy .ev-paper2 {
+  animation-name: idle-paper2-41;
+  animation-timing-function: linear;
+}
+.idle-scene--scan .ev-coin {
+  animation-name: idle-coin-2;
+}
+.idle-scene--scan .ev-ding {
+  animation-name: idle-ding-9;
+}
+.idle-scene--scan .ev-drop {
+  animation-name: idle-drop-10;
+  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.idle-scene--scan .ev-sweep {
+  animation-name: idle-sweep-20;
+  animation-timing-function: linear;
+}
+.idle-scene--scan .ev-fly-in {
+  animation-name: idle-flyin-33;
+}
+.idle-scene--scan .ev-waiting {
+  animation-name: idle-waiting-44;
+}
+.idle-scene--scan .ev-received {
+  animation-name: idle-pop-44;
+  animation-timing-function: cubic-bezier(0.3, 1.4, 0.4, 1);
+}
+.idle-scene--scan .ev-wifi {
+  animation-name: idle-wifi-33, idle-wifi-38;
 }
 
 /* ── Keyframes ─────────────────────────────────────────────────────────────── */
 @keyframes idle-overlay-fade-in {
-  0% {
+  from {
     opacity: 0;
   }
-  100% {
+  to {
     opacity: 1;
   }
 }
-
 @keyframes idle-overlay-fade-out {
-  0% {
+  from {
     opacity: 1;
   }
-  100% {
+  to {
     opacity: 0;
+  }
+}
+
+@keyframes idle-live-arrive {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes idle-live-depart {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0) scale(0.985);
   }
 }
 
@@ -295,7 +609,7 @@ html.kiosk-boot-idle .kiosk-shell {
     transform: translate(0, 0) scale(1);
   }
   to {
-    transform: translate(6%, 10%) scale(1.1);
+    transform: translate(-6%, 8%) scale(1.1);
   }
 }
 
@@ -304,7 +618,7 @@ html.kiosk-boot-idle .kiosk-shell {
     transform: translate(0, 0) scale(1);
   }
   to {
-    transform: translate(-7%, -8%) scale(1.08);
+    transform: translate(7%, -6%) scale(1.08);
   }
 }
 
@@ -320,54 +634,592 @@ html.kiosk-boot-idle .kiosk-shell {
 @keyframes idle-ring-pulse {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.5;
     transform: scale(1);
   }
   50% {
     opacity: 1;
-    transform: scale(1.045);
+    transform: scale(1.04);
   }
 }
 
-@keyframes idle-cta-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(167, 170, 225, 0.65);
-  }
-  70% {
-    box-shadow: 0 0 0 16px rgba(167, 170, 225, 0);
-  }
+@keyframes idle-stage-bob {
+  0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(167, 170, 225, 0);
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
   }
 }
 
 @keyframes idle-cta-breathe {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(105, 111, 199, 0);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 8px 40px rgba(105, 111, 199, 0.22);
-    transform: scale(1.015);
+    transform: scale(1.025);
   }
 }
 
-@keyframes idle-content-arrive {
+@keyframes idle-cta-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+/* A scene's visible slot is the first third of the cycle */
+@keyframes idle-slot {
   0% {
     opacity: 0;
-    transform: translate3d(0, 28px, 0) scale(0.97);
+  }
+  2% {
+    opacity: 1;
+  }
+  31% {
+    opacity: 1;
+  }
+  33.3% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes idle-slot-text {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  2.4% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  31% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  33.3% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes idle-tab-label {
+  0% {
+    color: var(--idle-text-soft);
+  }
+  1% {
+    color: #ffffff;
+  }
+  33% {
+    color: #ffffff;
+  }
+  34% {
+    color: var(--idle-text-soft);
+  }
+  100% {
+    color: var(--idle-text-soft);
+  }
+}
+
+@keyframes idle-tab-progress {
+  0% {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  33.3% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  33.4% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+
+@keyframes idle-spark {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-14px);
+    opacity: 1;
+  }
+}
+
+/* Slot 1 (print/scan): look left at the phone. Slot 2 (photocopy): look up at the glass. */
+@keyframes idle-eyes-look {
+  0% {
+    transform: translate(-9px, 0);
+  }
+  31% {
+    transform: translate(-9px, 0);
+  }
+  35% {
+    transform: translate(0, -7px);
+  }
+  64% {
+    transform: translate(0, -7px);
+  }
+  68% {
+    transform: translate(-9px, 0);
+  }
+  100% {
+    transform: translate(-9px, 0);
+  }
+}
+
+@keyframes idle-phone-dim {
+  0%,
+  31% {
+    opacity: 1;
+  }
+  35%,
+  64% {
+    opacity: 0.2;
+  }
+  68%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes idle-eye-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.1);
+  }
+}
+
+/* Generated per-event keyframes (percentages are of the 18s cycle) */
+@keyframes idle-select-5 {
+  0% {
+    opacity: 0;
+  }
+  2.778% {
+    opacity: 0;
+  }
+  4.778% {
+    opacity: 1;
   }
   100% {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
-@keyframes idle-backdrop-arrive {
+@keyframes idle-tap-10 {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.2);
+  }
+  5.556% {
+    opacity: 0.9;
+    transform: scale(0.2);
+  }
+  8.556% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@keyframes idle-flyout-12 {
   0% {
     opacity: 0;
-    transform: scale(0.92);
+    transform: translate(0, 0) scale(0.7);
+  }
+  6.667% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.7);
+  }
+  7.667% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.9);
+  }
+  10.167% {
+    opacity: 1;
+    transform: translate(110px, -66px) scale(1);
+  }
+  13.056% {
+    opacity: 1;
+    transform: translate(222px, -30px) scale(0.7);
+  }
+  13.667% {
+    opacity: 0;
+    transform: translate(240px, -16px) scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(240px, -16px) scale(0.3);
+  }
+}
+
+@keyframes idle-coin-25 {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scaleX(1);
+  }
+  13.889% {
+    opacity: 0;
+    transform: translateY(0) scaleX(1);
+  }
+  14.5% {
+    opacity: 1;
+    transform: translateY(8px) scaleX(1);
+  }
+  15.667% {
+    opacity: 1;
+    transform: translateY(80px) scaleX(0.15);
+  }
+  16.889% {
+    opacity: 1;
+    transform: translateY(170px) scaleX(1);
+  }
+  17.889% {
+    opacity: 1;
+    transform: translateY(236px) scaleX(0.15);
+  }
+  18.389% {
+    opacity: 0;
+    transform: translateY(258px) scaleX(0.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(258px) scaleX(0.15);
+  }
+}
+
+@keyframes idle-ding-32 {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  17.778% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  20.778% {
+    opacity: 0;
+    transform: scale(3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+@keyframes idle-paper-35 {
+  0% {
+    transform: translateY(-150px);
+  }
+  19.444% {
+    transform: translateY(-150px);
+  }
+  20.944% {
+    transform: translateY(-122px);
+  }
+  21.444% {
+    transform: translateY(-120px);
+  }
+  22.944% {
+    transform: translateY(-62px);
+  }
+  23.444% {
+    transform: translateY(-60px);
+  }
+  25.0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes idle-wifi-12 {
+  0% {
+    opacity: 0;
+  }
+  6.667% {
+    opacity: 0;
+  }
+  7.556% {
+    opacity: 1;
+  }
+  8.889% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes idle-wifi-17 {
+  0% {
+    opacity: 0;
+  }
+  9.444% {
+    opacity: 0;
+  }
+  10.333% {
+    opacity: 1;
+  }
+  11.667% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes idle-coin-2 {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scaleX(1);
+  }
+  1.111% {
+    opacity: 0;
+    transform: translateY(0) scaleX(1);
+  }
+  1.722% {
+    opacity: 1;
+    transform: translateY(8px) scaleX(1);
+  }
+  2.889% {
+    opacity: 1;
+    transform: translateY(80px) scaleX(0.15);
+  }
+  4.111% {
+    opacity: 1;
+    transform: translateY(170px) scaleX(1);
+  }
+  5.111% {
+    opacity: 1;
+    transform: translateY(236px) scaleX(0.15);
+  }
+  5.611% {
+    opacity: 0;
+    transform: translateY(258px) scaleX(0.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(258px) scaleX(0.15);
+  }
+}
+
+@keyframes idle-ding-9 {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  5.0% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  8.0% {
+    opacity: 0;
+    transform: scale(3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+@keyframes idle-drop-10 {
+  0% {
+    opacity: 0;
+    transform: translateY(-120px) rotate(-4deg);
+  }
+  5.556% {
+    opacity: 0;
+    transform: translateY(-120px) rotate(-4deg);
+  }
+  8.556% {
+    opacity: 1;
+    transform: translateY(-60px) rotate(-4deg);
+  }
+  9.944% {
+    opacity: 1;
+    transform: translateY(6px) rotate(-4deg);
+  }
+  11.111% {
+    opacity: 1;
+    transform: translateY(0) rotate(-4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(-4deg);
+  }
+}
+
+@keyframes idle-sweep-20 {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  11.111% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  12.111% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  17.611% {
+    opacity: 1;
+    transform: translateY(128px);
+  }
+  18.333% {
+    opacity: 0;
+    transform: translateY(128px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(128px);
+  }
+}
+
+@keyframes idle-paper-33 {
+  0% {
+    transform: translateY(-150px);
+  }
+  18.333% {
+    transform: translateY(-150px);
+  }
+  19.833% {
+    transform: translateY(-122px);
+  }
+  20.333% {
+    transform: translateY(-120px);
+  }
+  21.833% {
+    transform: translateY(-62px);
+  }
+  22.333% {
+    transform: translateY(-60px);
+  }
+  23.889% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes idle-paper2-41 {
+  0% {
+    transform: translate(16px, -150px) rotate(3deg);
+  }
+  22.778% {
+    transform: translate(16px, -150px) rotate(3deg);
+  }
+  24.278% {
+    transform: translate(16px, -122px) rotate(3deg);
+  }
+  24.778% {
+    transform: translate(16px, -120px) rotate(3deg);
+  }
+  26.278% {
+    transform: translate(16px, -62px) rotate(3deg);
+  }
+  26.778% {
+    transform: translate(16px, -60px) rotate(3deg);
+  }
+  28.333% {
+    transform: translate(16px, 0) rotate(3deg);
+  }
+  100% {
+    transform: translate(16px, 0) rotate(3deg);
+  }
+}
+
+@keyframes idle-flyin-33 {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  18.333% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  19.333% {
+    opacity: 1;
+    transform: translate(0, -6px) scale(0.9);
+  }
+  21.833% {
+    opacity: 1;
+    transform: translate(-190px, -48px) scale(1);
+  }
+  24.722% {
+    opacity: 1;
+    transform: translate(-360px, 80px) scale(0.8);
+  }
+  25.333% {
+    opacity: 0;
+    transform: translate(-382px, 105px) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-382px, 105px) scale(0.4);
+  }
+}
+
+@keyframes idle-waiting-44 {
+  0% {
+    opacity: 1;
+  }
+  24.444% {
+    opacity: 1;
+  }
+  26.444% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes idle-pop-44 {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  24.444% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  27.444% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  29.444% {
+    opacity: 1;
+    transform: scale(1);
   }
   100% {
     opacity: 1;
@@ -375,47 +1227,114 @@ html.kiosk-boot-idle .kiosk-shell {
   }
 }
 
-@keyframes idle-content-depart {
+@keyframes idle-wifi-33 {
   0% {
+    opacity: 0;
+  }
+  18.333% {
+    opacity: 0;
+  }
+  19.222% {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+  }
+  20.556% {
+    opacity: 0;
   }
   100% {
     opacity: 0;
-    transform: translate3d(0, -12px, 0) scale(0.985);
   }
 }
 
-@keyframes idle-backdrop-depart {
+@keyframes idle-wifi-38 {
   0% {
+    opacity: 0;
+  }
+  21.111% {
+    opacity: 0;
+  }
+  22.0% {
     opacity: 1;
-    transform: scale(1);
+  }
+  23.333% {
+    opacity: 0;
   }
   100% {
     opacity: 0;
-    transform: scale(1.03);
   }
 }
 
-/* ── Responsive adjustments ────────────────────────────────────────────────── */
-@media (max-width: 540px) {
-  .idle-headline {
-    font-size: clamp(44px, 14vw, 68px);
+/* ── Portrait / narrow screens: stage on top, copy below ───────────────────── */
+@media (max-aspect-ratio: 1 / 1), (max-width: 900px) {
+  .idle-live {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'header'
+      'stage'
+      'copy'
+      'footer';
   }
 
-  .idle-cta {
-    padding: 14px 28px;
+  .idle-copy-block {
+    align-self: start;
+    gap: 24px;
+  }
+
+  .idle-copy__title {
+    max-width: 14ch;
+    font-size: clamp(36px, 8vw, 64px);
+  }
+
+  .idle-copy__sub,
+  .idle-tabs {
+    max-width: 36ch;
   }
 }
 
+/* Short screens: drop the secondary line, tighten spacing */
 @media (max-height: 600px) {
-  .idle-eyebrow {
+  .idle-hint {
     display: none;
   }
 
-  .idle-headline {
-    font-size: clamp(36px, 8vw, 60px);
-    margin-bottom: 28px;
+  .idle-copy__title {
+    font-size: clamp(32px, 4.4vw, 56px);
+  }
+
+  .idle-copy__sub {
+    min-height: 0;
+  }
+}
+
+/* ── Reduced motion: one still frame (Print, paper delivered) ──────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .idle-live *,
+  .idle-live *::before,
+  .idle-live *::after {
+    animation: none !important;
+  }
+
+  .idle-copy--print,
+  .idle-scene--print {
+    opacity: 1;
+  }
+
+  .idle-scene--print .ev-select,
+  .idle-scene--print .ev-paper {
+    opacity: 1;
+    transform: none;
+  }
+
+  .idle-tab__bar i {
+    transform: scaleX(0);
+  }
+
+  .idle-scene--print .ev-fly-out,
+  .idle-scene--print .ev-coin,
+  .idle-scene--print .ev-ding,
+  .idle-scene--print .ev-tap,
+  .idle-scene--print .ev-wifi {
+    opacity: 0;
   }
 }
 
@@ -424,12 +1343,19 @@ html[data-high-contrast='true'] .idle-overlay {
   background: #000000;
 }
 
-html[data-high-contrast='true'] .idle-headline,
-html[data-high-contrast='true'] .idle-eyebrow {
+html[data-high-contrast='true'] .idle-blob,
+html[data-high-contrast='true'] .idle-ring {
+  display: none;
+}
+
+html[data-high-contrast='true'] .idle-copy__sub,
+html[data-high-contrast='true'] .idle-hint,
+html[data-high-contrast='true'] .idle-tab__label {
   color: #ffffff;
 }
 
 html[data-high-contrast='true'] .idle-cta {
-  border-color: #ffffff;
-  background: transparent;
+  background: #0057ff;
+  border: 2px solid #ffffff;
+  box-shadow: none;
 }

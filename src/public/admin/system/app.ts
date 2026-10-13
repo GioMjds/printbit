@@ -79,6 +79,51 @@ const printerSelectionHint = document.getElementById(
   'printerSelectionHint',
 ) as HTMLElement | null;
 
+// ── Document Conversion element refs ──────────────────────────────────────────
+
+const conversionIconWrap = document.getElementById(
+  'conversionIconWrap',
+) as HTMLElement | null;
+const conversionStatus = document.getElementById(
+  'conversionStatus',
+) as HTMLElement | null;
+const conversionEngine = document.getElementById(
+  'conversionEngine',
+) as HTMLElement | null;
+const conversionUpdatedAt = document.getElementById(
+  'conversionUpdatedAt',
+) as HTMLElement | null;
+const conversionBadge = document.getElementById(
+  'conversionBadge',
+) as HTMLElement | null;
+const conversionExecutable = document.getElementById(
+  'conversionExecutable',
+) as HTMLElement | null;
+const conversionPipe = document.getElementById(
+  'conversionPipe',
+) as HTMLElement | null;
+const zombieTerminationStatus = document.getElementById(
+  'zombieTerminationStatus',
+) as HTMLElement | null;
+const zombieProcessCount = document.getElementById(
+  'zombieProcessCount',
+) as HTMLElement | null;
+const terminateZombiesBtn = document.getElementById(
+  'terminateZombiesBtn',
+) as HTMLButtonElement | null;
+const toggleZombieTerminationBtn = document.getElementById(
+  'toggleZombieTerminationBtn',
+) as HTMLButtonElement | null;
+const zombieToggleText = document.getElementById(
+  'zombieToggleText',
+) as HTMLElement | null;
+const zombieToggleSubText = document.getElementById(
+  'zombieToggleSubText',
+) as HTMLElement | null;
+const testConversionBtn = document.getElementById(
+  'testConversionBtn',
+) as HTMLButtonElement | null;
+
 // ── Error simulation refs ────────────────────────────────────────────────────
 
 const simLowInkBtn = document.getElementById(
@@ -302,6 +347,65 @@ function applyPrinterExt(p: PrinterTelemetryExt): void {
   }
 }
 
+// ── Helper: apply conversion fields ──────────────────────────────────────────
+
+function applyConversion(c: SummaryResponse['status']['conversion']): void {
+  if (!c) {
+    if (conversionStatus) conversionStatus.textContent = 'Disabled';
+    conversionBadge?.setAttribute('data-ok', 'false');
+    if (conversionIconWrap) conversionIconWrap.dataset.connected = 'false';
+    return;
+  }
+
+  const isOk = c.connected && c.status === 'operational';
+  if (conversionStatus) {
+    conversionStatus.textContent =
+      c.status === 'operational'
+        ? 'Operational'
+        : c.status === 'degraded'
+          ? 'Degraded'
+          : 'Offline';
+  }
+  conversionBadge?.setAttribute('data-ok', String(isOk));
+  if (conversionIconWrap) {
+    conversionIconWrap.dataset.connected = String(c.connected);
+  }
+  if (conversionEngine) {
+    conversionEngine.textContent = c.engine || 'LibreOffice Headless';
+  }
+  if (conversionUpdatedAt) {
+    conversionUpdatedAt.textContent = `Updated ${new Date(c.lastCheckedAt).toLocaleTimeString()}`;
+  }
+  if (conversionExecutable) {
+    conversionExecutable.textContent = c.resolvedPath
+      ? c.resolvedPath
+      : c.executableFound
+        ? 'Found'
+        : 'Missing';
+  }
+  if (conversionPipe) {
+    conversionPipe.textContent = c.pipeConnected ? 'Connected' : 'Unavailable';
+  }
+  if (zombieTerminationStatus) {
+    zombieTerminationStatus.textContent = c.zombieTerminationEnabled
+      ? 'Active (Auto-Kill)'
+      : 'Disabled';
+  }
+  if (zombieProcessCount) {
+    zombieProcessCount.textContent = `${c.activeZombieProcesses} running (${c.totalZombiesTerminated} killed)`;
+  }
+  if (zombieToggleText) {
+    zombieToggleText.textContent = c.zombieTerminationEnabled
+      ? 'Disable Auto-Termination'
+      : 'Enable Auto-Termination';
+  }
+  if (zombieToggleSubText) {
+    zombieToggleSubText.textContent = c.zombieTerminationEnabled
+      ? 'Auto-kill is ON (clears frozen soffice)'
+      : 'Auto-kill is OFF (processes may linger)';
+  }
+}
+
 // ── Apply summary data to UI ────────────────────────────────────────────────────
 
 function applySystem(summary: SummaryResponse): void {
@@ -318,6 +422,7 @@ function applySystem(summary: SummaryResponse): void {
   printerNameEl.textContent = p.name ?? '—';
 
   applyPrinterExt(p as PrinterTelemetryExt);
+  applyConversion(summary.status.conversion);
   updateSidebarBadges(summary);
 }
 
@@ -591,6 +696,110 @@ restartSpoolerBtn?.addEventListener('click', () => {
     )
     .finally(() => {
       restartSpoolerBtn.disabled = false;
+    });
+});
+
+// ── Document Conversion actions ──────────────────────────────────────────────
+
+terminateZombiesBtn?.addEventListener('click', () => {
+  if (
+    !window.confirm(
+      'Force-terminate all lingering LibreOffice background processes and clear lock files?',
+    )
+  ) {
+    return;
+  }
+
+  terminateZombiesBtn.disabled = true;
+  setMessage('Terminating zombie LibreOffice processes...');
+
+  void apiFetch('/api/admin/conversion/terminate-zombies', { method: 'POST' })
+    .then(async (res) => {
+      const body = (await res.json()) as {
+        success?: boolean;
+        message?: string;
+        killedCount?: number;
+        status?: SummaryResponse['status']['conversion'];
+        error?: string;
+      };
+      if (!res.ok || body.success === false) {
+        throw new Error(
+          body.error ?? body.message ?? 'Failed to terminate zombie processes.',
+        );
+      }
+      setMessage(body.message ?? `Terminated ${body.killedCount ?? 0} processes.`);
+      if (body.status) applyConversion(body.status);
+      void loadData().catch(showRefreshError);
+    })
+    .catch((err: unknown) => {
+      setMessage(
+        err instanceof Error ? err.message : 'Failed to terminate zombie processes.',
+      );
+    })
+    .finally(() => {
+      terminateZombiesBtn.disabled = false;
+    });
+});
+
+toggleZombieTerminationBtn?.addEventListener('click', () => {
+  toggleZombieTerminationBtn.disabled = true;
+  setMessage('Updating zombie process termination policy...');
+
+  void apiFetch('/api/admin/conversion/toggle-zombie-termination', {
+    method: 'POST',
+  })
+    .then(async (res) => {
+      const body = (await res.json()) as {
+        success?: boolean;
+        enabled?: boolean;
+        status?: SummaryResponse['status']['conversion'];
+        error?: string;
+      };
+      if (!res.ok || body.success === false) {
+        throw new Error(body.error ?? 'Failed to toggle zombie termination.');
+      }
+      setMessage(
+        `Zombie termination policy is now ${body.enabled ? 'Enabled' : 'Disabled'}.`,
+      );
+      if (body.status) applyConversion(body.status);
+      void loadData().catch(showRefreshError);
+    })
+    .catch((err: unknown) => {
+      setMessage(
+        err instanceof Error ? err.message : 'Failed to toggle zombie termination.',
+      );
+    })
+    .finally(() => {
+      toggleZombieTerminationBtn.disabled = false;
+    });
+});
+
+testConversionBtn?.addEventListener('click', () => {
+  testConversionBtn.disabled = true;
+  setMessage('Testing document conversion engine via worker pipe...');
+
+  void apiFetch('/api/admin/conversion/test', { method: 'POST' })
+    .then(async (res) => {
+      const body = (await res.json()) as {
+        success?: boolean;
+        message?: string;
+        status?: SummaryResponse['status']['conversion'];
+        error?: string;
+      };
+      if (!res.ok || body.success === false) {
+        throw new Error(body.error ?? body.message ?? 'Conversion test failed.');
+      }
+      setMessage(body.message ?? 'Conversion engine test succeeded.');
+      if (body.status) applyConversion(body.status);
+      void loadData().catch(showRefreshError);
+    })
+    .catch((err: unknown) => {
+      setMessage(
+        err instanceof Error ? err.message : 'Conversion engine test failed.',
+      );
+    })
+    .finally(() => {
+      testConversionBtn.disabled = false;
     });
 });
 

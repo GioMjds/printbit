@@ -73,55 +73,6 @@
           </div>
         </div>
 
-        <!-- Customer Ink Out Notice (Prominent notification banner when ink is empty) -->
-        <div
-          id="noInkCustomerNotice"
-          class="no-ink-notice hidden"
-          role="alert"
-          aria-live="assertive"
-        >
-          <div class="no-ink-notice__icon-wrap" aria-hidden="true">
-            <svg
-              class="no-ink-notice__icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 9v4" />
-              <path d="M12 17h.01" />
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            </svg>
-          </div>
-          <div class="no-ink-notice__content">
-            <div class="no-ink-notice__badge">
-              <span class="no-ink-notice__dot"></span>
-              <span id="noInkNoticeBadgeText">PRINT &amp; COPY DISABLED</span>
-            </div>
-            <h3 class="no-ink-notice__title" id="noInkNoticeTitle">
-              Printer Out of Ink
-            </h3>
-            <p class="no-ink-notice__desc" id="noInkNoticeDesc">
-              The printer has run out of ink. Print and Copy methods are temporarily unavailable until ink is refilled. Scanning is still fully available.
-            </p>
-          </div>
-          <div class="no-ink-notice__action">
-            <button
-              type="button"
-              class="no-ink-notice__btn"
-              id="noInkNoticeScanBtn"
-              aria-label="Use Scan Service"
-            >
-              <span id="noInkNoticeBtnText">Use Scan Service</span>
-              <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
-                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
         <p class="action-hint">Then select a print method</p>
 
         <div class="action-grid">
@@ -152,7 +103,6 @@
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
               <span class="action-card__pill-label">How to print</span>
             </span>
-            <span class="action-card__disabled-pill hidden" id="printDisabledPill" aria-hidden="true">Unavailable &bull; No Ink</span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
@@ -225,7 +175,6 @@
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
               <span class="action-card__pill-label">How to copy</span>
             </span>
-            <span class="action-card__disabled-pill hidden" id="copyDisabledPill" aria-hidden="true">Unavailable &bull; No Ink</span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
@@ -282,7 +231,9 @@
               </svg>
             </div>
             <h2 class="action-card__title">Copy</h2>
-            <p class="action-card__sub">Make photocopies of your paper document</p>
+            <p class="action-card__sub">
+              Make photocopies of your paper document
+            </p>
           </button>
 
           <!-- Scan Card -->
@@ -312,7 +263,6 @@
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
               <span class="action-card__pill-label">How to scan</span>
             </span>
-            <span class="action-card__available-pill hidden" id="scanAvailablePill" aria-hidden="true">Available</span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
@@ -432,10 +382,16 @@
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
-        <p class="pricing-modal__eyebrow" id="pricingEyebrow">TRANSPARENT KIOSK RATES</p>
+        <p class="pricing-modal__eyebrow" id="pricingEyebrow">
+          TRANSPARENT KIOSK RATES
+        </p>
         <h2 id="pricingTitle">Service pricing</h2>
 
-        <div class="pricing-tabs" role="tablist" aria-label="Print method pricing">
+        <div
+          class="pricing-tabs"
+          role="tablist"
+          aria-label="Print method pricing"
+        >
           <button
             class="pricing-tab is-active"
             id="pricingTab-print"
@@ -445,9 +401,20 @@
             aria-selected="true"
             aria-controls="pricingPanel-print"
           >
-            <svg class="pricing-tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              class="pricing-tab__icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M6 9V2h12v7"></path>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <path
+                d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+              ></path>
               <rect x="6" y="14" width="12" height="8"></rect>
             </svg>
             <span>Print</span>
@@ -461,9 +428,20 @@
             aria-selected="false"
             aria-controls="pricingPanel-copy"
           >
-            <svg class="pricing-tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              class="pricing-tab__icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              <path
+                d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+              ></path>
             </svg>
             <span>Copy</span>
           </button>
@@ -476,7 +454,16 @@
             aria-selected="false"
             aria-controls="pricingPanel-scan"
           >
-            <svg class="pricing-tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              class="pricing-tab__icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <rect x="3" y="5" width="18" height="14" rx="2"></rect>
               <line x1="7" y1="12" x2="17" y2="12"></line>
             </svg>
@@ -492,9 +479,9 @@
           aria-labelledby="pricingTab-print"
         >
           <p class="pricing-modal__intro">
-            Prices consist of physical bond paper per sheet + metered ink coverage
-            per printed page. Your total updates automatically after choosing your
-            document and settings.
+            Prices consist of physical bond paper per sheet + metered ink
+            coverage per printed page. Your total updates automatically after
+            choosing your document and settings.
           </p>
           <div id="pricingGuideContent" aria-live="polite">
             Loading printing prices…
@@ -510,7 +497,9 @@
           style="display: none"
         >
           <p class="pricing-modal__intro">
-            Photocopies are charged at a transparent flat rate per page with bond paper included. Place your document on the scanner glass or feeder to begin.
+            Photocopies are charged at a transparent flat rate per page with
+            bond paper included. Place your document on the scanner glass or
+            feeder to begin.
           </p>
           <div id="copyPricingGuideContent" aria-live="polite">
             Loading photocopy prices…
@@ -526,7 +515,8 @@
           style="display: none"
         >
           <p class="pricing-modal__intro">
-            Turn physical paper documents into high-resolution digital soft copies (PDF) sent directly to your phone via local Wi-Fi.
+            Turn physical paper documents into high-resolution digital soft
+            copies (PDF) sent directly to your phone via local Wi-Fi.
           </p>
           <div id="scanPricingGuideContent" aria-live="polite">
             Loading scanning prices…
@@ -1070,6 +1060,8 @@
       Shown after homepage idle timeout and immediately after boot.
       The overlay sits above the homepage DOM (z-index 9000).
       JS in app.ts / shared/idle-screen.ts toggles .is-visible / .is-leaving.
+      Three scenes (Print, Photocopy, Scan) loop on an 18s CSS-only cycle.
+      Keep the order machine → scenes: the machine <svg> owns the shared <defs>.
     -->
     <div
       class="idle-overlay"
@@ -1079,67 +1071,1127 @@
       aria-label="PrintBit kiosk is idle. Tap anywhere to start."
       role="dialog"
     >
-      <!-- Aurora background blobs -->
+      <!-- Soft glow backdrop -->
       <div class="idle-backdrop" aria-hidden="true">
         <span class="idle-blob idle-blob--1"></span>
         <span class="idle-blob idle-blob--2"></span>
         <span class="idle-blob idle-blob--3"></span>
       </div>
 
-      <!-- Pulsing concentric rings -->
-      <div class="idle-rings" aria-hidden="true">
-        <span class="idle-ring idle-ring--1"></span>
-        <span class="idle-ring idle-ring--2"></span>
-        <span class="idle-ring idle-ring--3"></span>
-        <span class="idle-ring idle-ring--4"></span>
-      </div>
-
-      <!-- Idle content -->
-      <div class="idle-content">
-        <!-- Brand lockup -->
-        <div class="idle-brand" aria-label="PrintBit">
-          <span class="idle-brand__mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-              <rect
-                x="7"
-                y="4"
-                width="18"
-                height="11"
-                rx="2.5"
-                fill="currentColor"
-                opacity="0.92"
-              />
-              <rect
-                x="4"
-                y="12"
-                width="24"
-                height="14"
-                rx="3.5"
-                fill="currentColor"
-              />
-              <rect x="7" y="20" width="18" height="9" rx="2" fill="#ffffff" />
-              <rect
-                x="10"
-                y="23"
-                width="12"
-                height="2"
-                rx="1"
-                fill="currentColor"
-                opacity="0.55"
-              />
-            </svg>
-          </span>
-          <span class="idle-brand__name">PrintBit</span>
+      <div class="idle-live">
+        <!-- Header: brand -->
+        <div class="idle-header">
+          <div class="idle-brand" aria-label="PrintBit">
+            <span class="idle-brand__mark" aria-hidden="true"></span>
+            <span class="idle-brand__name">PrintBit</span>
+          </div>
         </div>
 
-        <p class="idle-eyebrow">SELF-SERVICE PRINTING KIOSK</p>
+        <!-- Copy: rotating headline + sub-line + scene progress (one group) -->
+        <div class="idle-copy-block">
+          <div class="idle-copy-stack">
+            <div class="idle-copy idle-copy--print" style="--d: 0s">
+              <h2 class="idle-copy__title">Phone to paper.</h2>
+              <p class="idle-copy__sub">
+                Join the PrintBit Wi-Fi, send your file from your phone, and
+                pick up your pages.
+              </p>
+            </div>
+            <div class="idle-copy idle-copy--copy" style="--d: 6s">
+              <h2 class="idle-copy__title">Paper to more paper.</h2>
+              <p class="idle-copy__sub">
+                Place your document on the scanner and copy it, just like a
+                regular photocopier.
+              </p>
+            </div>
+            <div class="idle-copy idle-copy--scan" style="--d: 12s">
+              <h2 class="idle-copy__title">Paper to your pocket.</h2>
+              <p class="idle-copy__sub">
+                Scan a paper document and get the PDF on your phone over
+                PrintBit Wi-Fi.
+              </p>
+            </div>
+          </div>
 
-        <h1 class="idle-headline">Print. Copy.<br />Scan.</h1>
+          <!-- Progress only: not interactive, so no tab/pill styling -->
+          <div class="idle-tabs" aria-hidden="true">
+            <span class="idle-tab" style="--d: 0s">
+              <span class="idle-tab__bar"><i></i></span>
+              <span class="idle-tab__label">Print</span>
+            </span>
+            <span class="idle-tab" style="--d: 6s">
+              <span class="idle-tab__bar"><i></i></span>
+              <span class="idle-tab__label">Copy</span>
+            </span>
+            <span class="idle-tab" style="--d: 12s">
+              <span class="idle-tab__bar"><i></i></span>
+              <span class="idle-tab__label">Scan</span>
+            </span>
+          </div>
+        </div>
 
-        <!-- Tap-to-start call to action -->
-        <div class="idle-cta" aria-live="polite">
-          <span class="idle-cta__pulse" aria-hidden="true"></span>
-          <span class="idle-cta__label">Tap anywhere to start</span>
+        <!-- Right: the PrintBit machine performs each service -->
+        <div class="idle-stage" aria-hidden="true">
+          <div class="idle-stage__inner">
+            <div class="idle-rings">
+              <span class="idle-ring idle-ring--1"></span>
+              <span class="idle-ring idle-ring--2"></span>
+              <span class="idle-ring idle-ring--3"></span>
+            </div>
+
+            <!-- Machine + phone chassis (persistent) and shared defs -->
+            <svg
+              class="idle-machine"
+              viewBox="0 0 840 540"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <linearGradient id="idleTop" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#d5d7f4" />
+                  <stop offset="1" stop-color="#a7aae1" />
+                </linearGradient>
+                <linearGradient id="idleBody" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#7f85d9" />
+                  <stop offset="1" stop-color="#5156ab" />
+                </linearGradient>
+                <linearGradient id="idleGlass" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#2a2958" />
+                  <stop offset="1" stop-color="#15142f" />
+                </linearGradient>
+                <linearGradient id="idleCoin" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#fff3df" />
+                  <stop offset="0.55" stop-color="#f5d3c4" />
+                  <stop offset="1" stop-color="#f2aebb" />
+                </linearGradient>
+                <linearGradient id="idleScan" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#8de5bc" stop-opacity="0" />
+                  <stop offset="1" stop-color="#8de5bc" stop-opacity="0.45" />
+                </linearGradient>
+                <radialGradient id="idleShadow">
+                  <stop offset="0" stop-color="#000" stop-opacity="0.45" />
+                  <stop offset="1" stop-color="#000" stop-opacity="0" />
+                </radialGradient>
+                <clipPath id="idleClipOut">
+                  <rect x="0" y="399" width="840" height="141" />
+                </clipPath>
+                <clipPath id="idleClipGlass">
+                  <rect x="314" y="104" width="372" height="134" rx="14" />
+                </clipPath>
+              </defs>
+
+              <ellipse
+                cx="500"
+                cy="492"
+                rx="300"
+                ry="22"
+                fill="url(#idleShadow)"
+              />
+              <rect
+                x="440"
+                y="468"
+                width="300"
+                height="14"
+                rx="7"
+                fill="#3b3a78"
+              />
+
+              <!-- Scanner deck seen from above -->
+              <rect
+                x="290"
+                y="84"
+                width="420"
+                height="190"
+                rx="28"
+                fill="url(#idleTop)"
+              />
+              <rect
+                x="314"
+                y="104"
+                width="372"
+                height="134"
+                rx="14"
+                fill="url(#idleGlass)"
+                stroke="#696fc7"
+                stroke-opacity="0.6"
+                stroke-width="2"
+              />
+              <path d="M420 104h44l-56 134h-44z" fill="#fff" opacity="0.05" />
+              <path d="M484 104h20l-56 134h-20z" fill="#fff" opacity="0.05" />
+
+              <!-- Machine front -->
+              <rect
+                x="250"
+                y="250"
+                width="500"
+                height="170"
+                rx="32"
+                fill="url(#idleBody)"
+              />
+              <rect
+                x="266"
+                y="253"
+                width="468"
+                height="3"
+                rx="1.5"
+                fill="#fff"
+                opacity="0.28"
+              />
+
+              <!-- Face: the control panel -->
+              <rect
+                x="292"
+                y="282"
+                width="132"
+                height="74"
+                rx="14"
+                fill="#12112a"
+                stroke="#fff"
+                stroke-opacity="0.15"
+              />
+              <g class="idle-eyes">
+                <rect
+                  class="idle-eye"
+                  x="324"
+                  y="292"
+                  width="16"
+                  height="28"
+                  rx="6"
+                  fill="#8de5bc"
+                />
+                <rect
+                  class="idle-eye idle-eye--r"
+                  x="376"
+                  y="292"
+                  width="16"
+                  height="28"
+                  rx="6"
+                  fill="#8de5bc"
+                />
+              </g>
+              <path
+                d="M340 338q18 12 36 0"
+                fill="none"
+                stroke="#8de5bc"
+                stroke-width="5"
+                stroke-linecap="round"
+              />
+              <circle cx="452" cy="306" r="9" fill="#f2aebb" />
+              <circle cx="452" cy="334" r="9" fill="#8de5bc" />
+
+              <!-- Paper slot and coin slot -->
+              <rect
+                x="462"
+                y="392"
+                width="200"
+                height="14"
+                rx="7"
+                fill="#0c0b1e"
+              />
+              <rect
+                x="690"
+                y="280"
+                width="48"
+                height="70"
+                rx="12"
+                fill="#2c2b4b"
+              />
+              <rect
+                x="710"
+                y="292"
+                width="8"
+                height="36"
+                rx="4"
+                fill="#0c0b1e"
+              />
+              <text
+                x="714"
+                y="344"
+                text-anchor="middle"
+                font-size="13"
+                font-weight="800"
+                fill="#f5d3c4"
+              >
+                ₱
+              </text>
+
+              <!-- Phone chassis -->
+              <g class="idle-phone">
+                <rect
+                  x="40"
+                  y="196"
+                  width="156"
+                  height="276"
+                  rx="30"
+                  fill="#1b1a38"
+                  stroke="#a7aae1"
+                  stroke-width="3"
+                />
+                <rect
+                  x="52"
+                  y="210"
+                  width="132"
+                  height="248"
+                  rx="20"
+                  fill="#0f0e24"
+                />
+                <rect
+                  x="94"
+                  y="216"
+                  width="48"
+                  height="6"
+                  rx="3"
+                  fill="#2c2b55"
+                />
+              </g>
+
+              <!-- Pixel sparkles (echo the logo's pixel trail) -->
+              <rect
+                class="idle-spark"
+                x="262"
+                y="58"
+                width="12"
+                height="12"
+                fill="#f2aebb"
+              />
+              <rect
+                class="idle-spark idle-spark--2"
+                x="760"
+                y="70"
+                width="14"
+                height="14"
+                fill="#8de5bc"
+              />
+              <rect
+                class="idle-spark idle-spark--3"
+                x="790"
+                y="430"
+                width="10"
+                height="10"
+                fill="#a7aae1"
+              />
+              <rect
+                class="idle-spark idle-spark--4"
+                x="214"
+                y="120"
+                width="8"
+                height="8"
+                fill="#f5d3c4"
+              />
+            </svg>
+
+            <!-- Scene 1: Print (phone → machine → paper) -->
+            <svg
+              class="idle-scene idle-scene--print"
+              viewBox="0 0 840 540"
+              style="--d: 0s"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                x="64"
+                y="226"
+                width="60"
+                height="8"
+                rx="4"
+                fill="#a7aae1"
+                opacity="0.8"
+              />
+              <rect
+                x="62"
+                y="248"
+                width="112"
+                height="44"
+                rx="10"
+                fill="#1f1e40"
+              />
+              <rect
+                x="72"
+                y="258"
+                width="20"
+                height="24"
+                rx="4"
+                fill="#a7aae1"
+                opacity="0.5"
+              />
+              <rect
+                x="100"
+                y="262"
+                width="56"
+                height="6"
+                rx="3"
+                fill="#3a3970"
+              />
+              <rect
+                x="100"
+                y="274"
+                width="36"
+                height="6"
+                rx="3"
+                fill="#3a3970"
+              />
+              <rect
+                x="62"
+                y="300"
+                width="112"
+                height="44"
+                rx="10"
+                fill="#1f1e40"
+              />
+              <rect
+                x="72"
+                y="310"
+                width="20"
+                height="24"
+                rx="4"
+                fill="#a7aae1"
+                opacity="0.5"
+              />
+              <rect
+                x="100"
+                y="314"
+                width="56"
+                height="6"
+                rx="3"
+                fill="#3a3970"
+              />
+              <rect
+                x="100"
+                y="326"
+                width="36"
+                height="6"
+                rx="3"
+                fill="#3a3970"
+              />
+              <rect
+                class="ev ev-select"
+                x="62"
+                y="300"
+                width="112"
+                height="44"
+                rx="10"
+                fill="#696fc7"
+                fill-opacity="0.4"
+                stroke="#a7aae1"
+                stroke-width="2"
+              />
+              <rect
+                x="62"
+                y="352"
+                width="112"
+                height="44"
+                rx="10"
+                fill="#1f1e40"
+              />
+              <rect
+                x="72"
+                y="362"
+                width="20"
+                height="24"
+                rx="4"
+                fill="#a7aae1"
+                opacity="0.5"
+              />
+              <rect
+                x="100"
+                y="366"
+                width="56"
+                height="6"
+                rx="3"
+                fill="#3a3970"
+              />
+              <rect
+                x="100"
+                y="378"
+                width="36"
+                height="6"
+                rx="3"
+                fill="#3a3970"
+              />
+              <rect
+                x="62"
+                y="406"
+                width="112"
+                height="38"
+                rx="19"
+                fill="#696fc7"
+              />
+              <text
+                x="118"
+                y="431"
+                text-anchor="middle"
+                font-size="16"
+                font-weight="800"
+                fill="#fff"
+              >
+                Send
+              </text>
+              <circle
+                class="ev ev-tap"
+                cx="118"
+                cy="425"
+                r="12"
+                fill="none"
+                stroke="#fff"
+                stroke-width="3"
+              />
+
+              <g
+                fill="none"
+                stroke="#a7aae1"
+                stroke-width="4"
+                stroke-linecap="round"
+              >
+                <path
+                  class="ev ev-wifi"
+                  style="--a: 0s"
+                  d="M208 312q16 18 0 36"
+                />
+                <path
+                  class="ev ev-wifi"
+                  style="--a: 0.1s"
+                  d="M216 300q24 30 0 60"
+                />
+                <path
+                  class="ev ev-wifi"
+                  style="--a: 0.2s"
+                  d="M224 288q32 42 0 84"
+                />
+              </g>
+
+              <g class="ev ev-fly-out">
+                <rect
+                  x="90"
+                  y="300"
+                  width="56"
+                  height="68"
+                  rx="8"
+                  fill="#fff"
+                />
+                <rect
+                  x="100"
+                  y="312"
+                  width="22"
+                  height="18"
+                  rx="4"
+                  fill="#f2aebb"
+                />
+                <rect
+                  x="100"
+                  y="340"
+                  width="36"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="100"
+                  y="352"
+                  width="26"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+              </g>
+
+              <g class="ev ev-coin">
+                <circle
+                  cx="714"
+                  cy="40"
+                  r="17"
+                  fill="url(#idleCoin)"
+                  stroke="#e8b9a5"
+                  stroke-width="2"
+                />
+                <text
+                  x="714"
+                  y="46"
+                  text-anchor="middle"
+                  font-size="17"
+                  font-weight="800"
+                  fill="#8a4b3b"
+                >
+                  ₱
+                </text>
+              </g>
+              <circle
+                class="ev ev-ding"
+                cx="714"
+                cy="310"
+                r="14"
+                fill="none"
+                stroke="#f2aebb"
+                stroke-width="3"
+              />
+
+              <g clip-path="url(#idleClipOut)">
+                <g class="ev ev-paper">
+                  <rect
+                    x="472"
+                    y="318"
+                    width="180"
+                    height="150"
+                    rx="8"
+                    fill="#fff"
+                  />
+                  <rect
+                    x="492"
+                    y="338"
+                    width="54"
+                    height="40"
+                    rx="6"
+                    fill="#f2aebb"
+                  />
+                  <rect
+                    x="558"
+                    y="342"
+                    width="74"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="558"
+                    y="358"
+                    width="54"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="392"
+                    width="140"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="410"
+                    width="140"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="428"
+                    width="96"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                </g>
+              </g>
+            </svg>
+
+            <!-- Scene 2: Photocopy (document on glass → two copies) -->
+            <svg
+              class="idle-scene idle-scene--copy"
+              viewBox="0 0 840 540"
+              style="--d: 6s"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <g class="ev ev-coin">
+                <circle
+                  cx="714"
+                  cy="40"
+                  r="17"
+                  fill="url(#idleCoin)"
+                  stroke="#e8b9a5"
+                  stroke-width="2"
+                />
+                <text
+                  x="714"
+                  y="46"
+                  text-anchor="middle"
+                  font-size="17"
+                  font-weight="800"
+                  fill="#8a4b3b"
+                >
+                  ₱
+                </text>
+              </g>
+              <circle
+                class="ev ev-ding"
+                cx="714"
+                cy="310"
+                r="14"
+                fill="none"
+                stroke="#f2aebb"
+                stroke-width="3"
+              />
+
+              <g class="ev ev-drop">
+                <rect
+                  x="454"
+                  y="115"
+                  width="92"
+                  height="112"
+                  rx="5"
+                  fill="#fff"
+                />
+                <rect
+                  x="466"
+                  y="127"
+                  width="34"
+                  height="26"
+                  rx="4"
+                  fill="#f2aebb"
+                />
+                <rect
+                  x="508"
+                  y="130"
+                  width="26"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="508"
+                  y="142"
+                  width="18"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="466"
+                  y="164"
+                  width="68"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="466"
+                  y="178"
+                  width="68"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="466"
+                  y="192"
+                  width="44"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+              </g>
+
+              <g clip-path="url(#idleClipGlass)">
+                <g class="ev ev-sweep">
+                  <rect
+                    x="314"
+                    y="76"
+                    width="372"
+                    height="28"
+                    fill="url(#idleScan)"
+                  />
+                  <rect
+                    x="314"
+                    y="102"
+                    width="372"
+                    height="4"
+                    rx="2"
+                    fill="#8de5bc"
+                  />
+                </g>
+              </g>
+
+              <g clip-path="url(#idleClipOut)">
+                <g class="ev ev-paper">
+                  <rect
+                    x="472"
+                    y="318"
+                    width="180"
+                    height="150"
+                    rx="8"
+                    fill="#fff"
+                  />
+                  <rect
+                    x="492"
+                    y="338"
+                    width="54"
+                    height="40"
+                    rx="6"
+                    fill="#f2aebb"
+                  />
+                  <rect
+                    x="558"
+                    y="342"
+                    width="74"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="558"
+                    y="358"
+                    width="54"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="392"
+                    width="140"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="410"
+                    width="140"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="428"
+                    width="96"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                </g>
+                <g class="ev ev-paper2">
+                  <rect
+                    x="472"
+                    y="318"
+                    width="180"
+                    height="150"
+                    rx="8"
+                    fill="#fff"
+                    stroke="#e3e3f1"
+                    stroke-width="2"
+                  />
+                  <rect
+                    x="492"
+                    y="338"
+                    width="54"
+                    height="40"
+                    rx="6"
+                    fill="#f2aebb"
+                  />
+                  <rect
+                    x="558"
+                    y="342"
+                    width="74"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="558"
+                    y="358"
+                    width="54"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="392"
+                    width="140"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="410"
+                    width="140"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                  <rect
+                    x="492"
+                    y="428"
+                    width="96"
+                    height="8"
+                    rx="4"
+                    fill="#c9c9dc"
+                  />
+                </g>
+              </g>
+            </svg>
+
+            <!-- Scene 3: Scan (document on glass → PDF flies to the phone) -->
+            <svg
+              class="idle-scene idle-scene--scan"
+              viewBox="0 0 840 540"
+              style="--d: 12s"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                x="64"
+                y="226"
+                width="60"
+                height="8"
+                rx="4"
+                fill="#a7aae1"
+                opacity="0.8"
+              />
+              <rect
+                class="ev ev-waiting"
+                x="62"
+                y="248"
+                width="112"
+                height="56"
+                rx="10"
+                fill="none"
+                stroke="#a7aae1"
+                stroke-opacity="0.5"
+                stroke-width="2"
+                stroke-dasharray="6 5"
+              />
+              <g class="ev ev-received">
+                <rect
+                  x="62"
+                  y="248"
+                  width="112"
+                  height="56"
+                  rx="10"
+                  fill="#1f1e40"
+                />
+                <rect
+                  x="72"
+                  y="258"
+                  width="24"
+                  height="30"
+                  rx="4"
+                  fill="#f2aebb"
+                />
+                <text
+                  x="84"
+                  y="277"
+                  text-anchor="middle"
+                  font-size="9"
+                  font-weight="800"
+                  fill="#5a2f3a"
+                >
+                  PDF
+                </text>
+                <rect
+                  x="104"
+                  y="262"
+                  width="58"
+                  height="6"
+                  rx="3"
+                  fill="#3a3970"
+                />
+                <rect
+                  x="104"
+                  y="274"
+                  width="36"
+                  height="6"
+                  rx="3"
+                  fill="#3a3970"
+                />
+                <circle cx="160" cy="292" r="11" fill="#8de5bc" />
+                <path
+                  d="M154 292l4 4 8-9"
+                  fill="none"
+                  stroke="#0c3b27"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </g>
+
+              <g class="ev ev-coin">
+                <circle
+                  cx="714"
+                  cy="40"
+                  r="17"
+                  fill="url(#idleCoin)"
+                  stroke="#e8b9a5"
+                  stroke-width="2"
+                />
+                <text
+                  x="714"
+                  y="46"
+                  text-anchor="middle"
+                  font-size="17"
+                  font-weight="800"
+                  fill="#8a4b3b"
+                >
+                  ₱
+                </text>
+              </g>
+              <circle
+                class="ev ev-ding"
+                cx="714"
+                cy="310"
+                r="14"
+                fill="none"
+                stroke="#f2aebb"
+                stroke-width="3"
+              />
+
+              <g class="ev ev-drop">
+                <rect
+                  x="454"
+                  y="115"
+                  width="92"
+                  height="112"
+                  rx="5"
+                  fill="#fff"
+                />
+                <rect
+                  x="466"
+                  y="127"
+                  width="34"
+                  height="26"
+                  rx="4"
+                  fill="#f2aebb"
+                />
+                <rect
+                  x="508"
+                  y="130"
+                  width="26"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="508"
+                  y="142"
+                  width="18"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="466"
+                  y="164"
+                  width="68"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="466"
+                  y="178"
+                  width="68"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="466"
+                  y="192"
+                  width="44"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+              </g>
+
+              <g clip-path="url(#idleClipGlass)">
+                <g class="ev ev-sweep">
+                  <rect
+                    x="314"
+                    y="76"
+                    width="372"
+                    height="28"
+                    fill="url(#idleScan)"
+                  />
+                  <rect
+                    x="314"
+                    y="102"
+                    width="372"
+                    height="4"
+                    rx="2"
+                    fill="#8de5bc"
+                  />
+                </g>
+              </g>
+
+              <g
+                fill="none"
+                stroke="#a7aae1"
+                stroke-width="4"
+                stroke-linecap="round"
+              >
+                <path
+                  class="ev ev-wifi"
+                  style="--a: 0.2s"
+                  d="M208 312q16 18 0 36"
+                />
+                <path
+                  class="ev ev-wifi"
+                  style="--a: 0.1s"
+                  d="M216 300q24 30 0 60"
+                />
+                <path
+                  class="ev ev-wifi"
+                  style="--a: 0s"
+                  d="M224 288q32 42 0 84"
+                />
+              </g>
+
+              <g class="ev ev-fly-in">
+                <rect
+                  x="472"
+                  y="136"
+                  width="56"
+                  height="70"
+                  rx="8"
+                  fill="#fff"
+                />
+                <rect
+                  x="480"
+                  y="176"
+                  width="40"
+                  height="18"
+                  rx="5"
+                  fill="#f2aebb"
+                />
+                <text
+                  x="500"
+                  y="189"
+                  text-anchor="middle"
+                  font-size="11"
+                  font-weight="800"
+                  fill="#fff"
+                >
+                  PDF
+                </text>
+                <rect
+                  x="482"
+                  y="148"
+                  width="26"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+                <rect
+                  x="482"
+                  y="160"
+                  width="36"
+                  height="6"
+                  rx="3"
+                  fill="#c9c9dc"
+                />
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Footer: the one action -->
+        <div class="idle-footer">
+          <div class="idle-cta" aria-live="polite">
+            <span class="idle-cta__pulse" aria-hidden="true"></span>
+            <span class="idle-cta__label">Tap anywhere to start</span>
+          </div>
+          <p class="idle-hint">Coins and your phone are all you need.</p>
         </div>
       </div>
     </div>

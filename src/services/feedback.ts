@@ -116,6 +116,7 @@ class FeedbackService {
       rating,
       status: 'open',
       resolvedAt: null,
+      needsAction: false,
       meta: input.meta,
     };
 

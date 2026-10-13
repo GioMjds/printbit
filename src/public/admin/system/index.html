@@ -440,6 +440,62 @@
                   </dl>
                 </article>
 
+                <article class="printer-spotlight" id="conversionCard">
+                  <header class="printer-spotlight__head">
+                    <div class="printer-spotlight__identity">
+                      <div
+                        class="printer-spotlight__icon"
+                        id="conversionIconWrap"
+                        aria-hidden="true"
+                        data-connected="true"
+                      >
+                        <svg viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            fill-rule="evenodd"
+                            d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <p class="printer-spotlight__eyebrow">Document Conversion</p>
+                        <h4
+                          class="printer-spotlight__status"
+                          id="conversionStatus"
+                        >
+                          —
+                        </h4>
+                        <p class="printer-spotlight__meta">
+                          <span id="conversionEngine">LibreOffice Headless</span>
+                          <span id="conversionUpdatedAt"></span>
+                        </p>
+                      </div>
+                    </div>
+                    <span class="status-sigil" id="conversionBadge" data-ok="">
+                      <span class="status-sigil__dot" aria-hidden="true"></span>
+                    </span>
+                  </header>
+
+                  <dl class="printer-facts">
+                    <div class="printer-facts__item">
+                      <dt>Executable</dt>
+                      <dd id="conversionExecutable">—</dd>
+                    </div>
+                    <div class="printer-facts__item">
+                      <dt>IPC Pipe</dt>
+                      <dd id="conversionPipe">—</dd>
+                    </div>
+                    <div class="printer-facts__item">
+                      <dt>Zombie Killer</dt>
+                      <dd id="zombieTerminationStatus">—</dd>
+                    </div>
+                    <div class="printer-facts__item">
+                      <dt>Active Processes</dt>
+                      <dd id="zombieProcessCount">—</dd>
+                    </div>
+                  </dl>
+                </article>
+
                 <section class="system-panel printer-selection-panel">
                   <header class="system-panel__head">
                     <h3 class="system-panel__title" id="printerSelectionTitle">
@@ -661,6 +717,44 @@
                       <span>
                         Send Test Page
                         <span class="ctrl-btn__sub">Confirms end-to-end print dispatch</span>
+                      </span>
+                    </button>
+                  </div>
+                </section>
+
+                <section class="system-panel">
+                  <header class="system-panel__head">
+                    <h3 class="system-panel__title">Document Conversion</h3>
+                    <p class="system-panel__desc">
+                      LibreOffice process lifecycle and offline conversion controls.
+                    </p>
+                  </header>
+                  <div class="system-panel__body">
+                    <button id="terminateZombiesBtn" class="ctrl-btn ctrl-btn--amber" type="button">
+                      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.486 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                      </svg>
+                      <span>
+                        Terminate Zombie Processes
+                        <span class="ctrl-btn__sub">Force-kills hanging soffice instances &amp; lock files</span>
+                      </span>
+                    </button>
+                    <button id="toggleZombieTerminationBtn" class="ctrl-btn ctrl-btn--indigo" type="button">
+                      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                      </svg>
+                      <span>
+                        <span id="zombieToggleText">Toggle Auto-Termination</span>
+                        <span class="ctrl-btn__sub" id="zombieToggleSubText">Auto-kill stuck processes on timeout</span>
+                      </span>
+                    </button>
+                    <button id="testConversionBtn" class="ctrl-btn ctrl-btn--green" type="button">
+                      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
+                      </svg>
+                      <span>
+                        Test Conversion Engine
+                        <span class="ctrl-btn__sub">Validates LibreOffice conversion via worker</span>
                       </span>
                     </button>
                   </div>

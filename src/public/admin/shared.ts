@@ -183,6 +183,22 @@ export type SummaryResponse = {
       lastCheckedAt: string;
       lastError: string | null;
     };
+    conversion?: {
+      connected: boolean;
+      status: 'operational' | 'degraded' | 'offline';
+      engine: string;
+      configuredPath: string;
+      executableFound: boolean;
+      resolvedPath: string | null;
+      pipeName: string;
+      pipeConnected: boolean;
+      zombieTerminationEnabled: boolean;
+      activeZombieProcesses: number;
+      lastTerminationAt: string | null;
+      totalZombiesTerminated: number;
+      lastError: string | null;
+      lastCheckedAt: string;
+    };
   };
 };
 

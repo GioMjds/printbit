@@ -58,6 +58,13 @@ import {
   validateScanFilenameFormatSettings,
 } from '@/services/scan-filename';
 import { getScannerStatus } from '@/services/scanner';
+import {
+  getDocumentConversionStatus,
+  terminateZombieProcesses,
+  testDocumentConversion,
+  setZombieTerminationEnabled,
+  isZombieTerminationEnabled,
+} from '@/services/document-conversion-monitor';
 import { generateTestPagePdf } from '@/services/test-page';
 import {
   assertTrustedTimeForFinancialOperation,
@@ -553,6 +560,32 @@ export class AdminController {
       this.handleHopperSelfTest,
     );
 
+    // ── Document Conversion routes ─────────────────────────────────────────────
+    this.router.get(
+      '/conversion/status',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleGetConversionStatus,
+    );
+    this.router.post(
+      '/conversion/terminate-zombies',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleTerminateZombies,
+    );
+    this.router.post(
+      '/conversion/toggle-zombie-termination',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleToggleZombieTermination,
+    );
+    this.router.post(
+      '/conversion/test',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleTestConversion,
+    );
+
     // ── Settings routes ────────────────────────────────────────────────────────
     this.router.get(
       '/settings',
@@ -941,13 +974,14 @@ export class AdminController {
 
   // ── Summary and status handlers ────────────────────────────────────────────
 
-  private handleGetSummary = (req: Request, res: Response) => {
+  private handleGetSummary = async (req: Request, res: Response) => {
     const storage = this.adminService.getStorageUsage(this.deps.uploadDir);
     const host = req.get('host') ?? 'unknown';
     const wifiActive =
       !host.startsWith('localhost') && !host.startsWith('127.0.0.1');
     const printer = getPrinterTelemetry();
     const scanner = getScannerStatus();
+    const conversion = await getDocumentConversionStatus();
     const anomalyOpenCount = db.data!.anomalyIncidents.filter(
       (entry) => entry.status === 'open',
     ).length;
@@ -1125,6 +1159,7 @@ export class AdminController {
           hopper: this.deps.getHopperStatus(),
           printer,
           scanner,
+          conversion,
           watchdog: getExternalWatchdogState(),
           trustedTime: getTrustedTimeStatus(),
           host,
@@ -1189,6 +1224,7 @@ export class AdminController {
           hopper: this.deps.getHopperStatus(),
           printer,
           scanner,
+          conversion,
           watchdog: getExternalWatchdogState(),
           trustedTime: getTrustedTimeStatus(),
           host,
@@ -1198,13 +1234,14 @@ export class AdminController {
     }
   };
 
-  private handleGetStatus = (req: Request, res: Response) => {
+  private handleGetStatus = async (req: Request, res: Response) => {
     const storage = this.adminService.getStorageUsage(this.deps.uploadDir);
     const host = req.get('host') ?? 'unknown';
     const wifiActive =
       !host.startsWith('localhost') && !host.startsWith('127.0.0.1');
     const printer = getPrinterTelemetry();
     const scanner = getScannerStatus();
+    const conversion = await getDocumentConversionStatus();
     res.json({
       serverRunning: true,
       uptimeSeconds: Math.floor(process.uptime()),
@@ -1212,12 +1249,76 @@ export class AdminController {
       hopper: this.deps.getHopperStatus(),
       printer,
       scanner,
+      conversion,
       watchdog: getExternalWatchdogState(),
       trustedTime: getTrustedTimeStatus(),
       storage,
       host,
       wifiActive,
     });
+  };
+
+  private handleGetConversionStatus = async (_req: Request, res: Response) => {
+    try {
+      const status = await getDocumentConversionStatus(true);
+      res.json(status);
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  private handleTerminateZombies = async (_req: Request, res: Response) => {
+    try {
+      const result = await terminateZombieProcesses();
+      await this.adminService.appendAdminLog(
+        'conversion_zombies_terminated',
+        `Admin manually terminated conversion zombies: ${result.message}`,
+      );
+      const status = await getDocumentConversionStatus(true);
+      res.json({ ...result, status });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  private handleToggleZombieTermination = async (req: Request, res: Response) => {
+    try {
+      const body = req.body as { enabled?: boolean } | undefined;
+      const current = isZombieTerminationEnabled();
+      const next = typeof body?.enabled === 'boolean' ? body.enabled : !current;
+      setZombieTerminationEnabled(next);
+      await this.adminService.appendAdminLog(
+        'conversion_zombie_termination_toggled',
+        `Admin set zombie process termination to ${next ? 'enabled' : 'disabled'}.`,
+      );
+      const status = await getDocumentConversionStatus(true);
+      res.json({ success: true, enabled: next, status });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  private handleTestConversion = async (_req: Request, res: Response) => {
+    try {
+      const result = await testDocumentConversion();
+      await this.adminService.appendAdminLog(
+        'conversion_test_executed',
+        `Admin ran conversion probe test: ${result.message}`,
+      );
+      const status = await getDocumentConversionStatus(true);
+      res.json({ ...result, status });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   };
 
   private handleSystemShutdown = async (_req: Request, res: Response) => {

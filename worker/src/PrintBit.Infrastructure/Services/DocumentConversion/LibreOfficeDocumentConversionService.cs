@@ -219,27 +219,23 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
 
         var executableToRun = File.Exists(resolvedExecutable) ? resolvedExecutable : _settings.SofficePath;
 
+        string? jobProfileDir = null;
         await LibreOfficeGate.WaitAsync(cancellationToken);
         try
         {
             var baseProfileDir = string.IsNullOrWhiteSpace(_settings.UserProfileDirectory)
-                ? Path.Combine(Path.GetTempPath(), "printbit-lo-profile")
+                ? Path.Combine(Path.GetTempPath(), "printbit-lo-profiles")
                 : _settings.UserProfileDirectory;
 
-            var profileDir = Path.Combine(baseProfileDir, "shared");
-            if (!Directory.Exists(profileDir))
+            PurgeStaleProfiles(baseProfileDir, _logger);
+
+            jobProfileDir = Path.Combine(baseProfileDir, $"job-{Guid.NewGuid():N}");
+            if (!Directory.Exists(jobProfileDir))
             {
-                Directory.CreateDirectory(profileDir);
+                Directory.CreateDirectory(jobProfileDir);
             }
 
-            // Remove stale lock files left from abrupt power losses or unexpected crashes
-            var lockFile = Path.Combine(profileDir, ".lock");
-            if (File.Exists(lockFile))
-            {
-                try { File.Delete(lockFile); } catch { }
-            }
-
-            var profileUri = new Uri(Path.GetFullPath(profileDir)).AbsoluteUri;
+            var profileUri = new Uri(Path.GetFullPath(jobProfileDir)).AbsoluteUri;
 
             // Delete stale expected output if present to prevent returning outdated artifacts
             try { if (File.Exists(expectedPdfPath)) File.Delete(expectedPdfPath); } catch { }
@@ -254,27 +250,13 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
             };
 
             psi.ArgumentList.Add("--headless");
+            psi.ArgumentList.Add("--invisible");
             psi.ArgumentList.Add("--nologo");
             psi.ArgumentList.Add("--nodefault");
             psi.ArgumentList.Add("--norestore");
             psi.ArgumentList.Add("--nolockcheck");
             psi.ArgumentList.Add("--nofirststartwizard");
             psi.ArgumentList.Add($"-env:UserInstallation={profileUri}");
-
-            var ext = Path.GetExtension(request.SourcePath).ToLowerInvariant();
-            if (ext is ".doc" or ".docx" or ".odt" or ".rtf" or ".txt")
-            {
-                psi.ArgumentList.Add("--writer");
-            }
-            else if (ext is ".xls" or ".xlsx" or ".ods")
-            {
-                psi.ArgumentList.Add("--calc");
-            }
-            else if (ext is ".ppt" or ".pptx" or ".odp")
-            {
-                psi.ArgumentList.Add("--impress");
-            }
-
             psi.ArgumentList.Add("--convert-to");
             psi.ArgumentList.Add("pdf");
             psi.ArgumentList.Add("--outdir");
@@ -291,11 +273,12 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
             using var process = new Process { StartInfo = psi };
 
             _logger.LogInformation(
-                "Starting LibreOffice conversion: {Executable} {SourcePath} -> {OutputDir} (timeout: {Timeout}s)",
+                "Starting LibreOffice conversion: {Executable} {SourcePath} -> {OutputDir} (timeout: {Timeout}s, profile: {ProfileDir})",
                 executableToRun,
                 request.SourcePath,
                 outputDir,
-                timeoutSeconds);
+                timeoutSeconds,
+                jobProfileDir);
 
             try
             {
@@ -328,7 +311,14 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+                if (_settings.EnableZombieTermination)
+                {
+                    TerminateProcessTree(process, _logger);
+                }
+                else
+                {
+                    try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+                }
                 sw.Stop();
                 _logger.LogWarning("LibreOffice conversion for {SourcePath} timed out after {Timeout}s", request.SourcePath, timeoutSeconds);
                 return new DocumentConversionResult
@@ -342,7 +332,14 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
             }
             catch (OperationCanceledException)
             {
-                try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+                if (_settings.EnableZombieTermination)
+                {
+                    TerminateProcessTree(process, _logger);
+                }
+                else
+                {
+                    try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+                }
                 throw;
             }
 
@@ -361,7 +358,23 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
                 };
             }
 
-            if (!File.Exists(expectedPdfPath) || new FileInfo(expectedPdfPath).Length == 0)
+            var actualPdfPath = expectedPdfPath;
+            if (!File.Exists(actualPdfPath) || new FileInfo(actualPdfPath).Length == 0)
+            {
+                // Fallback: check if LibreOffice generated a PDF in outputDir with a case-insensitive match or matching prefix
+                var sourceBaseName = Path.GetFileNameWithoutExtension(request.SourcePath);
+                var fallbackCandidate = Directory.EnumerateFiles(outputDir, "*.pdf")
+                    .Where(f => string.Equals(Path.GetFileNameWithoutExtension(f), sourceBaseName, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(File.GetLastWriteTimeUtc)
+                    .FirstOrDefault();
+
+                if (fallbackCandidate != null && new FileInfo(fallbackCandidate).Length > 0)
+                {
+                    actualPdfPath = fallbackCandidate;
+                }
+            }
+
+            if (!File.Exists(actualPdfPath) || new FileInfo(actualPdfPath).Length == 0)
             {
                 sw.Stop();
                 _logger.LogError("LibreOffice conversion did not create valid PDF at {OutputPath}", expectedPdfPath);
@@ -375,13 +388,13 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
                 };
             }
 
-            var pageCount = PdfPageCounter.Count(expectedPdfPath);
+            var pageCount = PdfPageCounter.Count(actualPdfPath);
             sw.Stop();
 
             _logger.LogInformation(
                 "LibreOffice conversion succeeded for {SourcePath} -> {OutputPath} ({PageCount} pages, {DurationMs}ms)",
                 request.SourcePath,
-                expectedPdfPath,
+                actualPdfPath,
                 pageCount,
                 sw.ElapsedMilliseconds);
 
@@ -389,7 +402,7 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
             {
                 RequestId = request.RequestId,
                 Success = true,
-                OutputPath = expectedPdfPath,
+                OutputPath = actualPdfPath,
                 PageCount = pageCount,
                 SourceFormat = sourceFormat,
                 DurationMs = sw.ElapsedMilliseconds
@@ -397,6 +410,7 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
         }
         finally
         {
+            TryCleanupProfileDirectory(jobProfileDir, _logger);
             LibreOfficeGate.Release();
         }
     }
@@ -443,5 +457,81 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
         }
 
         return configuredPath;
+    }
+
+    private static void TerminateProcessTree(Process process, ILogger logger)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Initial process termination check threw exception");
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                using var killer = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "taskkill",
+                    Arguments = $"/F /T /PID {process.Id}",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+                killer?.WaitForExit(2000);
+            }
+            catch
+            {
+                // Taskkill may fail if process already exited; ignore.
+            }
+        }
+    }
+
+    private static void TryCleanupProfileDirectory(string? profileDir, ILogger logger)
+    {
+        if (string.IsNullOrWhiteSpace(profileDir) || !Directory.Exists(profileDir)) return;
+
+        try
+        {
+            Directory.Delete(profileDir, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed to delete temporary profile directory {ProfileDir} immediately", profileDir);
+        }
+    }
+
+    private static void PurgeStaleProfiles(string baseProfileDir, ILogger logger)
+    {
+        try
+        {
+            if (!Directory.Exists(baseProfileDir)) return;
+
+            var threshold = DateTime.UtcNow.AddMinutes(-30);
+            foreach (var dir in Directory.EnumerateDirectories(baseProfileDir, "job-*"))
+            {
+                try
+                {
+                    if (Directory.GetCreationTimeUtc(dir) < threshold)
+                    {
+                        Directory.Delete(dir, recursive: true);
+                    }
+                }
+                catch
+                {
+                    // Profile may be locked by another active job; skip.
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "PurgeStaleProfiles encountered an error while scanning {BaseDir}", baseProfileDir);
+        }
     }
 }

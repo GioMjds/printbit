@@ -114,74 +114,10 @@ const ioFactory = (
 const homeSocket = typeof ioFactory === 'function' ? ioFactory() : null;
 attachPowerSafetyOverlay({ socket: homeSocket });
 attachUiBlockingOverlay({ socket: homeSocket });
-void initPrinterGuard(homeSocket, {
-  mode: 'kiosk_wide_only',
-  excludeErrors: ['E_INK_OUT'],
-});
+void initPrinterGuard(homeSocket, { mode: 'kiosk_wide_only' });
 
 const homeLowInkWarning = document.getElementById('homeLowInkWarning');
 const homeInkOutWarning = document.getElementById('homeInkOutWarning');
-
-let isNoInkActive = false;
-
-const NO_INK_COPY = {
-  en: {
-    badge: 'PRINT & COPY DISABLED',
-    title: 'Printer Out of Ink',
-    desc: 'The printer has run out of ink. Print and Copy methods are temporarily unavailable until ink is refilled. Scanning is still fully available.',
-    btn: 'Use Scan Service',
-    disabledPill: 'Unavailable • No Ink',
-    availablePill: 'Available',
-  },
-  fil: {
-    badge: 'HINDI MAGAGAMIT ANG PRINT AT COPY',
-    title: 'Walang Tinta ang Printer',
-    desc: 'Kasalukuyang ubos ang tinta ng printer. Pansamantalang hindi magagamit ang Print at Copy habang hinihintay ang paglalagay ng tinta. Maaari pa ring gamitin ang Scan.',
-    btn: 'Gamitin ang Scan',
-    disabledPill: 'Hindi Magagamit • Walang Tinta',
-    availablePill: 'Magagamit',
-  },
-};
-
-function getHomeKioskLanguage(): 'en' | 'fil' {
-  try {
-    return window.localStorage.getItem('printbit.kiosk.language') === 'fil'
-      ? 'fil'
-      : 'en';
-  } catch {
-    return 'en';
-  }
-}
-
-function updateNoInkNoticeCopy(): void {
-  const lang = getHomeKioskLanguage();
-  const copy = NO_INK_COPY[lang];
-
-  const badgeText = document.getElementById('noInkNoticeBadgeText');
-  const titleEl = document.getElementById('noInkNoticeTitle');
-  const descEl = document.getElementById('noInkNoticeDesc');
-  const btnText = document.getElementById('noInkNoticeBtnText');
-  const printPill = document.getElementById('printDisabledPill');
-  const copyPill = document.getElementById('copyDisabledPill');
-  const scanPill = document.getElementById('scanAvailablePill');
-
-  if (badgeText) badgeText.textContent = copy.badge;
-  if (titleEl) titleEl.textContent = copy.title;
-  if (descEl) descEl.textContent = copy.desc;
-  if (btnText) btnText.textContent = copy.btn;
-  if (printPill) printPill.textContent = copy.disabledPill;
-  if (copyPill) copyPill.textContent = copy.disabledPill;
-  if (scanPill) scanPill.textContent = copy.availablePill;
-}
-
-function pulseNoInkNotice(): void {
-  const notice = document.getElementById('noInkCustomerNotice');
-  if (!notice) return;
-  notice.classList.remove('no-ink-notice--pulse');
-  void notice.offsetWidth;
-  notice.classList.add('no-ink-notice--pulse');
-  notice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
 
 function setHomeLowInkWarningVisible(visible: boolean): void {
   if (!homeLowInkWarning) return;
@@ -194,59 +130,6 @@ function setHomeInkOutWarningVisible(visible: boolean): void {
   homeInkOutWarning.classList.toggle('hidden', !visible);
   homeInkOutWarning.setAttribute('aria-hidden', String(!visible));
 }
-
-function setNoInkState(active: boolean): void {
-  isNoInkActive = active;
-  const notice = document.getElementById('noInkCustomerNotice');
-  const printBtn = document.getElementById('openPrintBtn');
-  const copyBtn = document.getElementById('openCopyBtn');
-  const scanBtn = document.getElementById('openScanBtn');
-  const printPill = document.getElementById('printDisabledPill');
-  const copyPill = document.getElementById('copyDisabledPill');
-  const scanPill = document.getElementById('scanAvailablePill');
-
-  if (active) {
-    updateNoInkNoticeCopy();
-    notice?.classList.remove('hidden');
-    notice?.setAttribute('aria-hidden', 'false');
-
-    printBtn?.classList.add('action-card--disabled');
-    printBtn?.setAttribute('aria-disabled', 'true');
-    printPill?.classList.remove('hidden');
-
-    copyBtn?.classList.add('action-card--disabled');
-    copyBtn?.setAttribute('aria-disabled', 'true');
-    copyPill?.classList.remove('hidden');
-
-    scanBtn?.classList.add('action-card--highlighted');
-    scanPill?.classList.remove('hidden');
-
-    setHomeInkOutWarningVisible(true);
-    setHomeLowInkWarningVisible(false);
-  } else {
-    notice?.classList.add('hidden');
-    notice?.setAttribute('aria-hidden', 'true');
-
-    printBtn?.classList.remove('action-card--disabled');
-    printBtn?.removeAttribute('aria-disabled');
-    printPill?.classList.add('hidden');
-
-    copyBtn?.classList.remove('action-card--disabled');
-    copyBtn?.removeAttribute('aria-disabled');
-    copyPill?.classList.add('hidden');
-
-    scanBtn?.classList.remove('action-card--highlighted');
-    scanPill?.classList.add('hidden');
-
-    setHomeInkOutWarningVisible(false);
-  }
-}
-
-window.addEventListener(KIOSK_LANGUAGE_CHANGED_EVENT, () => {
-  if (isNoInkActive) {
-    updateNoInkNoticeCopy();
-  }
-});
 
 if (homeSocket) {
   homeSocket.on('balance', (amount: unknown) => {
@@ -269,7 +152,7 @@ if (homeSocket) {
         typeof payload === 'object' &&
         (payload as { active?: boolean }).active,
     );
-    setNoInkState(active);
+    setHomeInkOutWarningVisible(active);
   });
 
   homeSocket.on('printer:simulation-state', (payload: unknown) => {
@@ -278,38 +161,17 @@ if (homeSocket) {
         ? (payload as { activeError?: string | null }).activeError
         : null;
     setHomeLowInkWarningVisible(activeError === 'low_ink');
-    setNoInkState(activeError === 'ink_out');
-  });
-
-  homeSocket.on('printer:error-guide-update', (payload: unknown) => {
-    const activeError =
-      payload && typeof payload === 'object'
-        ? (payload as { activeError?: { code?: string } | null }).activeError
-        : null;
-    if (activeError?.code === 'E_INK_OUT') {
-      setNoInkState(true);
-    } else if (!activeError) {
-      void fetch('/api/printer/simulation-status')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data: { activeError?: string | null } | null) => {
-          if (data?.activeError !== 'ink_out') {
-            setNoInkState(false);
-          }
-        })
-        .catch(() => {
-          setNoInkState(false);
-        });
-    }
+    setHomeInkOutWarningVisible(activeError === 'ink_out');
   });
 
   homeSocket.on('printer:simulation-cleared', () => {
     setHomeLowInkWarningVisible(false);
-    setNoInkState(false);
+    setHomeInkOutWarningVisible(false);
   });
 
   homeSocket.on('printerStatusRestored', () => {
     setHomeLowInkWarningVisible(false);
-    setNoInkState(false);
+    setHomeInkOutWarningVisible(false);
   });
 }
 
@@ -320,16 +182,7 @@ void fetch('/api/printer/simulation-status')
       setHomeLowInkWarningVisible(true);
     }
     if (data?.activeError === 'ink_out') {
-      setNoInkState(true);
-    }
-  })
-  .catch(() => {});
-
-void fetch('/api/printer/active-error')
-  .then((res) => (res.ok ? res.json() : null))
-  .then((data: { activeError?: { code?: string } | null } | null) => {
-    if (data?.activeError?.code === 'E_INK_OUT') {
-      setNoInkState(true);
+      setHomeInkOutWarningVisible(true);
     }
   })
   .catch(() => {});
@@ -544,30 +397,11 @@ window.addEventListener('pagehide', (event) => {
   }
 });
 
-openPrint?.addEventListener('click', (event) => {
-  if (isNoInkActive) {
-    event.preventDefault();
-    pulseNoInkNotice();
-    return;
-  }
+openPrint?.addEventListener('click', () => {
   navigateTo('/print');
 });
-
-openCopy?.addEventListener('click', (event) => {
-  if (isNoInkActive) {
-    event.preventDefault();
-    pulseNoInkNotice();
-    return;
-  }
-  navigateTo('/copy');
-});
-
+openCopy?.addEventListener('click', () => navigateTo('/copy'));
 openScan?.addEventListener('click', () => navigateTo('/scan'));
-
-const noInkNoticeScanBtn = document.getElementById('noInkNoticeScanBtn');
-noInkNoticeScanBtn?.addEventListener('click', () => {
-  navigateTo('/scan');
-});
 
 // ── Hotspot Wi-Fi connection modal (Public ESP32 Hotspot) ─────────────────────
 
