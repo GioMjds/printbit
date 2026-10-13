@@ -28,6 +28,7 @@ import {
   WORKER_FAILED_DIR,
 } from '@/config/http.config';
 import { computeResubmitPlan, type ResubmitPlan } from './resubmit-plan';
+import { printerErrorStateManager } from '@/services/printer-error-state';
 
 // Re-export so that `printer.service.ts` remains the canonical public
 // surface of this module — callers should not need to know about
@@ -115,6 +116,16 @@ export class PrinterService {
     private readonly io?: SocketIOServer,
     private readonly sessionStore?: SessionStore,
   ) {}
+
+  getActiveError(): {
+    activeError: ReturnType<typeof printerErrorStateManager.getActiveError>;
+    outOfService: boolean;
+  } {
+    return {
+      activeError: printerErrorStateManager.getActiveError(),
+      outOfService: printerErrorStateManager.isKioskOutOfService(),
+    };
+  }
 
   async getStatusResponse(): Promise<PrinterStatusResponse> {
     let telemetry = getPrinterTelemetry();

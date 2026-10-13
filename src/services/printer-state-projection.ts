@@ -1,4 +1,71 @@
+import { EventEmitter } from 'node:events';
+import type { Server } from 'socket.io';
 import type { WorkerPrintEvent } from './worker-return-pipe';
+import { printerErrorStateManager } from './printer-error-state';
+import {
+  lockCoinSlot,
+  unlockOwnedCoinSlot as unlockCoinSlot,
+} from './hardware-state-projection';
+import { anomalyService } from './anomaly';
+import { translateHardwarePrinterError } from './printer-error-translation';
+
+type SocketIoEmitter = { emit: (event: string, ...args: unknown[]) => void } | Server;
+
+let printerGuideSocketIo: SocketIoEmitter | null = null;
+
+export function setPrinterGuideSocketIo(io: SocketIoEmitter | null): void {
+  printerGuideSocketIo = io;
+}
+
+export function handlePrinterStatusUpdate(
+  statusText: string,
+  errorCode?: string | null,
+): void {
+  const normalized = (statusText ?? '').trim().toLowerCase();
+  const isHealthy = normalized === 'ready' || normalized === 'healthy';
+
+  if (isHealthy) {
+    const { cleared } = printerErrorStateManager.recordHealthyPoll();
+    if (cleared) {
+      unlockCoinSlot('printer-error-guide');
+      printerGuideSocketIo?.emit('printer:error-guide-update', { activeError: null });
+    }
+  } else {
+    const translated = translateHardwarePrinterError({
+      message: statusText,
+      errorCode,
+    });
+
+    if (translated.tier === 'None' || translated.code === 'PAPER_JAM_PRINT') {
+      return;
+    }
+
+    const activeError = printerErrorStateManager.recordError(translated.code);
+
+    if (translated.locksCoinSlot) {
+      lockCoinSlot('printer-error-guide', 'printer_error_' + translated.code);
+    }
+
+    if (activeError.tier === 'Staff' || activeError.tier === 'Technician') {
+      void anomalyService.report({
+        type: `printer_error_${activeError.code.toLowerCase()}`,
+        source: 'printer-guide',
+        category: 'printer',
+        severity: activeError.tier === 'Technician' ? 'critical' : 'warning',
+        message: translated.userMessage,
+        fingerprint: `printer-${activeError.code}`,
+        context: {
+          code: activeError.code,
+          tier: activeError.tier,
+          occurrences: activeError.occurrences,
+          status: activeError.status,
+        },
+      });
+    }
+
+    printerGuideSocketIo?.emit('printer:error-guide-update', { activeError });
+  }
+}
 
 export interface ProjectedPrinterState {
   connected: boolean;
@@ -8,7 +75,7 @@ export interface ProjectedPrinterState {
   error: string | null;
 }
 
-export class PrinterStateProjection {
+export class PrinterStateProjection extends EventEmitter {
   private state = {
     connected: false,
     name: null,
@@ -16,6 +83,10 @@ export class PrinterStateProjection {
     lastCheckedAt: new Date().toISOString(),
     error: null,
   } as ProjectedPrinterState;
+
+  constructor() {
+    super();
+  }
 
   public reset(): void {
     this.state = {
@@ -25,6 +96,7 @@ export class PrinterStateProjection {
       lastCheckedAt: new Date().toISOString(),
       error: null,
     };
+    this.emit('state', this.getSnapshot());
   }
 
   public applyEvent(evt: WorkerPrintEvent): void {
@@ -43,6 +115,7 @@ export class PrinterStateProjection {
             lastCheckedAt: timestamp,
             error: evt.errorMessage ?? evt.message ?? 'Printer is offline',
           };
+          handlePrinterStatusUpdate(this.state.error ?? 'offline', evt.errorCode);
           break;
         }
         this.state = {
@@ -52,6 +125,7 @@ export class PrinterStateProjection {
           lastCheckedAt: timestamp,
           error: null,
         };
+        handlePrinterStatusUpdate('ready');
         break;
 
       case 'PrinterOffline':
@@ -62,6 +136,7 @@ export class PrinterStateProjection {
           lastCheckedAt: timestamp,
           error: evt.errorMessage ?? evt.message ?? 'Printer is offline',
         };
+        handlePrinterStatusUpdate(this.state.error ?? 'offline', evt.errorCode);
         break;
 
       case 'PrinterError':
@@ -72,6 +147,10 @@ export class PrinterStateProjection {
           lastCheckedAt: timestamp,
           error: evt.errorMessage ?? evt.message ?? 'Printer hardware error',
         };
+        handlePrinterStatusUpdate(
+          evt.errorMessage ?? evt.message ?? 'Printer hardware error',
+          evt.errorCode,
+        );
         break;
 
       case 'PrintStarted':
@@ -95,6 +174,8 @@ export class PrinterStateProjection {
         }
         break;
     }
+    this.emit('event', evt);
+    this.emit('state', this.getSnapshot());
   }
 
   public getSnapshot(): ProjectedPrinterState {
@@ -225,20 +306,56 @@ export async function listInstalledPrinters(): Promise<InstalledPrinterInfo[]> {
   ];
 }
 
-export async function runInkTelemetryDiagnostics(): Promise<{
+export interface InkDiagnosticEntry {
+  propertyName: string;
+  value: unknown;
+}
+
+export interface TargetPrinterIdentity {
+  pnpInstanceId: string | null;
+  pnpFriendlyName: string | null;
+  deviceSerialNumber: string | null;
+}
+
+export interface InkTelemetryDiagnosticsResult {
   installedPrinters: InstalledPrinterInfo[];
-  inkDiagnostics: any[];
-  targetPrinterName?: string | null;
-  targetResolved?: boolean;
-  telemetry?: PrinterTelemetry;
-}> {
+  inkDiagnostics: InkDiagnosticEntry[];
+  matchingProperties: InkDiagnosticEntry[];
+  targetPrinterName: string | null;
+  targetResolved: boolean;
+  targetPrinterIdentity: TargetPrinterIdentity | null;
+  telemetry: PrinterTelemetry;
+}
+
+export async function runInkTelemetryDiagnostics(): Promise<InkTelemetryDiagnosticsResult> {
   const printers = await listInstalledPrinters();
   const telemetry = getPrinterTelemetry();
+  const targetPrinterName = telemetry.name;
+  const targetResolved = Boolean(targetPrinterName);
+
+  const targetPrinter = targetPrinterName
+    ? printers.find(
+        (p) => p.name === targetPrinterName || p.Name === targetPrinterName,
+      )
+    : printers[0] ?? null;
+
+  const targetPrinterIdentity: TargetPrinterIdentity | null = targetPrinter
+    ? {
+        pnpInstanceId: targetPrinter.PnpInstanceId ?? null,
+        pnpFriendlyName: targetPrinter.PnpFriendlyName ?? null,
+        deviceSerialNumber: targetPrinter.DeviceSerialNumber ?? null,
+      }
+    : null;
+
+  const matchingProperties: InkDiagnosticEntry[] = [];
+
   return {
     installedPrinters: printers,
-    inkDiagnostics: [],
-    targetPrinterName: telemetry.name,
-    targetResolved: Boolean(telemetry.name),
+    inkDiagnostics: matchingProperties,
+    matchingProperties,
+    targetPrinterName,
+    targetResolved,
+    targetPrinterIdentity,
     telemetry,
   };
 }
@@ -266,11 +383,6 @@ export interface EdgeJobActionResult {
   noOp?: boolean;
   alreadyInState?: boolean;
 }
-
-// TO REMOVE (functions): Since it is not going to be implemented
-// 1. `cancelPrintJobViaEdge`
-// 2. `pausePrintJobViaEdge`
-// 3. `resumePrintJobViaEdge`
 
 export async function cancelPrintJobViaEdge(
   _printerName: string,
@@ -329,15 +441,157 @@ export interface PrinterFault {
   severity: 'warning' | 'critical';
 }
 
+export interface WatchJobOptions {
+  jobId?: string;
+  sessionId?: string | null;
+  pollIntervalMs?: number;
+  watchDurationMs?: number;
+  onFailure?: (jobId: string, fault: PrinterFault) => void;
+}
+
+export interface WatchJobResult {
+  faultDetected: boolean;
+  fault?: PrinterFault;
+}
+
 export async function watchJobForMalfunction(
-  _io?: any,
-  _opts?: {
-    jobId?: string;
-    sessionId?: string | null;
-    pollIntervalMs?: number;
-    watchDurationMs?: number;
-    onFailure?: (jobId: string, fault: PrinterFault) => void;
-  },
-): Promise<{ faultDetected: boolean; fault?: PrinterFault }> {
-  return { faultDetected: false };
+  io?: SocketIoEmitter | null,
+  opts?: WatchJobOptions,
+): Promise<WatchJobResult> {
+  const watchDurationMs = opts?.watchDurationMs ?? 30_000;
+  const pollIntervalMs = opts?.pollIntervalMs ?? 1_000;
+  const jobId = opts?.jobId;
+
+  const initial = printerStateProjection.getSnapshot();
+  if (
+    !initial.connected ||
+    initial.status === 'error' ||
+    initial.status === 'offline'
+  ) {
+    const fault: PrinterFault = {
+      timestamp: initial.lastCheckedAt || new Date().toISOString(),
+      reason:
+        initial.error ??
+        (!initial.connected
+          ? 'Printer is offline'
+          : `Printer in ${initial.status} state`),
+      severity: initial.status === 'error' ? 'critical' : 'warning',
+    };
+
+    if (jobId && opts?.onFailure) {
+      opts.onFailure(jobId, fault);
+    }
+
+    if (io) {
+      io.emit('printerMalfunction', {
+        status: initial.status,
+        printerName: initial.name,
+        timestamp: fault.timestamp,
+        reason: fault.reason,
+      });
+    }
+
+    return { faultDetected: true, fault };
+  }
+
+  return new Promise<WatchJobResult>((resolve) => {
+    let settled = false;
+    let timeoutTimer: NodeJS.Timeout | null = null;
+    let pollTimer: NodeJS.Timeout | null = null;
+
+    const cleanup = () => {
+      settled = true;
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (pollTimer) clearInterval(pollTimer);
+      printerStateProjection.removeListener('event', onWorkerEvent);
+    };
+
+    const triggerFault = (fault: PrinterFault) => {
+      if (settled) return;
+      cleanup();
+
+      if (jobId && opts?.onFailure) {
+        opts.onFailure(jobId, fault);
+      }
+
+      if (io) {
+        io.emit('printerMalfunction', {
+          status: 'error',
+          printerName: printerStateProjection.getSnapshot().name,
+          timestamp: fault.timestamp,
+          reason: fault.reason,
+        });
+      }
+
+      resolve({ faultDetected: true, fault });
+    };
+
+    const onWorkerEvent = (evt: WorkerPrintEvent) => {
+      if (settled) return;
+
+      if (jobId && evt.transactionId && evt.transactionId !== jobId) {
+        return;
+      }
+
+      if (evt.type === 'PrinterError' || evt.type === 'PrinterOffline') {
+        const fault: PrinterFault = {
+          timestamp: evt.timestampUtc || new Date().toISOString(),
+          reason:
+            evt.errorMessage ??
+            evt.message ??
+            'Printer hardware error detected',
+          severity: evt.type === 'PrinterError' ? 'critical' : 'warning',
+        };
+        triggerFault(fault);
+        return;
+      }
+
+      if (evt.type === 'PrintFailed') {
+        if (!evt.transactionId || evt.transactionId === jobId) {
+          const fault: PrinterFault = {
+            timestamp: evt.timestampUtc || new Date().toISOString(),
+            reason: evt.errorMessage ?? evt.message ?? 'Print job failed',
+            severity: 'critical',
+          };
+          triggerFault(fault);
+          return;
+        }
+      }
+
+      if (
+        (evt.type === 'PrintSucceeded' || evt.type === 'JobCompleted') &&
+        (!evt.transactionId || evt.transactionId === jobId)
+      ) {
+        cleanup();
+        resolve({ faultDetected: false });
+      }
+    };
+
+    printerStateProjection.on('event', onWorkerEvent);
+
+    pollTimer = setInterval(() => {
+      if (settled) return;
+      const snap = printerStateProjection.getSnapshot();
+      if (!snap.connected || snap.status === 'error' || snap.status === 'offline') {
+        const fault: PrinterFault = {
+          timestamp: snap.lastCheckedAt || new Date().toISOString(),
+          reason:
+            snap.error ??
+            (!snap.connected
+              ? 'Printer is offline'
+              : `Printer in ${snap.status} state`),
+          severity: snap.status === 'error' ? 'critical' : 'warning',
+        };
+        triggerFault(fault);
+      }
+    }, pollIntervalMs);
+    pollTimer.unref?.();
+
+    timeoutTimer = setTimeout(() => {
+      if (settled) return;
+      cleanup();
+      resolve({ faultDetected: false });
+    }, watchDurationMs);
+    timeoutTimer.unref?.();
+  });
 }
