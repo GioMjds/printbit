@@ -235,20 +235,37 @@
               <p class="error-banner__text" id="errorText">
                 No document detected.
               </p>
-              <button id="retryBtn" type="button" class="retry-btn">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                  fill-rule="evenodd"
-                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0
-                0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0
-                010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002
-                5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2
-                0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              Retry
-            </button>
+              <div class="error-banner__actions">
+                <button
+                  id="copySeeStepsBtn"
+                  type="button"
+                  class="see-steps-btn"
+                  style="display: none"
+                  aria-haspopup="dialog"
+                  aria-controls="copyAdfModal"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                  <span>See Steps</span>
+                </button>
+                <button id="retryBtn" type="button" class="retry-btn">
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                      fill-rule="evenodd"
+                      d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0
+                    0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0
+                    010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002
+                    5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2
+                    0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  Retry
+                </button>
+              </div>
             </div>
 
             <!-- Troubleshooting details live inside the error card -->
@@ -493,6 +510,127 @@
         </section>
       </main>
       <div class="modal-overlay document-care-modal" id="documentCareModal" role="dialog" aria-modal="true" aria-labelledby="documentCareTitle" aria-hidden="true"><div class="modal-card document-care-modal__card"><div class="document-care-modal__icon" aria-hidden="true">!</div><h2 class="modal-title" id="documentCareTitle">Prepare your document</h2><p class="modal-subtitle">To avoid paper jams and keep your preview clear:</p><ul><li>Use clean, flat, undamaged bond paper.</li><li>Remove staples, clips, tape, folded areas, and torn edges.</li><li>For the ADF, align pages straight. On the glass, place the document flat.</li></ul><div class="modal-actions"><button type="button" class="modal-btn modal-btn--primary document-care-modal__close" id="documentCareClose">Got it</button></div></div></div>
+
+      <!-- ADF Paper Jam Visual Guide Modal (Enlarged) -->
+      <div
+        class="modal-overlay adf-visual-modal"
+        id="copyAdfModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="copyAdfModalTitle"
+        aria-hidden="true"
+      >
+        <div class="modal-card adf-visual-modal__card">
+          <div class="adf-visual-modal__header">
+            <div>
+              <h2 class="modal-title" id="copyAdfModalTitle">ADF Paper Jam Removal Directions</h2>
+            </div>
+            <button
+              type="button"
+              class="adf-visual-modal__close-icon"
+              id="copyAdfModalCloseIcon"
+              aria-label="Close dialog"
+            >
+              &times;
+            </button>
+          </div>
+          <div class="adf-visual-modal__content">
+            <div class="adf-visual-modal__step">
+              <span class="adf-visual-modal__step-num">Step 1</span>
+              <div class="adf-visual-modal__step-img-wrap">
+                <img
+                  src="/assets/adf/adf-step-1.png"
+                  alt="Step 1: Open the ADF cover"
+                  class="adf-visual-modal__step-img"
+                />
+              </div>
+              <div class="adf-visual-modal__step-body">
+                <h3 class="adf-visual-modal__step-title">1. Open the ADF cover</h3>
+                <p class="adf-visual-modal__step-caution">
+                  <strong>Caution:</strong> Make sure you open the ADF cover before removing any jammed paper. Otherwise the product may be damaged.
+                </p>
+              </div>
+            </div>
+
+            <div class="adf-visual-modal__step">
+              <span class="adf-visual-modal__step-num">Step 2</span>
+              <div class="adf-visual-modal__step-img-wrap">
+                <img
+                  src="/assets/adf/adf-step-2.png"
+                  alt="Step 2: Carefully remove any jammed paper"
+                  class="adf-visual-modal__step-img"
+                />
+              </div>
+              <div class="adf-visual-modal__step-body">
+                <h3 class="adf-visual-modal__step-title">2. Carefully remove any jammed paper</h3>
+                <p class="adf-visual-modal__step-desc">
+                  Gently pull the jammed sheet out from the feeder. Ensure no torn scraps remain inside.
+                </p>
+              </div>
+            </div>
+
+            <div class="adf-visual-modal__step">
+              <span class="adf-visual-modal__step-num">Step 3</span>
+              <div class="adf-visual-modal__step-img-wrap">
+                <img
+                  src="/assets/adf/adf-step-3.png"
+                  alt="Step 3: Open the ADF input tray"
+                  class="adf-visual-modal__step-img"
+                />
+              </div>
+              <div class="adf-visual-modal__step-body">
+                <h3 class="adf-visual-modal__step-title">3. Open the ADF input tray</h3>
+                <p class="adf-visual-modal__step-caution">
+                  <strong>Caution:</strong> Make sure you open the ADF cover before opening the input tray. Otherwise the product may be damaged.
+                </p>
+              </div>
+            </div>
+
+            <div class="adf-visual-modal__step">
+              <span class="adf-visual-modal__step-num">Step 4</span>
+              <div class="adf-visual-modal__step-img-wrap">
+                <img
+                  src="/assets/adf/adf-step-4.png"
+                  alt="Step 4: Carefully remove jammed paper from beneath the ADF input tray"
+                  class="adf-visual-modal__step-img"
+                />
+              </div>
+              <div class="adf-visual-modal__step-body">
+                <h3 class="adf-visual-modal__step-title">4. Carefully remove jammed paper from beneath tray</h3>
+                <p class="adf-visual-modal__step-desc">
+                  Gently remove any jammed paper from beneath the input tray.
+                </p>
+              </div>
+            </div>
+
+            <div class="adf-visual-modal__step">
+              <span class="adf-visual-modal__step-num">Step 5</span>
+              <div class="adf-visual-modal__step-img-wrap">
+                <img
+                  src="/assets/adf/adf-step-5.png"
+                  alt="Step 5: Close the ADF input tray (1), and then close the ADF cover firmly (2)"
+                  class="adf-visual-modal__step-img"
+                />
+              </div>
+              <div class="adf-visual-modal__step-body">
+                <h3 class="adf-visual-modal__step-title">5. Close tray (1) and ADF cover (2)</h3>
+                <p class="adf-visual-modal__step-desc">
+                  Close the ADF input tray first (1), then close the ADF cover firmly until it clicks (2). Reload flat paper and tap Retry.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="modal-btn modal-btn--primary"
+              id="copyAdfModalCloseBtn"
+            >
+              Close &amp; Retry
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Footer -->
       <footer class="copy-footer">

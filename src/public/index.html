@@ -1060,7 +1060,7 @@
       Shown after homepage idle timeout and immediately after boot.
       The overlay sits above the homepage DOM (z-index 9000).
       JS in app.ts / shared/idle-screen.ts toggles .is-visible / .is-leaving.
-      Three scenes (Print, Photocopy, Scan) loop on an 18s CSS-only cycle.
+      Three scenes (Print, Copy, Scan) loop on an 18s CSS-only cycle.
       Keep the order machine → scenes: the machine <svg> owns the shared <defs>.
     -->
     <div
@@ -1115,18 +1115,12 @@
 
           <!-- Progress only: not interactive, so no tab/pill styling -->
           <div class="idle-tabs" aria-hidden="true">
-            <span class="idle-tab" style="--d: 0s">
-              <span class="idle-tab__bar"><i></i></span>
-              <span class="idle-tab__label">Print</span>
-            </span>
-            <span class="idle-tab" style="--d: 6s">
-              <span class="idle-tab__bar"><i></i></span>
-              <span class="idle-tab__label">Copy</span>
-            </span>
-            <span class="idle-tab" style="--d: 12s">
-              <span class="idle-tab__bar"><i></i></span>
-              <span class="idle-tab__label">Scan</span>
-            </span>
+            <div class="idle-tab-track"><i></i></div>
+            <div class="idle-tab-labels">
+              <span class="idle-tab-label" style="--d: 0s">Print</span>
+              <span class="idle-tab-label" style="--d: 6s">Copy</span>
+              <span class="idle-tab-label" style="--d: 12s">Scan</span>
+            </div>
           </div>
         </div>
 
@@ -1684,7 +1678,7 @@
               </g>
             </svg>
 
-            <!-- Scene 2: Photocopy (document on glass → two copies) -->
+            <!-- Scene 2: Copy (document on glass → two copies) -->
             <svg
               class="idle-scene idle-scene--copy"
               viewBox="0 0 840 540"

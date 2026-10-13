@@ -21,6 +21,7 @@ import { analyzeDocument } from '@/services/document-analysis';
 import { jobStore, type ScanJobSettings } from '@/services/job-store';
 import { ReceiptService } from '@/modules/receipt/receipt.service';
 import { adminService } from '@/services/admin';
+import { getPrinterSimulationState } from '@/services/printer-simulation';
 import { db } from '@/services/db';
 import type { SupportedDpi } from '@/core/database/models/admin.model';
 import { settlementService } from '@/services/settlement';
@@ -382,6 +383,13 @@ export class ScannerService {
     }
     if (!VALID_PAPER_SIZES.has(paperSize)) {
       throw new Error('Invalid paperSize. Accepted: "A4", "Short", "Long"');
+    }
+
+    const simulation = getPrinterSimulationState();
+    if (simulation.active && simulation.activeError === 'adf_error') {
+      throw new Error(
+        'Printer ADF Error Detected. Clear the printer ADF error or paper jam, then proceed with scanning.',
+      );
     }
 
     const runtime = getScannerStatus();

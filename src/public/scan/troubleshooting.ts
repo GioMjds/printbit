@@ -2,6 +2,7 @@ export interface ScanTroubleshootingGuide {
   title: string;
   summary: string;
   checks: string[];
+  hasVisualGuide?: boolean;
 }
 
 type ScanFailureCause =
@@ -17,38 +18,46 @@ const GUIDES = {
   adf_error: {
     title: 'Printer ADF Error Detected',
     summary:
-      'Clear the printer ADF error first, then proceed with scanning on this kiosk screen.',
+      'Clear the printer ADF error or paper jam, then proceed with scanning.',
     checks: [
-      'Go to the printer first to clear out the paper jam or error from the ADF feeder.',
-      'Check that the printer error indicator or screen is cleared and the printer is ready.',
-      'Proceed with scanning using this kiosk screen in PrintBit.',
+      'Open the ADF cover. (Caution: Always open the ADF cover before removing jammed paper to prevent damage.)',
+      'Carefully remove any jammed paper inside the document feeder.',
+      'Open the ADF input tray. (Caution: Make sure the ADF cover is open before opening the input tray.)',
+      'Carefully remove any jammed paper from beneath the ADF input tray.',
+      'Close the ADF input tray and ADF cover firmly, reload flat paper straight, then try again.',
     ],
+    hasVisualGuide: true,
   },
   paper_jam: {
-    title: 'Paper jam in the feeder',
-    summary: 'Remove the paper, clear the feeder, then try again.',
+    title: 'Paper Jam in Document Feeder (ADF)',
+    summary:
+      'Paper is jammed in the feeder. Open the ADF cover before removing paper to avoid damage.',
     checks: [
-      'Remove the paper from the top feeder tray.',
-      'Make sure no torn paper is left inside the feeder.',
-      'Load the paper straight, then try again.',
+      'Remove any loose paper from the top ADF input tray.',
+      'Open the ADF cover. (Caution: Always open the ADF cover before removing jammed paper to prevent damage.)',
+      'Carefully remove any jammed paper inside the document feeder.',
+      'Open the ADF input tray. (Caution: Make sure the ADF cover is open before opening the input tray.)',
+      'Carefully remove any jammed paper from beneath the ADF input tray.',
+      'Close the ADF input tray and ADF cover firmly, reload flat paper straight, then try again.',
     ],
+    hasVisualGuide: true,
   },
   empty_feeder: {
-    title: 'We could not find your paper',
-    summary: 'Load your document straight into the top tray, then try again.',
+    title: 'No document detected in the feeder',
+    summary: 'Load your document face-up straight into the top ADF tray, then try again.',
     checks: [
-      'Remove the paper and line up its edges.',
-      'Slide it straight into the top tray.',
-      'Move the side guides gently against the paper.',
+      'Remove the paper and check that all edges are lined up.',
+      'Insert the document face-up into the top ADF tray, short edge first.',
+      'Slide it in gently until gripped, and move side edge guides snugly against the paper.',
     ],
   },
   multi_feed: {
-    title: 'More than one page went in',
-    summary: 'Separate the pages, then load a smaller stack and try again.',
+    title: 'Misfeed or multiple pages entered',
+    summary: 'Separate pages, align edges, then reload and try again.',
     checks: [
-      'Take the stack out of the top tray.',
-      'Separate the pages and line up the edges.',
-      'Load fewer pages, then try again.',
+      'Take the pages out of the top ADF tray.',
+      'Ensure pages are flat, undamaged, and aligned straight.',
+      'Insert the pages face-up, short edge first, and adjust side guides snugly.',
     ],
   },
   busy: {
@@ -56,7 +65,7 @@ const GUIDES = {
     summary: 'Wait until the scanner is quiet, then try again once.',
     checks: [
       'Wait a few seconds for the scanner to finish.',
-      'Keep the paper in place.',
+      'Keep the paper in place in the ADF.',
       'Try again once the scanner is quiet.',
     ],
   },
@@ -65,7 +74,7 @@ const GUIDES = {
     summary: 'Make sure the scanner is switched on, then try again.',
     checks: [
       'Check that the scanner has power.',
-      'Wait a moment for it to wake up.',
+      'Verify the scanner USB cable is firmly connected.',
       'If it still does not work, ask a staff member for help.',
     ],
   },
@@ -73,9 +82,9 @@ const GUIDES = {
     title: 'Let’s try that again',
     summary: 'Put the paper in straight, then try the scan again.',
     checks: [
-      'Take the paper out of the top tray.',
-      'Check that it is flat and straight.',
-      'Load it again, then try again.',
+      'Take the paper out of the top ADF tray.',
+      'Check that it is flat, unfolded, and straight.',
+      'Load it face-up again until gripped, then try again.',
     ],
   },
 } satisfies Record<ScanFailureCause, ScanTroubleshootingGuide>;

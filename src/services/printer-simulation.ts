@@ -92,7 +92,7 @@ export function simulatePrinterError(
 
     case 'adf_error': {
       currentSimulation.message =
-        'ADF feeder error on printer; clear printer first';
+        'Clear the printer ADF error or paper jam, then proceed with scanning';
       io?.emit('printer:simulation-state', {
         activeError: 'adf_error',
         message: currentSimulation.message,
@@ -103,7 +103,7 @@ export function simulatePrinterError(
       });
       io?.emit('scan:adf-error', {
         error:
-          'ADF feeder error on printer. Go to the printer first to clear the feeder error, then proceed with scanning using the kiosk screen.',
+          'Printer ADF Error Detected. Clear the printer ADF error or paper jam, then proceed with scanning.',
         title: 'Printer ADF Error Detected',
       });
       break;

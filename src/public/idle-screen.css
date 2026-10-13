@@ -1,21 +1,17 @@
-/* ── Idle / Attractor Screen Overlay ──────────────────────────────────────── */
-/*
- * Full-screen overlay shown on the homepage after the idle timeout and right
- * after boot (loading → idle → homepage).
- *
- * Concept: the PrintBit machine is the character. It sits on a stage and
- * "performs" what each service does, looping Print → Photocopy → Scan
- * (6s each, 18s cycle). Copy on the left changes in sync with the stage.
- *
- * JS contract is unchanged: #idleOverlay toggles .is-visible / .is-leaving,
- * and html.kiosk-boot-idle covers the homepage before first render.
- *
- * Timing: every scene is a 6s slot inside an 18s cycle. Each scene sets --d
- * (0s / 6s / 12s) and every animated element offsets its own events from it.
- * All animated content lives inside .idle-live, which is display:none while
- * the overlay is hidden, so animations cost nothing when idle is not showing
- * and always restart from the top when the overlay appears.
- */
+/* ═══════════════════════════════════════════════════════════════════════════
+   IDLE / ATTRACTOR SCREEN — "Cinematic Full-Bleed" layout
+   ───────────────────────────────────────────────────────────────────────────
+   The PrintBit machine bleeds across the top ~65% of the viewport as the
+   background hero. A frosted-glass copy card sits below it, containing the
+   rotating headline, sub-line, a full-width progress bar, and the method
+   label row. The CTA pill and hint sit at the very bottom.
+
+   Layering (z-index inside .idle-live):
+     0  .idle-stage       machine SVG bleeding
+     3  .idle-header      brand (top-left)
+     3  .idle-copy-block  frosted glass card
+     4  .idle-footer      CTA + hint
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Tokens (mirror globals.css) ───────────────────────────────────────────── */
 .idle-overlay {
@@ -55,18 +51,19 @@ html.kiosk-boot-idle .kiosk-shell {
   position: fixed;
   inset: 0;
   z-index: 9000;
+  /* Deeper, richer backdrop for the cinematic feel */
   background:
     radial-gradient(
-      ellipse at 15% 10%,
-      rgba(105, 111, 199, 0.24),
-      transparent 55%
+      ellipse at 20% 5%,
+      rgba(105, 111, 199, 0.3),
+      transparent 58%
     ),
     radial-gradient(
-      ellipse at 85% 90%,
-      rgba(242, 174, 187, 0.14),
-      transparent 48%
+      ellipse at 82% 92%,
+      rgba(242, 174, 187, 0.16),
+      transparent 52%
     ),
-    linear-gradient(160deg, #0e0d1f 0%, #100f22 50%, #0c0b1c 100%);
+    linear-gradient(165deg, #0e0d1f 0%, #100f22 45%, #0a0918 100%);
   color: var(--idle-text);
   opacity: 0;
   pointer-events: none;
@@ -87,6 +84,20 @@ html.kiosk-boot-idle .kiosk-shell {
   animation: idle-overlay-fade-out 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
 }
 
+/* Subtle vignette so the edges recede and the machine floats in the centre */
+.idle-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 58%,
+    rgba(0, 0, 0, 0.42) 100%
+  );
+}
+
 /* Everything animated is hidden (and therefore stopped) until the overlay is live */
 .idle-overlay .idle-live {
   display: none;
@@ -95,10 +106,10 @@ html.kiosk-boot-idle .kiosk-shell {
 .idle-overlay.is-visible .idle-live,
 .idle-overlay.is-leaving .idle-live,
 html.kiosk-boot-idle .idle-overlay .idle-live {
-  display: grid;
+  display: flex;
 }
 
-/* ── Soft glow backdrop (gradients, no blur filters: light on a tablet GPU) ── */
+/* ── Soft glow backdrop (gradients, no blur filters: light on tablet GPU) ─── */
 .idle-backdrop {
   position: absolute;
   inset: 0;
@@ -112,10 +123,10 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
 }
 
 .idle-blob--1 {
-  width: 60vw;
-  height: 60vw;
-  top: -20%;
-  right: -14%;
+  width: 62vw;
+  height: 62vw;
+  top: -22%;
+  right: -16%;
   background: radial-gradient(
     circle,
     rgba(105, 111, 199, 0.34),
@@ -125,10 +136,10 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
 }
 
 .idle-blob--2 {
-  width: 52vw;
-  height: 52vw;
-  bottom: -24%;
-  left: -12%;
+  width: 54vw;
+  height: 54vw;
+  bottom: -26%;
+  left: -14%;
   background: radial-gradient(
     circle,
     rgba(242, 174, 187, 0.22),
@@ -138,9 +149,9 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
 }
 
 .idle-blob--3 {
-  width: 34vw;
-  height: 34vw;
-  top: 38%;
+  width: 36vw;
+  height: 36vw;
+  top: 34%;
   left: 40%;
   background: radial-gradient(
     circle,
@@ -150,34 +161,27 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   animation: idle-blob-drift-3 20s ease-in-out infinite alternate;
 }
 
-/* ── Layout ────────────────────────────────────────────────────────────────── */
-/*
- * Reading path: brand → headline → stage → the one action.
- *
- *   ┌────────────────────────────────────────┐
- *   │ [logo] PrintBit                        │  header
- *   │ Headline            ┌──────────────┐   │
- *   │ sub-line            │    stage     │   │  copy | stage (vertically centred together)
- *   │ ▬▬ ▬▬ ▬▬            └──────────────┘   │
- *   │        ( ● Tap anywhere to start )     │  footer: CTA + hint, centred
- *   └────────────────────────────────────────┘
- *
- * Spacing uses an 8px scale: 8 / 16 / 24 / 32 / 48 / 64.
- */
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT
+   ───────────────────────────────────────────────────────────────────────────
+   .idle-live = full-viewport flex column.
+     - .idle-header sits at top
+     - .idle-copy-block uses margin-top:auto to sink to the bottom
+     - .idle-footer sits below
+     - .idle-stage is absolutely positioned and bleeds full viewport
+
+   Top of the screen:  brand → empty space → machine (behind the card)
+   Bottom third:       frosted card (headline, sub, progress, labels) → CTA
+   ═══════════════════════════════════════════════════════════════════════════ */
 .idle-live {
   position: relative;
   z-index: 1;
   height: 100%;
+  width: 100%;
   box-sizing: border-box;
-  padding: clamp(24px, 4vw, 64px) clamp(24px, 5vw, 96px);
-  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    'header header'
-    'copy stage'
-    'footer footer';
-  column-gap: clamp(24px, 3.4vw, 72px);
-  row-gap: clamp(16px, 2.2vw, 40px);
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
   animation: idle-live-arrive 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -185,195 +189,93 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   animation: idle-live-depart 260ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
+/* ── Header ────────────────────────────────────────────────────────────────── */
 .idle-header {
-  grid-area: header;
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  padding: clamp(20px, 2.4vw, 40px) clamp(24px, 3vw, 56px) 0;
 }
 
-.idle-copy-block {
-  grid-area: copy;
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(24px, 3vw, 48px);
-  min-width: 0;
-}
-
-.idle-footer {
-  grid-area: footer;
-  justify-self: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-/* ── Brand ─────────────────────────────────────────────────────────────────── */
 .idle-brand {
   display: inline-flex;
   align-items: center;
-  gap: 16px;
+  gap: clamp(12px, 1.2vw, 18px);
 }
 
 .idle-brand__mark {
-  width: clamp(48px, 4.4vw, 72px);
-  height: clamp(48px, 4.4vw, 72px);
+  width: clamp(40px, 3.6vw, 60px);
+  height: clamp(40px, 3.6vw, 60px);
   background: url('/assets/logo.png') center / contain no-repeat;
+  flex-shrink: 0;
 }
 
 .idle-brand__name {
-  font-size: clamp(24px, 2.4vw, 40px);
+  font-size: clamp(22px, 2.2vw, 38px);
   font-weight: 700;
   letter-spacing: -0.035em;
 }
 
-/* ── Rotating copy (3 blocks stacked in one grid cell) ─────────────────────── */
-.idle-copy-stack {
-  display: grid;
-}
-
-.idle-copy {
-  grid-area: 1 / 1;
-  opacity: 0;
-  animation: idle-slot-text var(--idle-cycle) var(--d, 0s) linear infinite both;
-}
-
-/* Every headline wraps to exactly two lines and every sub-line reserves three,
-   so the progress bars below never jump between scenes. */
-.idle-copy__title {
-  margin: 0 0 16px;
-  max-width: 11ch;
-  min-height: 1.96em;
-  font-size: clamp(40px, 4.4vw, 84px);
-  font-weight: 800;
-  line-height: 0.98;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
-}
-
-.idle-copy__sub {
-  margin: 0;
-  max-width: 30ch;
-  min-height: 4.2em;
-  color: var(--idle-text-muted);
-  font-size: clamp(18px, 1.5vw, 28px);
-  font-weight: 500;
-  line-height: 1.4;
-  text-wrap: pretty;
-}
-
-/* ── Scene progress: indicator only (looks passive on purpose) ─────────────── */
-.idle-tabs {
-  display: flex;
-  gap: clamp(8px, 1vw, 16px);
-  width: 100%;
-  max-width: 30ch;
-  font-size: clamp(18px, 1.5vw, 28px);
-}
-
-.idle-tab {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.idle-tab__bar {
-  display: block;
-  height: 4px;
-  margin-bottom: 8px;
-  border-radius: 999px;
-  background: rgba(167, 170, 225, 0.2);
-  overflow: hidden;
-}
-
-.idle-tab__bar i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    var(--idle-primary-soft),
-    var(--idle-accent)
-  );
-  transform-origin: left center;
-  animation: idle-tab-progress var(--idle-cycle) var(--d, 0s) linear infinite
-    both;
-}
-
-.idle-tab__label {
-  display: block;
-  color: var(--idle-text-soft);
-  font-size: clamp(13px, 1vw, 17px);
-  font-weight: 600;
-  white-space: nowrap;
-  animation: idle-tab-label var(--idle-cycle) var(--d, 0s) linear infinite both;
-}
-
-/* CTA: the single filled element; everything else stays quiet around it */
-.idle-cta {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 64px;
-  padding: clamp(16px, 1.5vw, 24px) clamp(32px, 3vw, 56px)
-    clamp(16px, 1.5vw, 24px) clamp(24px, 2.4vw, 40px);
-  border-radius: 999px;
-  background: linear-gradient(135deg, #696fc7 0%, #8489df 100%);
-  box-shadow:
-    0 10px 40px rgba(105, 111, 199, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  animation: idle-cta-breathe 3.2s ease-in-out infinite;
-}
-
-.idle-cta__pulse {
-  position: relative;
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-}
-
-.idle-cta__pulse::before,
-.idle-cta__pulse::after {
-  content: '';
+/* ═══════════════════════════════════════════════════════════════════════════
+   STAGE — machine SVG bleeds behind the copy card
+   ───────────────────────────────────────────────────────────────────────────
+   inset:0 on a fixed-position overlay means it covers the whole viewport.
+   padding-top reserves a tiny header strip; padding-bottom reserves the card
+   + CTA zone. The SVG letterboxes to fit the remaining space with its own
+   aspect ratio (840×540), so it lands centred in the top ~65% of the screen.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.idle-stage {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  animation: idle-cta-ripple 2.4s ease-out infinite;
-}
-
-.idle-cta__pulse::after {
-  animation-delay: 1.2s;
-}
-
-.idle-cta__label {
-  font-size: clamp(20px, 1.7vw, 32px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-}
-
-.idle-hint {
-  margin: 0;
-  color: var(--idle-text-soft);
-  font-size: clamp(14px, 1.1vw, 18px);
-  font-weight: 500;
-}
-
-/* ── Stage ─────────────────────────────────────────────────────────────────── */
-.idle-stage {
-  grid-area: stage;
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
+  z-index: 0;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  padding-top: 6vh;
+  padding-bottom: 48vh;
 }
 
 .idle-stage__inner {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 800px;
+  max-height: 50vh;
   animation: idle-stage-bob 6s ease-in-out infinite;
+}
+
+/* Soft bottom scrim so the machine blends into the copy card area */
+.idle-stage::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 45%;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(10, 9, 24, 0.55) 70%,
+    rgba(10, 9, 24, 0.85) 100%
+  );
+}
+
+/* Soft glow behind the machine — reads as ambient light on the stage */
+.idle-stage::before {
+  content: '';
+  position: absolute;
+  inset: 12% 6% 42% 6%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(105, 111, 199, 0.32),
+    transparent 70%
+  );
+  animation: idle-stage-glow 4.5s ease-in-out infinite;
 }
 
 .idle-rings {
@@ -456,7 +358,7 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   animation-delay: -1s;
 }
 
-/* Phone: dims during Photocopy because that service doesn't use it */
+/* Phone: dims during Copy because that service doesn't use it */
 .idle-phone {
   animation: idle-phone-dim var(--idle-cycle) linear infinite both;
 }
@@ -474,11 +376,230 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   animation-delay: 0.02s;
 }
 
-/* ── Scene events ─────────────────────────────────────────────────────────── */
-/* Each event's start offset inside the scene's 6s slot is baked into its generated
-   keyframes (@keyframes idle-<event>-<offset in 0.1s>), and every event shares the
-   scene's --d delay. That way the whole scene snaps back to its starting state
-   exactly when the 18s cycle restarts, while the scene itself is invisible. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   FROSTED COPY CARD
+   ───────────────────────────────────────────────────────────────────────────
+   A glass panel containing: rotating headline + sub-line, then the progress
+   bar + method label row. Sits at the bottom of the flex column.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.idle-copy-block {
+  position: relative;
+  z-index: 3;
+  margin-top: auto;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0;
+  width: calc(100% - 2 * clamp(20px, 2.6vw, 48px));
+  max-width: 760px;
+  /* Slightly reduced padding */
+  padding: clamp(20px, 2.5vw, 32px) clamp(24px, 3vw, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 24px); /* Reduced gap */
+  border-radius: 32px;
+  /* Made background darker/more opaque to clearly separate from the SVG */
+  background: linear-gradient(
+    180deg,
+    rgba(14, 13, 31, 0.85) 0%,
+    rgba(14, 13, 31, 0.98) 100%
+  );
+  border: 1px solid rgba(167, 170, 225, 0.18);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Optional: enable backdrop blur for the real glass look.
+   Disabled by default because globals.css turns off backdrop-filter under
+   data-kiosk-static="true" for GPU conservation. Uncomment only if your
+   kiosk hardware has headroom. */
+/*
+
+html[data-kiosk-static='true'] .idle-overlay .idle-copy-block {
+  backdrop-filter: blur(20px) saturate(1.3) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.3) !important;
+}
+*/
+
+/* ── Rotating copy (3 blocks stacked in one grid cell) ─────────────────────── */
+.idle-copy-stack {
+  display: grid;
+}
+
+.idle-copy {
+  grid-area: 1 / 1;
+  opacity: 0;
+  animation: idle-slot-text var(--idle-cycle) var(--d, 0s) linear infinite both;
+}
+
+/* Headline: dominant, tightly tracked, cinematically large */
+.idle-copy__title {
+  margin: 0 0 clamp(8px, 1vw, 12px);
+  font-size: clamp(32px, 3.8vw, 54px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+  color: var(--idle-text);
+}
+
+/* Sub-line: comfortable, still readable from a distance */
+.idle-copy__sub {
+  margin: 0;
+  max-width: 50ch;
+  color: var(--idle-text-muted);
+  font-size: clamp(15px, 1.2vw, 19px);
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRESS BAR + METHOD LABELS
+   ───────────────────────────────────────────────────────────────────────────
+   Single bar fills over the whole 18s cycle. Below it, three labels sit
+   evenly spaced. Whichever method is currently playing gets a bright white
+   colour + a glowing accent dot.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.idle-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.4vw, 18px);
+  width: 100%;
+}
+
+.idle-tab-track {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(167, 170, 225, 0.18);
+  overflow: hidden;
+}
+
+.idle-tab-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--idle-primary-soft) 0%,
+    var(--idle-accent) 100%
+  );
+  transform-origin: left center;
+  animation: idle-tab-progress-full var(--idle-cycle) linear infinite both;
+}
+
+.idle-tab-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(12px, 2vw, 32px);
+}
+
+.idle-tab-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(17px, 1.35vw, 24px);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  color: var(--idle-text-soft);
+  white-space: nowrap;
+  animation: idle-tab-label-color var(--idle-cycle) var(--d, 0s) linear infinite
+    both;
+}
+
+.idle-tab-label::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--idle-text-soft);
+  flex-shrink: 0;
+  animation: idle-tab-dot-active var(--idle-cycle) var(--d, 0s) linear infinite
+    both;
+}
+
+/* ── Footer: CTA + hint ────────────────────────────────────────────────────── */
+.idle-footer {
+  position: relative;
+  z-index: 4;
+  flex-shrink: 0;
+  padding: clamp(16px, 2vw, 24px) clamp(24px, 3vw, 56px)
+    clamp(20px, 2.5vw, 36px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(12px, 1.4vw, 18px);
+}
+
+.idle-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(14px, 1.4vw, 20px);
+  min-height: 64px;
+  padding: clamp(14px, 1.5vw, 20px) clamp(28px, 2.8vw, 50px)
+    clamp(14px, 1.5vw, 20px) clamp(22px, 2.2vw, 38px);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #696fc7 0%, #8489df 100%);
+  box-shadow:
+    0 14px 48px rgba(105, 111, 199, 0.48),
+    0 0 80px rgba(105, 111, 199, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  animation: idle-cta-breathe 3.2s ease-in-out infinite;
+}
+
+.idle-cta__pulse {
+  position: relative;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.idle-cta__pulse::before,
+.idle-cta__pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  animation: idle-cta-ripple 2.4s ease-out infinite;
+}
+
+.idle-cta__pulse::after {
+  animation-delay: 1.2s;
+}
+
+.idle-cta__label {
+  font-size: clamp(20px, 1.6vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.idle-hint {
+  margin: 0;
+  color: var(--idle-text-soft);
+  font-size: clamp(15px, 1.05vw, 19px);
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCENE EVENTS
+   ───────────────────────────────────────────────────────────────────────────
+   Each event's start offset inside the scene's 6s slot is baked into its
+   generated keyframes (@keyframes idle-<event>-<offset in 0.1s>), and every
+   event shares the scene's --d delay. That way the whole scene snaps back to
+   its starting state exactly when the 18s cycle restarts, while the scene
+   itself is invisible.
+   ═══════════════════════════════════════════════════════════════════════════ */
 .ev {
   animation-duration: var(--idle-cycle);
   animation-delay: var(--d, 0s);
@@ -564,7 +685,9 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   animation-name: idle-wifi-33, idle-wifi-38;
 }
 
-/* ── Keyframes ─────────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYFRAMES
+   ═══════════════════════════════════════════════════════════════════════════ */
 @keyframes idle-overlay-fade-in {
   from {
     opacity: 0;
@@ -653,6 +776,18 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   }
 }
 
+@keyframes idle-stage-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
 @keyframes idle-cta-breathe {
   0%,
   100% {
@@ -716,7 +851,18 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   }
 }
 
-@keyframes idle-tab-label {
+/* NEW: single bar fills over the entire 18s cycle */
+@keyframes idle-tab-progress-full {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+/* NEW: label text colour highlights during its own 6s slot */
+@keyframes idle-tab-label-color {
   0% {
     color: var(--idle-text-soft);
   }
@@ -734,22 +880,32 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   }
 }
 
-@keyframes idle-tab-progress {
+/* NEW: dot indicator glows during its own 6s slot */
+@keyframes idle-tab-dot-active {
   0% {
-    transform: scaleX(0);
-    opacity: 1;
+    background: var(--idle-text-soft);
+    box-shadow: none;
+    transform: scale(1);
   }
-  33.3% {
-    transform: scaleX(1);
-    opacity: 1;
+  1% {
+    background: var(--idle-accent);
+    box-shadow: 0 0 12px var(--idle-accent);
+    transform: scale(1.15);
   }
-  33.4% {
-    transform: scaleX(1);
-    opacity: 0;
+  33% {
+    background: var(--idle-accent);
+    box-shadow: 0 0 12px var(--idle-accent);
+    transform: scale(1.15);
+  }
+  34% {
+    background: var(--idle-text-soft);
+    box-shadow: none;
+    transform: scale(1);
   }
   100% {
-    transform: scaleX(0);
-    opacity: 0;
+    background: var(--idle-text-soft);
+    box-shadow: none;
+    transform: scale(1);
   }
 }
 
@@ -765,7 +921,7 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   }
 }
 
-/* Slot 1 (print/scan): look left at the phone. Slot 2 (photocopy): look up at the glass. */
+/* Slot 1 (print/scan): look left at the phone. Slot 2 (copy): look up at the glass. */
 @keyframes idle-eyes-look {
   0% {
     transform: translate(-9px, 0);
@@ -1263,50 +1419,153 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   }
 }
 
-/* ── Portrait / narrow screens: stage on top, copy below ───────────────────── */
-@media (max-aspect-ratio: 1 / 1), (max-width: 900px) {
-  .idle-live {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
-    grid-template-areas:
-      'header'
-      'stage'
-      'copy'
-      'footer';
-  }
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-  .idle-copy-block {
-    align-self: start;
-    gap: 24px;
+/* Portrait / narrow screens: give the card more room, shrink the machine */
+@media (max-aspect-ratio: 1 / 1), (max-width: 900px) {
+  .idle-stage {
+    padding-bottom: 42vh;
   }
 
   .idle-copy__title {
-    max-width: 14ch;
-    font-size: clamp(36px, 8vw, 64px);
+    font-size: clamp(34px, 6.8vw, 58px);
   }
 
-  .idle-copy__sub,
-  .idle-tabs {
-    max-width: 36ch;
+  .idle-copy__sub {
+    font-size: clamp(15px, 2vw, 20px);
+    max-width: 52ch;
+  }
+
+  .idle-tab-label {
+    font-size: clamp(15px, 2vw, 20px);
+    gap: 8px;
+  }
+
+  .idle-tab-label::before {
+    width: 8px;
+    height: 8px;
+  }
+
+  .idle-cta__label {
+    font-size: clamp(19px, 2.4vw, 28px);
   }
 }
 
-/* Short screens: drop the secondary line, tighten spacing */
-@media (max-height: 600px) {
+/* Short viewports: hide the hint, tighten everything */
+@media (max-height: 640px) {
   .idle-hint {
     display: none;
   }
 
-  .idle-copy__title {
-    font-size: clamp(32px, 4.4vw, 56px);
+  .idle-stage {
+    padding-bottom: 45vh;
   }
 
-  .idle-copy__sub {
-    min-height: 0;
+  .idle-copy-block {
+    padding: 20px 24px;
+    gap: 16px;
+  }
+
+  .idle-copy__title {
+    font-size: clamp(28px, 4vw, 44px);
+  }
+
+  .idle-footer {
+    padding-top: 16px;
+    padding-bottom: 20px;
+  }
+
+  .idle-cta {
+    min-height: 60px;
+    padding: 14px 28px 14px 22px;
   }
 }
 
-/* ── Reduced motion: one still frame (Print, paper delivered) ──────────────── */
+/* Mobile phones */
+@media (max-width: 520px) {
+  .idle-header {
+    padding: 16px 20px 0;
+  }
+
+  .idle-brand__mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .idle-brand__name {
+    font-size: 20px;
+  }
+
+  .idle-stage {
+    padding-bottom: 46vh;
+  }
+
+  .idle-copy-block {
+    width: calc(100% - 24px);
+    border-radius: 24px;
+    padding: 22px 22px 24px;
+    gap: 18px;
+  }
+
+  .idle-copy__title {
+    font-size: clamp(28px, 8.6vw, 40px);
+    line-height: 1.08;
+  }
+
+  .idle-copy__sub {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .idle-tab-labels {
+    gap: 10px;
+  }
+
+  .idle-tab-label {
+    font-size: 15px;
+    gap: 6px;
+    letter-spacing: 0;
+  }
+
+  .idle-tab-label::before {
+    width: 7px;
+    height: 7px;
+  }
+
+  .idle-footer {
+    padding: 16px 20px 24px;
+    gap: 10px;
+  }
+
+  .idle-cta {
+    width: 100%;
+    justify-content: center;
+    min-height: 60px;
+    padding: 14px 22px;
+    gap: 12px;
+  }
+
+  .idle-cta__label {
+    font-size: 17px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .idle-cta__pulse {
+    width: 12px;
+    height: 12px;
+  }
+
+  .idle-hint {
+    font-size: 13px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION
+   ═══════════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .idle-live *,
   .idle-live *::before,
@@ -1325,8 +1584,17 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
     transform: none;
   }
 
-  .idle-tab__bar i {
-    transform: scaleX(0);
+  .idle-tab-track i {
+    transform: scaleX(0.33);
+  }
+
+  .idle-tab-label:first-child {
+    color: #ffffff;
+  }
+
+  .idle-tab-label:first-child::before {
+    background: var(--idle-accent);
+    box-shadow: 0 0 12px var(--idle-accent);
   }
 
   .idle-scene--print .ev-fly-out,
@@ -1338,24 +1606,338 @@ html.kiosk-boot-idle .idle-overlay .idle-live {
   }
 }
 
-/* ── High contrast mode ────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   HIGH CONTRAST
+   ═══════════════════════════════════════════════════════════════════════════ */
 html[data-high-contrast='true'] .idle-overlay {
   background: #000000;
 }
 
 html[data-high-contrast='true'] .idle-blob,
-html[data-high-contrast='true'] .idle-ring {
+html[data-high-contrast='true'] .idle-ring,
+html[data-high-contrast='true'] .idle-stage::before,
+html[data-high-contrast='true'] .idle-stage::after {
   display: none;
+}
+
+html[data-high-contrast='true'] .idle-copy-block {
+  background: #000 !important;
+  border-color: #fff !important;
+  box-shadow: none !important;
 }
 
 html[data-high-contrast='true'] .idle-copy__sub,
 html[data-high-contrast='true'] .idle-hint,
-html[data-high-contrast='true'] .idle-tab__label {
+html[data-high-contrast='true'] .idle-tab-label {
   color: #ffffff;
+}
+
+html[data-high-contrast='true'] .idle-tab-track {
+  background: #333;
+}
+
+html[data-high-contrast='true'] .idle-tab-track i {
+  background: #ffffff;
+}
+
+html[data-high-contrast='true'] .idle-tab-label::before {
+  background: #ffffff;
 }
 
 html[data-high-contrast='true'] .idle-cta {
   background: #0057ff;
   border: 2px solid #ffffff;
   box-shadow: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KIOSK-STATIC ANIMATION RE-ENABLE — THE ACTUAL BUG FIX
+   ───────────────────────────────────────────────────────────────────────────
+   globals.css applies a blanket `animation: none !important` to every
+   element when <html data-kiosk-static="true"> is set (kiosk GPU conservation).
+   The idle screen's whole point is animation, so we re-enable every animation
+   it uses here. Because globals.css uses !important, every value we want
+   back must also be !important, and our selectors must be more specific than
+   the blanket rule — they are (we scope to .idle-overlay .idle-live).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-copy {
+  animation: idle-slot-text var(--idle-cycle) var(--d, 0s) linear infinite both !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-scene {
+  animation: idle-slot var(--idle-cycle) var(--d, 0s) linear infinite both !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-spark {
+  animation: idle-spark 7s ease-in-out infinite !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-spark--2 {
+  animation-duration: 9s !important;
+  animation-delay: -3s !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-spark--3 {
+  animation-duration: 8s !important;
+  animation-delay: -5s !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-spark--4 {
+  animation-duration: 10s !important;
+  animation-delay: -1s !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-eyes {
+  animation: idle-eyes-look var(--idle-cycle) linear infinite both !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-eye {
+  animation: idle-eye-blink 5.5s ease-in-out infinite !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-eye--r {
+  animation-delay: 0.02s !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-phone {
+  animation: idle-phone-dim var(--idle-cycle) linear infinite both !important;
+}
+
+/* Base event rule */
+html[data-kiosk-static='true'] .idle-overlay .idle-live .ev {
+  animation-duration: var(--idle-cycle) !important;
+  animation-delay: var(--d, 0s) !important;
+  animation-iteration-count: infinite !important;
+  animation-fill-mode: both !important;
+  animation-timing-function: ease-in-out !important;
+}
+
+/* WiFi event two-value delay */
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-scene .ev-wifi {
+  animation-delay:
+    calc(var(--d, 0s) + var(--a, 0s)), calc(var(--d, 0s) + var(--a, 0s)) !important;
+}
+
+/* Print scene animation-names */
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--print
+  .ev-select {
+  animation-name: idle-select-5 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--print
+  .ev-tap {
+  animation-name: idle-tap-10 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--print
+  .ev-fly-out {
+  animation-name: idle-flyout-12 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--print
+  .ev-coin {
+  animation-name: idle-coin-25 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--print
+  .ev-ding {
+  animation-name: idle-ding-32 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--print
+  .ev-paper {
+  animation-name: idle-paper-35 !important;
+  animation-timing-function: linear !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--print
+  .ev-wifi {
+  animation-name: idle-wifi-12, idle-wifi-17 !important;
+}
+
+/* Copy scene */
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--copy
+  .ev-coin {
+  animation-name: idle-coin-2 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--copy
+  .ev-ding {
+  animation-name: idle-ding-9 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--copy
+  .ev-drop {
+  animation-name: idle-drop-10 !important;
+  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1) !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--copy
+  .ev-sweep {
+  animation-name: idle-sweep-20 !important;
+  animation-timing-function: linear !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--copy
+  .ev-paper {
+  animation-name: idle-paper-33 !important;
+  animation-timing-function: linear !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--copy
+  .ev-paper2 {
+  animation-name: idle-paper2-41 !important;
+  animation-timing-function: linear !important;
+}
+
+/* Scan scene */
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--scan
+  .ev-coin {
+  animation-name: idle-coin-2 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--scan
+  .ev-ding {
+  animation-name: idle-ding-9 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--scan
+  .ev-drop {
+  animation-name: idle-drop-10 !important;
+  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1) !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--scan
+  .ev-sweep {
+  animation-name: idle-sweep-20 !important;
+  animation-timing-function: linear !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--scan
+  .ev-fly-in {
+  animation-name: idle-flyin-33 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--scan
+  .ev-waiting {
+  animation-name: idle-waiting-44 !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--scan
+  .ev-received {
+  animation-name: idle-pop-44 !important;
+  animation-timing-function: cubic-bezier(0.3, 1.4, 0.4, 1) !important;
+}
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-scene--scan
+  .ev-wifi {
+  animation-name: idle-wifi-33, idle-wifi-38 !important;
+}
+
+/* Progress bar + method label animations */
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-tab-track i {
+  animation: idle-tab-progress-full var(--idle-cycle) linear infinite both !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-tab-label {
+  animation: idle-tab-label-color var(--idle-cycle) var(--d, 0s) linear infinite
+    both !important;
+}
+
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-live
+  .idle-tab-label::before {
+  animation: idle-tab-dot-active var(--idle-cycle) var(--d, 0s) linear infinite
+    both !important;
+}
+
+/* Overlay fade in/out — keep the existing overlay-level entrance intact */
+html[data-kiosk-static='true'] .idle-overlay.is-visible {
+  animation: idle-overlay-fade-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay.is-leaving {
+  animation: idle-overlay-fade-out 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+}
+
+/* Stage bob, CTA breathe, and blobs */
+html[data-kiosk-static='true'] .idle-overlay .idle-stage__inner {
+  animation: idle-stage-bob 6s ease-in-out infinite !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-cta {
+  animation: idle-cta-breathe 3.2s ease-in-out infinite !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-cta__pulse::before,
+html[data-kiosk-static='true'] .idle-overlay .idle-cta__pulse::after {
+  animation: idle-cta-ripple 2.4s ease-out infinite !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-cta__pulse::after {
+  animation-delay: 1.2s !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-blob--1 {
+  animation: idle-blob-drift-1 22s ease-in-out infinite alternate !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-blob--2 {
+  animation: idle-blob-drift-2 28s ease-in-out infinite alternate !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-blob--3 {
+  animation: idle-blob-drift-3 20s ease-in-out infinite alternate !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-ring {
+  animation: idle-ring-pulse 5s ease-in-out infinite !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-ring--2 {
+  animation-delay: 0.8s !important;
+}
+html[data-kiosk-static='true'] .idle-overlay .idle-ring--3 {
+  animation-delay: 1.6s !important;
+}
+
+html[data-kiosk-static='true'] .idle-overlay .idle-stage::before {
+  animation: idle-stage-glow 4.5s ease-in-out infinite !important;
 }

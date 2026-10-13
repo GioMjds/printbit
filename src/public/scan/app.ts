@@ -176,9 +176,34 @@ documentCareModal?.addEventListener('click', (event) => {
   if (event.target === documentCareModal)
     document.getElementById('documentCareClose')?.click();
 });
+
+const scanAdfModal = document.getElementById('scanAdfModal');
+const openScanAdfModal = () => {
+  const card = scanAdfModal?.querySelector('.adf-visual-modal__card');
+  if (card) card.scrollTop = 0;
+  scanAdfModal?.classList.add('is-open');
+  scanAdfModal?.setAttribute('aria-hidden', 'false');
+};
+const closeScanAdfModal = () => {
+  scanAdfModal?.classList.remove('is-open');
+  scanAdfModal?.setAttribute('aria-hidden', 'true');
+};
+document.getElementById('scanAdfModalOpenBtn')?.addEventListener('click', openScanAdfModal);
+document.getElementById('scanSeeStepsBtn')?.addEventListener('click', openScanAdfModal);
+document.getElementById('scanAdfModalCloseBtn')?.addEventListener('click', () => {
+  closeScanAdfModal();
+  scanRetryBtn?.click();
+});
+document.getElementById('scanAdfModalCloseIcon')?.addEventListener('click', closeScanAdfModal);
+scanAdfModal?.addEventListener('click', (event) => {
+  if (event.target === scanAdfModal) closeScanAdfModal();
+});
+
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape')
+  if (event.key === 'Escape') {
     document.getElementById('documentCareClose')?.click();
+    closeScanAdfModal();
+  }
 });
 
 const scanLoadingController =
@@ -438,6 +463,10 @@ function hideScanTroubleshooting(): void {
   if (errorSubtext) errorSubtext.textContent = '';
   scanKeepPrevBtn?.classList.add('hidden');
   replaceListItems(scanErrorNoticeChecks, []);
+  const visualGuideEl = document.getElementById('scanAdfVisualGuide');
+  if (visualGuideEl) visualGuideEl.style.display = 'none';
+  const seeStepsBtn = document.getElementById('scanSeeStepsBtn');
+  if (seeStepsBtn) seeStepsBtn.style.display = 'none';
 }
 
 function showScanTroubleshooting(
@@ -456,6 +485,19 @@ function showScanTroubleshooting(
   // button only exists when there is an earlier scan to go back to.
   replaceListItems(scanErrorNoticeChecks, guide.checks);
   scanKeepPrevBtn?.classList.toggle('hidden', !hasPreviousPreview);
+
+  const isAdf = source === 'feeder';
+  const shouldShowVisual = Boolean(guide.hasVisualGuide || isAdf);
+
+  const visualGuideEl = document.getElementById('scanAdfVisualGuide');
+  if (visualGuideEl) {
+    visualGuideEl.style.display = shouldShowVisual ? 'block' : 'none';
+  }
+
+  const seeStepsBtn = document.getElementById('scanSeeStepsBtn');
+  if (seeStepsBtn) {
+    seeStepsBtn.style.display = shouldShowVisual ? 'inline-flex' : 'none';
+  }
 
   return userFriendlyTitle;
 }
@@ -1021,26 +1063,40 @@ function setupScanSocket(): void {
     const errorMsg =
       payload && typeof payload === 'object' && 'error' in payload
         ? String((payload as { error: unknown }).error)
-        : 'ADF feeder error on printer.';
-    showScanTroubleshooting(errorMsg, true, 'feeder');
-    errorText.textContent = 'Printer ADF Error Detected';
-    showPreview('error', 'Printer ADF Error Detected');
+        : 'Printer ADF Error Detected';
+    const userFriendlyTitle = showScanTroubleshooting(
+      errorMsg,
+      Boolean(scannedPages.length),
+      'feeder',
+    );
+    errorText.textContent = userFriendlyTitle;
+    showPreview('error', 'Scan failed');
     setScanSourceRadiosDisabled(false);
     setScanFormatRadiosDisabled(false);
     scanBtn.disabled = false;
     scanBtn.setAttribute('aria-disabled', 'false');
+    rescanBtn.style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'none';
+    proceedBtn.style.display = 'none';
   });
 
   socket.on('printer:simulation-state', (payload: unknown) => {
     const p = payload as { activeError?: string | null } | null;
     if (p?.activeError === 'adf_error') {
-      showScanTroubleshooting('ADF feeder error on printer', true, 'feeder');
-      errorText.textContent = 'Printer ADF Error Detected';
-      showPreview('error', 'Printer ADF Error Detected');
+      const userFriendlyTitle = showScanTroubleshooting(
+        'Printer ADF Error Detected',
+        Boolean(scannedPages.length),
+        'feeder',
+      );
+      errorText.textContent = userFriendlyTitle;
+      showPreview('error', 'Scan failed');
       setScanSourceRadiosDisabled(false);
       setScanFormatRadiosDisabled(false);
       scanBtn.disabled = false;
       scanBtn.setAttribute('aria-disabled', 'false');
+      rescanBtn.style.display = 'none';
+      if (clearBtn) clearBtn.style.display = 'none';
+      proceedBtn.style.display = 'none';
     } else if (!p?.activeError) {
       hideScanTroubleshooting();
       showPreview('idle', 'Insert document into the feeder and press Scan');
@@ -1073,9 +1129,20 @@ async function initializeScanPage(): Promise<void> {
     .then((res) => (res.ok ? res.json() : null))
     .then((data: { activeError?: string | null } | null) => {
       if (data?.activeError === 'adf_error') {
-        showScanTroubleshooting('ADF feeder error on printer', true, 'feeder');
-        errorText.textContent = 'Printer ADF Error Detected';
-        showPreview('error', 'Printer ADF Error Detected');
+        const userFriendlyTitle = showScanTroubleshooting(
+          'Printer ADF Error Detected',
+          Boolean(scannedPages.length),
+          'feeder',
+        );
+        errorText.textContent = userFriendlyTitle;
+        showPreview('error', 'Scan failed');
+        setScanSourceRadiosDisabled(false);
+        setScanFormatRadiosDisabled(false);
+        scanBtn.disabled = false;
+        scanBtn.setAttribute('aria-disabled', 'false');
+        rescanBtn.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        proceedBtn.style.display = 'none';
       }
     })
     .catch(() => {});

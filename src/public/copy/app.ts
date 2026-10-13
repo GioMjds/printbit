@@ -146,9 +146,34 @@ documentCareModal?.addEventListener('click', (event) => {
   if (event.target === documentCareModal)
     document.getElementById('documentCareClose')?.click();
 });
+
+const copyAdfModal = document.getElementById('copyAdfModal');
+const openCopyAdfModal = () => {
+  const card = copyAdfModal?.querySelector('.adf-visual-modal__card');
+  if (card) card.scrollTop = 0;
+  copyAdfModal?.classList.add('is-open');
+  copyAdfModal?.setAttribute('aria-hidden', 'false');
+};
+const closeCopyAdfModal = () => {
+  copyAdfModal?.classList.remove('is-open');
+  copyAdfModal?.setAttribute('aria-hidden', 'true');
+};
+document.getElementById('copyAdfModalOpenBtn')?.addEventListener('click', openCopyAdfModal);
+document.getElementById('copySeeStepsBtn')?.addEventListener('click', openCopyAdfModal);
+document.getElementById('copyAdfModalCloseBtn')?.addEventListener('click', () => {
+  closeCopyAdfModal();
+  void checkForDocument();
+});
+document.getElementById('copyAdfModalCloseIcon')?.addEventListener('click', closeCopyAdfModal);
+copyAdfModal?.addEventListener('click', (event) => {
+  if (event.target === copyAdfModal) closeCopyAdfModal();
+});
+
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape')
+  if (event.key === 'Escape') {
     document.getElementById('documentCareClose')?.click();
+    closeCopyAdfModal();
+  }
 });
 
 type CopyPaperSize = 'A4' | 'Short' | 'Long';
@@ -178,7 +203,10 @@ function getSelectedCopySource(): 'feeder' | 'glass' {
   if (checked?.value === 'feeder' || checked?.value === 'adf') {
     return 'feeder';
   }
-  return 'glass';
+  if (checked?.value === 'glass' || checked?.value === 'flatbed') {
+    return 'glass';
+  }
+  return getSelectedCopyPaperSize() === 'Long' ? 'feeder' : 'glass';
 }
 
 function updateCopySourceInstructions(paperSize: CopyPaperSize): void {
@@ -413,23 +441,33 @@ function replaceListItems(
 
 function hideCopyTroubleshooting(): void {
   if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = 'none';
+  const visualGuideEl = document.getElementById('copyAdfVisualGuide');
+  if (visualGuideEl) visualGuideEl.style.display = 'none';
+  const seeStepsBtn = document.getElementById('copySeeStepsBtn');
+  if (seeStepsBtn) seeStepsBtn.style.display = 'none';
 }
 
 function showCopyTroubleshooting(rawMessage: string, usesAdf: boolean): string {
-  const isPaperJam = isAdfPaperJam(rawMessage, usesAdf);
-  const paperJamGuide = getCopyTroubleshootingGuide(rawMessage, usesAdf);
+  const guide = getCopyTroubleshootingGuide(rawMessage, usesAdf);
   const safeMessage = sanitizeUserFacingError(rawMessage);
-  const cause = classifyCopyFailure(rawMessage);
-  const guide = isPaperJam
-    ? paperJamGuide
-    : usesAdf && cause === 'no_document'
-      ? ADF_NO_DOCUMENT_GUIDE
-      : COPY_FAILURE_GUIDES[cause];
-  const userFacingMessage = isPaperJam ? paperJamGuide.summary : safeMessage;
+  const userFacingMessage = guide.summary || safeMessage;
 
   replaceListItems(copyTroubleshootCauses, guide.causes);
   replaceListItems(copyTroubleshootSteps, guide.steps);
   if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = '';
+
+  const shouldShowVisual = Boolean(guide.hasVisualGuide || usesAdf);
+
+  const visualGuideEl = document.getElementById('copyAdfVisualGuide');
+  if (visualGuideEl) {
+    visualGuideEl.style.display = shouldShowVisual ? 'block' : 'none';
+  }
+
+  const seeStepsBtn = document.getElementById('copySeeStepsBtn');
+  if (seeStepsBtn) {
+    seeStepsBtn.style.display = shouldShowVisual ? 'inline-flex' : 'none';
+  }
+
   return userFacingMessage;
 }
 
