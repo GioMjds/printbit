@@ -1,8 +1,21 @@
 import {
-  PRINTER_ERROR_CATALOG,
-  type PrinterErrorCode,
+  getPrinterErrorDefinition,
 } from '@/shared/printer-error-catalog';
 import type { ActivePrinterErrorState } from '@/services/printer-error-state';
+
+function escapeHtml(str: string): string {
+  return str.replace(
+    /[&<>"']/g,
+    (m) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[m] || m,
+  );
+}
 
 export interface ErrorGuideModalOptions {
   container: HTMLElement;
@@ -19,6 +32,7 @@ export class PrinterErrorGuideModalController {
     this.overlay.className = 'printer-error-guide-overlay';
     this.overlay.setAttribute('role', 'alertdialog');
     this.overlay.setAttribute('aria-modal', 'true');
+    this.overlay.setAttribute('aria-labelledby', 'printer-error-guide-title');
     this.overlay.setAttribute('hidden', '');
 
     this.card = document.createElement('div');
@@ -30,9 +44,7 @@ export class PrinterErrorGuideModalController {
 
   public render(errorState: ActivePrinterErrorState): void {
     const lang = this.options.getLanguage ? this.options.getLanguage() : 'en';
-    const def =
-      PRINTER_ERROR_CATALOG[errorState.code as PrinterErrorCode] ??
-      PRINTER_ERROR_CATALOG.E_UNKNOWN;
+    const def = getPrinterErrorDefinition(errorState.code);
 
     const titleText = def.title[lang];
     const whatText = def.what[lang];
@@ -47,7 +59,7 @@ export class PrinterErrorGuideModalController {
       const normalizedAction = actionText.toLowerCase();
       const normalizedScreenNote = screenNote.toLowerCase().replace('.', '');
       if (!normalizedAction.includes(normalizedScreenNote)) {
-        screenPrompt = `<p class="printer-error-guide-screen">${screenNote}</p>`;
+        screenPrompt = `<p class="printer-error-guide-screen">${escapeHtml(screenNote)}</p>`;
       }
     }
 
@@ -57,7 +69,7 @@ export class PrinterErrorGuideModalController {
         : 'Do not press Cancel on the printer.';
 
     const jobBadge = errorState.jobId
-      ? `<span class="printer-error-guide-badge printer-error-guide-badge--ref">${errorState.jobId}</span>`
+      ? `<span class="printer-error-guide-badge printer-error-guide-badge--ref">${escapeHtml(errorState.jobId)}</span>`
       : '';
 
     this.card.innerHTML = `
@@ -67,19 +79,19 @@ export class PrinterErrorGuideModalController {
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h2 class="printer-error-guide-title">${titleText}</h2>
+        <h2 id="printer-error-guide-title" class="printer-error-guide-title">${escapeHtml(titleText)}</h2>
       </div>
 
       <div class="printer-error-guide-body">
-        <p class="printer-error-guide-what">${whatText}</p>
-        <p class="printer-error-guide-action">${actionText}</p>
+        <p class="printer-error-guide-what">${escapeHtml(whatText)}</p>
+        <p class="printer-error-guide-action">${escapeHtml(actionText)}</p>
         ${screenPrompt}
       </div>
 
       <div class="printer-error-guide-footer">
-        <p class="printer-error-guide-warning">${cancelWarning}</p>
+        <p class="printer-error-guide-warning">${escapeHtml(cancelWarning)}</p>
         <div class="printer-error-guide-tags">
-          <span class="printer-error-guide-badge printer-error-guide-badge--code">${errorState.code}</span>
+          <span class="printer-error-guide-badge printer-error-guide-badge--code">${escapeHtml(errorState.code)}</span>
           ${jobBadge}
         </div>
       </div>

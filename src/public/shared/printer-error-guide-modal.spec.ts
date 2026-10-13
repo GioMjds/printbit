@@ -21,6 +21,36 @@ describe('PrinterErrorGuideModalController', () => {
     container.remove();
   });
 
+  it('initializes in hidden state', () => {
+    expect(controller.isVisible()).toBe(false);
+    const overlay = container.querySelector('.printer-error-guide-overlay');
+    expect(overlay?.hasAttribute('hidden')).toBe(true);
+    expect(overlay?.getAttribute('role')).toBe('alertdialog');
+    expect(overlay?.getAttribute('aria-labelledby')).toBe(
+      'printer-error-guide-title',
+    );
+  });
+
+  it('escapes dynamic markup to prevent XSS injection', () => {
+    controller.render({
+      code: '<script>alert(1)</script>' as unknown as import('@/shared/printer-error-catalog').PrinterErrorCode,
+      tier: 'Customer',
+      autoClear: true,
+      locksCoinSlot: true,
+      lookAtPrinterScreen: false,
+      jobId: 'PB-<xss>',
+      jobRequiresStaff: false,
+      firstSeenAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString(),
+      occurrences: 1,
+      status: 'active',
+    });
+
+    expect(container.querySelector('script')).toBeNull();
+    expect(container.innerHTML).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(container.innerHTML).toContain('PB-&lt;xss&gt;');
+  });
+
   it('renders required 3-part message and fixed footer without any buttons', () => {
     const errorState: ActivePrinterErrorState = {
       code: 'E_COVER_OPEN',
