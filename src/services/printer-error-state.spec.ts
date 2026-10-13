@@ -101,4 +101,72 @@ describe('PrinterErrorStateManager', () => {
     expect(manager.isKioskOutOfService()).toBe(false);
     expect(manager.getActiveError()).toBeNull();
   });
+
+  it('does not increase repeat occurrences or lockout on continuous polls of same active error', () => {
+    for (let i = 0; i < 10; i++) {
+      const state = manager.recordError('E_COVER_OPEN');
+      expect(state.occurrences).toBe(1);
+      expect(state.status).toBe('active');
+    }
+    expect(manager.isKioskOutOfService()).toBe(false);
+  });
+
+  it('expires faults older than repeatWindowMs so they do not cause lockout', () => {
+    jest.useFakeTimers();
+    try {
+      manager.recordError('E_COVER_OPEN');
+      manager.recordHealthyPoll();
+      manager.recordHealthyPoll(); // cleared
+
+      jest.advanceTimersByTime(10_000);
+      manager.recordError('E_COVER_OPEN');
+      manager.recordHealthyPoll();
+      manager.recordHealthyPoll(); // cleared
+
+      // Advance past 5-minute repeat window for all prior errors
+      jest.advanceTimersByTime(350_000);
+
+      // 3rd error: older occurrences have expired
+      const state = manager.recordError('E_COVER_OPEN');
+      expect(state.occurrences).toBe(1);
+      expect(state.status).toBe('active');
+      expect(manager.isKioskOutOfService()).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('preserves out_of_service lockout if another error code arrives', () => {
+    manager.recordError('E_COVER_OPEN');
+    manager.recordHealthyPoll();
+    manager.recordHealthyPoll();
+    manager.recordError('E_COVER_OPEN');
+    manager.recordHealthyPoll();
+    manager.recordHealthyPoll();
+    manager.recordError('E_COVER_OPEN');
+    expect(manager.isKioskOutOfService()).toBe(true);
+
+    const newState = manager.recordError('E_NO_PAPER');
+    expect(newState.status).toBe('out_of_service');
+    expect(manager.isKioskOutOfService()).toBe(true);
+  });
+
+  it('resets firstSeenAt when error code changes', () => {
+    jest.useFakeTimers();
+    try {
+      const err1 = manager.recordError('E_COVER_OPEN');
+      const firstSeen1 = err1.firstSeenAt;
+
+      jest.advanceTimersByTime(5_000);
+      const sameErr = manager.recordError('E_COVER_OPEN');
+      expect(sameErr.firstSeenAt).toBe(firstSeen1);
+
+      jest.advanceTimersByTime(5_000);
+      const diffErr = manager.recordError('E_NO_PAPER');
+      expect(diffErr.firstSeenAt).not.toBe(firstSeen1);
+      expect(diffErr.firstSeenAt).toBe(new Date(Date.now()).toISOString());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

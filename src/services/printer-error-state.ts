@@ -50,13 +50,18 @@ export class PrinterErrorStateManager {
     const timestamps = (this.repeatHistory.get(code) ?? []).filter(
       (ts) => now - ts <= this.repeatWindowMs,
     );
-    timestamps.push(now);
-    this.repeatHistory.set(code, timestamps);
+    const isSameActiveFault = Boolean(
+      this.active && this.active.code === code && this.active.status !== 'cleared',
+    );
+    if (!isSameActiveFault) {
+      timestamps.push(now);
+      this.repeatHistory.set(code, timestamps);
+    }
 
     const occurrences = timestamps.length;
     let status: ActivePrinterErrorState['status'] = 'active';
 
-    if (occurrences > this.maxRepeatsBeforeLockout) {
+    if (this.outOfService || occurrences > this.maxRepeatsBeforeLockout) {
       status = 'out_of_service';
       this.outOfService = true;
     }
@@ -69,7 +74,7 @@ export class PrinterErrorStateManager {
       lookAtPrinterScreen: def.lookAtPrinterScreen,
       jobId: jobId ?? this.active?.jobId ?? null,
       jobRequiresStaff: Boolean(jobId ?? this.active?.jobId),
-      firstSeenAt: this.active?.firstSeenAt ?? nowIso,
+      firstSeenAt: (this.active?.code === code ? this.active.firstSeenAt : null) ?? nowIso,
       lastSeenAt: nowIso,
       occurrences,
       status,
