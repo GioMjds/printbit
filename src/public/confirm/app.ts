@@ -2787,6 +2787,7 @@ function handleErrorGuideUpdate(
 ): void {
   if (activeError) {
     const isMidJob =
+      isJobInterruptedState ||
       hasActiveJob() ||
       Boolean(activeError.jobRequiresStaff) ||
       Boolean(activeError.jobId);
@@ -2824,6 +2825,8 @@ function handleErrorGuideUpdate(
       });
     } else {
       confirmErrorGuideModal.render(activeError);
+      applyConfirmGate();
+      syncPaymentLeaseState();
     }
   } else {
     confirmErrorGuideModal.clear();
@@ -2841,6 +2844,9 @@ function handleErrorGuideUpdate(
         spoolerCorrelationKey:
           paymentSpoolerCorrelationKey ?? activeSpoolerCorrelationKey,
       });
+    } else {
+      applyConfirmGate();
+      syncPaymentLeaseState();
     }
   }
 }

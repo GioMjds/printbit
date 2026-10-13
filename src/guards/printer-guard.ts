@@ -105,6 +105,8 @@ function applyState(
 ): void {
   const overlay = getOverlay();
   const idle = getIdleScreen();
+  const modalVisible = _errorGuideModal ? _errorGuideModal.isVisible() : false;
+  const effectiveBlocked = blocked || modalVisible;
 
   // Toggle overlay visibility
   if (overlay) {
@@ -123,18 +125,22 @@ function applyState(
 
   // Hide/show the normal kiosk idle content
   if (idle) {
-    idle.style.display = blocked ? 'none' : '';
+    idle.style.display = effectiveBlocked ? 'none' : '';
   }
 
   // Signal the coin acceptor controller — it listens for this event
   // and enables/disables coin acceptance independently of this module.
   window.dispatchEvent(
     new CustomEvent('printer:block', {
-      detail: { blocked, status, printerName: printerName ?? null },
+      detail: {
+        blocked: effectiveBlocked,
+        status,
+        printerName: printerName ?? null,
+      },
     }),
   );
 
-  console.log(`[printer-guard] blocked=${blocked} status="${status}"`);
+  console.log(`[printer-guard] blocked=${effectiveBlocked} status="${status}"`);
 }
 
 // ── Initial REST checks ───────────────────────────────────────────────────────
@@ -174,6 +180,7 @@ async function checkActiveErrorOnLoad(): Promise<void> {
     const data = (await res.json()) as ActiveErrorResponse;
     if (data.activeError) {
       _errorGuideModal?.render(data.activeError);
+      applyState(true, data.activeError.code);
     } else {
       _errorGuideModal?.clear();
     }
@@ -206,8 +213,12 @@ function onErrorGuideUpdate(raw: unknown): void {
   const activeError = payload?.activeError;
   if (activeError) {
     _errorGuideModal?.render(activeError);
+    applyState(true, activeError.code);
   } else {
     _errorGuideModal?.clear();
+    const overlay = getOverlay();
+    const stillBlocked = overlay ? overlay.style.display === 'flex' : false;
+    applyState(stillBlocked, stillBlocked ? 'Blocked' : 'Ready');
   }
 }
 
