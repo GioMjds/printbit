@@ -4,6 +4,12 @@ export interface CopyTroubleshootingGuide {
   causes: string[];
   steps: string[];
   hasVisualGuide?: boolean;
+  /**
+   * Which visual guide modal the "See Steps" button should open.
+   * - 'adf'           → existing ADF paper-jam modal
+   * - 'printer_panel' → printer LED/button modal
+   */
+  visualGuideKind?: 'adf' | 'printer_panel';
 }
 
 export const ADF_PAPER_JAM_GUIDE = {
@@ -24,6 +30,7 @@ export const ADF_PAPER_JAM_GUIDE = {
     'Close the ADF input tray and ADF cover firmly, then tap Retry.',
   ],
   hasVisualGuide: true,
+  visualGuideKind: 'adf',
 } satisfies CopyTroubleshootingGuide;
 
 export const ADF_ERROR_GUIDE = {
@@ -43,6 +50,29 @@ export const ADF_ERROR_GUIDE = {
     'Reload flat paper straight into the feeder, then tap Retry.',
   ],
   hasVisualGuide: true,
+  visualGuideKind: 'adf',
+} satisfies CopyTroubleshootingGuide;
+
+export const ADF_PRINTER_PANEL_GUIDE = {
+  title: 'Clear the Printer Error First',
+  summary:
+    'The printer is showing an error on its own screen/LED. Lift the cover, then clear the error on the printer before retrying here.',
+  causes: [
+    "The printer's control panel or LED is showing an error (jam, cover open, or ADF error).",
+    'Long Bond paper fed through the ADF triggered a printer-side error that must be acknowledged on the printer itself.',
+    'The printer is paused and waiting for a button press on its own panel before it will accept the next job.',
+    'The printer cover above the tablet is still closed, hiding the printer screen and buttons.',
+  ],
+  steps: [
+    'Lift the printer cover above the tablet to expose the printer screen and buttons.',
+    "Look at the printer's control panel — note which LED or error icon is lit or blinking.",
+    "Press the printer's paper/stop button (or the OK/start button) on the printer to acknowledge and clear the error.",
+    'If the printer screen shows a jam, open the ADF cover, gently remove the jammed page, then close the cover firmly.',
+    "Wait until the printer's LED returns to a steady ready state (no red or blinking error).",
+    'Return to this kiosk screen and tap Retry.',
+  ],
+  hasVisualGuide: true,
+  visualGuideKind: 'printer_panel',
 } satisfies CopyTroubleshootingGuide;
 
 export const ADF_NO_DOCUMENT_GUIDE = {
@@ -54,10 +84,12 @@ export const ADF_NO_DOCUMENT_GUIDE = {
     'Paper was not pushed in far enough for the feeder rollers to detect it.',
   ],
   steps: [
-    'Place your Long Bond paper face-up in the top ADF feeder tray, short edge first.',
-    'Slide it in until the feeder grips the page.',
-    'Adjust the side edge guides snugly against both edges of the paper.',
-    'Tap Check Document again.',
+    'Lift the printer cover above the tablet to expose the printer screen and buttons.',
+    "Look at the printer's control panel — note which LED or error icon is lit or blinking.",
+    "Press the printer's paper/stop button (or the OK/start button) on the printer to acknowledge and clear the error.",
+    'If the printer screen shows a jam, open the ADF cover, gently remove the jammed page, then close the cover firmly.',
+    "Wait until the printer's LED returns to a steady ready state (no red or blinking error).",
+    'Return to this kiosk screen and tap Retry.',
   ],
 } satisfies CopyTroubleshootingGuide;
 
@@ -214,6 +246,25 @@ export function getCopyTroubleshootingGuide(
   const message = rawMessage.toLowerCase();
 
   if (usesAdf) {
+    // ── Printer-panel / LED error (Long Bond / ADF) ─────────────
+    if (
+      message.includes('led') ||
+      message.includes('light') ||
+      message.includes('blinking') ||
+      message.includes('blink') ||
+      message.includes('control panel') ||
+      message.includes('printer panel') ||
+      message.includes('printer screen') ||
+      message.includes('printer display') ||
+      message.includes('printer button') ||
+      message.includes('printer error') ||
+      message.includes('error light') ||
+      message.includes('acknowledge') ||
+      message.includes('press the')
+    ) {
+      return ADF_PRINTER_PANEL_GUIDE;
+    }
+
     if (
       message.includes('jam') ||
       message.includes('stuck') ||

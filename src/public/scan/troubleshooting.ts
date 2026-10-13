@@ -44,7 +44,8 @@ const GUIDES = {
   },
   empty_feeder: {
     title: 'No document detected in the feeder',
-    summary: 'Load your document face-up straight into the top ADF tray, then try again.',
+    summary:
+      'Load your document face-up straight into the top ADF tray, then try again.',
     checks: [
       'Remove the paper and check that all edges are lined up.',
       'Insert the document face-up into the top ADF tray, short edge first.',
@@ -82,14 +83,19 @@ const GUIDES = {
     title: 'Let’s try that again',
     summary: 'Put the paper in straight, then try the scan again.',
     checks: [
-      'Take the paper out of the top ADF tray.',
-      'Check that it is flat, unfolded, and straight.',
-      'Load it face-up again until gripped, then try again.',
+      'Lift the printer cover above the tablet to expose the printer screen and buttons.',
+      "Look at the printer's control panel — note which LED or error icon is lit or blinking.",
+      "Press the printer's paper/stop button (or the OK/start button) on the printer to acknowledge and clear the error.",
+      'If the printer screen shows a jam, open the ADF cover, gently remove the jammed page, then close the cover firmly.',
+      "Wait until the printer's LED returns to a steady ready state (no red or blinking error).",
+      'Return to this kiosk screen and tap Try again.',
     ],
   },
 } satisfies Record<ScanFailureCause, ScanTroubleshootingGuide>;
 
-const GLASS_GUIDES: Partial<Record<ScanFailureCause, ScanTroubleshootingGuide>> = {
+const GLASS_GUIDES: Partial<
+  Record<ScanFailureCause, ScanTroubleshootingGuide>
+> = {
   adf_error: {
     title: 'Printer ADF Error Detected',
     summary:
@@ -131,9 +137,12 @@ const GLASS_GUIDES: Partial<Record<ScanFailureCause, ScanTroubleshootingGuide>> 
     title: 'Let’s try that again',
     summary: 'Check your document on the scanner glass, then try again.',
     checks: [
-      'Place the document face-down flat on the glass.',
-      'Make sure the scanner lid is closed.',
-      'Tap Scan to try again.',
+      'Lift the printer cover above the tablet to expose the printer screen and buttons.',
+      "Look at the printer's control panel — note which LED or error icon is lit or blinking.",
+      "Press the printer's paper/stop button (or the OK/start button) on the printer to acknowledge and clear the error.",
+      'If the printer screen shows a jam, open the ADF cover, gently remove the jammed page, then close the cover firmly.',
+      "Wait until the printer's LED returns to a steady ready state (no red or blinking error).",
+      'Return to this kiosk screen and tap Try again.',
     ],
   },
 };

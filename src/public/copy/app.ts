@@ -147,6 +147,9 @@ documentCareModal?.addEventListener('click', (event) => {
     document.getElementById('documentCareClose')?.click();
 });
 
+// Which visual guide modal the "See Steps" button should open.
+let currentVisualGuideKind: 'adf' | 'printer_panel' | null = null;
+
 const copyAdfModal = document.getElementById('copyAdfModal');
 const openCopyAdfModal = () => {
   const card = copyAdfModal?.querySelector('.adf-visual-modal__card');
@@ -158,21 +161,61 @@ const closeCopyAdfModal = () => {
   copyAdfModal?.classList.remove('is-open');
   copyAdfModal?.setAttribute('aria-hidden', 'true');
 };
-document.getElementById('copyAdfModalOpenBtn')?.addEventListener('click', openCopyAdfModal);
-document.getElementById('copySeeStepsBtn')?.addEventListener('click', openCopyAdfModal);
-document.getElementById('copyAdfModalCloseBtn')?.addEventListener('click', () => {
-  closeCopyAdfModal();
-  void checkForDocument();
-});
-document.getElementById('copyAdfModalCloseIcon')?.addEventListener('click', closeCopyAdfModal);
+document
+  .getElementById('copyAdfModalOpenBtn')
+  ?.addEventListener('click', openCopyAdfModal);
+document
+  .getElementById('copyAdfModalCloseBtn')
+  ?.addEventListener('click', () => {
+    closeCopyAdfModal();
+    void checkForDocument();
+  });
+document
+  .getElementById('copyAdfModalCloseIcon')
+  ?.addEventListener('click', closeCopyAdfModal);
 copyAdfModal?.addEventListener('click', (event) => {
   if (event.target === copyAdfModal) closeCopyAdfModal();
+});
+
+// ── Printer LED / panel modal (Long Bond / ADF printer errors) ──
+const copyPrinterPanelModal = document.getElementById('copyPrinterPanelModal');
+const openCopyPrinterPanelModal = () => {
+  const card = copyPrinterPanelModal?.querySelector('.adf-visual-modal__card');
+  if (card) card.scrollTop = 0;
+  copyPrinterPanelModal?.classList.add('is-open');
+  copyPrinterPanelModal?.setAttribute('aria-hidden', 'false');
+};
+const closeCopyPrinterPanelModal = () => {
+  copyPrinterPanelModal?.classList.remove('is-open');
+  copyPrinterPanelModal?.setAttribute('aria-hidden', 'true');
+};
+document
+  .getElementById('copyPrinterPanelCloseBtn')
+  ?.addEventListener('click', () => {
+    closeCopyPrinterPanelModal();
+    void checkForDocument();
+  });
+document
+  .getElementById('copyPrinterPanelCloseIcon')
+  ?.addEventListener('click', closeCopyPrinterPanelModal);
+copyPrinterPanelModal?.addEventListener('click', (event) => {
+  if (event.target === copyPrinterPanelModal) closeCopyPrinterPanelModal();
+});
+
+// "See Steps" opens the correct visual guide based on the current guide kind.
+document.getElementById('copySeeStepsBtn')?.addEventListener('click', () => {
+  if (currentVisualGuideKind === 'printer_panel') {
+    openCopyPrinterPanelModal();
+  } else {
+    openCopyAdfModal();
+  }
 });
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     document.getElementById('documentCareClose')?.click();
     closeCopyAdfModal();
+    closeCopyPrinterPanelModal();
   }
 });
 
@@ -445,6 +488,7 @@ function hideCopyTroubleshooting(): void {
   if (visualGuideEl) visualGuideEl.style.display = 'none';
   const seeStepsBtn = document.getElementById('copySeeStepsBtn');
   if (seeStepsBtn) seeStepsBtn.style.display = 'none';
+  currentVisualGuideKind = null;
 }
 
 function showCopyTroubleshooting(rawMessage: string, usesAdf: boolean): string {
@@ -456,6 +500,9 @@ function showCopyTroubleshooting(rawMessage: string, usesAdf: boolean): string {
   replaceListItems(copyTroubleshootSteps, guide.steps);
   if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = '';
 
+  // Remember which visual guide (if any) matches this failure.
+  currentVisualGuideKind = guide.visualGuideKind ?? (usesAdf ? 'adf' : null);
+
   const shouldShowVisual = Boolean(guide.hasVisualGuide || usesAdf);
 
   const visualGuideEl = document.getElementById('copyAdfVisualGuide');
@@ -466,6 +513,12 @@ function showCopyTroubleshooting(rawMessage: string, usesAdf: boolean): string {
   const seeStepsBtn = document.getElementById('copySeeStepsBtn');
   if (seeStepsBtn) {
     seeStepsBtn.style.display = shouldShowVisual ? 'inline-flex' : 'none';
+    seeStepsBtn.setAttribute(
+      'aria-controls',
+      currentVisualGuideKind === 'printer_panel'
+        ? 'copyPrinterPanelModal'
+        : 'copyAdfModal',
+    );
   }
 
   return userFacingMessage;
