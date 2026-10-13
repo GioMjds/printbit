@@ -185,6 +185,32 @@ describe('printer-guard', () => {
     expect(document.querySelector('.printer-error-guide-title')?.textContent).toContain('Ink Tank Empty');
   });
 
+  it('filters out excluded errors when excludeErrors option is provided', async () => {
+    await initPrinterGuard(mockSocket, {
+      mode: 'kiosk_wide_only',
+      excludeErrors: ['E_INK_OUT'],
+    });
+    const overlay = document.querySelector('.printer-error-guide-overlay');
+    expect(overlay?.hasAttribute('hidden')).toBe(true);
+
+    socketHandlers['printer:error-guide-update']({
+      activeError: {
+        code: 'E_INK_OUT',
+        tier: 'Staff',
+        autoClear: false,
+        locksCoinSlot: true,
+        lookAtPrinterScreen: false,
+        jobId: null,
+        jobRequiresStaff: false,
+        firstSeenAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+        occurrences: 1,
+        status: 'active',
+      },
+    });
+    expect(overlay?.hasAttribute('hidden')).toBe(true);
+  });
+
   it('cleans up socket listeners and removes modal on destroyPrinterGuard', async () => {
     await initPrinterGuard(mockSocket);
     expect(mockSocket.on).toHaveBeenCalledWith('printer:error-guide-update', expect.any(Function));

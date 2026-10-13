@@ -73,6 +73,55 @@
           </div>
         </div>
 
+        <!-- Customer Ink Out Notice (Prominent notification banner when ink is empty) -->
+        <div
+          id="noInkCustomerNotice"
+          class="no-ink-notice hidden"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div class="no-ink-notice__icon-wrap" aria-hidden="true">
+            <svg
+              class="no-ink-notice__icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            </svg>
+          </div>
+          <div class="no-ink-notice__content">
+            <div class="no-ink-notice__badge">
+              <span class="no-ink-notice__dot"></span>
+              <span id="noInkNoticeBadgeText">PRINT &amp; COPY DISABLED</span>
+            </div>
+            <h3 class="no-ink-notice__title" id="noInkNoticeTitle">
+              Printer Out of Ink
+            </h3>
+            <p class="no-ink-notice__desc" id="noInkNoticeDesc">
+              The printer has run out of ink. Print and Copy methods are temporarily unavailable until ink is refilled. Scanning is still fully available.
+            </p>
+          </div>
+          <div class="no-ink-notice__action">
+            <button
+              type="button"
+              class="no-ink-notice__btn"
+              id="noInkNoticeScanBtn"
+              aria-label="Use Scan Service"
+            >
+              <span id="noInkNoticeBtnText">Use Scan Service</span>
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <p class="action-hint">Then select a print method</p>
 
         <div class="action-grid">
@@ -103,6 +152,7 @@
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
               <span class="action-card__pill-label">How to print</span>
             </span>
+            <span class="action-card__disabled-pill hidden" id="printDisabledPill" aria-hidden="true">Unavailable &bull; No Ink</span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
@@ -175,6 +225,7 @@
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
               <span class="action-card__pill-label">How to copy</span>
             </span>
+            <span class="action-card__disabled-pill hidden" id="copyDisabledPill" aria-hidden="true">Unavailable &bull; No Ink</span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
@@ -261,6 +312,7 @@
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
               <span class="action-card__pill-label">How to scan</span>
             </span>
+            <span class="action-card__available-pill hidden" id="scanAvailablePill" aria-hidden="true">Available</span>
             <div class="action-card__glow"></div>
             <div
               class="action-card__icon-wrap lottie-loading"
