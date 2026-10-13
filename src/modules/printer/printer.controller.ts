@@ -1,11 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { PrinterService } from './printer.service';
-import { printerErrorStateManager } from '@/services/printer-error-state';
 
 export class PrinterController {
   public readonly router: Router;
 
-  constructor(private readonly printerService?: PrinterService) {
+  constructor(private readonly printerService: PrinterService) {
     this.router = Router();
     this.initializeRoutes();
   }
@@ -20,18 +19,14 @@ export class PrinterController {
   }
 
   public getActiveError = (_req: Request, res: Response): void => {
-    const activeError = printerErrorStateManager.getActiveError();
-    res.json({
-      activeError,
-      outOfService: printerErrorStateManager.isKioskOutOfService(),
-    });
+    try {
+      res.json(this.printerService.getActiveError());
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
   };
 
   private getStatus = async (_req: Request, res: Response): Promise<void> => {
-    if (!this.printerService) {
-      res.status(500).json({ error: 'PrinterService not available' });
-      return;
-    }
     const response = await this.printerService.getStatusResponse();
     res.set('Cache-Control', 'no-store');
     res.json(response);
@@ -42,10 +37,6 @@ export class PrinterController {
    * and returns a structured printError if a blocking condition is detected.
    */
   private preflight = async (req: Request, res: Response): Promise<void> => {
-    if (!this.printerService) {
-      res.status(500).json({ error: 'PrinterService not available' });
-      return;
-    }
     try {
       const { printerName } = req.body ?? {};
       if (printerName !== undefined && printerName !== null) {
@@ -78,10 +69,6 @@ export class PrinterController {
   };
 
   private pauseJob = async (req: Request, res: Response): Promise<void> => {
-    if (!this.printerService) {
-      res.status(500).json({ error: 'PrinterService not available' });
-      return;
-    }
     try {
       const { spoolerCorrelationKey } = req.body ?? {};
       if (!isValidCorrelationKey(spoolerCorrelationKey)) {
@@ -97,10 +84,6 @@ export class PrinterController {
   };
 
   private resumeJob = async (req: Request, res: Response): Promise<void> => {
-    if (!this.printerService) {
-      res.status(500).json({ error: 'PrinterService not available' });
-      return;
-    }
     try {
       const { spoolerCorrelationKey } = req.body ?? {};
       if (!isValidCorrelationKey(spoolerCorrelationKey)) {
@@ -116,10 +99,6 @@ export class PrinterController {
   };
 
   private cancelRemainingJob = async (req: Request, res: Response): Promise<void> => {
-    if (!this.printerService) {
-      res.status(500).json({ error: 'PrinterService not available' });
-      return;
-    }
     try {
       const { spoolerCorrelationKey } = req.body ?? {};
       if (!isValidCorrelationKey(spoolerCorrelationKey)) {
@@ -138,5 +117,3 @@ export class PrinterController {
 function isValidCorrelationKey(key: string): key is string {
   return typeof key === 'string' && key.length <= 255 && /^[a-zA-Z0-9-_]+$/.test(key);
 }
-
-export const printerController = new PrinterController();

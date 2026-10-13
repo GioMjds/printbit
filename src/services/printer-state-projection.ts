@@ -5,6 +5,7 @@ import { printerErrorStateManager } from './printer-error-state';
 import {
   lockCoinSlot,
   unlockOwnedCoinSlot as unlockCoinSlot,
+  isCoinSlotLockedBy,
 } from './hardware-state-projection';
 import { anomalyService } from './anomaly';
 import { translateHardwarePrinterError } from './printer-error-translation';
@@ -20,15 +21,23 @@ export function setPrinterGuideSocketIo(io: SocketIoEmitter | null): void {
 export function handlePrinterStatusUpdate(
   statusText: string,
   errorCode?: string | null,
+  jobId?: string | null,
 ): void {
   const normalized = (statusText ?? '').trim().toLowerCase();
   const isHealthy = normalized === 'ready' || normalized === 'healthy';
 
   if (isHealthy) {
-    const { cleared } = printerErrorStateManager.recordHealthyPoll();
-    if (cleared) {
-      unlockCoinSlot('printer-error-guide');
-      printerGuideSocketIo?.emit('printer:error-guide-update', { activeError: null });
+    const { cleared, state } = printerErrorStateManager.recordHealthyPoll();
+    const active = printerErrorStateManager.getActiveError();
+    if (cleared || (isCoinSlotLockedBy('printer-error-guide') && !active)) {
+      if (state?.jobRequiresStaff) {
+        printerGuideSocketIo?.emit('printer:error-guide-update', {
+          activeError: { ...state, status: 'interrupted' },
+        });
+      } else {
+        unlockCoinSlot('printer-error-guide');
+        printerGuideSocketIo?.emit('printer:error-guide-update', { activeError: null });
+      }
     }
   } else {
     const translated = translateHardwarePrinterError({
@@ -40,13 +49,19 @@ export function handlePrinterStatusUpdate(
       return;
     }
 
-    const activeError = printerErrorStateManager.recordError(translated.code);
+    const prev = printerErrorStateManager.getActiveError();
+    const isNewFault =
+      !prev || prev.code !== translated.code || prev.status !== 'active';
+    const activeError = printerErrorStateManager.recordError(translated.code, jobId);
 
-    if (translated.locksCoinSlot) {
+    if (translated.locksCoinSlot && !isCoinSlotLockedBy('printer-error-guide')) {
       lockCoinSlot('printer-error-guide', 'printer_error_' + translated.code);
     }
 
-    if (activeError.tier === 'Staff' || activeError.tier === 'Technician') {
+    if (
+      isNewFault &&
+      (activeError.tier === 'Staff' || activeError.tier === 'Technician')
+    ) {
       void anomalyService.report({
         type: `printer_error_${activeError.code.toLowerCase()}`,
         source: 'printer-guide',
@@ -59,8 +74,10 @@ export function handlePrinterStatusUpdate(
           tier: activeError.tier,
           occurrences: activeError.occurrences,
           status: activeError.status,
+          jobId: activeError.jobId,
         },
       });
+      printerGuideSocketIo?.emit('printer:staff-alert', { activeError });
     }
 
     printerGuideSocketIo?.emit('printer:error-guide-update', { activeError });
@@ -115,7 +132,11 @@ export class PrinterStateProjection extends EventEmitter {
             lastCheckedAt: timestamp,
             error: evt.errorMessage ?? evt.message ?? 'Printer is offline',
           };
-          handlePrinterStatusUpdate(this.state.error ?? 'offline', evt.errorCode);
+          handlePrinterStatusUpdate(
+            this.state.error ?? 'offline',
+            evt.errorCode,
+            evt.transactionId,
+          );
           break;
         }
         this.state = {
@@ -136,7 +157,11 @@ export class PrinterStateProjection extends EventEmitter {
           lastCheckedAt: timestamp,
           error: evt.errorMessage ?? evt.message ?? 'Printer is offline',
         };
-        handlePrinterStatusUpdate(this.state.error ?? 'offline', evt.errorCode);
+        handlePrinterStatusUpdate(
+          this.state.error ?? 'offline',
+          evt.errorCode,
+          evt.transactionId,
+        );
         break;
 
       case 'PrinterError':
@@ -150,6 +175,7 @@ export class PrinterStateProjection extends EventEmitter {
         handlePrinterStatusUpdate(
           evt.errorMessage ?? evt.message ?? 'Printer hardware error',
           evt.errorCode,
+          evt.transactionId,
         );
         break;
 
