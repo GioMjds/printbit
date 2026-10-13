@@ -1,0 +1,97 @@
+.printer-error-guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.printer-error-guide-overlay[hidden] {
+  display: none !important;
+}
+
+.printer-error-guide-card {
+  background: #ffffff;
+  border-radius: 1.25rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-width: 32rem;
+  width: 100%;
+  padding: 2rem;
+  text-align: center;
+}
+
+.printer-error-guide-icon {
+  margin: 0 auto 1rem;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 9999px;
+  background: #fee2e2;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.printer-error-guide-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.printer-error-guide-what {
+  font-size: 1.125rem;
+  color: #475569;
+  margin-bottom: 0.75rem;
+}
+
+.printer-error-guide-action {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.printer-error-guide-screen {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2563eb;
+  margin-bottom: 1.5rem;
+}
+
+.printer-error-guide-footer {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1.25rem;
+}
+
+.printer-error-guide-warning {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #b91c1c;
+  margin-bottom: 0.75rem;
+}
+
+.printer-error-guide-tags {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.printer-error-guide-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.printer-error-guide-badge--ref {
+  background: #e0f2fe;
+  color: #0369a1;
+}
