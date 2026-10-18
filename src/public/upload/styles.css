@@ -298,6 +298,36 @@ body {
   background: rgba(167, 170, 225, 0.08);
 }
 
+.drop-zone.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.04);
+}
+
+.drop-zone.disabled:hover,
+.drop-zone.disabled:focus-visible {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.04);
+  transform: none;
+}
+
+.drop-zone.disabled .drop-zone__input {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.drop-zone.disabled .drop-zone__icon {
+  transform: none !important;
+  color: rgba(248, 113, 113, 0.5);
+}
+
+.drop-zone.disabled .drop-zone__browse {
+  text-decoration: none;
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+
 .drop-zone.drag-over {
   border-color: var(--indigo);
   background: rgba(105, 111, 199, 0.12);
@@ -305,7 +335,23 @@ body {
 }
 
 .drop-zone.has-files {
-  padding: 20px 24px 16px;
+  padding: 16px 20px 14px;
+  margin-bottom: 12px;
+}
+
+.drop-zone.has-files .drop-zone__icon {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 6px;
+}
+
+.drop-zone.has-files .drop-zone__label {
+  font-size: 13.5px;
+  margin-bottom: 0;
+}
+
+.drop-zone.has-files .drop-zone__hint {
+  display: none;
 }
 
 .drop-zone__input {
@@ -374,6 +420,25 @@ body {
   flex-direction: column;
   gap: 8px;
   margin-bottom: 16px;
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 170, 225, 0.25) transparent;
+}
+
+.file-queue::-webkit-scrollbar {
+  width: 6px;
+}
+
+.file-queue::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.file-queue::-webkit-scrollbar-thumb {
+  background: rgba(167, 170, 225, 0.25);
+  border-radius: 6px;
 }
 
 .file-queue:empty {
@@ -552,8 +617,10 @@ body {
   border: none;
   color: var(--ink-muted);
   cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
+  padding: 8px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -595,6 +662,9 @@ body {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 4px 20px rgba(105, 111, 199, 0.4);
+  position: sticky;
+  bottom: 8px;
+  z-index: 5;
   transition:
     background 160ms ease,
     transform 160ms cubic-bezier(0.34, 1.4, 0.64, 1),
@@ -635,6 +705,107 @@ body {
   50% {
     box-shadow: 0 6px 28px rgba(105, 111, 199, 0.6);
   }
+}
+
+/* ── Toaster Notification ─────────────────────────────────── */
+.upload-toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100% - 32px), 480px);
+  z-index: 1000;
+  background: rgba(18, 17, 36, 0.94);
+  border: 1.5px solid rgba(74, 222, 128, 0.35);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.55),
+    0 0 24px rgba(74, 222, 128, 0.16);
+  border-radius: 18px;
+  padding: 13px 15px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: toast-in 350ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.upload-toast[hidden] {
+  display: none !important;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.upload-toast__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.16);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.upload-toast__icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.upload-toast__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.upload-toast__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4ade80;
+  margin-bottom: 2px;
+}
+
+.upload-toast__desc {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.upload-toast__close {
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: 30px;
+  min-height: 30px;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.upload-toast__close:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.upload-toast__close svg {
+  width: 15px;
+  height: 15px;
 }
 
 /* ── Status box ───────────────────────────────────────────── */

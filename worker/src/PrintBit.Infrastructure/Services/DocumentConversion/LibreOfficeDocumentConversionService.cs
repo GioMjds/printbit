@@ -20,10 +20,10 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
 
     private static readonly HashSet<string> OfficeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".rtf", ".txt"
+        ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".rtf", ".txt", ".webp"
     };
 
-    private static readonly SemaphoreSlim LibreOfficeGate = new(1, 1);
+    private static readonly SemaphoreSlim ConversionGate = new(1, 1);
 
     private readonly DocumentConversionSettings _settings;
     private readonly ILogger<LibreOfficeDocumentConversionService> _logger;
@@ -49,15 +49,13 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
             };
         }
 
-        var sw = Stopwatch.StartNew();
-
         if (string.IsNullOrWhiteSpace(request.SourcePath))
         {
             return new DocumentConversionResult
             {
                 RequestId = request.RequestId,
                 Success = false,
-                DurationMs = sw.ElapsedMilliseconds,
+                DurationMs = 0,
                 ErrorMessage = "Source path cannot be null or whitespace."
             };
         }
@@ -68,7 +66,7 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
             {
                 RequestId = request.RequestId,
                 Success = false,
-                DurationMs = sw.ElapsedMilliseconds,
+                DurationMs = 0,
                 ErrorMessage = $"Source file '{request.SourcePath}' does not exist."
             };
         }
@@ -95,7 +93,7 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
                 RequestId = request.RequestId,
                 Success = false,
                 SourceFormat = sourceFormat,
-                DurationMs = sw.ElapsedMilliseconds,
+                DurationMs = 0,
                 ErrorMessage = $"Failed to create output directory: {ex.Message}"
             };
         }
@@ -106,45 +104,67 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
 
         if (ext == ".pdf")
         {
+            var swPdf = Stopwatch.StartNew();
             if (!string.Equals(Path.GetFullPath(request.SourcePath), Path.GetFullPath(expectedPdfPath), StringComparison.OrdinalIgnoreCase))
             {
                 File.Copy(request.SourcePath, expectedPdfPath, overwrite: true);
             }
 
-            var pageCount = PdfPageCounter.Count(expectedPdfPath);
-            sw.Stop();
+            var pdfVerification = VerifyPdfOutput(expectedPdfPath);
+            swPdf.Stop();
+            if (!pdfVerification.Valid)
+            {
+                return new DocumentConversionResult
+                {
+                    RequestId = request.RequestId,
+                    Success = false,
+                    SourceFormat = sourceFormat,
+                    DurationMs = swPdf.ElapsedMilliseconds,
+                    ErrorMessage = pdfVerification.ErrorMessage
+                };
+            }
+
             return new DocumentConversionResult
             {
                 RequestId = request.RequestId,
                 Success = true,
                 OutputPath = expectedPdfPath,
-                PageCount = pageCount,
+                PageCount = pdfVerification.PageCount,
                 SourceFormat = sourceFormat,
-                DurationMs = sw.ElapsedMilliseconds
+                DurationMs = swPdf.ElapsedMilliseconds
             };
         }
 
-        // 1. Image formats -> Native C# ImageToPdfConverter
-        if (ImageExtensions.Contains(ext))
+        if (!ImageExtensions.Contains(ext) && !OfficeExtensions.Contains(ext))
         {
-            return await ConvertImageAsync(request, sourceFormat, expectedPdfPath, sw, cancellationToken);
+            return new DocumentConversionResult
+            {
+                RequestId = request.RequestId,
+                Success = false,
+                SourceFormat = sourceFormat,
+                DurationMs = 0,
+                ErrorMessage = $"Unsupported file extension '{ext}' for document conversion."
+            };
         }
 
-        // 2. Office document formats -> Headless LibreOffice
-        if (OfficeExtensions.Contains(ext))
+        await ConversionGate.WaitAsync(cancellationToken);
+        try
         {
+            var sw = Stopwatch.StartNew();
+
+            // 1. Image formats -> Native C# ImageToPdfConverter
+            if (ImageExtensions.Contains(ext))
+            {
+                return await ConvertImageAsync(request, sourceFormat, expectedPdfPath, sw, cancellationToken);
+            }
+
+            // 2. Office document formats -> Headless LibreOffice
             return await ConvertViaLibreOfficeAsync(request, sourceFormat, outputDir, expectedPdfPath, sw, cancellationToken);
         }
-
-        // 3. Unsupported format
-        return new DocumentConversionResult
+        finally
         {
-            RequestId = request.RequestId,
-            Success = false,
-            SourceFormat = sourceFormat,
-            DurationMs = sw.ElapsedMilliseconds,
-            ErrorMessage = $"Unsupported file extension '{ext}' for document conversion."
-        };
+            ConversionGate.Release();
+        }
     }
 
     private async Task<DocumentConversionResult> ConvertImageAsync(
@@ -157,18 +177,33 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
         try
         {
             _logger.LogInformation("Converting image {SourcePath} to PDF", request.SourcePath);
-            var pageCount = await ImageToPdfConverter.ConvertAsync(
+            await ImageToPdfConverter.ConvertAsync(
                 request.SourcePath,
                 expectedPdfPath,
                 cancellationToken);
 
+            var verification = VerifyPdfOutput(expectedPdfPath);
             sw.Stop();
+
+            if (!verification.Valid)
+            {
+                _logger.LogError("Image conversion output verification failed for {SourcePath}: {Error}", request.SourcePath, verification.ErrorMessage);
+                return new DocumentConversionResult
+                {
+                    RequestId = request.RequestId,
+                    Success = false,
+                    SourceFormat = sourceFormat,
+                    DurationMs = sw.ElapsedMilliseconds,
+                    ErrorMessage = verification.ErrorMessage
+                };
+            }
+
             return new DocumentConversionResult
             {
                 RequestId = request.RequestId,
                 Success = true,
                 OutputPath = expectedPdfPath,
-                PageCount = pageCount,
+                PageCount = verification.PageCount,
                 SourceFormat = sourceFormat,
                 DurationMs = sw.ElapsedMilliseconds
             };
@@ -220,7 +255,6 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
         var executableToRun = File.Exists(resolvedExecutable) ? resolvedExecutable : _settings.SofficePath;
 
         string? jobProfileDir = null;
-        await LibreOfficeGate.WaitAsync(cancellationToken);
         try
         {
             var baseProfileDir = string.IsNullOrWhiteSpace(_settings.UserProfileDirectory)
@@ -374,28 +408,27 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
                 }
             }
 
-            if (!File.Exists(actualPdfPath) || new FileInfo(actualPdfPath).Length == 0)
+            var verification = VerifyPdfOutput(actualPdfPath);
+            sw.Stop();
+
+            if (!verification.Valid)
             {
-                sw.Stop();
-                _logger.LogError("LibreOffice conversion did not create valid PDF at {OutputPath}", expectedPdfPath);
+                _logger.LogError("LibreOffice conversion output verification failed for {SourcePath}: {Error}", request.SourcePath, verification.ErrorMessage);
                 return new DocumentConversionResult
                 {
                     RequestId = request.RequestId,
                     Success = false,
                     SourceFormat = sourceFormat,
                     DurationMs = sw.ElapsedMilliseconds,
-                    ErrorMessage = "LibreOffice conversion completed but output PDF was not found or is empty."
+                    ErrorMessage = verification.ErrorMessage
                 };
             }
-
-            var pageCount = PdfPageCounter.Count(actualPdfPath);
-            sw.Stop();
 
             _logger.LogInformation(
                 "LibreOffice conversion succeeded for {SourcePath} -> {OutputPath} ({PageCount} pages, {DurationMs}ms)",
                 request.SourcePath,
                 actualPdfPath,
-                pageCount,
+                verification.PageCount,
                 sw.ElapsedMilliseconds);
 
             return new DocumentConversionResult
@@ -403,7 +436,7 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
                 RequestId = request.RequestId,
                 Success = true,
                 OutputPath = actualPdfPath,
-                PageCount = pageCount,
+                PageCount = verification.PageCount,
                 SourceFormat = sourceFormat,
                 DurationMs = sw.ElapsedMilliseconds
             };
@@ -411,7 +444,6 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
         finally
         {
             TryCleanupProfileDirectory(jobProfileDir, _logger);
-            LibreOfficeGate.Release();
         }
     }
 
@@ -493,17 +525,67 @@ public sealed class LibreOfficeDocumentConversionService : IDocumentConversionSe
         }
     }
 
+    private static (bool Valid, int PageCount, string ErrorMessage) VerifyPdfOutput(string pdfPath)
+    {
+        if (string.IsNullOrWhiteSpace(pdfPath) || !File.Exists(pdfPath))
+        {
+            return (false, 0, $"Output PDF '{pdfPath}' was not created.");
+        }
+
+        var info = new FileInfo(pdfPath);
+        if (info.Length == 0)
+        {
+            TryDeleteFile(pdfPath);
+            return (false, 0, $"Output PDF '{pdfPath}' is empty (0 bytes).");
+        }
+
+        var pageCount = PdfPageCounter.Count(pdfPath);
+        if (pageCount is null or <= 0)
+        {
+            TryDeleteFile(pdfPath);
+            return (false, 0, $"Output PDF '{pdfPath}' is invalid or contains zero pages.");
+        }
+
+        return (true, pageCount.Value, string.Empty);
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // Ignore deletion errors for cleanup
+        }
+    }
+
     private static void TryCleanupProfileDirectory(string? profileDir, ILogger logger)
     {
         if (string.IsNullOrWhiteSpace(profileDir) || !Directory.Exists(profileDir)) return;
 
-        try
+        for (int attempt = 1; attempt <= 3; attempt++)
         {
-            Directory.Delete(profileDir, recursive: true);
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Failed to delete temporary profile directory {ProfileDir} immediately", profileDir);
+            try
+            {
+                Directory.Delete(profileDir, recursive: true);
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (attempt == 3)
+                {
+                    logger.LogDebug(ex, "Failed to delete temporary profile directory {ProfileDir} after 3 attempts", profileDir);
+                }
+                else
+                {
+                    Thread.Sleep(attempt * 100);
+                }
+            }
         }
     }
 

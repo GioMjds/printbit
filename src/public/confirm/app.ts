@@ -306,6 +306,12 @@ const scanCard = document.getElementById('scanCard');
 const coinLottieCanvas = document.getElementById('coinLottieCanvas') as HTMLCanvasElement | null;
 const coinLottieWrapper = document.getElementById('coinLottieWrapper');
 
+// Confirmation Modal Lottie Refs
+const modalTrayLottieCanvas = document.getElementById('modalTrayLottieCanvas') as HTMLCanvasElement | null;
+const modalTrayLottieWrapper = document.getElementById('modalTrayLottieWrapper');
+const modalReviewLottieCanvas = document.getElementById('modalReviewLottieCanvas') as HTMLCanvasElement | null;
+const modalReviewLottieWrapper = document.getElementById('modalReviewLottieWrapper');
+
 // Action column refs (spec: JS bridge)
 const actionPriceValue = document.getElementById('actionPriceValue');
 const actionCol = document.querySelector<HTMLElement>('.action-col');
@@ -360,22 +366,48 @@ const modalCancelBtn = document.getElementById(
 const modalConfirmBtn = document.getElementById(
   'modalConfirmBtn',
 ) as HTMLButtonElement;
-const modalFile = document.getElementById('modalFile');
+const modalMethodRow = document.getElementById('modalMethodRow');
+const modalMethodTitle = document.getElementById('modalMethodTitle');
 const modalMode = document.getElementById('modalMode');
 const modalColor = document.getElementById('modalColor');
 const modalColorRow = document.getElementById('modalColorRow');
+const modalColorDetectedBadge = document.getElementById(
+  'modalColorDetectedBadge',
+);
+const modalColorSelectedBadge = document.getElementById(
+  'modalColorSelectedBadge',
+);
 const modalQuality = document.getElementById('modalQuality');
 const modalQualityRow = document.getElementById('modalQualityRow');
 const modalCopies = document.getElementById('modalCopies');
 const modalCopiesRow = document.getElementById('modalCopiesRow');
 const modalPages = document.getElementById('modalPages');
 const modalPagesRow = document.getElementById('modalPagesRow');
+const modalPagesRange = document.getElementById('modalPagesRange');
+const modalBwChip = document.getElementById('modalBwChip');
+const modalBwCount = document.getElementById('modalBwCount');
+const modalColorChip = document.getElementById('modalColorChip');
+const modalColorCount = document.getElementById('modalColorCount');
 const modalOrientation = document.getElementById('modalOrientation');
 const modalOrientationRow = document.getElementById('modalOrientationRow');
+const modalDuplex = document.getElementById('modalDuplex');
+const modalDuplexRow = document.getElementById('modalDuplexRow');
+const modalLayoutRow = document.getElementById('modalLayoutRow');
 const modalRotation = document.getElementById('modalRotation');
 const modalRotationRow = document.getElementById('modalRotationRow');
 const modalPaper = document.getElementById('modalPaper');
 const modalPaperRow = document.getElementById('modalPaperRow');
+const modalScanRow = document.getElementById('modalScanRow');
+const modalPricingSummary = document.getElementById('modalPricingSummary');
+const modalPaperCostRow = document.getElementById('modalPaperCostRow');
+const modalPaperCostLabel = document.getElementById('modalPaperCostLabel');
+const modalPaperCostValue = document.getElementById('modalPaperCostValue');
+const modalPrintCostRow = document.getElementById('modalPrintCostRow');
+const modalPrintCostValue = document.getElementById('modalPrintCostValue');
+const modalDuplexSavingsRow = document.getElementById('modalDuplexSavingsRow');
+const modalDuplexSavingsValue = document.getElementById(
+  'modalDuplexSavingsValue',
+);
 const modalPrice = document.getElementById('modalPrice');
 const modalPaid = document.getElementById('modalPaid');
 const modalChange = document.getElementById('modalChange');
@@ -600,7 +632,7 @@ function recordConfirmationTerminalSuccess(
 let powerSafetyOverlay: PowerSafetyOverlayController;
 
 const DEFAULT_COIN_INSERT_GUIDANCE_MESSAGE =
-  'Tip: Insert one coin at a time. Rapid insertion may not be detected by the kiosk.';
+  'Please insert coins slowly. Rapid insertion may not be detected by the kiosk.';
 const COIN_INSERT_GUIDANCE_MESSAGE =
   coinInsertNote?.textContent?.trim() ||
   footerNote?.textContent?.trim() ||
@@ -871,6 +903,8 @@ window.addEventListener('pagehide', (event) => {
   if (!event.persisted) {
     confirmLoadingController?.destroy();
     coinLottiePlayer?.destroy();
+    modalTrayLottiePlayer?.destroy();
+    modalReviewLottiePlayer?.destroy();
   }
 });
 
@@ -1080,6 +1114,70 @@ function initCoinLottieAnimation(): void {
   }
 }
 
+let modalTrayLottiePlayer: DotLottie | null = null;
+let modalReviewLottiePlayer: DotLottie | null = null;
+
+function initModalLottieAnimations(): void {
+  DotLottie.setWasmUrl('/vendor/dotlottie/dotlottie-player.wasm');
+
+  if (modalTrayLottieCanvas) {
+    try {
+      modalTrayLottiePlayer = new DotLottie({
+        canvas: modalTrayLottieCanvas,
+        src: '/assets/lottie/paper-tray.json',
+        autoplay: true,
+        loop: true,
+        layout: { fit: 'contain', align: [0.5, 0.5] },
+      });
+
+      modalTrayLottiePlayer.addEventListener('load', () => {
+        modalTrayLottieWrapper?.classList.remove('is-fallback');
+      });
+      modalTrayLottiePlayer.addEventListener('loadError', () => {
+        modalTrayLottieWrapper?.classList.add('is-fallback');
+      });
+      modalTrayLottiePlayer.addEventListener('renderError', () => {
+        modalTrayLottieWrapper?.classList.add('is-fallback');
+      });
+    } catch (err) {
+      console.warn('[MODAL-TRAY-LOTTIE] Failed to initialize DotLottie player:', err);
+      modalTrayLottieWrapper?.classList.add('is-fallback');
+    }
+  }
+
+  if (modalReviewLottieCanvas) {
+    try {
+      const reviewSrc =
+        config.mode === 'copy'
+          ? '/assets/lottie/copying.lottie'
+          : config.mode === 'scan'
+            ? '/assets/lottie/scan-transfer.lottie'
+            : '/assets/lottie/printing.lottie';
+
+      modalReviewLottiePlayer = new DotLottie({
+        canvas: modalReviewLottieCanvas,
+        src: reviewSrc,
+        autoplay: true,
+        loop: true,
+        layout: { fit: 'contain', align: [0.5, 0.5] },
+      });
+
+      modalReviewLottiePlayer.addEventListener('load', () => {
+        modalReviewLottieWrapper?.classList.remove('is-fallback');
+      });
+      modalReviewLottiePlayer.addEventListener('loadError', () => {
+        modalReviewLottieWrapper?.classList.add('is-fallback');
+      });
+      modalReviewLottiePlayer.addEventListener('renderError', () => {
+        modalReviewLottieWrapper?.classList.add('is-fallback');
+      });
+    } catch (err) {
+      console.warn('[MODAL-REVIEW-LOTTIE] Failed to initialize DotLottie player:', err);
+      modalReviewLottieWrapper?.classList.add('is-fallback');
+    }
+  }
+}
+
 export function populateJobSummary(cfg: PrintConfig): void {
   if (modeValue) modeValue.textContent = cfg.mode.toUpperCase();
 
@@ -1106,18 +1204,22 @@ export function populateJobSummary(cfg: PrintConfig): void {
 
     // Hide scan-irrelevant rows in the confirmation modal
     modalPaperAlert?.setAttribute('hidden', '');
+    modalMethodRow?.removeAttribute('hidden');
+    modalScanRow?.removeAttribute('hidden');
     modalColorRow?.setAttribute('hidden', '');
     modalQualityRow?.setAttribute('hidden', '');
     modalCopiesRow?.setAttribute('hidden', '');
     modalPagesRow?.setAttribute('hidden', '');
     modalOrientationRow?.setAttribute('hidden', '');
+    modalLayoutRow?.setAttribute('hidden', '');
+    modalPaperRow?.setAttribute('hidden', '');
+    modalPricingSummary?.setAttribute('hidden', '');
     if (cfg.rotationDeg && cfg.rotationDeg !== 0) {
       if (modalRotation) modalRotation.textContent = `${cfg.rotationDeg}°`;
       modalRotationRow?.removeAttribute('hidden');
     } else {
       modalRotationRow?.setAttribute('hidden', '');
     }
-    modalPaperRow?.setAttribute('hidden', '');
     return;
   }
 
@@ -2405,32 +2507,101 @@ function showModal(): void {
     confirmModal.dataset.step = config.mode === 'scan' ? 'review' : 'tray';
   }
 
-  if (modalFile) {
-    const rawFileName =
-      config.mode === 'print'
-        ? (uploadedFile ?? 'No file')
-        : config.mode === 'copy'
-          ? 'Physical document copy'
-          : (config.scanFilename ?? 'Scanned document');
-    modalFile.textContent = truncateFilename(rawFileName, 32);
-    modalFile.setAttribute('title', rawFileName);
-    modalFile.setAttribute('aria-label', `Document: ${rawFileName}`);
+  const modeKey = (config.mode || 'print').toLowerCase();
+  if (modalMode) {
+    modalMode.textContent = modeKey.toUpperCase();
+    modalMode.className = `modal-method-badge modal-method-badge--${modeKey}`;
   }
-  if (modalMode) modalMode.textContent = config.mode.toUpperCase();
+  if (modalMethodTitle) {
+    modalMethodTitle.textContent =
+      modeKey === 'print'
+        ? 'Document Printing'
+        : modeKey === 'copy'
+          ? 'Physical Document Copy'
+          : 'Soft Copy Scanning';
+  }
 
-  if (config.mode !== 'scan') {
-    if (modalColor) modalColor.textContent = getColorModeSummaryLabel();
-    if (modalCopies) modalCopies.textContent = String(config.copies);
-    if (modalPages) {
-      if (currentPrintQuote) {
-        modalPages.textContent = `${pageRangeLabel(config.pageRange)} (${currentPrintQuote.selectedPages} of ${currentPrintQuote.totalPages} pages)`;
-      } else {
-        modalPages.textContent = pageRangeLabel(config.pageRange);
-      }
+  if (config.mode === 'scan') {
+    modalMethodRow?.removeAttribute('hidden');
+    modalScanRow?.removeAttribute('hidden');
+    modalPagesRow?.setAttribute('hidden', '');
+    modalColorRow?.setAttribute('hidden', '');
+    modalPaperRow?.setAttribute('hidden', '');
+    modalLayoutRow?.setAttribute('hidden', '');
+    modalQualityRow?.setAttribute('hidden', '');
+    modalPricingSummary?.setAttribute('hidden', '');
+  } else {
+    modalMethodRow?.removeAttribute('hidden');
+    modalScanRow?.setAttribute('hidden', '');
+    modalPagesRow?.removeAttribute('hidden');
+    modalColorRow?.removeAttribute('hidden');
+    modalPaperRow?.removeAttribute('hidden');
+    modalLayoutRow?.removeAttribute('hidden');
+    modalQualityRow?.removeAttribute('hidden');
+
+    // 1. Pages & Range
+    const quote = currentPrintQuote;
+    const totalSheets = quote ? quote.selectedPages : (config.totalPages ?? 1);
+    const totalDisplay = quote
+      ? `${quote.selectedPages} of ${quote.totalPages} ${quote.totalPages === 1 ? 'page' : 'pages'}`
+      : `${totalSheets} ${totalSheets === 1 ? 'page' : 'pages'}`;
+    if (modalPages) modalPages.textContent = totalDisplay;
+    if (modalPagesRange)
+      modalPagesRange.textContent = pageRangeLabel(config.pageRange);
+
+    if (quote) {
+      if (modalBwCount) modalBwCount.textContent = `${quote.billableBwPages}`;
+      if (modalColorCount)
+        modalColorCount.textContent = `${quote.billableColorPages}`;
+      modalBwChip?.removeAttribute('hidden');
+      modalColorChip?.removeAttribute('hidden');
+    } else {
+      const isColor = config.colorMode === 'colored';
+      if (modalBwCount)
+        modalBwCount.textContent = isColor ? '0' : `${totalSheets}`;
+      if (modalColorCount)
+        modalColorCount.textContent = isColor ? `${totalSheets}` : '0';
+      modalBwChip?.removeAttribute('hidden');
+      modalColorChip?.removeAttribute('hidden');
     }
+
+    // 2. Color Mode
+    if (modalColor) modalColor.textContent = getColorModeSummaryLabel();
+    if (
+      config.mode === 'print' &&
+      config.detectedColorMode &&
+      config.detectedColorMode !== config.colorMode
+    ) {
+      if (modalColorDetectedBadge) {
+        modalColorDetectedBadge.textContent = `Detected: ${formatColorMode(config.detectedColorMode)}`;
+        modalColorDetectedBadge.removeAttribute('hidden');
+      }
+      if (modalColorSelectedBadge) {
+        modalColorSelectedBadge.textContent = `Selected: ${formatColorMode(config.colorMode)}`;
+        modalColorSelectedBadge.removeAttribute('hidden');
+      }
+    } else {
+      modalColorDetectedBadge?.setAttribute('hidden', '');
+      modalColorSelectedBadge?.setAttribute('hidden', '');
+    }
+
+    // 3. Bond Paper Size
+    if (modalPaper) {
+      modalPaper.textContent = formatPaperSizeForPricing(config.paperSize);
+    }
+
+    // 4. Layout, Orientation, Sides, Rotation
     if (modalOrientation) {
       modalOrientation.textContent =
         config.orientation === 'landscape' ? 'Landscape' : 'Portrait';
+    }
+    if (config.duplex !== undefined) {
+      if (modalDuplex) {
+        modalDuplex.textContent = config.duplex ? '2-Sided (Duplex)' : '1-Sided';
+      }
+      modalDuplexRow?.removeAttribute('hidden');
+    } else {
+      modalDuplexRow?.setAttribute('hidden', '');
     }
     if (modalRotation) modalRotation.textContent = `${config.rotationDeg}°`;
     if (modalRotationRow) {
@@ -2440,8 +2611,49 @@ function showModal(): void {
         modalRotationRow.setAttribute('hidden', '');
       }
     }
-    if (modalPaper)
-      modalPaper.textContent = formatPaperSizeForPricing(config.paperSize);
+
+    // 5. Quality & Copies
+    if (modalQuality) {
+      modalQuality.textContent =
+        config.quality === 'high' ? 'High Quality' : 'Standard Quality';
+    }
+    if (modalCopies) modalCopies.textContent = String(config.copies);
+
+    // 6. Pricing Summary Breakdown
+    if (
+      quote &&
+      quote.paperSubtotal !== undefined &&
+      quote.printSubtotal !== undefined
+    ) {
+      modalPricingSummary?.removeAttribute('hidden');
+      if (modalPaperCostLabel) {
+        const sheets = quote.physicalSheets ?? quote.selectedPages;
+        modalPaperCostLabel.textContent = `Paper Sheets (${sheets} ${sheets === 1 ? 'sheet' : 'sheets'})`;
+      }
+      if (modalPaperCostValue) {
+        modalPaperCostValue.textContent = `₱ ${quote.paperSubtotal}`;
+      }
+      modalPaperCostRow?.removeAttribute('hidden');
+
+      if (modalPrintCostValue) {
+        modalPrintCostValue.textContent = `₱ ${quote.printSubtotal}`;
+      }
+      modalPrintCostRow?.removeAttribute('hidden');
+
+      if (quote.duplexSavings && quote.duplexSavings > 0) {
+        if (modalDuplexSavingsValue) {
+          modalDuplexSavingsValue.textContent = `-₱ ${quote.duplexSavings}`;
+        }
+        modalDuplexSavingsRow?.removeAttribute('hidden');
+      } else {
+        modalDuplexSavingsRow?.setAttribute('hidden', '');
+      }
+    } else {
+      modalPricingSummary?.setAttribute('hidden', '');
+      modalPaperCostRow?.setAttribute('hidden', '');
+      modalPrintCostRow?.setAttribute('hidden', '');
+      modalDuplexSavingsRow?.setAttribute('hidden', '');
+    }
   }
 
   if (modalPrice) modalPrice.textContent = `₱ ${totalPrice}`;
@@ -2455,10 +2667,17 @@ function showModal(): void {
 
   confirmModal.classList.add('is-visible');
   confirmModal.setAttribute('aria-hidden', 'false');
+  if (confirmModal.dataset.step === 'tray') {
+    modalTrayLottiePlayer?.play();
+  } else {
+    modalReviewLottiePlayer?.play();
+  }
   modalCancelBtn?.focus();
 }
 
 function hideModal(): void {
+  modalTrayLottiePlayer?.pause();
+  modalReviewLottiePlayer?.pause();
   confirmModal?.classList.remove('is-visible');
   confirmModal?.setAttribute('aria-hidden', 'true');
   confirmBtn?.focus();
@@ -2513,8 +2732,12 @@ modalCancelBtn?.addEventListener('click', () => {
   if (!confirmModal) return;
   if (confirmModal.dataset.step === 'review') {
     confirmModal.dataset.step = 'tray';
+    modalReviewLottiePlayer?.pause();
+    modalTrayLottiePlayer?.play();
     modalTrayOkBtn?.focus();
   } else {
+    modalTrayLottiePlayer?.pause();
+    modalReviewLottiePlayer?.pause();
     hideModal();
   }
 });
@@ -2522,11 +2745,15 @@ modalCancelBtn?.addEventListener('click', () => {
 modalTrayOkBtn?.addEventListener('click', () => {
   if (!confirmModal) return;
   confirmModal.dataset.step = 'review';
+  modalTrayLottiePlayer?.pause();
+  modalReviewLottiePlayer?.play();
   modalCancelBtn?.focus();
 });
 
 modalTrayIssueBtn?.addEventListener('click', () => {
   void releasePaymentLease('cancel', true);
+  modalTrayLottiePlayer?.pause();
+  modalReviewLottiePlayer?.pause();
   hideModal();
 });
 
@@ -3450,6 +3677,7 @@ async function loadActivePrinterError(): Promise<void> {
 
 async function boot(): Promise<void> {
   initCoinLottieAnimation();
+  initModalLottieAnimations();
   await Promise.all([
     loadPrinterStatus(),
     loadActivePrinterError(),

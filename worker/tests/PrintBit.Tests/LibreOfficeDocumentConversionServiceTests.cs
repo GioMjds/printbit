@@ -105,4 +105,95 @@ public class LibreOfficeDocumentConversionServiceTests
             if (File.Exists(tempDocx)) File.Delete(tempDocx);
         }
     }
+
+    [Fact]
+    public async Task ConvertAsync_ZeroBytePdf_ReturnsFailureAndCleansUp()
+    {
+        var tempPdf = Path.Combine(Path.GetTempPath(), $"empty-{Guid.NewGuid():N}.pdf");
+        var outputDir = Path.Combine(Path.GetTempPath(), $"out-{Guid.NewGuid():N}");
+        File.WriteAllBytes(tempPdf, Array.Empty<byte>());
+
+        try
+        {
+            var result = await _service.ConvertAsync(new DocumentConversionRequest
+            {
+                RequestId = "test-zero-byte",
+                SourcePath = tempPdf,
+                OutputDirectory = outputDir
+            });
+
+            Assert.False(result.Success);
+            Assert.Contains("empty (0 bytes)", result.ErrorMessage);
+            var expectedOut = Path.Combine(outputDir, Path.GetFileName(tempPdf));
+            Assert.False(File.Exists(expectedOut));
+        }
+        finally
+        {
+            if (File.Exists(tempPdf)) File.Delete(tempPdf);
+            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ConvertAsync_CorruptPdf_ReturnsFailureAndCleansUp()
+    {
+        var tempPdf = Path.Combine(Path.GetTempPath(), $"corrupt-{Guid.NewGuid():N}.pdf");
+        var outputDir = Path.Combine(Path.GetTempPath(), $"out-{Guid.NewGuid():N}");
+        File.WriteAllText(tempPdf, "This is not a real PDF file content.");
+
+        try
+        {
+            var result = await _service.ConvertAsync(new DocumentConversionRequest
+            {
+                RequestId = "test-corrupt-pdf",
+                SourcePath = tempPdf,
+                OutputDirectory = outputDir
+            });
+
+            Assert.False(result.Success);
+            Assert.Contains("invalid or contains zero pages", result.ErrorMessage);
+            var expectedOut = Path.Combine(outputDir, Path.GetFileName(tempPdf));
+            Assert.False(File.Exists(expectedOut));
+        }
+        finally
+        {
+            if (File.Exists(tempPdf)) File.Delete(tempPdf);
+            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ConvertAsync_ConcurrentRequests_ExecuteSequentiallyWithoutDeadlock()
+    {
+        var tempFiles = Enumerable.Range(0, 5).Select(_ =>
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"concur-{Guid.NewGuid():N}.docx");
+            File.WriteAllText(path, "dummy docx");
+            return path;
+        }).ToList();
+
+        try
+        {
+            var tasks = tempFiles.Select(f => _service.ConvertAsync(new DocumentConversionRequest
+            {
+                RequestId = Guid.NewGuid().ToString("N"),
+                SourcePath = f
+            })).ToList();
+
+            var results = await Task.WhenAll(tasks);
+            Assert.Equal(5, results.Length);
+            Assert.All(results, r =>
+            {
+                Assert.False(r.Success);
+                Assert.Contains("LibreOffice executable not found", r.ErrorMessage);
+            });
+        }
+        finally
+        {
+            foreach (var f in tempFiles)
+            {
+                if (File.Exists(f)) File.Delete(f);
+            }
+        }
+    }
 }

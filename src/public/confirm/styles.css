@@ -226,14 +226,142 @@ body {
   text-align: center;
 }
 
+/* ── Coin insertion guidance notice ────────────────────────── */
+.payment-col__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1.5px solid rgba(251, 191, 36, 0.35);
+  border-radius: 14px;
+  padding: 10px 14px;
+  max-width: 330px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  transition: opacity 300ms ease, border-color 300ms ease, background-color 300ms ease;
+}
+
+.payment-col__notice-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.payment-col__notice-icon svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.payment-col__notice-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.payment-col__notice-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fbbf24;
+  letter-spacing: 0.15px;
+  line-height: 1.25;
+}
+
 .payment-col__note {
-  margin: -4px 0 0;
-  max-width: 320px;
-  font-size: 12px;
-  line-height: 1.35;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
   font-weight: 500;
-  color: var(--ink-muted);
-  text-align: center;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: left;
+}
+
+/* Supported coins indicator */
+.payment-col__supported-coins {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.supported-coins__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.supported-coins__chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.coin-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  box-sizing: border-box;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  letter-spacing: -0.2px;
+  transition: transform 180ms ease, opacity 200ms ease;
+}
+
+.coin-chip--sm {
+  min-width: 23px;
+  height: 23px;
+  font-size: 9.5px;
+}
+
+/* ₱1 coin: Silver/steel finish */
+.coin-chip--1 {
+  background: rgba(226, 232, 240, 0.12);
+  border: 1.5px solid rgba(226, 232, 240, 0.65);
+  color: #f8fafc;
+}
+
+/* ₱5 coin: Silver/steel finish */
+.coin-chip--5 {
+  background: rgba(226, 232, 240, 0.16);
+  border: 1.5px solid rgba(226, 232, 240, 0.85);
+  color: #ffffff;
+}
+
+/* ₱10 coin: Two-tone / Ringed design */
+.coin-chip--10 {
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.25) 50%, rgba(226, 232, 240, 0.2) 55%);
+  border: 1.5px solid rgba(251, 191, 36, 0.75);
+  color: #fef08a;
+}
+
+/* ₱20 coin: Bimetallic (bronze center / silver outer ring) */
+.coin-chip--20 {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.35) 48%, rgba(226, 232, 240, 0.22) 53%);
+  border: 1.5px solid #f59e0b;
+  color: #fed7aa;
+  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.3);
 }
 
 /* ── Balance ring ─────────────────────────────────────────── */
@@ -1343,17 +1471,58 @@ body {
   border-top: 1px solid rgba(167, 170, 225, 0.1);
   padding: 12px 0 20px;
   flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.footer-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  max-width: 90vw;
+  box-sizing: border-box;
+}
+
+.footer-notice__icon {
+  width: 16px;
+  height: 16px;
+  color: #fbbf24;
+  flex-shrink: 0;
+  display: block;
+}
+
+.footer-notice__badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .footer-note {
   font-size: 13px;
   font-weight: 500;
-  color: var(--ink-muted);
+  color: rgba(255, 255, 255, 0.92);
   margin: 0;
+  line-height: 1.35;
   transition: color 300ms;
 }
+
 .footer-note.ready {
   color: #a3e6ac;
+}
+
+.footer-notice__coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 2px;
 }
 
 /* ── RIGHT: Action column ─────────────────────────────────── */
@@ -1661,9 +1830,22 @@ body {
    needs to flip one data attribute — no visibility logic here
    duplicates whatever open/close/focus-trap code already
    targets #confirmModal. */
+#confirmModal .modal-card,
+.modal-card--kiosk {
+  width: 780px;
+  max-width: min(95vw, 840px);
+  max-height: min(94vh, 760px);
+  padding: 24px 34px 22px;
+  border-radius: 28px;
+  gap: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
 .modal-step {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   gap: 10px;
 }
 #confirmModal[data-step='tray'] .modal-step--review,
@@ -1675,7 +1857,17 @@ body {
   align-items: stretch;
   text-align: center;
   padding: 2px 2px 0;
-  gap: 9px;
+  gap: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-step--review {
+  align-items: stretch;
+  padding: 2px 2px 0;
+  gap: 8px;
+  display: flex;
+  flex-direction: column;
 }
 .modal-step__badge {
   align-self: center;
@@ -1688,6 +1880,32 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
+
+/* ── Step 1 Lottie Tray Animation ── */
+.modal-tray-lottie-wrap {
+  align-self: center;
+  width: 240px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.modal-tray-lottie-canvas {
+  width: 240px;
+  height: 240px;
+  display: block;
+}
+.modal-tray-fallback-icon {
+  display: none;
+}
+.modal-tray-lottie-wrap.is-fallback .modal-tray-lottie-canvas {
+  display: none;
+}
+.modal-tray-lottie-wrap.is-fallback .modal-tray-fallback-icon {
+  display: flex;
+}
+
 .modal-tray-check__icon {
   align-self: center;
   width: 52px;
@@ -1719,6 +1937,38 @@ body {
 }
 .modal-actions--tray {
   margin-top: 2px;
+}
+
+/* ── Step 2 Lottie Review Animation ── */
+.modal-review-lottie-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  background: rgba(105, 111, 199, 0.16);
+  border: 1px solid rgba(105, 111, 199, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.modal-review-lottie-canvas {
+  width: 64px;
+  height: 64px;
+  display: block;
+}
+.modal-review-fallback-icon {
+  display: none;
+  width: 32px;
+  height: 32px;
+  color: var(--peach);
+}
+.modal-review-lottie-wrap.is-fallback .modal-review-lottie-canvas {
+  display: none;
+}
+.modal-review-lottie-wrap.is-fallback .modal-review-fallback-icon {
+  display: block;
 }
 
 /* ── Modal Paper Tray Alert Callout ───────────────────────── */
@@ -1877,9 +2127,9 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 .modal-details-label {
-  width: 36%;
-  padding: 10px 16px;
-  font-size: 14px;
+  width: 32%;
+  padding: 7px 14px;
+  font-size: 13px;
   font-weight: 750;
   color: var(--lavender);
   text-transform: uppercase;
@@ -1892,15 +2142,15 @@ body {
   gap: 8px;
 }
 .modal-details-label__inner svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   opacity: 0.85;
   flex-shrink: 0;
 }
 .modal-details-value {
-  padding: 10px 16px;
-  font-size: 17.5px;
-  font-weight: 750;
+  padding: 7px 14px;
+  font-size: 15.5px;
+  font-weight: 700;
   color: var(--white);
   vertical-align: middle;
 }
@@ -1908,7 +2158,7 @@ body {
   color: var(--peach);
 }
 .modal-details-subvalue {
-  font-size: 15.5px;
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--ink-muted);
   margin-left: 5px;
@@ -1917,33 +2167,117 @@ body {
   color: var(--white);
   font-weight: 800;
 }
-.modal-details-file-cell {
+.modal-method-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.modal-method-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.modal-method-badge--print {
+  background: rgba(105, 111, 199, 0.22);
+  color: #c5c8f8;
+  border: 1px solid rgba(105, 111, 199, 0.45);
+}
+.modal-method-badge--copy {
+  background: rgba(245, 178, 140, 0.18);
+  color: var(--peach);
+  border: 1px solid rgba(245, 178, 140, 0.35);
+}
+.modal-method-badge--scan {
+  background: rgba(106, 196, 122, 0.18);
+  color: #a3e6ac;
+  border: 1px solid rgba(106, 196, 122, 0.35);
+}
+.modal-method-title {
+  font-size: 15.5px;
+  font-weight: 750;
+  color: var(--white);
+}
+
+.modal-details-pages-cell {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  width: 100%;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-.modal-filename-text {
-  font-size: 16.5px;
+.modal-details-pages-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.modal-details-range-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 750;
+  background: rgba(105, 111, 199, 0.2);
+  color: var(--lavender);
+  letter-spacing: 0.4px;
+}
+.modal-details-breakdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.modal-details-color-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.modal-details-badges {
+  display: inline-flex;
+  gap: 6px;
+}
+
+/* ── Proper Pricing Summary Breakdown ─────────────────────── */
+.modal-pricing-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px dashed rgba(167, 170, 225, 0.2);
+  border-radius: 14px;
+  padding: 7px 16px;
+  box-sizing: border-box;
+}
+.modal-pricing-summary[hidden] {
+  display: none !important;
+}
+.modal-pricing-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+}
+.modal-pricing-summary__row[hidden] {
+  display: none !important;
+}
+.modal-pricing-summary__label {
+  font-weight: 600;
+}
+.modal-pricing-summary__amount {
   font-weight: 750;
   color: var(--white);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 290px;
-  display: inline-block;
-  vertical-align: middle;
 }
-.modal-details-badge {
-  padding: 3px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 800;
-  background: rgba(105, 111, 199, 0.25);
-  color: var(--lavender);
-  letter-spacing: 0.6px;
-  flex-shrink: 0;
+.modal-pricing-summary__row--savings {
+  color: #4ade80;
+}
+.modal-pricing-summary__row--savings .modal-pricing-summary__amount {
+  color: #4ade80;
 }
 
 /* ── Financial Bar (3 Columns) ────────────────────────────── */
@@ -2005,6 +2339,57 @@ body {
   display: flex;
   gap: 12px;
   margin-top: 2px;
+}
+
+/* ── Confirm Modal Actions (Anti Ghost-Touch Layout) ────────
+   The Windows tablet suffers from phantom touches in the screen's center dead-zone.
+   We enlarge touch targets (min 64px) and split actions:
+   Cancel/Back is anchored left, Confirm/Ready is anchored right, leaving a wide
+   safe gap across the center dead-zone. */
+#confirmModal .modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 28px;
+  margin-top: 14px;
+  padding-top: 4px;
+  width: 100%;
+}
+#confirmModal .modal-btn {
+  min-height: 64px;
+  padding: 16px 28px;
+  font-size: 18px;
+  font-weight: 750;
+  border-radius: 18px;
+  letter-spacing: 0.2px;
+  box-sizing: border-box;
+}
+#confirmModal .modal-btn svg {
+  width: 22px;
+  height: 22px;
+}
+#confirmModal .modal-btn--cancel {
+  flex: 0 0 36%;
+  max-width: 280px;
+  background: rgba(167, 170, 225, 0.12);
+  border: 2px solid rgba(167, 170, 225, 0.3);
+  color: var(--white);
+}
+#confirmModal .modal-btn--cancel:hover {
+  background: rgba(167, 170, 225, 0.2);
+  border-color: rgba(167, 170, 225, 0.45);
+}
+#confirmModal .modal-btn--confirm {
+  flex: 1;
+  background: #2e8b44;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  color: var(--white);
+  box-shadow: 0 6px 22px rgba(46, 139, 68, 0.45);
+  font-size: 18.5px;
+}
+#confirmModal .modal-btn--confirm:hover {
+  background: #369f4f;
+  box-shadow: 0 8px 26px rgba(46, 139, 68, 0.55);
 }
 .modal-btn {
   flex: 1;
@@ -2490,6 +2875,43 @@ body {
   color: #a3e6ac;
 }
 
+/* Coin notice state when slot is locked */
+.payment-col--locked .payment-col__notice {
+  background: rgba(167, 170, 225, 0.05);
+  border-color: rgba(167, 170, 225, 0.16);
+  opacity: 0.65;
+}
+
+.payment-col--locked .payment-col__notice-icon {
+  background: rgba(167, 170, 225, 0.1);
+  color: var(--lavender);
+}
+
+.payment-col--locked .payment-col__notice-title {
+  color: var(--lavender);
+}
+
+.payment-col--locked .payment-col__note {
+  color: var(--lavender);
+  opacity: 0.85;
+}
+
+.payment-col--locked .payment-col__supported-coins {
+  border-top-color: rgba(167, 170, 225, 0.12);
+}
+
+.payment-col--locked .supported-coins__label {
+  color: var(--lavender);
+}
+
+.payment-col--locked .coin-chip {
+  opacity: 0.55;
+  border-color: rgba(167, 170, 225, 0.25);
+  background: rgba(167, 170, 225, 0.08);
+  color: var(--lavender);
+  box-shadow: none;
+}
+
 /* ── Thank-you continuation prompt ─────────────────────────────── */
 
 .modal-subtitle--remaining {
@@ -2687,12 +3109,19 @@ body {
     scroll-behavior: auto !important;
   }
 
-  .coin-lottie-canvas {
+  .coin-lottie-canvas,
+  .modal-tray-lottie-canvas,
+  .modal-review-lottie-canvas {
     display: none !important;
   }
 
-  .coin-fallback-icon {
+  .coin-fallback-icon,
+  .modal-tray-fallback-icon {
     display: flex !important;
+  }
+
+  .modal-review-fallback-icon {
+    display: block !important;
   }
 }
 

@@ -890,8 +890,24 @@ async function createSession(): Promise<void> {
       pollHandle = null;
     }
     resetSessionCountdown();
+    const previousSessionId = activeSessionId;
+    const previousSessionToken = activeSessionToken;
     activeSessionId = '';
     activeSessionToken = '';
+
+    if (previousSessionId) {
+      try {
+        const tokenParam = previousSessionToken
+          ? `?token=${encodeURIComponent(previousSessionToken)}&reason=kiosk_reset`
+          : '?reason=kiosk_reset';
+        await fetch(
+          `/api/wireless/sessions/${encodeURIComponent(previousSessionId)}/cancel${tokenParam}`,
+          { method: 'DELETE' },
+        );
+      } catch {
+        /* best-effort session cleanup */
+      }
+    }
 
     if (!hotspotConfig) {
       try {

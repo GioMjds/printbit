@@ -13,7 +13,10 @@ import {
   formatLargePrintDisclaimer,
   isLargePrintDocument,
 } from '../shared/large-print-warning';
-import type { PageRange } from '../shared/page-selection';
+import {
+  formatPageRangeString,
+  type PageRange,
+} from '../shared/page-selection';
 import {
   destroyPdfLoadingTask,
   type PdfLoadingTask,
@@ -34,6 +37,7 @@ import { createConfigPreparationLoadingController } from './loading-state';
 import { shouldPreparePreviewInBackground } from './office-preview';
 import { getPreviewRequestTimeoutMs } from './preview-timeout';
 import { PagePickerModal } from './page-picker-modal';
+import { BlankPageWarningModal } from './blank-page-modal';
 
 export { };
 
@@ -2508,12 +2512,7 @@ async function applyColorAnalysis(
   }
 }
 
-continueBtn?.addEventListener('click', () => {
-  if (mode === 'print' && !sessionId) return;
-  if (mode === 'print' && !currentPrintQuote) return;
-  if (mode === 'copy' && !copyPreviewPath) return;
-  if (mode === 'scan' && !scanFilename) return;
-
+function proceedToConfirm(): void {
   const cfg = currentPreviewConfig();
   const config: PrintConfig = {
     scaling: cfg.scaling,
@@ -2561,6 +2560,66 @@ continueBtn?.addEventListener('click', () => {
   }
 
   navigateWithKioskMotion('/confirm');
+}
+
+const blankWarningDialog = document.getElementById(
+  'blankPageWarningDialog',
+) as HTMLDialogElement | null;
+
+let blankPageModal: BlankPageWarningModal | null = null;
+if (blankWarningDialog) {
+  blankPageModal = new BlankPageWarningModal({
+    dialog: blankWarningDialog,
+    onKeep: () => {
+      proceedToConfirm();
+    },
+    onExclude: async (nonBlankRanges) => {
+      if (pageModeCustom) {
+        pageModeCustom.checked = true;
+        pageModeCustom.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (customRangeBuilder) {
+        customRangeBuilder.setFromRanges(nonBlankRanges);
+      }
+      if (pageRangeInput) {
+        pageRangeInput.value = formatPageRangeString(nonBlankRanges);
+      }
+      syncCustomRangeInputs();
+      syncPageRangeUI();
+      updateSummary();
+
+      await refreshPrintQuote();
+
+      if (currentPrintQuote) {
+        proceedToConfirm();
+      }
+    },
+    onPreviewPage: (page) => {
+      void preview.goToPage(page);
+    },
+  });
+}
+
+continueBtn?.addEventListener('click', () => {
+  if (mode === 'print' && !sessionId) return;
+  if (mode === 'print' && !currentPrintQuote) return;
+  if (mode === 'copy' && !copyPreviewPath) return;
+  if (mode === 'scan' && !scanFilename) return;
+
+  // Check for blank pages in selected pages
+  if (mode === 'print' && currentPrintQuote?.pageBreakdown && blankPageModal) {
+    const selectedPages = currentPrintQuote.pageBreakdown.map((p) => p.pageNumber);
+    const blankPages = currentPrintQuote.pageBreakdown
+      .filter((p) => p.isBlank === true || (p.coverage ?? 0) < 0.001)
+      .map((p) => p.pageNumber);
+
+    if (blankPages.length > 0 && selectedPages.length > blankPages.length) {
+      blankPageModal.open(selectedPages, blankPages);
+      return;
+    }
+  }
+
+  proceedToConfirm();
 });
 
 async function prepareDocumentPreview(): Promise<void> {

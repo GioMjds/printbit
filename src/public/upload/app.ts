@@ -1,9 +1,6 @@
 export {};
 import { initKioskLocalization } from '../shared/kiosk-i18n';
-import {
-  formatLargePrintDisclaimer,
-  isLargePrintDocument,
-} from '../shared/large-print-warning';
+import { isLargePrintDocument } from '../shared/large-print-warning';
 
 void initKioskLocalization();
 
@@ -24,6 +21,7 @@ declare global {
 interface SocketClient {
   on: (event: string, callback: (...args: unknown[]) => void) => void;
   emit: (event: string, ...args: unknown[]) => void;
+  disconnect?: () => void;
 }
 
 type UploadState =
@@ -78,6 +76,10 @@ const uploadSubTitle = document.getElementById(
 const dropZoneHint = document.getElementById(
   'dropZoneHint',
 ) as HTMLParagraphElement | null;
+const uploadToast = document.getElementById('uploadToast') as HTMLElement | null;
+const toastCloseBtn = document.getElementById(
+  'toastCloseBtn',
+) as HTMLButtonElement | null;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -168,16 +170,33 @@ let nextId = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function updateDropZoneEnabled(): void {
+  const isEnabled =
+    !isSessionUnavailable &&
+    (appState === 'session-ready' || appState === 'all-done');
+  fileInput.disabled = !isEnabled;
+  dropZone.classList.toggle('disabled', !isEnabled);
+  dropZone.setAttribute('aria-disabled', isEnabled ? 'false' : 'true');
+  dropZone.setAttribute('tabindex', isEnabled ? '0' : '-1');
+}
+
 function setAppState(s: UploadState): void {
   appState = s;
   const canUpload =
     s === 'session-ready' && queue.some((q) => q.status === 'pending');
   uploadButton.disabled = !canUpload;
+  if (uploadToast) {
+    uploadToast.hidden = s !== 'all-done';
+  }
+  updateDropZoneEnabled();
 }
 
 function setStatus(msg: string, cls: 'info' | 'ok' | 'error' | ''): void {
   statusBox.textContent = msg;
   statusBox.className = cls ? `status-box ${cls}` : 'status-box';
+  if (msg) {
+    statusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 function clearStatus(): void {
@@ -324,7 +343,7 @@ async function sha256File(file: File): Promise<string | undefined> {
 }
 
 const SECURITY_CHECK_FAILED_MESSAGE =
-  'Security check failed: Suspicious or disguised file detected.';
+  'Security check: File format could not be verified. Please save as standard PDF or image.';
 
 function isSecurityCheckFailure(r: UploadErrorResponse): boolean {
   if (r.code === 'FILE_INFECTED' || r.code === 'DISGUISED_EXECUTABLE') {
@@ -333,6 +352,7 @@ function isSecurityCheckFailure(r: UploadErrorResponse): boolean {
   if (
     malwareScanningEnabled &&
     (r.error === 'File content does not match its declared type.' ||
+      r.error === 'Security check failed: Suspicious or disguised file detected.' ||
       r.error === SECURITY_CHECK_FAILED_MESSAGE)
   ) {
     return true;
@@ -415,7 +435,7 @@ function getCurrentRemainingSeconds(): number | null {
 function renderSessionCountdown(remainingSeconds: number): void {
   if (!sessionId) return;
   const countdown = formatCountdown(remainingSeconds);
-  setSessionUI(`${sessionId}`, 'active');
+  setSessionUI(`Connected to Kiosk (${countdown})`, 'active');
 
   if (
     remainingSeconds <= sessionWarningThresholdSeconds &&
@@ -462,6 +482,7 @@ function setSessionUnavailable(message: string): void {
   setStatus(message, 'error');
   stopSessionMonitor();
   resetSessionCountdown();
+  updateDropZoneEnabled();
 }
 
 async function refreshSessionLease(): Promise<void> {
@@ -560,7 +581,7 @@ function createQueueItem(qf: QueuedFile): HTMLElement {
       <span class="queue-item__size">${size}</span>
     </div>
     <div class="queue-item__actions">
-      <span class="queue-item__status queue-item__status--pending">Pending</span>
+      <span class="queue-item__status queue-item__status--pending">Ready to send</span>
       <button type="button" class="queue-item__remove" aria-label="Remove ${escHtml(qf.file.name)}">
         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd"
           d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414
@@ -592,7 +613,7 @@ function updateItemStatus(
   badge.textContent =
     labelOverride ??
     {
-      pending: 'Pending',
+      pending: 'Ready to send',
       uploading: 'Uploading…',
       done: '✓ Sent',
       error: 'Failed',
@@ -609,6 +630,7 @@ function removeFromQueue(id: string): void {
   if (idx === -1) return;
   const [qf] = queue.splice(idx, 1);
   qf.el.remove();
+  dropZone.classList.toggle('has-files', queue.length > 0);
   refreshUploadBtn();
   if (queue.length === 0) clearStatus();
 }
@@ -673,7 +695,17 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
     queue.push(qf);
     fileQueue.appendChild(el);
   }
+  dropZone.classList.toggle('has-files', queue.length > 0);
+  if (uploadToast) {
+    uploadToast.hidden = true;
+  }
+  if (appState === 'all-done') {
+    setAppState('session-ready');
+  }
   refreshUploadBtn();
+  if (queue.some((q) => q.status === 'pending')) {
+    uploadButton.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
   if (duplicateFiles.length > 0) {
     setStatus(
       `${duplicateFiles[0]} is already in the upload list${duplicateFiles.length > 1 ? ` (+${duplicateFiles.length - 1} more)` : ''}.`,
@@ -697,6 +729,10 @@ function clearQueueForRetry(): void {
   nextId = 0;
   fileQueue.innerHTML = '';
   fileInput.value = '';
+  dropZone.classList.remove('has-files');
+  if (uploadToast) {
+    uploadToast.hidden = true;
+  }
   uploadButton.disabled = true;
   uploadBtnLabel.textContent = 'Send to Kiosk';
   clearStatus();
@@ -755,7 +791,7 @@ async function initSession(): Promise<void> {
       applySessionCountdown(session.remainingSeconds);
     } else {
       resetSessionCountdown();
-      setSessionUI(`Session ${sessionId.slice(0, 8)}…`, 'active');
+      setSessionUI('Connected to Kiosk', 'active');
     }
     clearStatus();
     refreshUploadBtn();
@@ -771,14 +807,33 @@ async function initSession(): Promise<void> {
 
 // ── Socket ────────────────────────────────────────────────────────────────────
 
+let uploadSocket: SocketClient | null = null;
+
 function attachSocket(sid: string): void {
   if (typeof window.io !== 'function') return;
+  if (uploadSocket) {
+    uploadSocket.disconnect?.();
+    uploadSocket = null;
+  }
   const socket = window.io('/session', {
     auth: {
       sessionId: sid,
       token,
       clientId: uploadClientId,
     },
+  });
+  uploadSocket = socket;
+
+  socket.on('SessionCancelled', () => {
+    setSessionUnavailable(
+      'Session was ended at the kiosk. Please scan the new QR code on the kiosk screen.',
+    );
+  });
+
+  socket.on('SessionEnded', () => {
+    setSessionUnavailable(
+      'Session was ended at the kiosk. Please scan the new QR code on the kiosk screen.',
+    );
   });
 
   socket.on('UploadCompleted', (info: unknown) => {
@@ -820,7 +875,7 @@ function attachSocket(sid: string): void {
     ) {
       largePrintWarningShown = true;
       setStatus(
-        formatLargePrintDisclaimer(pageCount, maxPagesPerSession),
+        `Note: Document has ${pageCount} pages. Kiosk limit is ${maxPagesPerSession} printed pages per session. You can select your page range on the kiosk screen.`,
         'info',
       );
       return;
@@ -943,14 +998,14 @@ async function uploadPendingFiles(): Promise<void> {
   // Final summary
   if (errorCount === 0 && doneCount > 0) {
     setStatus(
-      `✓ ${doneCount} file${doneCount > 1 ? 's' : ''} sent successfully. You can continue at the kiosk.`,
+      `✓ ${doneCount} file${doneCount > 1 ? 's' : ''} sent successfully. Look up at the kiosk screen to continue.`,
       'ok',
     );
     setAppState('all-done');
   } else if (doneCount > 0 && errorCount > 0) {
     setStatus(
       securityErrorCount > 0
-        ? `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} rejected by security check. Please remove suspicious files.`
+        ? `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} rejected by security check. Please remove unsupported files.`
         : `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} failed. You can retry failed items.`,
       'info',
     );
@@ -959,7 +1014,7 @@ async function uploadPendingFiles(): Promise<void> {
   } else {
     setStatus(
       securityErrorCount > 0
-        ? 'Upload rejected by security check. Please remove suspicious files and try again.'
+        ? 'Upload rejected by security check. Please check your file format and try again.'
         : 'All uploads failed. Please check your network/internet connection and try again.',
       'error',
     );
@@ -977,6 +1032,7 @@ async function uploadPendingFiles(): Promise<void> {
 // No click handler needed here at all.
 
 dropZone.addEventListener('keydown', (e) => {
+  if (fileInput.disabled || isSessionUnavailable) return;
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
     fileInput.click();
@@ -984,6 +1040,7 @@ dropZone.addEventListener('keydown', (e) => {
 });
 
 fileInput.addEventListener('change', () => {
+  if (fileInput.disabled || isSessionUnavailable) return;
   if (fileInput.files?.length) {
     void addFilesToQueue(fileInput.files);
     fileInput.value = ''; // reset so same files can be re-added after removal
@@ -991,6 +1048,7 @@ fileInput.addEventListener('change', () => {
 });
 
 dropZone.addEventListener('dragover', (e) => {
+  if (fileInput.disabled || isSessionUnavailable) return;
   e.preventDefault();
   dropZone.classList.add('drag-over');
 });
@@ -1000,6 +1058,7 @@ dropZone.addEventListener('dragleave', () => {
 dropZone.addEventListener('drop', (e: DragEvent) => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
+  if (fileInput.disabled || isSessionUnavailable) return;
   if (e.dataTransfer?.files.length) void addFilesToQueue(e.dataTransfer.files);
 });
 
@@ -1010,7 +1069,7 @@ retrySessionButton.addEventListener('click', () => {
 
 uploadForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  if (appState !== 'session-ready') return;
+  if (appState !== 'session-ready' && appState !== 'all-done') return;
   void uploadPendingFiles();
 });
 
@@ -1021,6 +1080,10 @@ window.addEventListener('focus', () => {
 window.addEventListener('pageshow', () => {
   void refreshSessionLease();
 });
+toastCloseBtn?.addEventListener('click', () => {
+  if (uploadToast) uploadToast.hidden = true;
+});
 
 setDocumentConversionEnabled(documentConversionEnabled);
+updateDropZoneEnabled();
 void initSession();

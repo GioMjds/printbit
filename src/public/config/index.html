@@ -1125,6 +1125,55 @@
       </div>
     </dialog>
 
+    <!-- Blank Page Warning Modal -->
+    <dialog id="blankPageWarningDialog" class="blank-warning-dialog" aria-labelledby="blankWarningTitle">
+      <div class="blank-warning-content">
+        <div class="blank-warning-header">
+          <div class="blank-warning-icon-pill" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+          <div class="blank-warning-title-group">
+            <h2 id="blankWarningTitle" class="blank-warning-title">Blank Pages Detected</h2>
+            <p class="blank-warning-subtitle">Selected pages contain 0% ink coverage</p>
+          </div>
+          <button type="button" id="blankWarningCloseBtn" class="blank-warning-close-btn" aria-label="Close warning">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="blank-warning-body">
+          <p class="blank-warning-text">
+            Printing blank pages uses physical sheets and will be charged to your print total.
+          </p>
+          <div class="blank-warning-pages-box">
+            <span class="blank-warning-pages-label">Detected blank page(s):</span>
+            <div id="blankWarningPagesList" class="blank-warning-pages-list"></div>
+          </div>
+        </div>
+
+        <div class="blank-warning-actions">
+          <button type="button" id="blankWarningExcludeBtn" class="blank-warning-btn blank-warning-btn--primary">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+            <span>Exclude Blank Pages & Continue</span>
+          </button>
+          <button type="button" id="blankWarningKeepBtn" class="blank-warning-btn blank-warning-btn--secondary">
+            <span>Print Blank Pages Anyway</span>
+          </button>
+          <button type="button" id="blankWarningAdjustBtn" class="blank-warning-btn blank-warning-btn--ghost">
+            <span>Adjust Selection on Config</span>
+          </button>
+        </div>
+      </div>
+    </dialog>
+
     <script src="/config/app.js"></script>
   </body>
 </html>

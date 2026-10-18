@@ -37,7 +37,40 @@ function toPipePath(pipeName: string): string {
     : `\\\\.\\pipe\\${pipeName}`;
 }
 
+let activeQueuePromise: Promise<unknown> = Promise.resolve();
+let queueLength = 0;
+
+export function getDocumentConversionQueueLength(): number {
+  return queueLength;
+}
+
+export function _resetConversionQueueForTesting(): void {
+  activeQueuePromise = Promise.resolve();
+  queueLength = 0;
+}
+
+function enqueueConversion<T>(task: () => Promise<T>): Promise<T> {
+  queueLength++;
+  const runTask = async () => {
+    try {
+      return await task();
+    } finally {
+      queueLength = Math.max(0, queueLength - 1);
+    }
+  };
+  const nextPromise = activeQueuePromise.then(runTask, runTask);
+  activeQueuePromise = nextPromise.catch(() => {});
+  return nextPromise;
+}
+
 export async function convertDocumentViaWorker(
+  sourcePath: string,
+  options?: ConvertDocumentOptions,
+): Promise<DocumentConversionResult> {
+  return enqueueConversion(() => executeConversion(sourcePath, options));
+}
+
+function executeConversion(
   sourcePath: string,
   options?: ConvertDocumentOptions,
 ): Promise<DocumentConversionResult> {
