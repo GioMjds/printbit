@@ -346,7 +346,13 @@ const SECURITY_CHECK_FAILED_MESSAGE =
   'Security check: File format could not be verified. Please save as standard PDF or image.';
 
 function isSecurityCheckFailure(r: UploadErrorResponse): boolean {
-  if (r.code === 'FILE_INFECTED' || r.code === 'DISGUISED_EXECUTABLE') {
+  if (
+    r.code === 'FILE_INFECTED' ||
+    r.code === 'DISGUISED_EXECUTABLE' ||
+    r.code === 'DISGUISED_FILE' ||
+    r.code === 'SCAN_UNAVAILABLE' ||
+    r.code === 'SCAN_FAILED'
+  ) {
     return true;
   }
   if (
@@ -361,22 +367,26 @@ function isSecurityCheckFailure(r: UploadErrorResponse): boolean {
 }
 
 function mapError(r: UploadErrorResponse): string {
-  if (isSecurityCheckFailure(r)) {
-    return SECURITY_CHECK_FAILED_MESSAGE;
-  }
-
   switch (r.code) {
+    case 'DISGUISED_FILE':
+      return 'Security check: File format mismatch (disguised or corrupt file). Please use standard PDF or images.';
+    case 'DISGUISED_EXECUTABLE':
+      return r.error ?? 'Files with executable or script extension patterns (.exe, .ts, .py, etc.) are not allowed.';
+    case 'SCAN_UNAVAILABLE':
+      return 'Kiosk antivirus scanner is temporarily unavailable. Please retry in a few moments.';
+    case 'SCAN_FAILED':
+      return 'File security scan timed out or failed. Please retry in a moment.';
+    case 'FILE_INFECTED':
+      return r.error ?? 'File was identified as containing potential malware.';
     case 'DUPLICATE_FILE':
       return 'This file was already sent in this session.';
     case 'INVALID_TOKEN':
       return 'Invalid token. Scan a fresh kiosk QR or reopen the upload link from the kiosk.';
-    case 'DISGUISED_EXECUTABLE':
-      return r.error ?? 'Files with executable extension patterns are not allowed.';
-    case 'FILE_INFECTED':
-      return r.error ?? 'File was identified as containing potential malware.';
     case 'UNSUPPORTED_TYPE':
-      return r.error ?? 'Unsupported file type.';
     case 'UNSUPPORTED_FILE_TYPE':
+      if (isSecurityCheckFailure(r)) {
+        return SECURITY_CHECK_FAILED_MESSAGE;
+      }
       return r.error ?? 'Unsupported file type.';
     case 'FILE_TOO_LARGE':
       return r.error ?? 'File exceeds the 25 MB limit.';
@@ -393,6 +403,9 @@ function mapError(r: UploadErrorResponse): string {
     case 'SESSION_PERSIST_FAILED':
       return 'Kiosk could not save session changes. Please start a new kiosk session and retry.';
     default:
+      if (isSecurityCheckFailure(r)) {
+        return SECURITY_CHECK_FAILED_MESSAGE;
+      }
       return r.error ?? 'Upload failed.';
   }
 }
@@ -851,6 +864,16 @@ function attachSocket(sid: string): void {
     setStatus('Kiosk reported an upload error. Please retry.', 'error');
   });
 
+  socket.on('UploadRejected', (info: unknown) => {
+    const data =
+      typeof info === 'object' && info !== null
+        ? (info as { filename?: string; reason?: string })
+        : undefined;
+    const name = data?.filename ?? 'File';
+    const reason = data?.reason ?? 'Rejected by kiosk security check.';
+    setStatus(`⚠ ${name}: ${reason}`, 'error');
+  });
+
   socket.on('AnalysisStarted', (info: unknown) => {
     const name =
       typeof info === 'object' &&
@@ -1005,7 +1028,7 @@ async function uploadPendingFiles(): Promise<void> {
   } else if (doneCount > 0 && errorCount > 0) {
     setStatus(
       securityErrorCount > 0
-        ? `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} rejected by security check. Please remove unsupported files.`
+        ? `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} rejected by security check. Please remove unsupported or disguised files.`
         : `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} failed. You can retry failed items.`,
       'info',
     );
@@ -1014,8 +1037,8 @@ async function uploadPendingFiles(): Promise<void> {
   } else {
     setStatus(
       securityErrorCount > 0
-        ? 'Upload rejected by security check. Please check your file format and try again.'
-        : 'All uploads failed. Please check your network/internet connection and try again.',
+        ? 'Upload rejected by security check. Check file format (avoid disguised files) or retry shortly.'
+        : 'All uploads failed. Please check your network connection and try again.',
       'error',
     );
     setAppState('session-ready');

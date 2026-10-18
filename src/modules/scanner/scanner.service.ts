@@ -386,7 +386,7 @@ export class ScannerService {
     }
 
     const simulation = getPrinterSimulationState();
-    if (simulation.active && simulation.activeError === 'adf_error') {
+    if (simulation.activeError === 'adf_error') {
       throw new Error(
         'Printer ADF Error Detected. Clear the printer ADF error or paper jam, then proceed with scanning.',
       );

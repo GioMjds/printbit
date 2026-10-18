@@ -13,6 +13,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NAPS2.Images.Gdi" Version="1.5.0" />
+    <PackageReference Include="NAPS2.Sdk" Version="1.5.0" />
+    <PackageReference Include="NAPS2.Sdk.Worker.Win32" Version="1.5.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.8" />
   </ItemGroup>
 

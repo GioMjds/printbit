@@ -1108,6 +1108,10 @@ body {
   color: var(--lavender);
 }
 
+.footer-hint.error {
+  color: #f87171;
+}
+
 /* Continue button */
 .continue-btn {
   display: inline-flex;

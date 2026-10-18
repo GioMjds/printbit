@@ -411,6 +411,7 @@ const modalDuplexSavingsValue = document.getElementById(
 const modalPrice = document.getElementById('modalPrice');
 const modalPaid = document.getElementById('modalPaid');
 const modalChange = document.getElementById('modalChange');
+const modalReviewStepBadge = document.getElementById('modalReviewStepBadge');
 
 // Confirmation Modal — Step 1 (Tray Check) Elements
 const modalTrayOkBtn = document.getElementById(
@@ -1083,6 +1084,13 @@ if (modalConfirmBtnSpan) {
       : config.mode === 'copy'
         ? 'Copy now'
         : 'Download now';
+}
+
+if (confirmModal) {
+  confirmModal.dataset.mode = config.mode || 'print';
+}
+if (modalReviewStepBadge && config.mode === 'scan') {
+  modalReviewStepBadge.setAttribute('hidden', '');
 }
 
 let coinLottiePlayer: DotLottie | null = null;
@@ -2504,7 +2512,16 @@ function showModal(): void {
   // Scan jobs have no physical paper tray to check — start directly on the
   // review/pay step. Print and copy jobs start on the tray-check step.
   if (confirmModal) {
+    confirmModal.dataset.mode = config.mode || 'print';
     confirmModal.dataset.step = config.mode === 'scan' ? 'review' : 'tray';
+  }
+
+  if (modalReviewStepBadge) {
+    if (config.mode === 'scan') {
+      modalReviewStepBadge.setAttribute('hidden', '');
+    } else {
+      modalReviewStepBadge.removeAttribute('hidden');
+    }
   }
 
   const modeKey = (config.mode || 'print').toLowerCase();
@@ -2730,7 +2747,7 @@ modalCancelBtn?.addEventListener('click', () => {
   // hideModal() stays a full close for everywhere else that calls it
   // (including modalConfirmBtn's handler below, which depends on that).
   if (!confirmModal) return;
-  if (confirmModal.dataset.step === 'review') {
+  if (confirmModal.dataset.step === 'review' && config.mode !== 'scan') {
     confirmModal.dataset.step = 'tray';
     modalReviewLottiePlayer?.pause();
     modalTrayLottiePlayer?.play();

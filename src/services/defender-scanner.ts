@@ -63,7 +63,10 @@ export interface DefenderScannerDeps {
   readonly config?: DefenderConfig;
   readonly fsAdapter?: FsAdapter;
   readonly env?: NodeJS.ProcessEnv;
-  readonly workerClient?: Pick<PlatformWorkerClient, 'getDefenderHealth' | 'scanFileSecurity'>;
+  readonly workerClient?: Pick<
+    PlatformWorkerClient,
+    'getDefenderHealth' | 'scanFileSecurity'
+  >;
   readonly logger?: Pick<Console, 'warn' | 'error' | 'log'>;
 }
 
@@ -134,10 +137,7 @@ const APPROVED_STATIC_FALLBACK = path.resolve(
 
 export function resolveMpCmdRunPath(fsAdapter: FsAdapter = fs): string | null {
   try {
-    if (
-      fsAdapter.readdirSync &&
-      fsAdapter.existsSync(APPROVED_PLATFORM_ROOT)
-    ) {
+    if (fsAdapter.readdirSync && fsAdapter.existsSync(APPROVED_PLATFORM_ROOT)) {
       const entries = fsAdapter.readdirSync(APPROVED_PLATFORM_ROOT);
       // Sort in descending order to prefer newest platform update folder
       const sorted = [...entries].sort().reverse();
@@ -173,16 +173,82 @@ export class DefaultDefenderScanner implements DefenderScanner {
   private readonly config: DefenderConfig;
   private readonly fsAdapter: FsAdapter;
 
-  constructor(deps: DefenderScannerDeps = {}) {
+  private cachedHealth: { health: DefenderHealth; expiresAt: number } | null =
+    null;
+  private inFlightHealth: Promise<DefenderHealth> | null = null;
+  private readonly healthTtlMs: number;
+  private activeScans = 0;
+  private readonly maxConcurrentScans: number;
+  private readonly scanQueue: Array<() => void> = [];
+
+  constructor(
+    deps: DefenderScannerDeps = {},
+    healthTtlMs = 60_000,
+    maxConcurrentScans = 2,
+  ) {
     this.runner = deps.runner ?? DEFAULT_RUNNER;
     this.config = deps.config ?? getDefenderConfig();
     this.fsAdapter = deps.fsAdapter ?? fs;
+    this.healthTtlMs = healthTtlMs;
+    this.maxConcurrentScans = Math.max(1, maxConcurrentScans);
+  }
+
+  private async acquireScanSlot(): Promise<void> {
+    if (this.activeScans < this.maxConcurrentScans) {
+      this.activeScans += 1;
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      this.scanQueue.push(() => {
+        this.activeScans += 1;
+        resolve();
+      });
+    });
+  }
+
+  private releaseScanSlot(): void {
+    this.activeScans -= 1;
+    const next = this.scanQueue.shift();
+    if (next) {
+      next();
+    }
+  }
+
+  clearHealthCache(): void {
+    this.cachedHealth = null;
+    this.inFlightHealth = null;
   }
 
   async getHealth(): Promise<DefenderHealth> {
+    const now = Date.now();
+    if (this.cachedHealth && now < this.cachedHealth.expiresAt) {
+      return this.cachedHealth.health;
+    }
+
+    if (this.inFlightHealth) {
+      return this.inFlightHealth;
+    }
+
+    this.inFlightHealth = this.queryHealthInternal()
+      .then((health) => {
+        const ttl = health.status === 'clean' ? this.healthTtlMs : 5_000;
+        this.cachedHealth = {
+          health,
+          expiresAt: Date.now() + ttl,
+        };
+        return health;
+      })
+      .finally(() => {
+        this.inFlightHealth = null;
+      });
+
+    return this.inFlightHealth;
+  }
+
+  private async queryHealthInternal(): Promise<DefenderHealth> {
     try {
       const psCommand =
-        'Get-MpComputerStatus | Select-Object AMRunningMode, AntivirusEnabled, AntivirusSignatureLastUpdated | ConvertTo-Json';
+        'try { Get-CimInstance -Namespace ROOT\\Microsoft\\Windows\\Defender -ClassName MSFT_MpComputerStatus -ErrorAction Stop | Select-Object AMRunningMode, AntivirusEnabled, AntivirusSignatureLastUpdated | ConvertTo-Json } catch { Get-MpComputerStatus | Select-Object AMRunningMode, AntivirusEnabled, AntivirusSignatureLastUpdated | ConvertTo-Json }';
 
       const result = await this.runner.run(
         'powershell.exe',
@@ -225,13 +291,15 @@ export class DefaultDefenderScanner implements DefenderScanner {
       }
 
       const isEnabled = parsed.AntivirusEnabled === true;
-      const isNormalMode = parsed.AMRunningMode === 'Normal' || parsed.AMRunningMode === 0;
+      const isNormalMode =
+        parsed.AMRunningMode === 'Normal' || parsed.AMRunningMode === 0;
 
       if (!isEnabled || !isNormalMode) {
         return {
           status: 'unavailable',
           signatureAgeHours: null,
-          detail: 'Microsoft Defender Antivirus is disabled or not in Normal mode.',
+          detail:
+            'Microsoft Defender Antivirus is disabled or not in Normal mode.',
         };
       }
 
@@ -240,7 +308,8 @@ export class DefaultDefenderScanner implements DefenderScanner {
         return {
           status: 'unavailable',
           signatureAgeHours: null,
-          detail: 'AntivirusSignatureLastUpdated was missing from status output.',
+          detail:
+            'AntivirusSignatureLastUpdated was missing from status output.',
         };
       }
 
@@ -299,10 +368,12 @@ export class DefaultDefenderScanner implements DefenderScanner {
       return {
         status: 'unavailable',
         detectionName: null,
-        detail: 'Microsoft Defender command-line tool (MpCmdRun.exe) was not found in approved locations.',
+        detail:
+          'Microsoft Defender command-line tool (MpCmdRun.exe) was not found in approved locations.',
       };
     }
 
+    await this.acquireScanSlot();
     try {
       const args = [
         '-Scan',
@@ -328,11 +399,14 @@ export class DefaultDefenderScanner implements DefenderScanner {
       }
 
       const combinedOutput = `${result.stdout}\n${result.stderr}`;
-      const threatMatch =
-        /(?:Threat(?:\s+detected)?\s*:\s*)([^\r\n]+)/i.exec(combinedOutput);
+      const threatMatch = /(?:Threat(?:\s+detected)?\s*:\s*)([^\r\n]+)/i.exec(
+        combinedOutput,
+      );
 
       if (result.exitCode === 2 || threatMatch) {
-        const detectionName = threatMatch ? threatMatch[1].trim() : 'ThreatDetected';
+        const detectionName = threatMatch
+          ? threatMatch[1].trim()
+          : 'ThreatDetected';
         return {
           status: 'infected',
           detectionName,
@@ -352,7 +426,9 @@ export class DefaultDefenderScanner implements DefenderScanner {
         status: 'failed',
         detectionName: null,
         detail: truncateDiagnostic(
-          result.stderr || result.stdout || `Scan failed with exit code ${result.exitCode}`,
+          result.stderr ||
+            result.stdout ||
+            `Scan failed with exit code ${result.exitCode}`,
         ),
       };
     } catch (err) {
@@ -363,13 +439,18 @@ export class DefaultDefenderScanner implements DefenderScanner {
           err instanceof Error ? err.message : String(err),
         ),
       };
+    } finally {
+      this.releaseScanSlot();
     }
   }
 }
 
 export class MigratingDefenderScanner implements DefenderScanner {
   private readonly legacyScanner: DefenderScanner;
-  private readonly workerClient: Pick<PlatformWorkerClient, 'getDefenderHealth' | 'scanFileSecurity'>;
+  private readonly workerClient: Pick<
+    PlatformWorkerClient,
+    'getDefenderHealth' | 'scanFileSecurity'
+  >;
   private readonly logger: Pick<Console, 'warn' | 'error' | 'log'>;
 
   constructor(deps: DefenderScannerDeps = {}) {
@@ -393,9 +474,12 @@ export class MigratingDefenderScanner implements DefenderScanner {
       return this.legacyScanner.getHealth();
     }
 
-    const validStatus = (res.status === 'clean' || res.status === 'stale' || res.status === 'unavailable')
-      ? res.status
-      : 'unavailable';
+    const validStatus =
+      res.status === 'clean' ||
+      res.status === 'stale' ||
+      res.status === 'unavailable'
+        ? res.status
+        : 'unavailable';
 
     return {
       status: validStatus,
@@ -419,8 +503,17 @@ export class MigratingDefenderScanner implements DefenderScanner {
       return this.legacyScanner.scanFile(stagedPath);
     }
 
-    const validStatuses: DefenderScanStatus[] = ['clean', 'infected', 'unavailable', 'stale', 'timeout', 'failed'];
-    const status: DefenderScanStatus = validStatuses.includes(res.status as DefenderScanStatus)
+    const validStatuses: DefenderScanStatus[] = [
+      'clean',
+      'infected',
+      'unavailable',
+      'stale',
+      'timeout',
+      'failed',
+    ];
+    const status: DefenderScanStatus = validStatuses.includes(
+      res.status as DefenderScanStatus,
+    )
       ? (res.status as DefenderScanStatus)
       : 'failed';
 
@@ -436,8 +529,25 @@ export function createDefenderScanner(
   deps: DefenderScannerDeps = {},
 ): DefenderScanner {
   const flags = getPlatformWorkerFlags(deps.env);
+  // NOTE: C# Worker scanner is deprecated to prevent contention on worker print/render queue.
   if (flags.defender) {
     return new MigratingDefenderScanner(deps);
   }
   return new DefaultDefenderScanner(deps);
 }
+
+let sharedDefenderScanner: DefenderScanner | null = null;
+
+export function getSharedDefenderScanner(
+  deps: DefenderScannerDeps = {},
+): DefenderScanner {
+  if (!sharedDefenderScanner) {
+    sharedDefenderScanner = createDefenderScanner(deps);
+  }
+  return sharedDefenderScanner;
+}
+
+export function resetSharedDefenderScanner(): void {
+  sharedDefenderScanner = null;
+}
+

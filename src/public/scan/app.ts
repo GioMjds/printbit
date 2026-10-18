@@ -884,6 +884,9 @@ async function startScan(): Promise<void> {
       void releaseScanFile(previousReleaseToken, 'scan_replaced_by_new_scan');
     }
 
+    // Close scanning overlay immediately once scan payload is received
+    showPreview('result', 'Loading preview…');
+
     if (data.filename.toLowerCase().endsWith('.pdf')) {
       try {
         await loadAndDisplayPdf(data.pages[0], 0);

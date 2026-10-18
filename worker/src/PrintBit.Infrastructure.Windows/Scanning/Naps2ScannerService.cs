@@ -1,20 +1,24 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NAPS2.Images;
+using NAPS2.Images.Gdi;
+using NAPS2.Pdf;
+using NAPS2.Scan;
 using PrintBit.Shared.Configurations;
 
 namespace PrintBit.Infrastructure.Windows.Scanning;
 
-public sealed class Naps2ScannerService : IScannerService
+public sealed class Naps2ScannerService : IScannerService, IDisposable
 {
     private readonly ILogger<Naps2ScannerService> _logger;
     private readonly ScannerSettings _settings;
     private readonly StubScannerService _stubService;
-    private readonly ConcurrentDictionary<string, Process> _activeProcesses = new();
+    private readonly ScanningContext _scanningContext;
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeScans = new();
 
     private ScannerRuntimeStatus _lastKnownStatus;
+    private ScanDevice? _selectedDevice;
 
     public Naps2ScannerService(
         ILogger<Naps2ScannerService> logger,
@@ -24,6 +28,9 @@ public sealed class Naps2ScannerService : IScannerService
         _logger = logger;
         _settings = settings.Value;
         _stubService = new StubScannerService(stubLogger, settings);
+        _scanningContext = new ScanningContext(new GdiImageContext());
+        _scanningContext.SetUpWin32Worker();
+
         _lastKnownStatus = new ScannerRuntimeStatus
         {
             Connected = false,
@@ -43,13 +50,10 @@ public sealed class Naps2ScannerService : IScannerService
             return _lastKnownStatus;
         }
 
-        if (File.Exists(_settings.Naps2Path))
+        var caps = await ProbeCapabilitiesAsync(cancellationToken);
+        if (caps.Available)
         {
-            var caps = await ProbeCapabilitiesAsync(cancellationToken);
-            if (caps.Available)
-            {
-                return _lastKnownStatus;
-            }
+            return _lastKnownStatus;
         }
 
         if (_settings.EnableStubFallback)
@@ -62,51 +66,53 @@ public sealed class Naps2ScannerService : IScannerService
 
     public async Task<ScannerCapabilities> ProbeCapabilitiesAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(_settings.Naps2Path))
+        var drivers = GetProbeDrivers(_settings.PreferredDriver);
+
+        foreach (var driver in drivers)
         {
-            _logger.LogWarning("[SCANNER] NAPS2 executable not found at {path}", _settings.Naps2Path);
-            _lastKnownStatus = _lastKnownStatus with
+            try
             {
-                Connected = false,
-                Adapter = "naps2",
-                LastError = $"NAPS2 executable not found at {_settings.Naps2Path}"
-            };
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.ProbeTimeoutSeconds));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-            if (_settings.EnableStubFallback)
-            {
-                return await _stubService.ProbeCapabilitiesAsync(cancellationToken);
-            }
+                var controller = new ScanController(_scanningContext);
+                var devices = await controller.GetDeviceList(driver);
 
-            return new ScannerCapabilities { Available = false };
-        }
-
-        foreach (var driver in GetProbeDrivers(_settings.PreferredDriver))
-        {
-            var devices = await ListDevicesAsync(driver, cancellationToken);
-            if (devices.Count > 0)
-            {
-                var preferred = SelectPreferredDevice(devices, _settings.PreferredScannerName);
-                if (!string.IsNullOrEmpty(preferred))
+                if (devices.Count > 0)
                 {
-                    _lastKnownStatus = new ScannerRuntimeStatus
+                    var preferred = SelectPreferredDevice(devices, _settings.PreferredScannerName);
+                    if (preferred != null)
                     {
-                        Connected = true,
-                        Adapter = "naps2",
-                        Driver = driver,
-                        DeviceName = preferred,
-                        PreferredName = _settings.PreferredScannerName,
-                        Capabilities = new ScannerCapabilities { Available = true },
-                        UsingStub = false,
-                        LastCheckedAt = DateTime.UtcNow,
-                        LastError = null
-                    };
+                        _selectedDevice = preferred;
+                        _lastKnownStatus = new ScannerRuntimeStatus
+                        {
+                            Connected = true,
+                            Adapter = "naps2",
+                            Driver = driver.ToString().ToLowerInvariant(),
+                            DeviceName = preferred.Name,
+                            PreferredName = _settings.PreferredScannerName,
+                            Capabilities = new ScannerCapabilities { Available = true },
+                            UsingStub = false,
+                            LastCheckedAt = DateTime.UtcNow,
+                            LastError = null
+                        };
 
-                    _logger.LogInformation("[SCANNER] Connected to {driver} device '{device}'", driver.ToUpperInvariant(), preferred);
-                    return _lastKnownStatus.Capabilities!;
+                        _logger.LogInformation("[SCANNER] NAPS2.Sdk connected to {driver} device '{device}'", driver, preferred.Name);
+                        return _lastKnownStatus.Capabilities!;
+                    }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("[SCANNER] {driver} probe timed out or was cancelled", driver);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[SCANNER] Error probing devices for driver {driver}", driver);
+            }
         }
 
+        _selectedDevice = null;
         _lastKnownStatus = new ScannerRuntimeStatus
         {
             Connected = false,
@@ -117,7 +123,7 @@ public sealed class Naps2ScannerService : IScannerService
             Capabilities = new ScannerCapabilities { Available = false },
             UsingStub = false,
             LastCheckedAt = DateTime.UtcNow,
-            LastError = "No compatible TWAIN or WIA scanner found"
+            LastError = "No compatible TWAIN, WIA, or eSCL scanner found"
         };
 
         if (_settings.EnableStubFallback)
@@ -131,12 +137,12 @@ public sealed class Naps2ScannerService : IScannerService
 
     public async Task<ScanResult> ExecuteScanAsync(ScanRequest request, CancellationToken cancellationToken = default)
     {
-        // Reuse known connected status if fresh to avoid 4-5s NAPS2 --listdevices probing overhead
-        var status = (_lastKnownStatus.Connected && !string.IsNullOrWhiteSpace(_lastKnownStatus.DeviceName))
+        // Reuse known connected status if fresh to avoid probing overhead
+        var status = (_lastKnownStatus.Connected && !string.IsNullOrWhiteSpace(_lastKnownStatus.DeviceName) && _selectedDevice != null)
             ? _lastKnownStatus
             : await GetStatusAsync(cancellationToken);
 
-        if (status.UsingStub || !File.Exists(_settings.Naps2Path) || !status.Connected)
+        if (status.UsingStub || !status.Connected || _selectedDevice == null)
         {
             if (_settings.EnableStubFallback)
             {
@@ -167,103 +173,79 @@ public sealed class Naps2ScannerService : IScannerService
         var fileName = $"scan-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.{ext}";
         var outputPath = Path.Combine(outputDir, fileName);
 
-        var args = BuildNaps2Args(
-            outputPath,
-            status.Driver,
-            status.DeviceName!,
-            request.Source,
-            request.Dpi,
-            request.ColorMode,
-            request.PaperSize);
+        var isFeeder = request.Source.Equals("adf", StringComparison.OrdinalIgnoreCase)
+            || request.Source.Equals("feeder", StringComparison.OrdinalIgnoreCase);
 
-        var psi = new ProcessStartInfo
+        var options = new ScanOptions
         {
-            FileName = _settings.Naps2Path,
-            Arguments = args,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
+            Device = _selectedDevice,
+            PaperSource = isFeeder ? PaperSource.Feeder : PaperSource.Flatbed,
+            Dpi = request.Dpi > 0 ? request.Dpi : 300,
+            BitDepth = request.ColorMode.Equals("grayscale", StringComparison.OrdinalIgnoreCase)
+                ? BitDepth.Grayscale : BitDepth.Color
         };
 
-        var stdoutBuilder = new StringBuilder();
-        var stderrBuilder = new StringBuilder();
-
-        using var proc = new Process { StartInfo = psi };
-        proc.OutputDataReceived += (_, e) => { if (e.Data != null) stdoutBuilder.AppendLine(e.Data); };
-        proc.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrBuilder.AppendLine(e.Data); };
-
-        _activeProcesses[request.RequestId] = proc;
+        var normPaper = request.PaperSize?.Trim().ToLowerInvariant();
+        options.PageSize = normPaper switch
+        {
+            "a4" => PageSize.A4,
+            "letter" or "short" => isFeeder ? PageSize.Letter : new PageSize(216m, 279m, PageSizeUnit.Millimetre),
+            "legal" or "folio" or "long" => new PageSize(216m, 330m, PageSizeUnit.Millimetre),
+            _ => isFeeder ? null : new PageSize(216m, 297m, PageSizeUnit.Millimetre)
+        };
 
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.ScanTimeoutSeconds));
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        _activeScans[request.RequestId] = linkedCts;
+
+        var controller = new ScanController(_scanningContext);
+        var images = new List<ProcessedImage>();
 
         try
         {
-            _logger.LogInformation("[SCANNER] Spawning NAPS2 for request {requestId}: {args}", request.RequestId, args);
-            proc.Start();
-            proc.BeginOutputReadLine();
-            proc.BeginErrorReadLine();
+            _logger.LogInformation(
+                "[SCANNER] Starting NAPS2.Sdk scan for request {requestId} ({source}, {dpi} DPI, {color}, device: {device})",
+                request.RequestId, request.Source, options.Dpi, request.ColorMode, _selectedDevice.Name);
 
-            await proc.WaitForExitAsync(linkedCts.Token);
-
-            if (proc.ExitCode != 0)
+            await foreach (var image in controller.Scan(options, linkedCts.Token))
             {
-                var stderr = stderrBuilder.ToString().Trim();
-                _logger.LogError("[SCANNER] NAPS2 process exited with code {code}: {err}", proc.ExitCode, stderr);
+                images.Add(image);
+                _logger.LogInformation("[SCANNER] Page {page} scanned for request {requestId}", images.Count, request.RequestId);
+            }
 
-                var errorCode = "PROCESS_FAILED";
-                if (stderr.Contains("feeder", StringComparison.OrdinalIgnoreCase) || stderr.Contains("empty", StringComparison.OrdinalIgnoreCase))
-                    errorCode = "FEEDER_EMPTY";
-                else if (stderr.Contains("jam", StringComparison.OrdinalIgnoreCase))
-                    errorCode = "PAPER_JAM";
-                else if (stderr.Contains("busy", StringComparison.OrdinalIgnoreCase))
-                    errorCode = "DEVICE_BUSY";
-
-                if (File.Exists(outputPath)) File.Delete(outputPath);
-
+            if (images.Count == 0)
+            {
+                _logger.LogWarning("[SCANNER] Scan completed with 0 pages for request {requestId}", request.RequestId);
                 return new ScanResult
                 {
                     Success = false,
-                    ErrorCode = errorCode,
-                    ErrorMessage = string.IsNullOrWhiteSpace(stderr) ? $"NAPS2 exit code {proc.ExitCode}" : stderr
+                    ErrorCode = isFeeder ? "FEEDER_EMPTY" : "OUTPUT_FILE_MISSING",
+                    ErrorMessage = isFeeder ? "ADF feeder is empty or paper feed not detected" : "No pages received from scanner"
                 };
             }
 
-            if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
+            if (ext == "pdf")
             {
-                return new ScanResult
-                {
-                    Success = false,
-                    ErrorCode = "OUTPUT_FILE_MISSING",
-                    ErrorMessage = "Scan process finished successfully but output file is missing or zero bytes"
-                };
+                var pdfExporter = new PdfExporter(_scanningContext);
+                await pdfExporter.Export(outputPath, images);
+            }
+            else
+            {
+                images[0].Save(outputPath);
             }
 
-            _logger.LogInformation("[SCANNER] Scan completed successfully -> {path}", outputPath);
+            _logger.LogInformation("[SCANNER] Scan completed successfully ({count} pages) -> {path}", images.Count, outputPath);
             return new ScanResult
             {
                 Success = true,
                 OutputPath = outputPath,
-                PageCount = 1,
+                PageCount = images.Count,
                 Format = ext
             };
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("[SCANNER] Scan execution cancelled or timed out for request {requestId}", request.RequestId);
-            try
-            {
-                if (!proc.HasExited)
-                {
-                    proc.Kill(entireProcessTree: true);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "[SCANNER] Failed killing process tree for request {requestId}", request.RequestId);
-            }
-
             if (File.Exists(outputPath)) File.Delete(outputPath);
 
             var code = timeoutCts.IsCancellationRequested ? "SCAN_TIMEOUT" : "CANCELLED";
@@ -276,23 +258,45 @@ public sealed class Naps2ScannerService : IScannerService
                     : "Scan cancelled"
             };
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[SCANNER] NAPS2.Sdk scan error for request {requestId}: {msg}", request.RequestId, ex.Message);
+            if (File.Exists(outputPath)) File.Delete(outputPath);
+
+            var errorCode = "PROCESS_FAILED";
+            var msg = ex.Message ?? "";
+            if (msg.Contains("feeder", StringComparison.OrdinalIgnoreCase) || msg.Contains("empty", StringComparison.OrdinalIgnoreCase))
+                errorCode = "FEEDER_EMPTY";
+            else if (msg.Contains("jam", StringComparison.OrdinalIgnoreCase))
+                errorCode = "PAPER_JAM";
+            else if (msg.Contains("busy", StringComparison.OrdinalIgnoreCase))
+                errorCode = "DEVICE_BUSY";
+
+            return new ScanResult
+            {
+                Success = false,
+                ErrorCode = errorCode,
+                ErrorMessage = string.IsNullOrWhiteSpace(msg) ? "Scanning failed." : msg
+            };
+        }
         finally
         {
-            _activeProcesses.TryRemove(request.RequestId, out _);
+            _activeScans.TryRemove(request.RequestId, out _);
+            foreach (var img in images)
+            {
+                if (img is IDisposable d) d.Dispose();
+            }
         }
     }
 
     public Task<bool> CancelScanAsync(string requestId)
     {
-        if (_activeProcesses.TryGetValue(requestId, out var proc))
+        if (_activeScans.TryGetValue(requestId, out var cts))
         {
             try
             {
-                if (!proc.HasExited)
-                {
-                    proc.Kill(entireProcessTree: true);
-                    return Task.FromResult(true);
-                }
+                cts.Cancel();
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
@@ -302,164 +306,36 @@ public sealed class Naps2ScannerService : IScannerService
         return _stubService.CancelScanAsync(requestId);
     }
 
-    private async Task<List<string>> ListDevicesAsync(string driver, CancellationToken cancellationToken)
+    private static Driver[] GetProbeDrivers(string preferredDriver)
     {
-        var psi = new ProcessStartInfo
+        var pref = preferredDriver?.Trim().ToLowerInvariant();
+        return pref switch
         {
-            FileName = _settings.Naps2Path,
-            Arguments = $"--listdevices --driver {driver}",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
+            "twain" => [Driver.Twain, Driver.Wia, Driver.Escl],
+            "escl" => [Driver.Escl, Driver.Wia, Driver.Twain],
+            _ => [Driver.Wia, Driver.Twain, Driver.Escl]
         };
-
-        using var proc = new Process { StartInfo = psi };
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.ProbeTimeoutSeconds));
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
-        var started = false;
-        try
-        {
-            if (!proc.Start()) return [];
-            started = true;
-
-            var stdoutTask = proc.StandardOutput.ReadToEndAsync(linkedCts.Token);
-            var stderrTask = proc.StandardError.ReadToEndAsync(linkedCts.Token);
-
-            await proc.WaitForExitAsync(linkedCts.Token);
-
-            var stdout = await stdoutTask;
-            var stderr = await stderrTask;
-
-            if (proc.ExitCode == 0)
-            {
-                return stdout
-                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(line => line.Trim())
-                    .Where(line => !string.IsNullOrWhiteSpace(line))
-                    .ToList();
-            }
-
-            _logger.LogWarning(
-                "[SCANNER] NAPS2 {driver} probe exited with code {code}: {error}",
-                driver,
-                proc.ExitCode,
-                stderr.Trim());
-        }
-        catch (OperationCanceledException)
-        {
-            if (started)
-            {
-                await TerminateProbeProcessAsync(proc, driver);
-            }
-
-            if (timeoutCts.IsCancellationRequested)
-            {
-                _logger.LogDebug(
-                    "[SCANNER] {driver} probe timed out after {seconds}s",
-                    driver.ToUpperInvariant(),
-                    _settings.ProbeTimeoutSeconds);
-            }
-            else
-            {
-                _logger.LogDebug("[SCANNER] {driver} probe was cancelled", driver.ToUpperInvariant());
-            }
-
-            return [];
-        }
-        catch (Exception ex)
-        {
-            if (started)
-            {
-                await TerminateProbeProcessAsync(proc, driver);
-            }
-
-            _logger.LogWarning(ex, "[SCANNER] Error probing devices for driver {driver}", driver);
-        }
-        return [];
     }
 
-    private async Task TerminateProbeProcessAsync(Process proc, string driver)
-    {
-        try
-        {
-            if (!proc.HasExited)
-            {
-                proc.Kill(entireProcessTree: true);
-                await proc.WaitForExitAsync(CancellationToken.None);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "[SCANNER] Failed terminating {driver} probe", driver);
-        }
-    }
-
-    private static string[] GetProbeDrivers(string preferredDriver) =>
-        preferredDriver.Equals("wia", StringComparison.OrdinalIgnoreCase)
-            ? ["wia", "twain"]
-            : ["twain", "wia"];
-
-    public static string? SelectPreferredDevice(IReadOnlyList<string> devices, string preferredName)
+    public static ScanDevice? SelectPreferredDevice(IReadOnlyList<ScanDevice> devices, string preferredName)
     {
         if (devices.Count == 0) return null;
         var preferredLower = preferredName.ToLowerInvariant();
 
-        var exact = devices.FirstOrDefault(d => d.Equals(preferredName, StringComparison.OrdinalIgnoreCase));
+        var exact = devices.FirstOrDefault(d => d.Name.Equals(preferredName, StringComparison.OrdinalIgnoreCase));
         if (exact != null) return exact;
 
-        var partial = devices.FirstOrDefault(d => d.ToLowerInvariant().Contains(preferredLower));
+        var partial = devices.FirstOrDefault(d => d.Name.ToLowerInvariant().Contains(preferredLower));
         if (partial != null) return partial;
 
-        var epson = devices.FirstOrDefault(d => d.ToLowerInvariant().Contains("epson"));
+        var epson = devices.FirstOrDefault(d => d.Name.ToLowerInvariant().Contains("epson"));
         if (epson != null) return epson;
 
         return devices[0];
     }
 
-    private static string BuildNaps2Args(
-        string outputPath,
-        string driver,
-        string deviceName,
-        string source,
-        int dpi,
-        string colorMode,
-        string? paperSize)
+    public void Dispose()
     {
-        var sb = new StringBuilder();
-        sb.Append("--noprofile ");
-        sb.Append($"-o \"{outputPath}\" ");
-        sb.Append($"--driver {driver} ");
-        sb.Append($"--device \"{deviceName}\" ");
-        sb.Append(source.Equals("adf", StringComparison.OrdinalIgnoreCase) || source.Equals("feeder", StringComparison.OrdinalIgnoreCase)
-            ? "--source feeder "
-            : "--source glass ");
-        sb.Append($"--dpi {dpi} ");
-        sb.Append(colorMode.Equals("grayscale", StringComparison.OrdinalIgnoreCase)
-            ? "--bitdepth gray "
-            : "--bitdepth color ");
-        sb.Append("--jpegquality 75 ");
-        sb.Append("--disableocr ");
-        sb.Append("--force --verbose ");
-
-        var isFeeder = source.Equals("adf", StringComparison.OrdinalIgnoreCase)
-            || source.Equals("feeder", StringComparison.OrdinalIgnoreCase);
-        var normPaper = paperSize?.Trim().ToLowerInvariant();
-        var pageSize = isFeeder ? normPaper switch
-        {
-            "a4" => "a4",
-            "letter" or "short" => "letter",
-            "legal" or "folio" or "long" => "216x330mm",
-            _ => null
-        } : normPaper switch
-        {
-            "letter" or "short" => "216x279mm",
-            "legal" or "folio" or "long" => "216x330mm",
-            _ => "216x297mm"
-        };
-        if (pageSize is not null) sb.Append($"--pagesize {pageSize} ");
-
-        return sb.ToString().Trim();
+        _scanningContext.Dispose();
     }
 }

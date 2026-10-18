@@ -1210,10 +1210,27 @@ function attachSocket(sid: string): void {
   });
   socket.on('UploadCompleted', () => {
     removeIncomingUploadSkeleton();
+    if (footerHint) {
+      footerHint.classList.remove('error');
+    }
     void checkUploadStatus();
   });
   socket.on('UploadFailed', () => {
     removeIncomingUploadSkeleton();
+  });
+  socket.on('UploadRejected', (raw: unknown) => {
+    removeIncomingUploadSkeleton();
+    const data =
+      typeof raw === 'object' && raw !== null
+        ? (raw as { filename?: string; code?: string; reason?: string })
+        : undefined;
+    const name = data?.filename ?? 'File';
+    const reason = data?.reason ?? 'Upload rejected by security validation.';
+    if (footerHint) {
+      footerHint.textContent = `⚠ ${name}: ${reason}`;
+      footerHint.classList.remove('ready');
+      footerHint.classList.add('error');
+    }
   });
   socket.on('UploadRemoved', () => {
     removeIncomingUploadSkeleton();

@@ -4,6 +4,7 @@ import {
   handleMulterError,
   validateMagicBytes,
   scanForMalware,
+  setUploadRejectionNotifier,
 } from '@/middleware/file-validation';
 import { createRateLimit } from '@/middleware/rate-limit';
 import { createKioskAccessMiddleware } from '@/middleware/kiosk-access';
@@ -39,6 +40,17 @@ export class WirelessSessionController {
   }
 
   private initializeRoutes(): void {
+    setUploadRejectionNotifier(({ sessionId, filename, code, reason }) => {
+      if (sessionId) {
+        this.wirelessSessionService.notifyUploadRejected(
+          sessionId,
+          filename ?? 'File',
+          code,
+          reason,
+        );
+      }
+    });
+
     this.router.get(
       '/api/wireless/sessions',
       createKioskAccessMiddleware(),
@@ -88,6 +100,15 @@ export class WirelessSessionController {
       wirelessUploadRateLimit,
       this.wirelessSessionService.verifyKioskOrOwnedUploadTarget,
       uploadMiddleware.single('file'),
+      (req, _res, next) => {
+        if (req.file && typeof req.params?.sessionId === 'string') {
+          this.wirelessSessionService.notifyUploadStarted(
+            req.params.sessionId,
+            req.file.originalname,
+          );
+        }
+        next();
+      },
       validateMagicBytes,
       scanForMalware,
       this.wirelessSessionService.uploadToSession,

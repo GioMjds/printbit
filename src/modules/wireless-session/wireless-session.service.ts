@@ -1028,6 +1028,23 @@ export class WirelessSessionService {
     this.deps.sessionIo.to(room).emit(event, payload);
   }
 
+  notifyUploadStarted(sessionId: string, filename: string): void {
+    this.emitToSession(sessionId, 'UploadStarted', filename);
+  }
+
+  notifyUploadRejected(
+    sessionId: string,
+    filename: string,
+    code: string,
+    reason: string,
+  ): void {
+    this.emitToSession(sessionId, 'UploadRejected', {
+      filename,
+      code,
+      reason,
+    });
+  }
+
   private ensurePricingAnalysisWorkerStarted(): void {
     if (WirelessSessionService.pricingAnalysisWorkerInitialized) return;
 

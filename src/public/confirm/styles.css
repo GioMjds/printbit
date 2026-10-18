@@ -1853,6 +1853,15 @@ body {
   display: none;
 }
 
+#confirmModal[data-mode='scan'] .modal-step--tray {
+  display: none !important;
+}
+
+.modal-step__badge[hidden],
+#confirmModal[data-mode='scan'] .modal-step__badge {
+  display: none !important;
+}
+
 .modal-step--tray {
   align-items: stretch;
   text-align: center;

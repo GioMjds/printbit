@@ -25,7 +25,7 @@ import {
   readStagedFileRange,
 } from '@/services/upload-staging';
 import {
-  createDefenderScanner,
+  getSharedDefenderScanner,
   type DefenderScanner,
 } from '@/services/defender-scanner';
 import { anomalyService, buildAnomalyFingerprint } from '@/services/anomaly';
@@ -46,11 +46,47 @@ export interface ValidationPolicy {
   readonly surface: UploadSurface;
 }
 
+export type UploadRejectionNotifier = (input: {
+  sessionId?: string | null;
+  filename?: string | null;
+  code: string;
+  reason: string;
+}) => void;
+
+let defaultUploadRejectionNotifier: UploadRejectionNotifier | null = null;
+
+export function setUploadRejectionNotifier(
+  notifier: UploadRejectionNotifier | null,
+): void {
+  defaultUploadRejectionNotifier = notifier;
+}
+
 export interface UploadSecurityMiddlewareDeps {
   readonly scanner?: DefenderScanner;
   readonly readRange?: typeof readStagedFileRange;
   readonly discardStaged?: typeof discardStagedUpload;
   readonly quarantineStaged?: typeof quarantineStagedUpload;
+  readonly onUploadRejected?: UploadRejectionNotifier;
+}
+
+function notifyUploadRejection(
+  req: Request,
+  file: Express.Multer.File | undefined,
+  code: string,
+  reason: string,
+  deps?: UploadSecurityMiddlewareDeps,
+): void {
+  const sessionId =
+    typeof req.params?.sessionId === 'string'
+      ? req.params.sessionId
+      : typeof req.body?.sessionId === 'string'
+        ? req.body.sessionId
+        : null;
+  const filename = file?.originalname ?? null;
+  const notifier = deps?.onUploadRejected ?? defaultUploadRejectionNotifier;
+  if (notifier && sessionId) {
+    notifier({ sessionId, filename, code, reason });
+  }
 }
 
 const DANGEROUS_SCRIPT_OR_EXECUTABLE_EXTENSIONS = new Set([
@@ -80,6 +116,18 @@ const DANGEROUS_SCRIPT_OR_EXECUTABLE_EXTENSIONS = new Set([
   '.jar',
   '.apk',
   '.gadget',
+  '.ts',
+  '.tsx',
+  '.py',
+  '.pyw',
+  '.php',
+  '.phtml',
+  '.vba',
+  '.rb',
+  '.pl',
+  '.cgi',
+  '.mjs',
+  '.cjs',
 ]);
 
 const DOCUMENT_UPLOAD_POLICY = {
@@ -123,7 +171,7 @@ function classifyDetectedMime(
   return null;
 }
 
-function detectDisguisedExecutableName(originalName: string): {
+export function detectDisguisedExecutableName(originalName: string): {
   flagged: boolean;
   matchedExtension: string | null;
 } {
@@ -226,6 +274,7 @@ function validateIncomingFileType(
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
   policy: ValidationPolicy,
+  deps?: UploadSecurityMiddlewareDeps,
 ): void {
   const ext = path.extname(file.originalname).toLowerCase();
   const incomingMime = file.mimetype.toLowerCase();
@@ -260,6 +309,13 @@ function validateIncomingFileType(
       ],
       context: meta,
     });
+    notifyUploadRejection(
+      req,
+      file,
+      'DISGUISED_EXECUTABLE',
+      `Disguised executable filename pattern detected (${disguised.matchedExtension}).`,
+      deps,
+    );
     cb(
       Object.assign(new Error('Disguised executable filename detected'), {
         code: 'DISGUISED_EXECUTABLE',
@@ -285,6 +341,13 @@ function validateIncomingFileType(
       'upload_security_violation',
       'Rejected upload because extension or declared MIME type is not allowed.',
       meta,
+    );
+    notifyUploadRejection(
+      req,
+      file,
+      'UNSUPPORTED_TYPE',
+      'File format not supported. Only PDF, DOCX, JPG, and PNG are allowed.',
+      deps,
     );
     cb(
       Object.assign(new Error('Invalid file type'), {
@@ -312,6 +375,13 @@ function validateIncomingFileType(
       'upload_security_violation',
       'Rejected upload because document conversion is disabled and file is a Word document.',
       meta,
+    );
+    notifyUploadRejection(
+      req,
+      file,
+      'UNSUPPORTED_TYPE',
+      'Word document conversion is disabled on this kiosk.',
+      deps,
     );
     cb(
       Object.assign(
@@ -345,6 +415,13 @@ function validateIncomingFileType(
       'Rejected upload because extension does not match declared MIME type.',
       meta,
     );
+    notifyUploadRejection(
+      req,
+      file,
+      'UNSUPPORTED_TYPE',
+      'File extension does not match declared content type.',
+      deps,
+    );
     cb(
       Object.assign(new Error('File extension does not match content type'), {
         code: 'UNSUPPORTED_TYPE',
@@ -359,18 +436,30 @@ function validateIncomingFileType(
 
 export function handleMulterError(
   error: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): void {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
+      notifyUploadRejection(
+        req,
+        req.file,
+        'FILE_TOO_LARGE',
+        `File size exceeds limit of ${MAX_FILE_SIZE_LABEL}.`,
+      );
       res.status(413).json({
         code: 'FILE_TOO_LARGE',
         error: `File size exceeds the limit of ${MAX_FILE_SIZE_LABEL}.`,
       });
       return;
     }
+    notifyUploadRejection(
+      req,
+      req.file,
+      'UPLOAD_ERROR',
+      error.message,
+    );
     res.status(400).json({
       code: 'UPLOAD_ERROR',
       error: error.message,
@@ -380,6 +469,12 @@ export function handleMulterError(
   if (error instanceof Error) {
     const code = (error as Error & { code?: string }).code;
     if (code === 'UNSUPPORTED_TYPE') {
+      notifyUploadRejection(
+        req,
+        req.file,
+        'UNSUPPORTED_TYPE',
+        error.message,
+      );
       res.status(415).json({
         code: 'UNSUPPORTED_FILE_TYPE',
         error: error.message,
@@ -387,6 +482,12 @@ export function handleMulterError(
       return;
     }
     if (code === 'DISGUISED_EXECUTABLE') {
+      notifyUploadRejection(
+        req,
+        req.file,
+        'DISGUISED_EXECUTABLE',
+        error.message,
+      );
       res.status(422).json({
         code: 'DISGUISED_EXECUTABLE',
         error: error.message,
@@ -394,6 +495,12 @@ export function handleMulterError(
       return;
     }
     if (code === 'STAGING_QUOTA_EXCEEDED') {
+      notifyUploadRejection(
+        req,
+        req.file,
+        'STAGING_QUOTA_EXCEEDED',
+        'Upload rejected: staging byte quota exceeded.',
+      );
       res.status(413).json({
         code: 'STAGING_QUOTA_EXCEEDED',
         error: 'Upload rejected: staging byte quota exceeded.',
@@ -451,22 +558,24 @@ function findEndOfCentralDirectoryOffset(buffer: Buffer): number {
 }
 
 const MAX_OOXML_CENTRAL_DIRECTORY_SIZE = 8 * 1024 * 1024; // 8 MiB
+const MAX_ZIP_ENTRIES = 2000;
+const MAX_ZIP_UNCOMPRESSED_SIZE = 150 * 1024 * 1024; // 150 MiB
 
-async function validateStagedOoxmlStructure(
+export async function validateStagedOoxmlStructure(
   filePath: string,
   fileSize: number,
   directoryMarker: string,
   readRangeFn: typeof readStagedFileRange,
-): Promise<boolean> {
+): Promise<{ valid: boolean; reason?: QuarantineReason }> {
   const centralDirectoryHeaderSignature = 0x02014b50;
   const tailReadLength = Math.min(fileSize, 65557);
   const tailOffset = fileSize - tailReadLength;
 
-  if (tailReadLength < 22) return false;
+  if (tailReadLength < 22) return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
 
   const tailBuffer = await readRangeFn(filePath, tailOffset, tailReadLength);
   const eocdRelativeOffset = findEndOfCentralDirectoryOffset(tailBuffer);
-  if (eocdRelativeOffset === -1) return false;
+  if (eocdRelativeOffset === -1) return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
 
   const eocdAbsoluteOffset = tailOffset + eocdRelativeOffset;
   const centralDirectorySize = tailBuffer.readUInt32LE(eocdRelativeOffset + 12);
@@ -480,7 +589,7 @@ async function validateStagedOoxmlStructure(
     centralDirectorySize > MAX_OOXML_CENTRAL_DIRECTORY_SIZE ||
     centralDirectoryOffset + centralDirectorySize > eocdAbsoluteOffset
   ) {
-    return false;
+    return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
   }
 
   const cdBuffer = await readRangeFn(
@@ -489,12 +598,25 @@ async function validateStagedOoxmlStructure(
     centralDirectorySize,
   );
   let cursor = 0;
+  let entryCount = 0;
+  let totalUncompressedSize = 0;
   let hasContentTypes = false;
   let hasDirectoryEntry = false;
 
   while (cursor + 46 <= cdBuffer.length) {
     if (cdBuffer.readUInt32LE(cursor) !== centralDirectoryHeaderSignature) {
-      return false;
+      return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
+    }
+
+    entryCount += 1;
+    if (entryCount > MAX_ZIP_ENTRIES) {
+      return { valid: false, reason: 'ZIP_BOMB_DETECTED' };
+    }
+
+    const uncompressedSize = cdBuffer.readUInt32LE(cursor + 24);
+    totalUncompressedSize += uncompressedSize;
+    if (totalUncompressedSize > MAX_ZIP_UNCOMPRESSED_SIZE) {
+      return { valid: false, reason: 'ZIP_BOMB_DETECTED' };
     }
 
     const fileNameLength = cdBuffer.readUInt16LE(cursor + 28);
@@ -503,9 +625,20 @@ async function validateStagedOoxmlStructure(
     const fileNameStart = cursor + 46;
     const fileNameEnd = fileNameStart + fileNameLength;
 
-    if (fileNameEnd > cdBuffer.length) return false;
+    if (fileNameEnd > cdBuffer.length) {
+      return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
+    }
 
     const entryName = cdBuffer.toString('utf8', fileNameStart, fileNameEnd);
+    const lowerName = entryName.toLowerCase();
+
+    if (
+      lowerName.endsWith('vbaproject.bin') ||
+      lowerName.includes('macrosheets') ||
+      lowerName.endsWith('.vba')
+    ) {
+      return { valid: false, reason: 'MACRO_DETECTED' };
+    }
 
     if (entryName === '[Content_Types].xml') {
       hasContentTypes = true;
@@ -518,14 +651,46 @@ async function validateStagedOoxmlStructure(
       hasDirectoryEntry = true;
     }
 
-    if (hasContentTypes && hasDirectoryEntry) {
-      return true;
-    }
-
     cursor = fileNameEnd + extraFieldLength + fileCommentLength;
   }
 
-  return false;
+  if (
+    totalUncompressedSize > 10 * 1024 * 1024 &&
+    totalUncompressedSize / Math.max(fileSize, 1) > 100
+  ) {
+    return { valid: false, reason: 'ZIP_BOMB_DETECTED' };
+  }
+
+  if (hasContentTypes && hasDirectoryEntry) {
+    return { valid: true };
+  }
+
+  return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
+}
+
+export async function validateStagedPdfStructure(
+  filePath: string,
+  fileSize: number,
+  readRangeFn: typeof readStagedFileRange,
+): Promise<{ valid: boolean; reason?: QuarantineReason }> {
+  const inspectSize = Math.min(fileSize, 4 * 1024 * 1024);
+  const buffer = await readRangeFn(filePath, 0, inspectSize);
+  const text = buffer.toString('latin1');
+
+  const forbiddenPdfTokens = [
+    /\/JavaScript\b/i,
+    /\/JS\b/i,
+    /\/Launch\b/i,
+    /\/EmbeddedFiles\b/i,
+  ];
+
+  for (const token of forbiddenPdfTokens) {
+    if (token.test(text)) {
+      return { valid: false, reason: 'ACTIVE_CONTENT_DETECTED' };
+    }
+  }
+
+  return { valid: true };
 }
 
 async function validateStagedMagicBytesWithPolicy(
@@ -559,19 +724,28 @@ async function validateStagedMagicBytesWithPolicy(
     const ooxmlMarker = OOXML_DIRECTORY_MARKERS[mime];
     const isOoxmlFormat = !!ooxmlMarker;
 
-    let ooxmlStructureIsValid = false;
-    if (isOoxmlFormat && hasValidMagicBytes) {
-      ooxmlStructureIsValid = await validateStagedOoxmlStructure(
-        file.path,
-        file.size,
-        ooxmlMarker,
-        readRangeFn,
-      );
+    let structuralResult: { valid: boolean; reason?: QuarantineReason } = {
+      valid: true,
+    };
+
+    if (hasValidMagicBytes) {
+      if (isOoxmlFormat) {
+        structuralResult = await validateStagedOoxmlStructure(
+          file.path,
+          file.size,
+          ooxmlMarker,
+          readRangeFn,
+        );
+      } else if (mime === 'application/pdf') {
+        structuralResult = await validateStagedPdfStructure(
+          file.path,
+          file.size,
+          readRangeFn,
+        );
+      }
     }
 
-    const isValid = isOoxmlFormat
-      ? hasValidMagicBytes && ooxmlStructureIsValid
-      : hasValidMagicBytes;
+    const isValid = hasValidMagicBytes && structuralResult.valid;
 
     if (!isValid) {
       const detectedMime = classifyDetectedMime(
@@ -580,7 +754,7 @@ async function validateStagedMagicBytesWithPolicy(
       );
       const validationReason: QuarantineReason = !hasValidMagicBytes
         ? 'MAGIC_BYTE_MISMATCH'
-        : 'OOXML_STRUCTURE_INVALID';
+        : (structuralResult.reason ?? 'OOXML_STRUCTURE_INVALID');
 
       const meta = {
         ...extractRequestContext(req),
@@ -597,23 +771,27 @@ async function validateStagedMagicBytesWithPolicy(
 
       appendSecurityLog(
         'upload_security_violation',
-        'Rejected upload because file signature or OOXML structure is invalid.',
+        `Rejected upload because file failed security validation (${validationReason}).`,
         meta,
       );
       void reportUploadSecurityAnomaly({
         type:
           validationReason === 'OOXML_STRUCTURE_INVALID'
             ? 'upload_ooxml_structure_invalid'
-            : 'upload_magic_byte_mismatch',
+            : validationReason === 'MACRO_DETECTED'
+              ? 'upload_macro_detected'
+              : validationReason === 'ACTIVE_CONTENT_DETECTED'
+                ? 'upload_active_content_detected'
+                : validationReason === 'ZIP_BOMB_DETECTED'
+                  ? 'upload_zip_bomb_detected'
+                  : 'upload_magic_byte_mismatch',
         source: policy.surface,
         severity: 'critical',
         message:
           'Upload rejected because file content validation failed against declared document type.',
         fingerprintParts: [
           policy.surface,
-          validationReason === 'OOXML_STRUCTURE_INVALID'
-            ? 'ooxml-structure-invalid'
-            : 'magic-byte-mismatch',
+          validationReason,
           mime,
           detectedMime,
         ],
@@ -621,12 +799,31 @@ async function validateStagedMagicBytesWithPolicy(
       });
 
       const pipeline = adminService.getPipelineSettings();
+      const isDisguised =
+        validationReason === 'OOXML_STRUCTURE_INVALID' ||
+        validationReason === 'MAGIC_BYTE_MISMATCH' ||
+        validationReason === 'MACRO_DETECTED' ||
+        validationReason === 'ACTIVE_CONTENT_DETECTED' ||
+        validationReason === 'ZIP_BOMB_DETECTED';
       const errorMessage = pipeline.malwareScanningEnabled
         ? 'Security check failed: Suspicious or disguised file detected.'
         : 'File content does not match its declared type.';
+      const clientCode = isDisguised ? 'DISGUISED_FILE' : 'UNSUPPORTED_TYPE';
+      const detailReason =
+        validationReason === 'MACRO_DETECTED'
+          ? 'Macros or executable content detected in document'
+          : validationReason === 'ACTIVE_CONTENT_DETECTED'
+            ? 'Interactive scripts or executable actions detected in PDF'
+            : validationReason === 'ZIP_BOMB_DETECTED'
+              ? 'Archive decompression safety limits exceeded'
+              : validationReason === 'OOXML_STRUCTURE_INVALID'
+                ? 'Corrupted or disguised document structure'
+                : 'File signature does not match declared format';
+
+      notifyUploadRejection(req, file, clientCode, detailReason, deps);
 
       res.status(422).json({
-        code: 'UNSUPPORTED_TYPE',
+        code: clientCode,
         error: errorMessage,
       });
       return;
@@ -637,6 +834,13 @@ async function validateStagedMagicBytesWithPolicy(
     console.error(
       '[file-validation] Unexpected error validating magic bytes:',
       error,
+    );
+    notifyUploadRejection(
+      req,
+      file,
+      'UNSUPPORTED_TYPE',
+      'File content could not be verified.',
+      deps,
     );
     res.status(422).json({
       code: 'UNSUPPORTED_TYPE',
@@ -664,7 +868,7 @@ async function scanStagedUploadWithSurface(
     return;
   }
 
-  const scanner = deps.scanner ?? createDefenderScanner();
+  const scanner = deps.scanner ?? getSharedDefenderScanner();
   const discardFn = deps.discardStaged ?? discardStagedUpload;
   const quarantineFn = deps.quarantineStaged ?? quarantineStagedUpload;
   const requestContext = extractRequestContext(req);
@@ -696,6 +900,14 @@ async function scanStagedUploadWithSurface(
         fingerprintParts: [surface, 'scanner-health', health.status],
         context: meta,
       });
+
+      notifyUploadRejection(
+        req,
+        file,
+        'SCAN_UNAVAILABLE',
+        `Malware scanning service is ${health.status}`,
+        deps,
+      );
 
       res.status(503).json({
         code: 'SCAN_UNAVAILABLE',
@@ -741,6 +953,16 @@ async function scanStagedUploadWithSurface(
         context: meta,
       });
 
+      notifyUploadRejection(
+        req,
+        file,
+        'FILE_INFECTED',
+        scanResult.detectionName
+          ? `Malware detected (${scanResult.detectionName})`
+          : 'Malware detected in uploaded file',
+        deps,
+      );
+
       res.status(422).json({
         code: 'FILE_INFECTED',
         error: 'File was identified as containing potential malware.',
@@ -764,6 +986,14 @@ async function scanStagedUploadWithSurface(
         meta,
       );
 
+      notifyUploadRejection(
+        req,
+        file,
+        'SCAN_FAILED',
+        `File security scan ${scanResult.status}`,
+        deps,
+      );
+
       res.status(503).json({
         code: 'SCAN_FAILED',
         error: 'File scanning could not be completed. Please try again.',
@@ -773,6 +1003,13 @@ async function scanStagedUploadWithSurface(
 
     if (scanResult.status === 'unavailable') {
       await discardFn(file);
+      notifyUploadRejection(
+        req,
+        file,
+        'SCAN_UNAVAILABLE',
+        'Malware scanning service is unavailable',
+        deps,
+      );
       res.status(503).json({
         code: 'SCAN_UNAVAILABLE',
         error: 'Malware scanning is unavailable.',
@@ -785,6 +1022,13 @@ async function scanStagedUploadWithSurface(
   } catch (error) {
     await discardFn(file);
     console.error('[file-validation] Error during malware scan gate:', error);
+    notifyUploadRejection(
+      req,
+      file,
+      'SCAN_FAILED',
+      'File security verification error',
+      deps,
+    );
     res.status(503).json({
       code: 'SCAN_FAILED',
       error: 'An error occurred during file security verification.',
@@ -799,7 +1043,7 @@ export function createUploadSecurityMiddleware(
     storage: createUploadStagingStorage('wireless-session-upload'),
     limits: { fileSize: MAX_FILE_SIZE_BYTES },
     fileFilter: (_req, file, cb) => {
-      validateIncomingFileType(_req, file, cb, DOCUMENT_UPLOAD_POLICY);
+      validateIncomingFileType(_req, file, cb, DOCUMENT_UPLOAD_POLICY, deps);
     },
   });
 
@@ -807,7 +1051,7 @@ export function createUploadSecurityMiddleware(
     storage: createUploadStagingStorage('legacy-upload'),
     limits: { fileSize: MAX_FILE_SIZE_BYTES },
     fileFilter: (req, file, cb) => {
-      validateIncomingFileType(req, file, cb, LEGACY_UPLOAD_POLICY);
+      validateIncomingFileType(req, file, cb, LEGACY_UPLOAD_POLICY, deps);
     },
   });
 
@@ -815,7 +1059,7 @@ export function createUploadSecurityMiddleware(
     storage: createUploadStagingStorage('report-issue-attachment'),
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-      validateIncomingFileType(req, file, cb, REPORT_ATTACHMENT_POLICY);
+      validateIncomingFileType(req, file, cb, REPORT_ATTACHMENT_POLICY, deps);
     },
   });
 

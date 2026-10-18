@@ -15,6 +15,9 @@ export type QuarantineReason =
   | 'UNSUPPORTED_TYPE'
   | 'MAGIC_BYTE_MISMATCH'
   | 'OOXML_STRUCTURE_INVALID'
+  | 'MACRO_DETECTED'
+  | 'ACTIVE_CONTENT_DETECTED'
+  | 'ZIP_BOMB_DETECTED'
   | 'FILE_INFECTED';
 
 export interface QuarantineRecord {
