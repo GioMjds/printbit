@@ -174,7 +174,11 @@ export class BlankPageWarningModal {
       this.dialog.setAttribute('open', '');
     }
 
-    this.armTimer = window.setTimeout(() => this.arm(), this.armDelayMs);
+    if (this.armDelayMs <= 0) {
+      this.arm();
+    } else {
+      this.armTimer = window.setTimeout(() => this.arm(), this.armDelayMs);
+    }
     if (!this.reducedMotion) void this.lottie?.play();
   }
 

@@ -1,3 +1,4 @@
+import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 
 const DEFAULT_RETRY_AFTER_MS = 1_500;
@@ -183,4 +184,5 @@ document.addEventListener('visibilitychange', () => {
   void poll();
 });
 
+void initKioskLocalization();
 void poll();

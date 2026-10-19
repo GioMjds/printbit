@@ -1,3 +1,5 @@
+import { initKioskLocalization } from '../shared/kiosk-i18n';
+
 type ReceiptPrintConfiguration = {
   copies: number | null;
   colorMode: 'monochrome' | 'colored' | null;
@@ -581,4 +583,5 @@ async function loadReceipt(): Promise<void> {
   }
 }
 
+void initKioskLocalization();
 void loadReceipt();
