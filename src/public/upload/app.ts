@@ -343,7 +343,7 @@ async function sha256File(file: File): Promise<string | undefined> {
 }
 
 const SECURITY_CHECK_FAILED_MESSAGE =
-  'Security check: File format could not be verified. Please save as standard PDF or image.';
+  'File format could not be verified. Please export as standard PDF or image.';
 
 function isSecurityCheckFailure(r: UploadErrorResponse): boolean {
   if (
@@ -369,7 +369,7 @@ function isSecurityCheckFailure(r: UploadErrorResponse): boolean {
 function mapError(r: UploadErrorResponse): string {
   switch (r.code) {
     case 'DISGUISED_FILE':
-      return 'Security check: File format mismatch (disguised or corrupt file). Please use standard PDF or images.';
+      return 'File format mismatch or damaged file. Please export as standard PDF or image.';
     case 'DISGUISED_EXECUTABLE':
       return r.error ?? 'Files with executable or script extension patterns (.exe, .ts, .py, etc.) are not allowed.';
     case 'SCAN_UNAVAILABLE':
@@ -393,9 +393,9 @@ function mapError(r: UploadErrorResponse): string {
     case 'SESSION_NOT_FOUND':
       return 'Session not found. Scan a fresh kiosk QR or reopen the upload link from the kiosk.';
     case 'SESSION_EXPIRED':
-      return 'Session expired. Stay on PrintBit Wi-Fi, then scan a fresh kiosk QR or reopen the latest upload link.';
+      return 'Session expired. Stay on PrintBit Wi-Fi, then scan the fresh QR code on the kiosk screen.';
     case 'SESSION_OWNED':
-      return 'This session is already active on another phone. Stay on PrintBit Wi-Fi and start a new kiosk session.';
+      return 'This session is already active on another phone. Stay on PrintBit Wi-Fi and tap "Clear & Start Over" on the kiosk.';
     case 'MISSING_CLIENT_ID':
       return 'Upload client identity missing. Reload this page.';
     case 'INVALID_CLIENT_ID':
@@ -487,11 +487,15 @@ function applySessionCountdown(remainingSeconds: number): void {
   startSessionCountdownTicker();
 }
 
-function setSessionUnavailable(message: string): void {
+function setSessionUnavailable(
+  message: string,
+  uiLabel = 'Session unavailable',
+  showRetry = false,
+): void {
   isSessionUnavailable = true;
   setAppState('session-error');
-  setSessionUI('Session unavailable', 'error');
-  setRetryButtonVisible(true);
+  setSessionUI(uiLabel, 'error');
+  setRetryButtonVisible(showRetry);
   setStatus(message, 'error');
   stopSessionMonitor();
   resetSessionCountdown();
@@ -520,13 +524,17 @@ async function refreshSessionLease(): Promise<void> {
         payload.code === 'SESSION_EXPIRED'
       ) {
         setSessionUnavailable(
-          'This session has expired. Stay on PrintBit Wi-Fi, then scan a fresh kiosk QR or reopen the latest upload link.',
+          'This session has expired. Stay on PrintBit Wi-Fi, then scan the fresh QR code on the kiosk screen.',
+          'Session Expired',
+          false,
         );
         return;
       }
       if (res.status === 409 || payload.code === 'SESSION_OWNED') {
         setSessionUnavailable(
-          'This session is active on another phone. Stay on PrintBit Wi-Fi and start a new kiosk session.',
+          'This session is active on another phone. Stay on PrintBit Wi-Fi and tap "Clear & Start Over" on the kiosk.',
+          'Session in Use',
+          false,
         );
         return;
       }
@@ -535,11 +543,11 @@ async function refreshSessionLease(): Promise<void> {
         (payload.code === 'MISSING_CLIENT_ID' ||
           payload.code === 'INVALID_CLIENT_ID')
       ) {
-        setSessionUnavailable(mapError(payload));
+        setSessionUnavailable(mapError(payload), 'Session unavailable', false);
         return;
       }
       if (res.status === 500 && payload.code === 'SESSION_PERSIST_FAILED') {
-        setSessionUnavailable(mapError(payload));
+        setSessionUnavailable(mapError(payload), 'Session Error', false);
       }
       return;
     }
@@ -626,7 +634,7 @@ function updateItemStatus(
   badge.textContent =
     labelOverride ??
     {
-      pending: 'Ready to send',
+      pending: 'Ready · Tap Send below',
       uploading: 'Uploading…',
       done: '✓ Sent',
       error: 'Failed',
@@ -766,7 +774,9 @@ async function initSession(): Promise<void> {
 
   if (!token) {
     setSessionUnavailable(
-      'No upload token found. Please scan a fresh kiosk QR.',
+      'No upload token found. Please scan the QR code on the kiosk screen.',
+      'Invalid Link',
+      false,
     );
     return;
   }
@@ -810,11 +820,21 @@ async function initSession(): Promise<void> {
     refreshUploadBtn();
     startSessionMonitor();
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Could not connect to this session.';
-    setSessionUnavailable(message);
+    const rawMsg = error instanceof Error ? error.message : '';
+    const isNetwork =
+      !error ||
+      rawMsg.includes('fetch') ||
+      rawMsg.includes('network') ||
+      rawMsg.includes('Failed to fetch') ||
+      rawMsg.includes('NetworkError');
+    const message = isNetwork
+      ? 'Cannot reach kiosk. Make sure you are connected to PrintBit Wi-Fi (Keep Connected even without internet), then tap Retry.'
+      : rawMsg || 'Could not connect to kiosk session.';
+    setSessionUnavailable(
+      message,
+      isNetwork ? 'Connection Lost' : 'Session unavailable',
+      isNetwork,
+    );
   }
 }
 
@@ -840,12 +860,16 @@ function attachSocket(sid: string): void {
   socket.on('SessionCancelled', () => {
     setSessionUnavailable(
       'Session was ended at the kiosk. Please scan the new QR code on the kiosk screen.',
+      'Session Ended',
+      false,
     );
   });
 
   socket.on('SessionEnded', () => {
     setSessionUnavailable(
       'Session was ended at the kiosk. Please scan the new QR code on the kiosk screen.',
+      'Session Ended',
+      false,
     );
   });
 
@@ -1028,7 +1052,7 @@ async function uploadPendingFiles(): Promise<void> {
   } else if (doneCount > 0 && errorCount > 0) {
     setStatus(
       securityErrorCount > 0
-        ? `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} rejected by security check. Please remove unsupported or disguised files.`
+        ? `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} rejected: unverified or damaged file. Please use standard PDF or image.`
         : `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} failed. You can retry failed items.`,
       'info',
     );
@@ -1037,8 +1061,8 @@ async function uploadPendingFiles(): Promise<void> {
   } else {
     setStatus(
       securityErrorCount > 0
-        ? 'Upload rejected by security check. Check file format (avoid disguised files) or retry shortly.'
-        : 'All uploads failed. Please check your network connection and try again.',
+        ? 'Upload rejected: file format could not be verified. Please export as standard PDF or image and retry.'
+        : 'Upload failed. Make sure your phone is connected to PrintBit Wi-Fi (keep connected even without internet), then retry.',
       'error',
     );
     setAppState('session-ready');

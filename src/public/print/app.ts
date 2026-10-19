@@ -249,7 +249,7 @@ let conversionWaitCancelled = false;
 let conversionWaitInFlight = false;
 let conversionReturnFocus: HTMLElement | null = null;
 const refreshSessionDefaultLabel =
-  refreshSessionBtnLabel?.textContent?.trim() ?? 'New session';
+  refreshSessionBtnLabel?.textContent?.trim() ?? 'Refresh QR Code';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -337,6 +337,10 @@ function getNewSessionCooldownRemainingMs(): number {
   return Math.max(0, newSessionCooldownUntilMs - Date.now());
 }
 
+function getRefreshSessionLabel(): string {
+  return knownFiles.size > 0 ? 'Clear & Start Over' : 'Refresh QR Code';
+}
+
 function renderRefreshSessionButtonState(): void {
   if (!refreshSessionBtn) return;
   const remainingMs = getNewSessionCooldownRemainingMs();
@@ -350,12 +354,13 @@ function renderRefreshSessionButtonState(): void {
     refreshSessionBtnLabel.textContent = 'Creating session…';
     return;
   }
+  const baseLabel = getRefreshSessionLabel();
   if (inCooldown) {
     const remainingSeconds = Math.ceil(remainingMs / 1000);
-    refreshSessionBtnLabel.textContent = `New session (${remainingSeconds}s)`;
+    refreshSessionBtnLabel.textContent = `${baseLabel} (${remainingSeconds}s)`;
     return;
   }
-  refreshSessionBtnLabel.textContent = refreshSessionDefaultLabel;
+  refreshSessionBtnLabel.textContent = baseLabel;
 }
 
 function stopNewSessionCooldownTicker(): void {
@@ -551,6 +556,7 @@ function setWaitingForFilesState(): void {
   if (footerHint) {
     footerHint.classList.remove('ready');
   }
+  renderRefreshSessionButtonState();
 }
 
 function selectFile(file: UploadedFile): void {
@@ -788,6 +794,7 @@ function renderFiles(files: UploadedFile[]): void {
     files.find((f) => (f.documentId || f.filename) === prevSelected) ??
     files[0];
   selectFile(selected);
+  renderRefreshSessionButtonState();
 }
 
 // ── Session management ────────────────────────────────────────────────────────
@@ -997,7 +1004,7 @@ async function checkUploadStatus(): Promise<void> {
       setWaitingForFilesState();
       if (footerHint) {
         footerHint.textContent =
-          'Session expired. Tap "New session" to generate a fresh QR code.';
+          'Session expired. Tap "Refresh QR Code" to generate a fresh QR code.';
         footerHint.classList.remove('ready');
       }
     }
@@ -1323,7 +1330,7 @@ function updateFileAnalysisState(
       statusEl.style.display = 'none';
       break;
     case 'failed':
-      statusEl.textContent = '⚠ Analysis unavailable';
+      statusEl.textContent = '⚠ Preview unverified (still printable)';
       statusEl.style.display = 'inline-block';
       break;
   }
@@ -1491,7 +1498,7 @@ continueBtn?.addEventListener('click', async () => {
     return;
   }
   if (footerHint) {
-    footerHint.textContent = `Proceeding to print configuration. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
+    footerHint.textContent = `Proceeding to print options. You can print up to ${maxPagesPerSession} pages on the options screen.`;
     footerHint.classList.add('ready');
   }
   if (selectedFileRecord?.analysisStatus !== 'completed') {
@@ -1532,7 +1539,7 @@ continueBtn?.addEventListener('click', async () => {
     }
     setConversionStatus(
       'Document ready!',
-      'Opening print configuration…',
+      'Opening print options…',
     );
   }
   const destination =
