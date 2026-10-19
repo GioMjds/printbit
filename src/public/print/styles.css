@@ -542,7 +542,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px 16px;
+  padding: 16px 24px 14px;
   border-bottom: 1px solid rgba(167, 170, 225, 0.1);
   flex-shrink: 0;
 }
@@ -575,45 +575,48 @@ body {
 /* ── Empty / waiting state ────────────────────────────────── */
 .files-empty {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 32px 24px;
+  justify-content: safe center; /* never clip the top if content overflows */
+  gap: 16px;
+  padding: 18px 28px;
   text-align: center;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 170, 225, 0.2) transparent;
+  container-type: inline-size; /* respond to pane width, not viewport */
 }
-
 .files-empty.hidden {
   display: none;
 }
 
-/* Kiosk Radar Assurance Beacon */
+/* Status pill (unchanged look) */
 .kiosk-assurance-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   padding: 6px 14px;
   border-radius: 999px;
   background: rgba(105, 111, 199, 0.14);
   border: 1px solid rgba(167, 170, 225, 0.24);
   color: var(--lavender);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 4px;
 }
-
 .assurance-beacon {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #4ade80;
   box-shadow: 0 0 10px rgba(74, 222, 128, 0.7);
   animation: beacon-pulse 2s ease-in-out infinite;
 }
-
 @keyframes beacon-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
   }
@@ -623,143 +626,240 @@ body {
   }
 }
 
-/* Anticipated Document Skeleton Preview */
-.skeleton-preview-card {
-  width: min(340px, 94%);
-  border-radius: 16px;
-  border: 1.5px dashed rgba(167, 170, 225, 0.22);
-  background: rgba(255, 255, 255, 0.025);
-  padding: 14px 16px;
-  margin: 4px 0 10px;
-  text-align: left;
-  position: relative;
-  overflow: hidden;
-}
-
-.skeleton-preview-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 20%,
-    rgba(167, 170, 225, 0.07) 50%,
-    transparent 80%
-  );
-  transform: translateX(-100%);
-  animation: skeleton-sweep 2.4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes skeleton-sweep {
-  0% { transform: translateX(-100%); }
-  60%, 100% { transform: translateX(100%); }
-}
-
-.skeleton-preview-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.skeleton-preview-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: rgba(105, 111, 199, 0.18);
-  border: 1px solid rgba(167, 170, 225, 0.2);
-  display: grid;
-  place-items: center;
+/* Hero illustration */
+.empty-hero {
+  width: min(230px, 100%);
+  height: auto;
   color: var(--lavender);
   flex-shrink: 0;
 }
-
-.skeleton-preview-icon svg {
-  width: 20px;
-  height: 20px;
-  opacity: 0.8;
+.empty-hero__phone {
+  stroke: currentColor;
+  stroke-width: 2.5;
+  fill: rgba(105, 111, 199, 0.1);
+}
+.empty-hero__phone-screen {
+  fill: rgba(167, 170, 225, 0.14);
+}
+.empty-hero__phone-btn {
+  fill: currentColor;
+  opacity: 0.5;
+}
+.empty-hero__dots circle {
+  fill: var(--indigo);
+  opacity: 0.25;
+  animation: empty-dot 1.8s ease-in-out infinite;
+}
+.empty-hero__dots circle:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.empty-hero__dots circle:nth-child(3) {
+  animation-delay: 0.4s;
+}
+.empty-hero__dots circle:nth-child(4) {
+  animation-delay: 0.6s;
+}
+@keyframes empty-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+.empty-hero__slot {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+  opacity: 0.6;
+  fill: rgba(255, 255, 255, 0.02);
+}
+.empty-hero__doc {
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  opacity: 0.55;
+}
+.empty-hero__doc-fold {
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0.55;
 }
 
-.skeleton-preview-lines {
-  flex: 1;
+/* Copy */
+.empty-copy {
+  display: grid;
+  gap: 4px;
+}
+.files-empty__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--white);
+}
+.files-empty__sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--lavender);
 }
 
-.skeleton-bar {
-  border-radius: 4px;
-  background: rgba(167, 170, 225, 0.12);
+/* Steps */
+.empty-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: min(720px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
-
-.skeleton-bar--title {
-  height: 11px;
-  width: 140px;
-  margin-bottom: 6px;
+.empty-step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(167, 170, 225, 0.16);
+  text-align: left;
 }
-
-.skeleton-bar--meta {
-  height: 8px;
-  width: 75px;
-}
-
-.skeleton-preview-pill {
+.empty-step__num {
+  display: grid;
+  place-items: center;
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 1.5px solid rgba(167, 170, 225, 0.18);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--indigo);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.empty-step__text {
+  display: grid;
+  gap: 2px;
+}
+.empty-step__text strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--white);
+}
+.empty-step__text > span {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--lavender);
+}
+.empty-ssid {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(105, 111, 199, 0.24);
+  border: 1px solid rgba(167, 170, 225, 0.3);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* Accepted formats */
+.empty-formats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.empty-formats__label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lavender);
+}
+.empty-formats__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.empty-format {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 5px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(167, 170, 225, 0.16);
+  color: var(--white);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.empty-format svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Privacy line */
+.empty-privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--lavender);
+}
+.empty-privacy svg {
+  width: 15px;
+  height: 15px;
+  color: var(--indigo);
   flex-shrink: 0;
 }
 
-.skeleton-preview-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* Narrow pane (container, not viewport): steps become a compact list */
+@container (max-width: 620px) {
+  .empty-steps {
+    grid-template-columns: 1fr;
+  }
+  .empty-step {
+    flex-direction: row;
+    align-items: center;
+  }
+  .empty-formats__label {
+    width: 100%;
+    text-align: center;
+  }
 }
 
-.skeleton-bar--line {
-  height: 7px;
-  width: 100%;
+/* Short kiosk screens: drop the hero, tighten rhythm */
+@media (max-height: 740px) {
+  .files-empty {
+    gap: 12px;
+    padding: 12px 20px;
+  }
+  .empty-hero {
+    display: none;
+  }
+  .files-empty__title {
+    font-size: 20px;
+  }
+  .empty-step {
+    padding: 10px 12px;
+  }
 }
 
-.skeleton-bar--short {
-  width: 60%;
-}
-
-.files-empty__title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--white);
-  opacity: 0.85;
-  margin: 0;
-}
-
-.files-empty__sub {
-  font-size: 13.5px;
-  color: var(--ink-muted);
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* Customer Assurance Benefits Strip */
-.kiosk-assurance-strip {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(340px, 94%);
-  margin-top: 8px;
-}
-
-.assurance-pill {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(167, 170, 225, 0.05);
-  border: 1px solid rgba(167, 170, 225, 0.12);
-  color: var(--lavender);
-  font-size: 12px;
-  text-align: left;
+@media (prefers-reduced-motion: reduce) {
+  .assurance-beacon,
+  .empty-hero__dots circle {
+    animation: none !important;
+  }
+  .empty-hero__dots circle {
+    opacity: 0.7;
+  }
 }
 
 .assurance-pill__icon {
@@ -798,7 +898,9 @@ body {
 }
 
 @keyframes radar-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .file-skeleton__name {
@@ -841,14 +943,23 @@ body {
   width: 100%;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--indigo), var(--lavender), var(--pink));
+  background: linear-gradient(
+    90deg,
+    var(--indigo),
+    var(--lavender),
+    var(--pink)
+  );
   background-size: 200% 100%;
   animation: bar-shimmer 1.8s ease-in-out infinite;
 }
 
 @keyframes bar-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .file-skeleton__pulse-chip {
@@ -1603,7 +1714,12 @@ body {
   bottom: 0;
   width: 45%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--indigo), var(--peach, #ffb38a), var(--indigo));
+  background: linear-gradient(
+    90deg,
+    var(--indigo),
+    var(--peach, #ffb38a),
+    var(--indigo)
+  );
   box-shadow: 0 0 12px rgba(105, 111, 199, 0.8);
   animation: preload-slide 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
@@ -1615,7 +1731,8 @@ body {
 }
 
 @keyframes preload-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -1721,7 +1838,9 @@ body {
   height: 17px;
   flex-shrink: 0;
   color: var(--secondary-lavender, #a7aae1);
-  transition: color 160ms ease, transform 160ms ease;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .wifi-troubleshoot-fab:hover svg {

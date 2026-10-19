@@ -1,3 +1,4 @@
+import type { Server } from 'socket.io';
 import { Router, Request, Response } from 'express';
 import path from 'node:path';
 import { requireAdminLocalAccess } from '@/middleware/admin-auth';
@@ -18,6 +19,7 @@ import {
 export type PageRoute = { route: string; filePath: string };
 
 export interface PageControllerDeps {
+  io?: Server | { emit: (event: string, ...args: unknown[]) => void };
   sessionStore: SessionStore;
   publicPageRoutes: PageRoute[];
   resolvePublicBaseUrl: (req: Request) => URL;
@@ -86,6 +88,9 @@ export class PageController {
 
     // Portal never reveals an active upload token; callers must use the QR code.
     this.router.get('/portal', this.handlePortal.bind(this));
+
+    // Remote kiosk navigation triggered by ESP32 captive portal
+    this.router.all('/api/kiosk/navigate', this.handleRemoteNavigate.bind(this));
 
     // The launcher obtains a one-time credential over loopback, then Edge consumes it.
     this.router.post(
@@ -206,6 +211,32 @@ export class PageController {
 
   private handlePortal(_req: Request, res: Response): void {
     res.type('html').send(PORTAL_WAITING_HTML);
+  }
+
+  private handleRemoteNavigate(req: Request, res: Response): void {
+    const rawTarget =
+      typeof req.query.target === 'string'
+        ? req.query.target
+        : typeof req.body?.target === 'string'
+          ? req.body.target
+          : typeof req.query.to === 'string'
+            ? req.query.to
+            : typeof req.body?.to === 'string'
+              ? req.body.to
+              : '/print';
+
+    const allowedTargets = new Set([
+      '/',
+      '/print',
+      '/copy',
+      '/scan',
+      '/report',
+      '/feedback',
+    ]);
+    const target = allowedTargets.has(rawTarget) ? rawTarget : '/print';
+    this.deps.io?.emit('kiosk:navigate', { path: target });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true, navigatedTo: target });
   }
 
   private handleIdleTimeout(_req: Request, res: Response): void {

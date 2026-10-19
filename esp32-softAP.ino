@@ -2,6 +2,7 @@
 #include <NetworkClient.h>
 #include <WiFiAP.h>
 #include <HTTPClient.h>
+#include <DNSServer.h>
 #include <Preferences.h>
 #include <esp_wifi.h>
 #include <esp_netif.h>
@@ -40,6 +41,47 @@ const char* coinBridgeApiKey = "printbit-coin-bridge-key";
 const char* hopperControlToken = "printbit-coin-bridge-key";
 
 NetworkServer server(80);
+
+const byte DNS_PORT = 53;
+DNSServer dnsServer;
+
+// CAPTIVE PORTAL CLIENT STATE
+const int maxAuthorizedStations = 32;
+IPAddress authorizedStationIps[maxAuthorizedStations];
+unsigned long authorizedStationUntil[maxAuthorizedStations] = { 0 };
+
+bool isStationAuthorized(const IPAddress& ip) {
+  if (ip == IPAddress(0, 0, 0, 0)) return false;
+  unsigned long now = millis();
+  for (int i = 0; i < maxAuthorizedStations; i++) {
+    if (authorizedStationIps[i] == ip) {
+      if ((long)(now - authorizedStationUntil[i]) < 0) {
+        return true;
+      }
+      authorizedStationIps[i] = IPAddress(0, 0, 0, 0);
+    }
+  }
+  return false;
+}
+
+void authorizeStation(const IPAddress& ip, unsigned long durationMs = 3600000UL) {
+  if (ip == IPAddress(0, 0, 0, 0)) return;
+  int slot = -1;
+  unsigned long now = millis();
+  for (int i = 0; i < maxAuthorizedStations; i++) {
+    if (authorizedStationIps[i] == ip) {
+      authorizedStationUntil[i] = now + durationMs;
+      return;
+    }
+    if (slot < 0 && (authorizedStationIps[i] == IPAddress(0, 0, 0, 0) || (long)(now - authorizedStationUntil[i]) >= 0)) {
+      slot = i;
+    }
+  }
+  if (slot >= 0) {
+    authorizedStationIps[slot] = ip;
+    authorizedStationUntil[slot] = now + durationMs;
+  }
+}
 
 String kioskIp = fallbackKioskIp;
 uint16_t kioskPort = fallbackKioskPort;
@@ -375,6 +417,7 @@ void handleAdminLogin(NetworkClient& client, const String& body) {
 
   adminSessionToken = makeAdminSessionToken();
   protectedAdminMac = loginAdminMac;
+  authorizeStation(client.remoteIP(), 86400000UL);
   Serial.print("admin_login_success:session_created:admin_mac=");
   Serial.println(protectedAdminMac);
   addAdminEvent(String("Admin device logged in: ") + protectedAdminMac);
@@ -1221,8 +1264,377 @@ String readRequestBody(NetworkClient& client, int contentLength) {
 }
 
 
-bool isCaptiveProbePath(const String& path) {
-  return path == "/hotspot-detect.html" || path == "/generate_204" || path == "/ncsi.txt" || path == "/connecttest.txt";
+bool triggerKioskNavigation(const String& path) {
+  String cleanPath = path;
+  cleanPath.trim();
+  if (!cleanPath.startsWith("/")) cleanPath = "/" + cleanPath;
+
+  Serial.print("KIOSK NAVIGATE ");
+  Serial.println(cleanPath);
+
+  if (kioskIp.length() == 0) return false;
+
+  HTTPClient http;
+  String url = "http://" + kioskIp + ":" + String(kioskPort) + "/api/kiosk/navigate?target=" + cleanPath;
+  http.begin(url);
+  http.setTimeout(1500);
+  int code = http.GET();
+  http.end();
+
+  Serial.print("kiosk_nav_code:");
+  Serial.println(code);
+  return (code == 200 || code == 204);
+}
+
+bool isCaptiveProbe(const String& path, const String& host) {
+  String p = path;
+  p.toLowerCase();
+  String h = host;
+  h.toLowerCase();
+
+  if (h.indexOf("apple.com") >= 0 || h.indexOf("google.com") >= 0 || 
+      h.indexOf("gstatic.com") >= 0 || h.indexOf("msftconnecttest.com") >= 0 || 
+      h.indexOf("msftncsi.com") >= 0 || h.indexOf("detectportal.firefox.com") >= 0 ||
+      h.indexOf("network-test.debian.org") >= 0 || h.indexOf("nmcheck.gnome.org") >= 0) {
+    return true;
+  }
+
+  return (p == "/hotspot-detect.html" || p == "/generate_204" || p == "/gen_204" || 
+          p == "/connecttest.txt" || p == "/ncsi.txt" || p == "/success.txt" || 
+          p == "/canonical.html" || p == "/check_network_status.txt" || 
+          p == "/library/test/success.html");
+}
+
+void replyCaptiveProbeSuccess(NetworkClient& client, const String& path, const String& host) {
+  String p = path;
+  p.toLowerCase();
+  String h = host;
+  h.toLowerCase();
+
+  if (p == "/generate_204" || p == "/gen_204") {
+    client.println("HTTP/1.1 204 No Content");
+    client.println("Connection: close");
+    client.println();
+    return;
+  }
+
+  if (p == "/hotspot-detect.html" || p == "/library/test/success.html" || h.indexOf("apple.com") >= 0) {
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/html; charset=utf-8");
+    client.println("Connection: close");
+    client.println();
+    client.print("<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");
+    return;
+  }
+
+  if (p == "/connecttest.txt") {
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/plain");
+    client.println("Connection: close");
+    client.println();
+    client.print("Microsoft Connect Test");
+    return;
+  }
+
+  if (p == "/ncsi.txt") {
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/plain");
+    client.println("Connection: close");
+    client.println();
+    client.print("Microsoft NCSI");
+    return;
+  }
+
+  if (p == "/success.txt") {
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/plain");
+    client.println("Connection: close");
+    client.println();
+    client.print("success\n");
+    return;
+  }
+
+  client.println("HTTP/1.1 204 No Content");
+  client.println("Connection: close");
+  client.println();
+}
+
+static const char captivePortalHtml[] PROGMEM = R"HTML(<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>PrintBit · Wi-Fi Guidance</title>
+  <style>
+    :root{--bg:#0e0d1f;--card:#181730;--border:rgba(167,170,225,.22);--primary:#696fc7;--primary-hover:#555bb5;--peach:#ffb38a;--lavender:#a7aae1;--muted:#7c80b5;--green:#10b981;--green-bg:rgba(16,185,129,.18)}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{margin:0;padding:16px 14px 40px;background:var(--bg);color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;min-height:100vh}
+    .wrap{max-width:440px;margin:0 auto}
+    .header{text-align:center;margin-bottom:18px}
+    .brand-row{display:inline-flex;align-items:center;gap:8px;margin-bottom:8px}
+    .logo{width:32px;height:32px;background:var(--primary);border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff}
+    .brand-name{font-size:20px;font-weight:800;letter-spacing:-.3px}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(105,111,199,.18);border:1px solid rgba(167,170,225,.3);border-radius:999px;font-size:12px;font-weight:700;color:var(--peach);margin-bottom:12px}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+    h1{margin:0 0 6px;font-size:21px;font-weight:800;letter-spacing:-.4px}
+    .sub{margin:0;font-size:13px;color:var(--lavender);line-height:1.4}
+    .list{display:flex;flex-direction:column;gap:12px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:15px;position:relative}
+    .card-top{display:flex;align-items:flex-start;gap:12px}
+    .icon-box{width:42px;height:42px;border-radius:12px;background:rgba(105,111,199,.2);border:1px solid rgba(167,170,225,.25);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+    .card-body{flex:1;min-width:0}
+    .card-title{margin:0 0 4px;font-size:15.5px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+    .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(255,179,138,.18);color:var(--peach)}
+    .desc{margin:0 0 12px;font-size:13px;color:var(--lavender);line-height:1.35}
+    .btn{width:100%;border:0;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--primary);color:#fff;text-decoration:none;transition:background .15s ease}
+    .btn:active{background:var(--primary-hover)}
+    .btn-sec{background:rgba(167,170,225,.12);color:var(--lavender);border:1px solid rgba(167,170,225,.25)}
+    .btn-sec:active{background:rgba(167,170,225,.2)}
+    .support-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .panel{display:none;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px 16px;text-align:center}
+    .panel.active{display:block;animation:fade .2s ease}
+    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .badge-ready{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;background:var(--green-bg);border:1px solid rgba(16,185,129,.35);color:#34d399;font-size:12.5px;font-weight:800;margin-bottom:12px}
+    .p-icon{width:56px;height:56px;border-radius:16px;background:rgba(105,111,199,.2);border:1px solid rgba(167,170,225,.3);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;color:var(--peach)}
+    .p-title{font-size:19px;font-weight:800;margin:0 0 6px}
+    .p-sub{font-size:13px;color:var(--lavender);line-height:1.4;margin:0 0 16px}
+    .steps{text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(167,170,225,.14);border-radius:14px;padding:12px 14px;margin-bottom:16px;display:flex;flex-direction:column;gap:10px}
+    .step{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.35;color:#e2e4f5}
+    .num{width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .countdown{font-size:12.5px;color:var(--peach);font-weight:700;margin-bottom:12px}
+    .back-link{display:inline-block;margin-top:14px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:underline;cursor:pointer}
+    .footer{text-align:center;margin-top:24px;font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="brand-row">
+      <div class="logo">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 8h10M7 12h6M7 16h4"/></svg>
+      </div>
+      <span class="brand-name">PrintBit</span>
+    </div>
+    <div>
+      <span class="pill"><span class="dot"></span> Connected to PrintBit Wi-Fi</span>
+    </div>
+    <h1>Kiosk Service Guidance</h1>
+    <p class="sub">Select what you want to do on the PrintBit kiosk machine:</p>
+  </div>
+
+  <!-- MENU VIEW -->
+  <div id="viewMenu" class="list">
+    <!-- Card 1: Print -->
+    <div class="card">
+      <div class="card-top">
+        <div class="icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        </div>
+        <div class="card-info">
+          <div class="card-title">Send Files to Print <span class="tag">Print</span></div>
+          <p class="desc">Send documents or photos from your phone to print on the kiosk.</p>
+        </div>
+      </div>
+      <button class="btn" onclick="startPrintHelp()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        Help for Sending Files (Go to Print)
+      </button>
+    </div>
+
+    <!-- Card 2: Copy -->
+    <div class="card">
+      <div class="card-top">
+        <div class="icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </div>
+        <div class="card-info">
+          <div class="card-title">Photocopy Paper <span class="tag">Copy</span></div>
+          <p class="desc">Duplicate your physical documents directly on the kiosk scanner.</p>
+        </div>
+      </div>
+      <button class="btn btn-sec" onclick="startCopyHelp()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        Proceed to Photocopy
+      </button>
+    </div>
+
+    <!-- Card 3: Scan -->
+    <div class="card">
+      <div class="card-top">
+        <div class="icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 8v8M8 12h8"/></svg>
+        </div>
+        <div class="card-info">
+          <div class="card-title">Document to Soft Copy <span class="tag">Scan</span></div>
+          <p class="desc">Convert paper documents into a digital PDF sent to this phone.</p>
+        </div>
+      </div>
+      <button class="btn btn-sec" onclick="startScanHelp()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        Proceed to Scan
+      </button>
+    </div>
+
+    <!-- Card 4: Support & Feedback -->
+    <div class="card">
+      <div class="card-title">Need Help or Have Feedback?</div>
+      <p class="desc">Report an issue with this machine or send us your feedback.</p>
+      <div class="support-grid">
+        <a id="linkReport" href="/portal/redirect?to=report" class="btn btn-sec">Report Issue</a>
+        <a id="linkFeedback" href="/portal/redirect?to=feedback" class="btn btn-sec">Send Feedback</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINT VIEW -->
+  <div id="viewPrint" class="panel">
+    <div class="badge-ready">✓ Kiosk Screen is Ready</div>
+    <div class="p-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </div>
+    <div class="p-title">Send Files to Print</div>
+    <p class="p-sub">The kiosk has been switched to the <strong>Upload File</strong> screen.</p>
+    <div class="steps">
+      <div class="step"><div class="num">1</div><div>Look at the <strong>PrintBit kiosk machine</strong> screen.</div></div>
+      <div class="step"><div class="num">2</div><div>Open your phone's normal <strong>Camera</strong> or QR scanner.</div></div>
+      <div class="step"><div class="num">3</div><div>Scan the <strong>Upload QR code</strong> shown on the kiosk screen.</div></div>
+      <div class="step"><div class="num">4</div><div>Select your document (PDF, Word, or Photo) to send it to the kiosk.</div></div>
+    </div>
+    <button class="btn" onclick="exitPortal()">Done / Exit Portal (Keep Connected)</button>
+    <div><span class="back-link" onclick="showMenu()">← Back to Options</span></div>
+  </div>
+
+  <!-- COPY VIEW -->
+  <div id="viewCopy" class="panel">
+    <div class="badge-ready" style="color:var(--peach);border-color:rgba(255,179,138,.35);background:rgba(255,179,138,.15)">Proceed to Kiosk Machine</div>
+    <div class="p-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    </div>
+    <div class="p-title">Photocopying Documents</div>
+    <p class="p-sub">No phone upload required. Please proceed directly to the physical kiosk machine.</p>
+    <div class="steps">
+      <div class="step"><div class="num">1</div><div>Place your paper document face down on the scanner glass or top feeder.</div></div>
+      <div class="step"><div class="num">2</div><div>On the kiosk touchscreen, tap <strong>'Copy'</strong>.</div></div>
+      <div class="step"><div class="num">3</div><div>Set number of copies and color mode, insert coins, and tap Start.</div></div>
+      <div class="step"><div class="num">✓</div><div>You remain connected to <strong>PrintBit Wi-Fi</strong>.</div></div>
+    </div>
+    <div class="countdown">Exiting portal in <b id="copyTimer">4</b>s...</div>
+    <button class="btn" onclick="exitPortal()">Exit Portal Now (Proceed to Kiosk)</button>
+    <div><span class="back-link" onclick="cancelTimerAndShowMenu()">← Back to Options</span></div>
+  </div>
+
+  <!-- SCAN VIEW -->
+  <div id="viewScan" class="panel">
+    <div class="badge-ready" style="color:var(--peach);border-color:rgba(255,179,138,.35);background:rgba(255,179,138,.15)">Proceed to Kiosk Machine</div>
+    <div class="p-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 8v8M8 12h8"/></svg>
+    </div>
+    <div class="p-title">Scanning to Soft Copy</div>
+    <p class="p-sub">Scan your physical papers on the kiosk, then download the soft copy to this phone.</p>
+    <div class="steps">
+      <div class="step"><div class="num">1</div><div>Place your paper document on the kiosk scanner glass or top feeder.</div></div>
+      <div class="step"><div class="num">2</div><div>On the kiosk touchscreen, tap <strong>'Scan'</strong>.</div></div>
+      <div class="step"><div class="num">3</div><div>Insert coins and tap Start Scan.</div></div>
+      <div class="step"><div class="num">4</div><div>When finished, scan the QR code on the kiosk screen with your phone camera to download your soft copy!</div></div>
+      <div class="step"><div class="num">✓</div><div>You remain connected to <strong>PrintBit Wi-Fi</strong>.</div></div>
+    </div>
+    <div class="countdown">Exiting portal in <b id="scanTimer">4</b>s...</div>
+    <button class="btn" onclick="exitPortal()">Exit Portal Now (Proceed to Kiosk)</button>
+    <div><span class="back-link" onclick="cancelTimerAndShowMenu()">← Back to Options</span></div>
+  </div>
+
+  <div class="footer">PrintBit Wireless Kiosk System</div>
+</div>
+
+<script>
+let kioskIp='192.168.4.2';let kioskPort=3000;let timerId=null;
+async function loadStatus(){try{const r=await fetch('/portal/status');const d=await r.json();if(d.kioskIp)kioskIp=d.kioskIp;if(d.kioskPort)kioskPort=d.kioskPort;}catch(e){}}
+loadStatus();
+function showView(id){if(timerId){clearInterval(timerId);timerId=null;}['viewMenu','viewPrint','viewCopy','viewScan'].forEach(v=>{const el=document.getElementById(v);if(el)el.classList.remove('active');});const t=document.getElementById(id);if(t)t.classList.add('active');window.scrollTo(0,0);}
+function showMenu(){showView('viewMenu');}
+function cancelTimerAndShowMenu(){if(timerId){clearInterval(timerId);timerId=null;}showMenu();}
+async function startPrintHelp(){showView('viewPrint');try{await fetch('/portal/api/action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=print'});}catch(e){}try{fetch('http://'+kioskIp+':'+kioskPort+'/api/kiosk/navigate?target=/print',{mode:'no-cors'});}catch(e){}}
+async function startCopyHelp(){showView('viewCopy');try{await fetch('/portal/api/action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=copy'});}catch(e){}startCountdown('copyTimer',4);}
+async function startScanHelp(){showView('viewScan');try{await fetch('/portal/api/action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=scan'});}catch(e){}startCountdown('scanTimer',4);}
+function startCountdown(elId,sec){let rem=sec;const el=document.getElementById(elId);if(el)el.textContent=rem;if(timerId)clearInterval(timerId);timerId=setInterval(()=>{rem--;if(el)el.textContent=rem;if(rem<=0){clearInterval(timerId);timerId=null;exitPortal();}},1000);}
+async function exitPortal(){if(timerId){clearInterval(timerId);timerId=null;}try{await fetch('/portal/api/action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=exit'});}catch(e){}window.location.href='/portal/exit';setTimeout(()=>{try{window.close();}catch(e){}},500);}
+</script>
+</body>
+</html>)HTML";
+
+void replyCaptivePortalPage(NetworkClient& client) {
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html; charset=utf-8");
+  client.println("Cache-Control: no-cache, no-store, must-revalidate");
+  client.println("Pragma: no-cache");
+  client.println("Expires: 0");
+  client.print("Content-Length: ");
+  client.println(strlen_P(captivePortalHtml));
+  client.println("Connection: close");
+  client.println();
+  client.print((const __FlashStringHelper*)captivePortalHtml);
+}
+
+void handlePortalStatus(NetworkClient& client) {
+  String json = "{";
+  json += "\"kioskIp\":\"" + (kioskIp.length() > 0 ? kioskIp : fallbackKioskIp) + "\",";
+  json += "\"kioskPort\":" + String(kioskPort > 0 ? kioskPort : fallbackKioskPort) + ",";
+  json += "\"registered\":" + String(hasKioskRegistration ? "true" : "false") + ",";
+  json += "\"ssid\":\"" + apSsid + "\"";
+  json += "}";
+  replyAdminJson(client, json);
+}
+
+void handlePortalApiAction(NetworkClient& client, const String& body, const String& query) {
+  String action = getFormValue(body, "action");
+  if (action.length() == 0) action = getQueryValue(query, "action");
+  action.trim();
+  action.toLowerCase();
+
+  Serial.print("portal_api_action:");
+  Serial.println(action);
+
+  if (action == "print") {
+    bool ok = triggerKioskNavigation("/print");
+    replyAdminJson(client, String("{\"ok\":true,\"action\":\"print\",\"navigated\":") + (ok ? "true" : "false") + "}");
+    return;
+  }
+
+  if (action == "copy" || action == "scan" || action == "exit") {
+    authorizeStation(client.remoteIP(), 3600000UL);
+    replyAdminJson(client, "{\"ok\":true,\"exited\":true}");
+    return;
+  }
+
+  replyAdminJson(client, "{\"ok\":false,\"error\":\"Unknown action\"}", 400, "Bad Request");
+}
+
+void handlePortalExit(NetworkClient& client, const String& userAgent) {
+  authorizeStation(client.remoteIP(), 3600000UL);
+  String ua = userAgent;
+  ua.toLowerCase();
+  if (ua.indexOf("captivenetworksupport") >= 0 || ua.indexOf("iphone") >= 0 || ua.indexOf("ipad") >= 0 || ua.indexOf("macintosh") >= 0) {
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/html; charset=utf-8");
+    client.println("Cache-Control: no-cache, no-store, must-revalidate");
+    client.println("Connection: close");
+    client.println();
+    client.print("<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");
+  } else {
+    client.println("HTTP/1.1 204 No Content");
+    client.println("Connection: close");
+    client.println();
+  }
+}
+
+void handlePortalRedirect(NetworkClient& client, const String& query) {
+  authorizeStation(client.remoteIP(), 3600000UL);
+  String to = getQueryValue(query, "to");
+  String path = (to == "feedback") ? "/feedback" : "/report";
+  String host = (kioskIp.length() > 0 ? kioskIp : fallbackKioskIp);
+  uint16_t port = (kioskPort > 0 ? kioskPort : fallbackKioskPort);
+  String url = "http://" + host + ":" + String(port) + path;
+  replyRedirect(client, url);
 }
 
 String buildCoinEventId() {
@@ -1384,6 +1796,7 @@ void handleRegisterRequest(NetworkClient& client, const String& body) {
   kioskPort = uint16_t(parsedPort);
   kioskPortalPath = normalizedPath(postedPath);
   hasKioskRegistration = true;
+  authorizeStation(registrationIp, 86400000UL);
   refreshTargets();
   addAdminEvent(String("Kiosk registered: ") + kioskIp + ":" + String(kioskPort));
 
@@ -1426,6 +1839,8 @@ void handleWifiRequest(NetworkClient& client) {
   int contentLength = 0;
   String hopperTokenHeader = "";
   String authorizationHeader = "";
+  String hostHeader = "";
+  String userAgentHeader = "";
   while (client.connected()) {
     String headerLine = client.readStringUntil('\r');
     client.readStringUntil('\n');
@@ -1444,6 +1859,12 @@ void handleWifiRequest(NetworkClient& client) {
     } else if (headerKey == "authorization") {
       authorizationHeader = headerLine.substring(colonPos + 1);
       authorizationHeader.trim();
+    } else if (headerKey == "host") {
+      hostHeader = headerLine.substring(colonPos + 1);
+      hostHeader.trim();
+    } else if (headerKey == "user-agent") {
+      userAgentHeader = headerLine.substring(colonPos + 1);
+      userAgentHeader.trim();
     }
   }
 
@@ -1629,12 +2050,42 @@ void handleWifiRequest(NetworkClient& client) {
     return;
   }
 
-  if (method == "GET" && isCaptiveProbePath(routePath)) {
-    if (hasKioskRegistration && kioskPortalUrl.length() > 0) {
-      replyRedirect(client, kioskPortalUrl);
+  if (method == "GET" && isCaptiveProbe(routePath, hostHeader)) {
+    if (isStationAuthorized(client.remoteIP())) {
+      replyCaptiveProbeSuccess(client, routePath, hostHeader);
     } else {
-      replyRedirect(client, "http://printbit.local/admin/login");
+      replyRedirect(client, "http://192.168.4.1/portal");
     }
+    client.stop();
+    return;
+  }
+
+  if (routePath == "/portal/api/action" || routePath == "/portal/api/kiosk-action") {
+    handlePortalApiAction(client, body, query);
+    client.stop();
+    return;
+  }
+
+  if (routePath == "/portal/exit") {
+    handlePortalExit(client, userAgentHeader);
+    client.stop();
+    return;
+  }
+
+  if (routePath == "/portal/redirect") {
+    handlePortalRedirect(client, query);
+    client.stop();
+    return;
+  }
+
+  if (routePath == "/portal/status") {
+    handlePortalStatus(client);
+    client.stop();
+    return;
+  }
+
+  if (method == "GET" && routePath == "/portal") {
+    replyCaptivePortalPage(client);
     client.stop();
     return;
   }
@@ -1745,6 +2196,25 @@ void handleWifiRequest(NetworkClient& client) {
   if (method == "GET" && routePath == "/" && query.startsWith("coins=")) {
     int coins = getQueryValue(query, "coins").toInt();
     startDispense(coins, buildHopperRequestId(), "legacy_query");
+    replyPlain(client, 200, "OK", "PRINTBIT OK");
+    client.stop();
+    return;
+  }
+
+  if (method == "GET" && routePath == "/") {
+    replyCaptivePortalPage(client);
+    client.stop();
+    return;
+  }
+
+  String lowerHost = hostHeader;
+  lowerHost.toLowerCase();
+  bool isLocalHost = (lowerHost.length() == 0 || lowerHost.startsWith("192.168.4.1") || lowerHost.startsWith("printbit.local") || lowerHost.startsWith("localhost"));
+
+  if (!isLocalHost) {
+    replyRedirect(client, "http://192.168.4.1/portal");
+    client.stop();
+    return;
   }
 
   if (routePath != "/") {
@@ -1756,6 +2226,7 @@ void handleWifiRequest(NetworkClient& client) {
 
   replyPlain(client, 200, "OK", "PRINTBIT OK");
   client.stop();
+  return;
 }
 
 // INTERRUPTS
@@ -1969,6 +2440,8 @@ void setup() {
 
   adminSessionToken = makeAdminSessionToken();
   server.begin();
+  dnsServer.start(DNS_PORT, "*", apIp);
+  Serial.println("DNS:Captive portal DNS server started (port 53)");
   addAdminEvent("ESP32 controller booted");
 
   Serial.println("ADMIN:http://192.168.4.1/admin");
@@ -2059,6 +2532,9 @@ void loop() {
   // Enforce short disconnect windows so auto-reconnecting clients are kicked again.
   enforceTemporaryDisconnectBlocks();
   enforceDeviceAccessPolicy();
+
+  // DNS REQUESTS FOR CAPTIVE PORTAL
+  dnsServer.processNextRequest();
 
   // WIFI REQUEST
   NetworkClient client = server.accept();

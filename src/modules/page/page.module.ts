@@ -16,6 +16,7 @@ export function registerPageModule(
   deps: PageModuleDeps,
 ): void {
   const controller = new PageController({
+    io: deps.io,
     sessionStore: deps.sessionStore,
     publicPageRoutes: deps.publicPageRoutes,
     resolvePublicBaseUrl: deps.resolvePublicBaseUrl,

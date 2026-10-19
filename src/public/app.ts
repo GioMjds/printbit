@@ -173,6 +173,15 @@ if (homeSocket) {
     setHomeLowInkWarningVisible(false);
     setHomeInkOutWarningVisible(false);
   });
+
+  homeSocket.on('kiosk:navigate', (payload: unknown) => {
+    if (payload && typeof payload === 'object' && 'path' in payload) {
+      const targetPath = String((payload as { path: unknown }).path);
+      if (targetPath.startsWith('/')) {
+        navigateTo(targetPath);
+      }
+    }
+  });
 }
 
 void fetch('/api/printer/simulation-status')
