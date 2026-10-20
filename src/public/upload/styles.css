@@ -504,7 +504,9 @@ body {
 .queue-item__icon[data-ext="jpg"],
 .queue-item__icon[data-ext="jpeg"],
 .queue-item__icon[data-ext="png"],
-.queue-item__icon[data-ext="gif"] {
+.queue-item__icon[data-ext="gif"],
+.queue-item__icon[data-ext="webp"],
+.queue-item__icon[data-ext="bmp"] {
   background: rgba(107, 70, 193, 0.2);
   color: #b794f4;
 }

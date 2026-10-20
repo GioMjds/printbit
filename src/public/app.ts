@@ -61,6 +61,11 @@ function syncFabVisibility(): void {
   const isWifiOpen = Boolean(
     document.getElementById('wifiOverlay')?.classList.contains('is-visible'),
   );
+  const isPrintWifiOpen = Boolean(
+    document
+      .getElementById('printWifiOverlay')
+      ?.classList.contains('is-visible'),
+  );
   const isAdminOpen = Boolean(
     document.getElementById('adminOverlay')?.classList.contains('is-visible'),
   );
@@ -83,6 +88,7 @@ function syncFabVisibility(): void {
     isReportOpen ||
     isFeedbackOpen ||
     isWifiOpen ||
+    isPrintWifiOpen ||
     isAdminOpen ||
     isIdleAttractorOpen ||
     isIdleWarningOpen;
@@ -406,8 +412,68 @@ window.addEventListener('pagehide', (event) => {
   }
 });
 
+// ── Print Wi-Fi Confirmation Intercept Modal ───────────────────────────────
+const printWifiOverlay = document.getElementById('printWifiOverlay');
+const printWifiConnectedBtn = document.getElementById('printWifiConnectedBtn');
+const printWifiNotYetBtn = document.getElementById('printWifiNotYetBtn');
+let wifiPulseTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function openPrintWifiConfirmModal(): void {
+  printWifiOverlay?.classList.add('is-visible');
+  printWifiOverlay?.setAttribute('aria-hidden', 'false');
+  syncFabVisibility();
+  printWifiConnectedBtn?.focus();
+}
+
+function closePrintWifiConfirmModal(): void {
+  printWifiOverlay?.classList.remove('is-visible');
+  printWifiOverlay?.setAttribute('aria-hidden', 'true');
+  syncFabVisibility();
+}
+
+function highlightHomeWifiCard(): void {
+  const card = document.querySelector<HTMLElement>('.wifi-inline-card');
+  if (!card) return;
+
+  if (wifiPulseTimeout !== null) {
+    clearTimeout(wifiPulseTimeout);
+  }
+  card.classList.remove('wifi-inline-card--pulse');
+  void card.offsetWidth;
+  card.classList.add('wifi-inline-card--pulse');
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  wifiPulseTimeout = setTimeout(() => {
+    card.classList.remove('wifi-inline-card--pulse');
+    wifiPulseTimeout = null;
+  }, 2400);
+}
+
 openPrint?.addEventListener('click', () => {
+  openPrintWifiConfirmModal();
+});
+
+printWifiConnectedBtn?.addEventListener('click', () => {
+  closePrintWifiConfirmModal();
   navigateTo('/print');
+});
+
+printWifiNotYetBtn?.addEventListener('click', () => {
+  closePrintWifiConfirmModal();
+  highlightHomeWifiCard();
+});
+
+printWifiOverlay?.addEventListener('click', (e) => {
+  if (e.target === printWifiOverlay) closePrintWifiConfirmModal();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (
+    e.key === 'Escape' &&
+    printWifiOverlay?.classList.contains('is-visible')
+  ) {
+    closePrintWifiConfirmModal();
+  }
 });
 openCopy?.addEventListener('click', () => navigateTo('/copy'));
 openScan?.addEventListener('click', () => navigateTo('/scan'));

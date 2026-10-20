@@ -346,7 +346,7 @@ function validateIncomingFileType(
       req,
       file,
       'UNSUPPORTED_TYPE',
-      'File format not supported. Only PDF, DOCX, JPG, and PNG are allowed.',
+      'File format not supported. Only PDF, DOCX, and images (JPG, PNG, GIF, WebP, BMP) are allowed.',
       deps,
     );
     cb(
@@ -397,9 +397,14 @@ function validateIncomingFileType(
   }
 
   const expectedMime = policy.extensionMimeMap[ext];
+  const isBothImages =
+    Boolean(expectedMime?.startsWith('image/')) &&
+    incomingMime.startsWith('image/');
   const normalizedMime =
-    incomingMime === 'application/octet-stream' ? expectedMime : incomingMime;
-  if (!normalizedMime || (expectedMime && expectedMime !== normalizedMime)) {
+    incomingMime === 'application/octet-stream' || isBothImages
+      ? (expectedMime ?? incomingMime)
+      : incomingMime;
+  if (!normalizedMime || (expectedMime && expectedMime !== normalizedMime && !isBothImages)) {
     const meta = {
       ...requestContext,
       originalFilename: file.originalname,
@@ -711,7 +716,7 @@ async function validateStagedMagicBytesWithPolicy(
 
   try {
     const headerBuffer = await readRangeFn(file.path, 0, 64);
-    const mime = file.mimetype.toLowerCase();
+    let mime = file.mimetype.toLowerCase();
     const hasKnownHeader = matchesMagicBytes(
       headerBuffer,
       mime,
@@ -719,7 +724,35 @@ async function validateStagedMagicBytesWithPolicy(
     );
     const webpValid =
       mime !== 'image/webp' || hasValidWebpSignature(headerBuffer);
-    const hasValidMagicBytes = hasKnownHeader && webpValid;
+    let hasValidMagicBytes = hasKnownHeader && webpValid;
+
+    // Auto-recover image format if declared as an image or has an image extension,
+    // but the actual header matches another supported image format (e.g. WebP/JPEG saved with .png extension).
+    if (!hasValidMagicBytes) {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const isImageCandidate =
+        mime.startsWith('image/') ||
+        ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(ext);
+      if (isImageCandidate) {
+        const detectedMime = classifyDetectedMime(
+          headerBuffer,
+          policy.magicSignatures,
+        );
+        if (
+          detectedMime &&
+          detectedMime.startsWith('image/') &&
+          policy.allowedMimeTypes.has(detectedMime)
+        ) {
+          const detectedWebpValid =
+            detectedMime !== 'image/webp' || hasValidWebpSignature(headerBuffer);
+          if (detectedWebpValid) {
+            mime = detectedMime;
+            file.mimetype = detectedMime;
+            hasValidMagicBytes = true;
+          }
+        }
+      }
+    }
 
     const ooxmlMarker = OOXML_DIRECTORY_MARKERS[mime];
     const isOoxmlFormat = !!ooxmlMarker;

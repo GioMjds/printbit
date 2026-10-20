@@ -8,6 +8,8 @@ export const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/gif',
+  'image/webp',
+  'image/bmp',
   'application/octet-stream',
 ]);
 
@@ -19,6 +21,8 @@ export const ALLOWED_EXTENSIONS = new Set([
   '.jpeg',
   '.png',
   '.gif',
+  '.webp',
+  '.bmp',
 ]);
 
 export const REPORT_ATTACHMENT_ALLOWED_MIME_TYPES = new Set([
@@ -66,6 +70,10 @@ export const MAGIC_SIGNATURES: Record<string, MagicSignature[]> = {
     { bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] },
     { bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] },
   ],
+  // WebP files begin with RIFF....WEBP (RIFF at offset 0 + WEBP at offset 8).
+  // The second marker is enforced through a custom validator in middleware.
+  'image/webp': [{ bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 }],
+  'image/bmp': [{ bytes: [0x42, 0x4d], offset: 0 }],
 };
 
 export const REPORT_ATTACHMENT_MAGIC_SIGNATURES: Record<
@@ -89,6 +97,8 @@ export const EXTENSION_MIME_MAP: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
 };
 
 export const REPORT_ATTACHMENT_EXTENSION_MIME_MAP: Record<string, string> = {

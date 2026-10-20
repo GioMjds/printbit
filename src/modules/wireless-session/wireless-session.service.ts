@@ -455,15 +455,21 @@ export class WirelessSessionService {
     const targetExt = path.extname(target.filename).toLowerCase();
     const isImage =
       target.contentType.startsWith('image/') ||
-      ['.jpg', '.jpeg', '.png', '.gif'].includes(targetExt);
+      ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(targetExt);
 
     if (isImage) {
       const mime =
-        targetExt === '.png'
-          ? 'image/png'
-          : targetExt === '.gif'
-            ? 'image/gif'
-            : 'image/jpeg';
+        target.contentType.startsWith('image/') && target.contentType !== 'image/*'
+          ? target.contentType
+          : targetExt === '.png'
+            ? 'image/png'
+            : targetExt === '.gif'
+              ? 'image/gif'
+              : targetExt === '.webp'
+                ? 'image/webp'
+                : targetExt === '.bmp'
+                  ? 'image/bmp'
+                  : 'image/jpeg';
       res.setHeader('Content-Type', mime);
       console.log('[preview] serving image file directly', {
         path: target.filePath,
@@ -1398,7 +1404,7 @@ export class WirelessSessionService {
     const targetExt = path.extname(target.filename).toLowerCase();
     const isOriginalImage =
       target.contentType.startsWith('image/') ||
-      ['.jpg', '.jpeg', '.png', '.gif'].includes(targetExt);
+      ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(targetExt);
     const originalFileType = isOriginalImage
       ? 'image'
       : resolveFileType(target.contentType, target.filename);

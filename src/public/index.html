@@ -1012,7 +1012,81 @@
       </div>
     </div>
 
-    <!-- Admin PIN modal — no visible entry point, triggered by hidden tap sequence -->
+        <!-- Print Wi-Fi Confirmation Intercept Modal -->
+    <div
+      class="print-wifi-overlay"
+      id="printWifiOverlay"
+      aria-hidden="true"
+    >
+      <div
+        class="print-wifi-modal"
+        role="dialog"
+        aria-labelledby="printWifiModalTitle"
+        aria-describedby="printWifiModalSub"
+        aria-modal="true"
+      >
+        <div class="print-wifi-modal__badge" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+            <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+            <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
+          </svg>
+        </div>
+
+        <h3 class="print-wifi-modal__title" id="printWifiModalTitle">
+          Connected to PrintBit Wi-Fi?
+        </h3>
+
+        <p class="print-wifi-modal__sub" id="printWifiModalSub">
+          Your phone must be connected to <strong>PrintBit</strong> Wi-Fi to send files to this kiosk.
+        </p>
+
+        <div class="print-wifi-modal__tip">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path
+              fill-rule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <span>If using <strong>Canva</strong> or <strong>Google Drive</strong>, download your files to your phone storage first before connecting.</span>
+        </div>
+
+        <div class="print-wifi-modal__actions">
+          <button
+            type="button"
+            class="print-wifi-btn print-wifi-btn--primary"
+            id="printWifiConnectedBtn"
+          >
+            <span>Connected</span>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="print-wifi-btn print-wifi-btn--subtle"
+            id="printWifiNotYetBtn"
+          >
+            Not yet
+          </button>
+        </div>
+      </div>
+    </div>
+
+<!-- Admin PIN modal — no visible entry point, triggered by hidden tap sequence -->
     <div class="admin-overlay" id="adminOverlay" aria-hidden="true">
       <div
         class="admin-modal"

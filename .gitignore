@@ -20,3 +20,7 @@ graphify-out/
 .superpowers
 REPORT_LOGS.txt
 release/
+
+printbit.test.sqlite
+printbit.test.sqlite-shm
+printbit.test.sqlite-wal
