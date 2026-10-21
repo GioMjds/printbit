@@ -182,7 +182,13 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
             PaperSource = isFeeder ? PaperSource.Feeder : PaperSource.Flatbed,
             Dpi = request.Dpi > 0 ? request.Dpi : 300,
             BitDepth = request.ColorMode.Equals("grayscale", StringComparison.OrdinalIgnoreCase)
-                ? BitDepth.Grayscale : BitDepth.Color
+                ? BitDepth.Grayscale : BitDepth.Color,
+            TwainOptions = new TwainOptions
+            {
+                Dsm = TwainDsm.New,
+                TransferMode = TwainTransferMode.Memory,
+                ShowProgress = false
+            }
         };
 
         var normPaper = request.PaperSize?.Trim().ToLowerInvariant();
@@ -200,27 +206,43 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
 
         var controller = new ScanController(_scanningContext);
         var images = new List<ProcessedImage>();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long lastPageMs = 0;
 
         try
         {
             _logger.LogInformation(
-                "[SCANNER] Starting NAPS2.Sdk scan for request {requestId} ({source}, {dpi} DPI, {color}, device: {device})",
-                request.RequestId, request.Source, options.Dpi, request.ColorMode, _selectedDevice.Name);
+                "[SCANNER] Starting NAPS2.Sdk scan for request {requestId} ({source}, {dpi} DPI, {color}, maxPages: {maxPages}, device: {device})",
+                request.RequestId, request.Source, options.Dpi, request.ColorMode, request.MaxPages, _selectedDevice.Name);
 
             await foreach (var image in controller.Scan(options, linkedCts.Token))
             {
+                var pageElapsed = sw.ElapsedMilliseconds - lastPageMs;
+                lastPageMs = sw.ElapsedMilliseconds;
                 images.Add(image);
-                _logger.LogInformation("[SCANNER] Page {page} scanned for request {requestId}", images.Count, request.RequestId);
+                _logger.LogInformation(
+                    "[SCANNER] Page {page} scanned in {pageMs}ms (total: {totalMs}ms) for request {requestId}",
+                    images.Count, pageElapsed, sw.ElapsedMilliseconds, request.RequestId);
+
+                if (request.MaxPages.HasValue && images.Count >= request.MaxPages.Value)
+                {
+                    _logger.LogInformation(
+                        "[SCANNER] Reached maxPages limit ({maxPages}) for request {requestId}; ending feeder acquisition early.",
+                        request.MaxPages.Value, request.RequestId);
+                    break;
+                }
             }
 
             if (images.Count == 0)
             {
-                _logger.LogWarning("[SCANNER] Scan completed with 0 pages for request {requestId}", request.RequestId);
+                sw.Stop();
+                _logger.LogWarning("[SCANNER] Scan completed with 0 pages for request {requestId} in {duration}ms", request.RequestId, sw.ElapsedMilliseconds);
                 return new ScanResult
                 {
                     Success = false,
                     ErrorCode = isFeeder ? "FEEDER_EMPTY" : "OUTPUT_FILE_MISSING",
-                    ErrorMessage = isFeeder ? "ADF feeder is empty or paper feed not detected" : "No pages received from scanner"
+                    ErrorMessage = isFeeder ? "ADF feeder is empty or paper feed not detected" : "No pages received from scanner",
+                    DurationMs = sw.ElapsedMilliseconds
                 };
             }
 
@@ -234,18 +256,21 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
                 images[0].Save(outputPath);
             }
 
-            _logger.LogInformation("[SCANNER] Scan completed successfully ({count} pages) -> {path}", images.Count, outputPath);
+            sw.Stop();
+            _logger.LogInformation("[SCANNER] Scan completed successfully ({count} pages in {duration}ms) -> {path}", images.Count, sw.ElapsedMilliseconds, outputPath);
             return new ScanResult
             {
                 Success = true,
                 OutputPath = outputPath,
                 PageCount = images.Count,
-                Format = ext
+                Format = ext,
+                DurationMs = sw.ElapsedMilliseconds
             };
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("[SCANNER] Scan execution cancelled or timed out for request {requestId}", request.RequestId);
+            sw.Stop();
+            _logger.LogWarning("[SCANNER] Scan execution cancelled or timed out after {duration}ms for request {requestId}", sw.ElapsedMilliseconds, request.RequestId);
             if (File.Exists(outputPath)) File.Delete(outputPath);
 
             var code = timeoutCts.IsCancellationRequested ? "SCAN_TIMEOUT" : "CANCELLED";
@@ -255,12 +280,14 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
                 ErrorCode = code,
                 ErrorMessage = timeoutCts.IsCancellationRequested
                     ? $"Scan timed out after {_settings.ScanTimeoutSeconds} seconds"
-                    : "Scan cancelled"
+                    : "Scan cancelled",
+                DurationMs = sw.ElapsedMilliseconds
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[SCANNER] NAPS2.Sdk scan error for request {requestId}: {msg}", request.RequestId, ex.Message);
+            sw.Stop();
+            _logger.LogError(ex, "[SCANNER] NAPS2.Sdk scan error after {duration}ms for request {requestId}: {msg}", sw.ElapsedMilliseconds, request.RequestId, ex.Message);
             if (File.Exists(outputPath)) File.Delete(outputPath);
 
             var errorCode = "PROCESS_FAILED";
@@ -276,7 +303,8 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
             {
                 Success = false,
                 ErrorCode = errorCode,
-                ErrorMessage = string.IsNullOrWhiteSpace(msg) ? "Scanning failed." : msg
+                ErrorMessage = string.IsNullOrWhiteSpace(msg) ? "Scanning failed." : msg,
+                DurationMs = sw.ElapsedMilliseconds
             };
         }
         finally

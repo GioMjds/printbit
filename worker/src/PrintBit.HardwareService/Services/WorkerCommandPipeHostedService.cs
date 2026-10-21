@@ -559,7 +559,8 @@ public sealed class WorkerCommandPipeHostedService : BackgroundService
                                     ColorMode = scanCmd.ColorMode,
                                     Format = scanCmd.Format,
                                     PaperSize = scanCmd.PaperSize,
-                                    OutputDir = scanCmd.OutputDir
+                                    OutputDir = scanCmd.OutputDir,
+                                    MaxPages = scanCmd.MaxPages
                                 }, cancellationToken);
 
                                 if (_eventPipeClient != null)
@@ -583,7 +584,8 @@ public sealed class WorkerCommandPipeHostedService : BackgroundService
                                     PageCount = scanResult.PageCount,
                                     Format = scanResult.Format,
                                     ErrorCode = scanResult.ErrorCode,
-                                    Message = scanResult.ErrorMessage
+                                    Message = scanResult.ErrorMessage,
+                                    DurationMs = scanResult.DurationMs
                                 };
                                 hwResponseJson = JsonSerializer.Serialize(startScanResponse, WorkerCommandParser.JsonOptions) + "\n";
                             }

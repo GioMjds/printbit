@@ -431,6 +431,8 @@ export class ScannerService {
         dpi: settings.dpi,
         colorMode: settings.colorMode,
         filename,
+        durationMs: result.durationMs ?? null,
+        pageCount: result.pageCount,
       },
     );
 
@@ -876,9 +878,12 @@ export class ScannerService {
 
     const normalizedPaperSize = normalizeScannerPaperSize(paperSize);
     const source = toCopyPreviewSource(normalizedPaperSize);
-    const dpi = this.resolveConfiguredDpi('copy', source);
+    // Preview scan only needs 300 DPI layout verification to minimize ADF feed and transfer time
+    const dpi = 300;
 
-    console.log(`[SCAN-PREVIEW] Starting copy pre-scan (${dpi} DPI color)…`);
+    console.log(
+      `[SCAN-PREVIEW] Starting copy pre-scan (${source}, ${dpi} DPI color, maxPages: 1)...`,
+    );
 
     const previewSettings = {
       source,
@@ -887,9 +892,17 @@ export class ScannerService {
       duplex: false,
       format: 'pdf' as const,
       paperSize: normalizedPaperSize,
+      maxPages: 1,
     };
 
     try {
+      const simulation = getPrinterSimulationState();
+      if (simulation.activeError === 'adf_error') {
+        throw new Error(
+          'Printer ADF Error Detected. Clear the printer ADF error or paper jam, then proceed with scanning.',
+        );
+      }
+
       const result = await getAdapter().scan(previewSettings, 'uploads/scans');
 
       const absPath = path.resolve(result.outputPath);

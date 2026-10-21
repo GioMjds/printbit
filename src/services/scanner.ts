@@ -9,6 +9,7 @@ export interface ScannerJobResult {
   outputPath: string;
   pageCount: number;
   format: string;
+  durationMs?: number;
 }
 
 export interface ScannerCapabilities {
@@ -74,6 +75,7 @@ interface WorkerStartScanResponse {
   format?: string;
   errorCode?: string;
   message?: string;
+  durationMs?: number;
 }
 
 interface WorkerCancelScanResponse {
@@ -167,6 +169,7 @@ export class WorkerScannerAdapter implements ScannerAdapter {
         format: settings.format,
         paperSize: settings.paperSize,
         outputDir: path.resolve(outputDir),
+        maxPages: settings.maxPages,
       },
       opts,
     );
@@ -193,6 +196,7 @@ export class WorkerScannerAdapter implements ScannerAdapter {
       outputPath: resp.outputPath,
       pageCount: resp.pageCount ?? 1,
       format: resp.format ?? settings.format,
+      durationMs: resp.durationMs ?? elapsed,
     };
   }
 

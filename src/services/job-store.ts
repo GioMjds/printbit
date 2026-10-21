@@ -41,6 +41,7 @@ export interface ScanJobSettings {
   duplex: boolean;
   format: ScanFormat;
   paperSize: 'A4' | 'Short' | 'Long';
+  maxPages?: number;
 }
 
 export interface BaseJob {

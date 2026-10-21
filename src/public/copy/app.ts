@@ -9,19 +9,27 @@ import {
   destroyPdfLoadingTask,
   type PdfLoadingTask,
 } from '../shared/pdfjs-loading-task-cleanup';
-import {
-  ADF_NO_DOCUMENT_GUIDE,
-  getCopyTroubleshootingGuide,
-  isAdfPaperJam,
-} from './troubleshooting';
+import { getCopyTroubleshootingGuide } from './troubleshooting';
 import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 import { initPrinterGuard } from '@/guards/printer-guard';
+
+declare const io: (opts?: {
+  auth?: Record<string, string>;
+  reconnectionDelay?: number;
+}) => {
+  on(event: string, cb: (...args: unknown[]) => void): void;
+  off?(event: string, cb: (...args: unknown[]) => void): void;
+  disconnect(): void;
+};
+
+const copySocket =
+  typeof io === "function" ? io({ reconnectionDelay: 2000 }) : null;
 
 export {};
 
 void initKioskLocalization();
 attachUiBlockingOverlay();
-void initPrinterGuard(null, { mode: 'kiosk_wide_only' });
+void initPrinterGuard(copySocket, { mode: "kiosk_wide_only" });
 
 // ── Idle Timeout with Warning Modal (Copy Page) ───────────────────────────────────────────────
 
@@ -68,14 +76,6 @@ interface PDFViewport {
   width: number;
   height: number;
 }
-
-type CopyFailureCause =
-  | 'no_document'
-  | 'placement'
-  | 'dirty_glass'
-  | 'busy'
-  | 'connection'
-  | 'unknown';
 
 const continueBtn = document.getElementById(
   'continueBtn',
@@ -317,83 +317,6 @@ let previewReleaseToken: string | null = null;
 let previewObjectUrl: string | null = null;
 const RELEASE_TIMEOUT_MS = 1_500;
 
-const COPY_FAILURE_GUIDES: Record<
-  CopyFailureCause,
-  { causes: string[]; steps: string[] }
-> = {
-  no_document: {
-    causes: [
-      'No page is currently on the scanner glass.',
-      'Page is face-up instead of face-down on the glass.',
-      'Only part of the page is inside the scan area.',
-    ],
-    steps: [
-      'Place one page face-down on the scanner glass.',
-      'Align the page with the corner marks so the whole page is inside the frame.',
-      'Close the scanner cover gently, then tap Check Document again.',
-    ],
-  },
-  placement: {
-    causes: [
-      'Page is tilted so edges are outside the scan area.',
-      'Paper shifted while the scanner started reading.',
-      'Document is smaller/larger than expected and not centered.',
-    ],
-    steps: [
-      'Reposition the page flat and straight on the glass.',
-      'Keep page corners inside the scanner frame markings.',
-      'Hold the cover steady while starting Check Document.',
-    ],
-  },
-  dirty_glass: {
-    causes: [
-      'Dust, smudges, or streaks are on the scanner glass.',
-      'Dirt on the white backing causes false detection issues.',
-      'Previous paper debris left marks in the scan area.',
-    ],
-    steps: [
-      'Open the lid and clean the scanner glass with a soft, dry microfiber cloth.',
-      'If needed, lightly dampen cloth with glass cleaner (do not spray directly on scanner).',
-      'Dry completely, place the document again, and retry.',
-    ],
-  },
-  busy: {
-    causes: [
-      'Scanner is still finishing a previous scan request.',
-      'Another process is using the scanner right now.',
-      'Scanner service is temporarily busy.',
-    ],
-    steps: [
-      'Wait a few seconds, then tap Retry once.',
-      'Avoid tapping Check Document repeatedly in quick succession.',
-      'If it remains busy, go back and try the copy flow again.',
-    ],
-  },
-  connection: {
-    causes: [
-      'Scanner connection is unstable or unavailable.',
-      'Scanner is powered off or not ready.',
-      'Scanner driver/service is unavailable on the kiosk.',
-    ],
-    steps: [
-      'Confirm scanner power is on and the scanner is ready.',
-      'Check scanner cable connections are firmly seated.',
-      'Retry; if still failing, ask staff to check scanner connection and service.',
-    ],
-  },
-  unknown: {
-    causes: [
-      'Scanner could not complete document detection.',
-      'Page placement or scanner readiness may have interrupted detection.',
-      'Temporary scanner runtime issue occurred.',
-    ],
-    steps: [
-      'Remove and place the page face-down again, flat on the glass.',
-      'Check the glass is clean and close the lid before retrying.',
-      'If it still fails, restart scan flow or ask staff for assistance.',
-    ],
-  },
-};
 
 function sanitizeUserFacingError(rawMessage: string): string {
   const fallback = 'Could not complete scanner check. Please try again.';
@@ -413,61 +336,6 @@ function sanitizeUserFacingError(rawMessage: string): string {
   return safeMessage;
 }
 
-function classifyCopyFailure(rawMessage: string): CopyFailureCause {
-  const normalized = rawMessage.toLowerCase();
-
-  if (
-    normalized.includes('no document') ||
-    normalized.includes('no pages') ||
-    normalized.includes('not detected')
-  ) {
-    return 'no_document';
-  }
-
-  if (
-    normalized.includes('align') ||
-    normalized.includes('alignment') ||
-    normalized.includes('skew') ||
-    normalized.includes('crop') ||
-    normalized.includes('position')
-  ) {
-    return 'placement';
-  }
-
-  if (
-    normalized.includes('dirty') ||
-    normalized.includes('smudge') ||
-    normalized.includes('streak') ||
-    normalized.includes('dust') ||
-    normalized.includes('glass')
-  ) {
-    return 'dirty_glass';
-  }
-
-  if (
-    normalized.includes('busy') ||
-    normalized.includes('in use') ||
-    normalized.includes('another scan') ||
-    normalized.includes('already scanning')
-  ) {
-    return 'busy';
-  }
-
-  if (
-    normalized.includes('no scanner') ||
-    normalized.includes('not connected') ||
-    normalized.includes('unavailable') ||
-    normalized.includes('connection') ||
-    normalized.includes('usb') ||
-    normalized.includes('driver') ||
-    normalized.includes('cannot communicate') ||
-    normalized.includes('offline')
-  ) {
-    return 'connection';
-  }
-
-  return 'unknown';
-}
 
 function replaceListItems(
   listEl: HTMLUListElement | HTMLOListElement | null,
@@ -492,18 +360,22 @@ function hideCopyTroubleshooting(): void {
 }
 
 function showCopyTroubleshooting(rawMessage: string, usesAdf: boolean): string {
-  const guide = getCopyTroubleshootingGuide(rawMessage, usesAdf);
+  const isAdfRelated =
+    usesAdf ||
+    rawMessage.toLowerCase().includes("adf") ||
+    rawMessage.toLowerCase().includes("feeder");
+  const guide = getCopyTroubleshootingGuide(rawMessage, isAdfRelated);
   const safeMessage = sanitizeUserFacingError(rawMessage);
   const userFacingMessage = guide.summary || safeMessage;
 
   replaceListItems(copyTroubleshootCauses, guide.causes);
   replaceListItems(copyTroubleshootSteps, guide.steps);
-  if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = '';
+  if (copyTroubleshootingPanel) copyTroubleshootingPanel.style.display = "";
 
   // Remember which visual guide (if any) matches this failure.
-  currentVisualGuideKind = guide.visualGuideKind ?? (usesAdf ? 'adf' : null);
+  currentVisualGuideKind = guide.visualGuideKind ?? (isAdfRelated ? "adf" : null);
 
-  const shouldShowVisual = Boolean(guide.hasVisualGuide || usesAdf);
+  const shouldShowVisual = Boolean(guide.hasVisualGuide || isAdfRelated);
 
   const visualGuideEl = document.getElementById('copyAdfVisualGuide');
   if (visualGuideEl) {
@@ -644,8 +516,86 @@ function showError(msg: string, usesAdf = false): void {
 
 function hideError(): void {
   setPreviewBlockedByError(false);
-  if (errorBanner) errorBanner.style.display = 'none';
+  if (errorBanner) errorBanner.style.display = "none";
   hideCopyTroubleshooting();
+}
+
+function clearSimulatedError(): void {
+  hideError();
+  closeCopyAdfModal();
+  closeCopyPrinterPanelModal();
+  setCopySourceRadiosDisabled(Boolean(previewPath));
+  if (previewPath) {
+    void showPreview(previewPath);
+  } else {
+    resetPreviewSurfaces();
+    if (previewSection) previewSection.style.display = "none";
+    if (previewPlaceholder) previewPlaceholder.style.display = "";
+    if (continueBtn) {
+      continueBtn.style.display = "none";
+      continueBtn.disabled = true;
+    }
+    if (clearRescanBtn) clearRescanBtn.style.display = "none";
+    if (checkDocBtn) {
+      checkDocBtn.style.display = "";
+      checkDocBtn.disabled = false;
+    }
+    if (previewStatusText) {
+      previewStatusText.textContent = "Waiting for scan";
+      previewStatusText.removeAttribute("data-status");
+    }
+  }
+}
+
+function setupCopySocket(): void {
+  if (!copySocket) return;
+
+  copySocket.on("scan:adf-error", (payload: unknown) => {
+    const errorMsg =
+      payload && typeof payload === "object" && "error" in payload
+        ? String((payload as { error: unknown }).error)
+        : "Printer ADF Error Detected. Clear the printer ADF error or paper jam, then proceed with scanning.";
+    showError(errorMsg, true);
+  });
+
+  copySocket.on("printer:simulation-state", (payload: unknown) => {
+    const p = payload as { activeError?: string | null } | null;
+    if (p?.activeError === "adf_error") {
+      showError(
+        "Printer ADF Error Detected. Clear the printer ADF error or paper jam, then proceed with scanning.",
+        true,
+      );
+    } else if (!p?.activeError) {
+      clearSimulatedError();
+    }
+  });
+
+  copySocket.on("printer:simulation-cleared", (payload: unknown) => {
+    const p = payload as { redirectHome?: boolean } | null;
+    if (p?.redirectHome) {
+      sessionStorage.removeItem("printbit.copyPreviewPath");
+      sessionStorage.removeItem("printbit.copyPreviewReleaseToken");
+      sessionStorage.removeItem("printbit.copySourcePaperSize");
+      navigateWithKioskMotion("/", "replace");
+      return;
+    }
+    clearSimulatedError();
+  });
+
+  copySocket.on("printer:paper-jam-cleared", () => {
+    sessionStorage.removeItem("printbit.copyPreviewPath");
+    sessionStorage.removeItem("printbit.copyPreviewReleaseToken");
+    sessionStorage.removeItem("printbit.copySourcePaperSize");
+    navigateWithKioskMotion("/", "replace");
+  });
+
+  copySocket.on("printerStatusRestored", () => {
+    clearSimulatedError();
+  });
+
+  copySocket.on("printerRecovered", () => {
+    clearSimulatedError();
+  });
 }
 
 async function renderPdfPreview(buf: ArrayBuffer): Promise<void> {
@@ -852,8 +802,11 @@ async function checkForDocument(): Promise<void> {
       await showPreview(data.previewPath);
     } else {
       setCopySourceRadiosDisabled(false);
-      const isUsingAdf = getSelectedCopySource() === 'feeder';
-      showError(data.error ?? 'No document detected.', isUsingAdf);
+      const isUsingAdf =
+        getSelectedCopySource() === "feeder" ||
+        (data.error ?? "").toLowerCase().includes("adf") ||
+        (data.error ?? "").toLowerCase().includes("feeder");
+      showError(data.error ?? "No document detected.", isUsingAdf);
     }
   } catch {
     showOverlay(false);
@@ -891,6 +844,28 @@ continueBtn?.addEventListener('click', () => {
 window.addEventListener('beforeunload', clearPreviewImageUrl);
 
 async function initializeCopyPage(): Promise<void> {
+  setupCopySocket();
+
+  void fetch("/api/printer/simulation-status")
+    .then((res) => (res.ok ? res.json() : null))
+    .then(
+      (
+        data: {
+          activeError?: string | null;
+          simulation?: { activeError?: string | null };
+        } | null,
+      ) => {
+        const activeError = data?.activeError ?? data?.simulation?.activeError;
+        if (activeError === "adf_error") {
+          showError(
+            "Printer ADF Error Detected. Clear the printer ADF error or paper jam, then proceed with scanning.",
+            true,
+          );
+        }
+      },
+    )
+    .catch(() => {});
+
   const savedSourceSize = sessionStorage.getItem(
     'printbit.copySourcePaperSize',
   );

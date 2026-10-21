@@ -264,13 +264,13 @@ function getSelectedScanSource(): ScanSource {
 function resolveScanDpi(source: ScanSource = getSelectedScanSource()): ScanDpi {
   const isAdf = source === 'feeder';
   const dpi = isAdf
-    ? (configuredScannerDpi?.scanAdf ?? 300)
+    ? (configuredScannerDpi?.scanAdf ?? 150)
     : (configuredScannerDpi?.scanGlass ?? 300);
   const dpiStr = String(dpi);
   if (dpiStr === '150' || dpiStr === '300' || dpiStr === '600') {
     return dpiStr;
   }
-  return '300';
+  return isAdf ? '150' : '300';
 }
 
 async function loadScannerSettings(): Promise<void> {

@@ -467,6 +467,15 @@ public static class WorkerCommandParser
                     outputDir = outElem.GetString();
                 }
 
+                int? maxPages = null;
+                if (TryGetPropertyCaseInsensitive(doc.RootElement, "maxPages", out var maxElem) &&
+                    maxElem.ValueKind == JsonValueKind.Number &&
+                    maxElem.TryGetInt32(out var parsedMax) &&
+                    parsedMax > 0)
+                {
+                    maxPages = parsedMax;
+                }
+
                 command = new StartScanCommand
                 {
                     RequestId = requestId,
@@ -475,7 +484,8 @@ public static class WorkerCommandParser
                     ColorMode = colorMode,
                     Format = format,
                     PaperSize = paperSize,
-                    OutputDir = outputDir
+                    OutputDir = outputDir,
+                    MaxPages = maxPages
                 };
                 return true;
             }

@@ -245,6 +245,26 @@ export function getCopyTroubleshootingGuide(
 ): CopyTroubleshootingGuide {
   const message = rawMessage.toLowerCase();
 
+  if (
+    message.includes('adf') ||
+    message.includes('feeder error') ||
+    message.includes('automatic document feeder')
+  ) {
+    if (
+      message.includes('jam') ||
+      message.includes('stuck') ||
+      message.includes('paper jam') ||
+      message.includes('feeder jam')
+    ) {
+      return ADF_PAPER_JAM_GUIDE;
+    }
+    return ADF_ERROR_GUIDE;
+  }
+
+  if (message.includes('feeder jam')) {
+    return ADF_PAPER_JAM_GUIDE;
+  }
+
   if (usesAdf) {
     // ── Printer-panel / LED error (Long Bond / ADF) ─────────────
     if (

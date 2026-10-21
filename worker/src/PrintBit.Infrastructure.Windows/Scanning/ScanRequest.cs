@@ -1,4 +1,4 @@
-﻿namespace PrintBit.Infrastructure.Windows.Scanning;
+namespace PrintBit.Infrastructure.Windows.Scanning;
 
 public sealed record ScanRequest
 {
@@ -9,4 +9,5 @@ public sealed record ScanRequest
     public string Format { get; init; } = "pdf";
     public string? PaperSize { get; init; }
     public string? OutputDir { get; init; }
+    public int? MaxPages { get; init; }
 }

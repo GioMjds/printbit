@@ -1,4 +1,4 @@
-﻿namespace PrintBit.Infrastructure.Windows.Scanning;
+namespace PrintBit.Infrastructure.Windows.Scanning;
 
 public sealed record ScanResult
 {
@@ -8,4 +8,5 @@ public sealed record ScanResult
     public string Format { get; init; } = string.Empty;
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
+    public long DurationMs { get; init; }
 }

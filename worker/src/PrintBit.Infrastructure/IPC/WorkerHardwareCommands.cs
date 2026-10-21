@@ -195,6 +195,10 @@ public sealed record StartScanCommand : WorkerHardwareCommand
     [JsonPropertyName("outputDir")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? OutputDir { get; init; }
+
+    [JsonPropertyName("maxPages")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxPages { get; init; }
 }
 
 public sealed record CancelScanCommand : WorkerHardwareCommand
@@ -262,6 +266,9 @@ public sealed record StartScanResponse
     [JsonPropertyName("message")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message { get; init; }
+
+    [JsonPropertyName("durationMs")]
+    public long DurationMs { get; init; }
 }
 
 public sealed record CancelScanResponse
