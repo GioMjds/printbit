@@ -140,8 +140,8 @@ net localgroup Administrators printbit-admin /add
 
 ```powershell
 # Create queue and binary folders
-New-Item -ItemType Directory -Path "C:\Users\printbit\printbit-worker\queue" -Force
-New-Item -ItemType Directory -Path "C:\Users\printbit\printbit-worker\failed" -Force
+New-Item -ItemType Directory -Path "C:\Users\printbit\worker\queue" -Force
+New-Item -ItemType Directory -Path "C:\Users\printbit\worker\failed" -Force
 New-Item -ItemType Directory -Path "C:\Users\printbit\bin" -Force
 Copy-Item ".\bin\SumatraPDF.exe" "C:\Users\printbit\bin\SumatraPDF.exe" -Force
 
@@ -149,7 +149,7 @@ Copy-Item ".\bin\SumatraPDF.exe" "C:\Users\printbit\bin\SumatraPDF.exe" -Force
 Add-Printer -Name "PrintBit - High" -DriverName "EPSON L5290 Series" -PortName "USB001"
 
 # Register the C# Worker Service as LocalSystem
-$workerExe = "C:\Users\printbit\printbit-worker\PrintBit.HardwareService.exe"
+$workerExe = "C:\Users\printbit\worker\publish\PrintBit.HardwareService.exe"
 sc.exe create PrintBitHardware `
   binPath= "`"$workerExe`"" `
   start= auto `
@@ -185,7 +185,7 @@ Lock the device to Microsoft Edge so users cannot access the desktop or settings
 1. Go to **Settings > Accounts > Family & other users > Set up assigned access** (or **Kiosk**).
 2. Select the **`printbit`** local user created in Step 3.
 3. Select **Microsoft Edge** as the kiosk app.
-4. When prompted for the URL, enter: `http://127.0.0.1:3000/loading` (Always use loopback `127.0.0.1`. Do not use `192.168.4.2` here as Wi-Fi does not associate until after boot).
+4. When prompted for the URL, enter: `http://127.0.0.1:3000/loading` (Always use loopback `127.0.0.1`. Do not use `192.168.4.2` here as Wi-Fi does not associate until after boot). OR, you can use: `file:///C:/ProgramData/printbit/boot.html` if Edge doesn't reject the local file URL.
 
 ---
 
