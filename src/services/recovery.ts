@@ -307,7 +307,8 @@ export async function recordSpoolerLifecycleTransition(
     state: input.state,
     timestamp,
     reason: typeof input.reason === 'string' ? input.reason : null,
-    printerName: typeof input.printerName === 'string' ? input.printerName : null,
+    printerName:
+      typeof input.printerName === 'string' ? input.printerName : null,
     spoolerCorrelationKey:
       typeof input.spoolerCorrelationKey === 'string'
         ? input.spoolerCorrelationKey
@@ -325,7 +326,8 @@ export async function recordSpoolerLifecycleTransition(
     entry.requiredAmount = Math.max(0, requiredAmount);
   }
   if (input.sessionId !== undefined) {
-    entry.sessionId = typeof input.sessionId === 'string' ? input.sessionId : null;
+    entry.sessionId =
+      typeof input.sessionId === 'string' ? input.sessionId : null;
   }
   if (input.documentId !== undefined) {
     entry.documentId =
@@ -348,7 +350,8 @@ export async function recordSpoolerLifecycleTransition(
     entry.reason = typeof input.reason === 'string' ? input.reason : null;
   }
   if (input.jobStatus !== undefined) {
-    entry.jobStatus = typeof input.jobStatus === 'string' ? input.jobStatus : null;
+    entry.jobStatus =
+      typeof input.jobStatus === 'string' ? input.jobStatus : null;
   }
   if (input.pagesPrinted !== undefined) {
     entry.pagesPrinted = pagesPrinted;
@@ -391,7 +394,8 @@ export function getSpoolerLifecycleRecord(
   ensureSpoolerLifecycleState();
   const match = db.data!.spoolerLifecycle.find(
     (entry) =>
-      entry.transactionId === transactionId && (mode ? entry.mode === mode : true),
+      entry.transactionId === transactionId &&
+      (mode ? entry.mode === mode : true),
   );
   return match ? structuredClone(match) : null;
 }
@@ -435,7 +439,7 @@ export async function markRecoveryStartup(
 }
 
 export async function markRecoveryShutdown(
-  signal: NodeJS.Signals,
+  signal: NodeJS.Signals | string = 'SIGTERM',
 ): Promise<void> {
   ensureRecoveryState();
   const lifecycle = db.data!.recovery.lifecycle;
@@ -737,7 +741,10 @@ export function getRecoveryStatusSnapshot(): RecoveryStatusSnapshot {
   ).length;
   const reconciled = sessions.length - inFlight;
   const startupPending = sessions.filter(
-    (entry) => entry.phase !== 'reconciled' && !entry.startupReconciled && entry.wasPresentAtStartup === true,
+    (entry) =>
+      entry.phase !== 'reconciled' &&
+      !entry.startupReconciled &&
+      entry.wasPresentAtStartup === true,
   ).length;
   const autoRefunded = sessions.filter(
     (entry) => entry.reconciliationAction === 'auto_refund',
@@ -767,7 +774,9 @@ export async function reconcileFinalizedCopySession(
   transactionId: string,
 ): Promise<void> {
   ensureRecoveryState();
-  const existing = db.data!.recovery.sessions.find((entry) => entry.id === transactionId);
+  const existing = db.data!.recovery.sessions.find(
+    (entry) => entry.id === transactionId,
+  );
   if (!existing) return;
   await checkpointRecoverySession({
     transactionId: existing.id,
@@ -785,7 +794,8 @@ export async function reconcileFinalizedCopySession(
     reconciledAt: nowIso(),
     startupReconciled: false,
     reconciliationAction: 'none',
-    reconciliationReason: 'Copy transaction finalized without spooler follow-up.',
+    reconciliationReason:
+      'Copy transaction finalized without spooler follow-up.',
     context: {
       finalizedWithoutSpooler: true,
     },
@@ -825,7 +835,8 @@ function baseSpoolerLifecycleRecord(input: {
     sessionId: input.sessionId ?? null,
     documentId: input.documentId ?? null,
     requiredAmount:
-      typeof input.requiredAmount === 'number' && Number.isFinite(input.requiredAmount)
+      typeof input.requiredAmount === 'number' &&
+      Number.isFinite(input.requiredAmount)
         ? Number(input.requiredAmount)
         : 0,
     spoolerCorrelationKey: input.spoolerCorrelationKey ?? null,

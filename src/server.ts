@@ -841,6 +841,8 @@ async function gracefulShutdown(signal: NodeJS.Signals): Promise<void> {
 
 process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+process.on('SIGHUP', () => void gracefulShutdown('SIGHUP'));
+process.on('SIGBREAK', () => void gracefulShutdown('SIGBREAK'));
 
 if (process.env.NODE_ENV !== 'test') {
   void start().catch((error) => {

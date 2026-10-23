@@ -52,6 +52,7 @@ import {
   checkpointRecoverySession,
   getRecoveryStatusSnapshot,
   getSpoolerLifecycleRecord,
+  markRecoveryShutdown,
 } from '@/services/recovery';
 import {
   DEFAULT_SCAN_FILENAME_FORMAT,
@@ -1337,11 +1338,19 @@ export class AdminController {
         'admin_system_shutdown_requested',
         'Administrator requested a Windows shutdown from the System Control Center.',
       );
-      await (this.deps.shutdownWindows ?? requestWindowsShutdown)();
-      return res.status(202).json({
+      await markRecoveryShutdown('admin_shutdown');
+      res.status(202).json({
         ok: true,
         message: 'Windows shutdown scheduled.',
       });
+
+      const shutdownFn = this.deps.shutdownWindows ?? requestWindowsShutdown;
+      setTimeout(() => {
+        void shutdownFn().catch((error) => {
+          console.error('[POWER] Failed to schedule Windows shutdown:', error);
+        })
+      }, 500);
+      return;
     } catch (error) {
       await this.adminService.appendAdminLog(
         'admin_system_shutdown_failed',
@@ -1372,11 +1381,19 @@ export class AdminController {
         'admin_system_restart_requested',
         'Administrator requested a Windows restart from the System Control Center.',
       );
-      await (this.deps.restartWindows ?? requestWindowsRestart)();
-      return res.status(202).json({
+      await markRecoveryShutdown('admin_restart');
+      res.status(202).json({
         ok: true,
         message: 'Windows restart scheduled.',
       });
+
+      const restartFn = this.deps.restartWindows ?? requestWindowsRestart;
+      setTimeout(() => {
+        void restartFn().catch((error) => {
+          console.error('[POWER] Failed to schedule Windows restart:', error);
+        })
+      }, 500);
+      return;
     } catch (error) {
       await this.adminService.appendAdminLog(
         'admin_system_restart_failed',
