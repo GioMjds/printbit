@@ -400,11 +400,29 @@ function validateIncomingFileType(
   const isBothImages =
     Boolean(expectedMime?.startsWith('image/')) &&
     incomingMime.startsWith('image/');
+  const isPdfAlias =
+    expectedMime === 'application/pdf' &&
+    (incomingMime === 'application/x-pdf' ||
+      incomingMime === 'application/acrobat' ||
+      incomingMime === 'applications/vnd.pdf');
+  const isDocAlias =
+    (expectedMime === 'application/msword' ||
+      expectedMime ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document') &&
+    (incomingMime === 'application/vnd.ms-word' ||
+      incomingMime === 'application/x-msword');
   const normalizedMime =
-    incomingMime === 'application/octet-stream' || isBothImages
+    incomingMime === 'application/octet-stream' ||
+    isBothImages ||
+    isPdfAlias ||
+    isDocAlias
       ? (expectedMime ?? incomingMime)
       : incomingMime;
-  if (!normalizedMime || (expectedMime && expectedMime !== normalizedMime && !isBothImages)) {
+
+  if (
+    !normalizedMime ||
+    (expectedMime && expectedMime !== normalizedMime && !isBothImages)
+  ) {
     const meta = {
       ...requestContext,
       originalFilename: file.originalname,
@@ -459,12 +477,7 @@ export function handleMulterError(
       });
       return;
     }
-    notifyUploadRejection(
-      req,
-      req.file,
-      'UPLOAD_ERROR',
-      error.message,
-    );
+    notifyUploadRejection(req, req.file, 'UPLOAD_ERROR', error.message);
     res.status(400).json({
       code: 'UPLOAD_ERROR',
       error: error.message,
@@ -474,12 +487,7 @@ export function handleMulterError(
   if (error instanceof Error) {
     const code = (error as Error & { code?: string }).code;
     if (code === 'UNSUPPORTED_TYPE') {
-      notifyUploadRejection(
-        req,
-        req.file,
-        'UNSUPPORTED_TYPE',
-        error.message,
-      );
+      notifyUploadRejection(req, req.file, 'UNSUPPORTED_TYPE', error.message);
       res.status(415).json({
         code: 'UNSUPPORTED_FILE_TYPE',
         error: error.message,
@@ -576,11 +584,13 @@ export async function validateStagedOoxmlStructure(
   const tailReadLength = Math.min(fileSize, 65557);
   const tailOffset = fileSize - tailReadLength;
 
-  if (tailReadLength < 22) return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
+  if (tailReadLength < 22)
+    return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
 
   const tailBuffer = await readRangeFn(filePath, tailOffset, tailReadLength);
   const eocdRelativeOffset = findEndOfCentralDirectoryOffset(tailBuffer);
-  if (eocdRelativeOffset === -1) return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
+  if (eocdRelativeOffset === -1)
+    return { valid: false, reason: 'OOXML_STRUCTURE_INVALID' };
 
   const eocdAbsoluteOffset = tailOffset + eocdRelativeOffset;
   const centralDirectorySize = tailBuffer.readUInt32LE(eocdRelativeOffset + 12);
@@ -680,17 +690,22 @@ export async function validateStagedPdfStructure(
 ): Promise<{ valid: boolean; reason?: QuarantineReason }> {
   const inspectSize = Math.min(fileSize, 4 * 1024 * 1024);
   const buffer = await readRangeFn(filePath, 0, inspectSize);
-  const text = buffer.toString('latin1');
+  const rawText = buffer.toString('latin1');
+
+  const structuralText = rawText.replace(
+    /stream[\r\n]+[\s\S]*?[\r\n]+endstream/gi,
+    '',
+  );
 
   const forbiddenPdfTokens = [
-    /\/JavaScript\b/i,
-    /\/JS\b/i,
-    /\/Launch\b/i,
-    /\/EmbeddedFiles\b/i,
+    /\/S\s*\/Launch\b/i,
+    /\/S\s*\/JavaScript\b/i,
+    /\/JavaScript\s*<<|<<\s*\/JavaScript/i,
+    /\/OpenAction\s*<<[^>]*\/Launch/i,
   ];
 
   for (const token of forbiddenPdfTokens) {
-    if (token.test(text)) {
+    if (token.test(structuralText)) {
       return { valid: false, reason: 'ACTIVE_CONTENT_DETECTED' };
     }
   }
@@ -744,7 +759,8 @@ async function validateStagedMagicBytesWithPolicy(
           policy.allowedMimeTypes.has(detectedMime)
         ) {
           const detectedWebpValid =
-            detectedMime !== 'image/webp' || hasValidWebpSignature(headerBuffer);
+            detectedMime !== 'image/webp' ||
+            hasValidWebpSignature(headerBuffer);
           if (detectedWebpValid) {
             mime = detectedMime;
             file.mimetype = detectedMime;
@@ -754,7 +770,8 @@ async function validateStagedMagicBytesWithPolicy(
       }
     }
 
-    const ooxmlMarker = OOXML_DIRECTORY_MARKERS[mime];
+    const ooxmlMarker =
+      OOXML_DIRECTORY_MARKERS[mime as keyof typeof OOXML_DIRECTORY_MARKERS];
     const isOoxmlFormat = !!ooxmlMarker;
 
     let structuralResult: { valid: boolean; reason?: QuarantineReason } = {
@@ -908,7 +925,34 @@ async function scanStagedUploadWithSurface(
 
   try {
     const health = await scanner.getHealth();
-    if (health.status !== 'clean') {
+    if (health.status === 'stale') {
+      const meta = {
+        ...requestContext,
+        originalFilename: file.originalname,
+        scannerHealth: health.status,
+        signatureAgeHours: health.signatureAgeHours,
+        scannerDetail: health.detail,
+        uploadSurface: surface,
+      };
+
+      appendSecurityLog(
+        'antivirus_scan_stale_warning',
+        `Scanning proceeded with stale Defender signatures (${health.detail}).`,
+        meta,
+      );
+
+      void reportUploadSecurityAnomaly({
+        type: 'upload_antivirus_stale_warning',
+        source: surface,
+        severity: 'warning',
+        message: `Microsoft Defender signatures are stale (${Math.round(
+          health.signatureAgeHours ?? 0,
+        )}h old). File scanned under grace policy.`,
+        fingerprintParts: [surface, 'scanner-health', health.status],
+        context: meta,
+      });
+      // Proceed to scanner.scanFile below instead of aborting
+    } else if (health.status !== 'clean') {
       await discardFn(file);
       const meta = {
         ...requestContext,
@@ -929,7 +973,9 @@ async function scanStagedUploadWithSurface(
         type: 'upload_antivirus_unavailable',
         source: surface,
         severity: 'critical',
-        message: `Upload blocked because Microsoft Defender scanner is ${health.status}.`,
+        message: `Upload blocked because Microsoft Defender scanner is ${
+          health.status
+        }.`,
         fingerprintParts: [surface, 'scanner-health', health.status],
         context: meta,
       });

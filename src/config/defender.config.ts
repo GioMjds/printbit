@@ -35,9 +35,9 @@ export function getDefenderConfig(
   return {
     maxSignatureAgeHours: readBoundedPositiveInt(
       env.PRINTBIT_DEFENDER_MAX_SIGNATURE_AGE_HOURS,
-      168,
+      720,
       1,
-      24 * 30,
+      24 * 60,
       'PRINTBIT_DEFENDER_MAX_SIGNATURE_AGE_HOURS',
     ),
     scanTimeoutMs: readBoundedPositiveInt(

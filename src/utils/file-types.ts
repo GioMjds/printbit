@@ -1,12 +1,19 @@
 export const ALLOWED_MIME_TYPES = new Set([
   // PDF
   'application/pdf',
+  'application/x-pdf',
+  'application/acrobat',
+  'applications/vnd.pdf',
   // Word
   'application/msword',
+  'application/vnd.ms-word',
+  'application/x-msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   // Images
   'image/jpeg',
+  'image/pjpeg',
   'image/png',
+  'image/x-png',
   'image/gif',
   'image/webp',
   'image/bmp',
@@ -55,7 +62,7 @@ const OLE_MAGIC: MagicSignature = {
 // OOXML (ZIP-based) header (used by DOCX)
 const OOXML_MAGIC: MagicSignature = { bytes: [0x50, 0x4b, 0x03, 0x04] };
 
-export const MAGIC_SIGNATURES: Record<string, MagicSignature[]> = {
+export const MAGIC_SIGNATURES = {
   // PDF
   'application/pdf': [{ bytes: [0x25, 0x50, 0x44, 0x46] }],
   // Word
@@ -74,21 +81,18 @@ export const MAGIC_SIGNATURES: Record<string, MagicSignature[]> = {
   // The second marker is enforced through a custom validator in middleware.
   'image/webp': [{ bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 }],
   'image/bmp': [{ bytes: [0x42, 0x4d], offset: 0 }],
-};
+} satisfies Record<string, MagicSignature[]>;
 
-export const REPORT_ATTACHMENT_MAGIC_SIGNATURES: Record<
-  string,
-  MagicSignature[]
-> = {
+export const REPORT_ATTACHMENT_MAGIC_SIGNATURES = {
   'image/jpeg': [{ bytes: [0xff, 0xd8, 0xff] }],
   'image/png': [{ bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] }],
   // WebP files begin with RIFF....WEBP (RIFF at offset 0 + WEBP at offset 8).
   // The second marker is enforced through a custom validator in middleware.
   'image/webp': [{ bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 }],
-};
+} satisfies Record<string, MagicSignature[]>;
 
 // Extension-to-MIME mapping for consistent lookups
-export const EXTENSION_MIME_MAP: Record<string, string> = {
+export const EXTENSION_MIME_MAP = {
   '.pdf': 'application/pdf',
   '.doc': 'application/msword',
   '.docx':
@@ -99,17 +103,17 @@ export const EXTENSION_MIME_MAP: Record<string, string> = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.bmp': 'image/bmp',
-};
+} satisfies Record<string, string>;
 
-export const REPORT_ATTACHMENT_EXTENSION_MIME_MAP: Record<string, string> = {
+export const REPORT_ATTACHMENT_EXTENSION_MIME_MAP = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.webp': 'image/webp',
-};
+} satisfies Record<string, string>;
 
 // OOXML internal directory markers for structural validation
-export const OOXML_DIRECTORY_MARKERS: Record<string, string> = {
+export const OOXML_DIRECTORY_MARKERS = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
     'word/',
-};
+} satisfies Record<string, string>;

@@ -1,4 +1,7 @@
-import { createUploadSecurityMiddleware } from './file-validation';
+import {
+  createUploadSecurityMiddleware,
+  validateStagedPdfStructure,
+} from './file-validation';
 import type { Request, Response } from 'express';
 
 describe('file-validation image format support and cross-format recovery', () => {
@@ -162,5 +165,146 @@ describe('file-validation image format support and cross-format recovery', () =>
       }),
     );
     expect(quarantineMock).toHaveBeenCalled();
+  });
+
+  describe('PDF structural validation (ACTIVE_CONTENT_DETECTED prevention)', () => {
+    it('accepts legitimate PDF containing stream with /js and /EmbeddedFiles tokens', async () => {
+      const pdfContent =
+        '%PDF-1.4\n' +
+        '1 0 obj\n' +
+        '<< /Type /Catalog /Pages 2 0 R /EmbeddedFiles 5 0 R >>\n' +
+        'endobj\n' +
+        '3 0 obj\n' +
+        '<< /Length 50 >>\n' +
+        'stream\n' +
+        'compressed binary data with /js and /Launch inside\n' +
+        'endstream\n' +
+        'endobj\n' +
+        '%%EOF';
+      const buffer = Buffer.from(pdfContent, 'latin1');
+      const result = await validateStagedPdfStructure(
+        '/tmp/case_study.pdf',
+        buffer.length,
+        async () => buffer,
+      );
+      expect(result.valid).toBe(true);
+      expect(result.reason).toBeUndefined();
+    });
+
+    it('rejects PDF containing explicit /S /Launch action', async () => {
+      const maliciousPdf =
+        '%PDF-1.4\n' +
+        '1 0 obj\n' +
+        '<< /Type /Action /S /Launch /F (cmd.exe) >>\n' +
+        'endobj\n' +
+        '%%EOF';
+      const buffer = Buffer.from(maliciousPdf, 'latin1');
+      const result = await validateStagedPdfStructure(
+        '/tmp/exploit.pdf',
+        buffer.length,
+        async () => buffer,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.reason).toBe('ACTIVE_CONTENT_DETECTED');
+    });
+
+    it('rejects PDF containing /S /JavaScript action', async () => {
+      const scriptPdf =
+        '%PDF-1.4\n' +
+        '1 0 obj\n' +
+        '<< /Type /Action /S /JavaScript /JS (app.alert(1)) >>\n' +
+        'endobj\n' +
+        '%%EOF';
+      const buffer = Buffer.from(scriptPdf, 'latin1');
+      const result = await validateStagedPdfStructure(
+        '/tmp/script.pdf',
+        buffer.length,
+        async () => buffer,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.reason).toBe('ACTIVE_CONTENT_DETECTED');
+    });
+  });
+
+  describe('Antivirus stale signature grace policy', () => {
+    it('scans and proceeds when Defender signatures are stale', async () => {
+      const mockScanner = {
+        getHealth: jest.fn().mockResolvedValue({
+          status: 'stale' as const,
+          signatureAgeHours: 180,
+          detail: 'Defender signatures are 180 hours old',
+        }),
+        scanFile: jest.fn().mockResolvedValue({
+          status: 'clean' as const,
+          detectionName: null,
+          detail: null,
+        }),
+      };
+
+      const { middleware } = createUploadSecurityMiddleware({
+        scanner: mockScanner,
+      });
+
+      const req = makeMockReq({
+        path: '/tmp/clean_doc.pdf',
+        originalname: 'clean_doc.pdf',
+        mimetype: 'application/pdf',
+        size: 1024,
+      });
+
+      const res = makeMockRes();
+      const next = jest.fn();
+
+      await (middleware.scanForMalware as (req: Request, res: Response, next: () => void) => Promise<void>)(
+        req,
+        res,
+        next,
+      );
+
+      expect(mockScanner.scanFile).toHaveBeenCalledWith('/tmp/clean_doc.pdf');
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('blocks upload with 503 when Defender service is unavailable', async () => {
+      const mockScanner = {
+        getHealth: jest.fn().mockResolvedValue({
+          status: 'unavailable' as const,
+          signatureAgeHours: null,
+          detail: 'MpCmdRun.exe missing or service stopped',
+        }),
+        scanFile: jest.fn(),
+      };
+
+      const { middleware } = createUploadSecurityMiddleware({
+        scanner: mockScanner,
+        discardStaged: jest.fn().mockResolvedValue(undefined),
+      });
+
+      const req = makeMockReq({
+        path: '/tmp/doc.pdf',
+        originalname: 'doc.pdf',
+        mimetype: 'application/pdf',
+        size: 1024,
+      });
+
+      const res = makeMockRes();
+      const next = jest.fn();
+
+      await (middleware.scanForMalware as (req: Request, res: Response, next: () => void) => Promise<void>)(
+        req,
+        res,
+        next,
+      );
+
+      expect(mockScanner.scanFile).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.jsonBody).toEqual(
+        expect.objectContaining({
+          code: 'SCAN_UNAVAILABLE',
+        }),
+      );
+    });
   });
 });

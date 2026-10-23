@@ -76,7 +76,9 @@ const uploadSubTitle = document.getElementById(
 const dropZoneHint = document.getElementById(
   'dropZoneHint',
 ) as HTMLParagraphElement | null;
-const uploadToast = document.getElementById('uploadToast') as HTMLElement | null;
+const uploadToast = document.getElementById(
+  'uploadToast',
+) as HTMLElement | null;
 const toastCloseBtn = document.getElementById(
   'toastCloseBtn',
 ) as HTMLButtonElement | null;
@@ -163,7 +165,7 @@ type QueuedFile = {
   contentHash?: string;
   status: ItemStatus;
   el: HTMLElement;
-}
+};
 
 const queue: QueuedFile[] = [];
 let nextId = 0;
@@ -259,7 +261,10 @@ function setDocumentConversionEnabled(enabled: boolean): void {
     let removedCount = 0;
     for (let i = queue.length - 1; i >= 0; i--) {
       const qf = queue[i];
-      if (qf.status === 'pending' && isWordDocument(qf.file.name, qf.file.type)) {
+      if (
+        qf.status === 'pending' &&
+        isWordDocument(qf.file.name, qf.file.type)
+      ) {
         queue.splice(i, 1);
         qf.el.remove();
         removedCount++;
@@ -293,11 +298,30 @@ function normalizeMimeByExtension(
     bmp: 'image/bmp',
   } as Record<string, string>;
 
-  if (normalizedMime !== '' && normalizedMime !== 'application/octet-stream') {
-    return normalizedMime;
+  const vendorAliases = {
+    'application/x-pdf': 'application/pdf',
+    'application/acrobat': 'application/pdf',
+    'applications/vnd.pdf': 'application/pdf',
+    'application/vnd.ms-word': 'application/msword',
+    'application/x-msword': 'application/msword',
+    'image/pjpeg': 'image/jpeg',
+    'image/x-png': 'image/png',
+  } as Record<string, string>;
+
+  if (vendorAliases[normalizedMime]) {
+    return vendorAliases[normalizedMime];
   }
 
-  return extensionMimeMap[ext] ?? null;
+  const mappedByExt = extensionMimeMap[ext];
+  if (
+    normalizedMime === '' ||
+    normalizedMime === 'application/octet-stream' ||
+    (mappedByExt && !normalizedMime.includes('/'))
+  ) {
+    return mappedByExt || null;
+  }
+
+  return mappedByExt ?? normalizedMime;
 }
 
 interface UnsupportedFilesResult {
@@ -342,7 +366,10 @@ function collectUnsupportedFiles(files: File[]): UnsupportedFilesResult {
 
 async function sha256File(file: File): Promise<string | undefined> {
   if (!crypto.subtle) return undefined;
-  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    await file.arrayBuffer(),
+  );
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('');
@@ -364,7 +391,8 @@ function isSecurityCheckFailure(r: UploadErrorResponse): boolean {
   if (
     malwareScanningEnabled &&
     (r.error === 'File content does not match its declared type.' ||
-      r.error === 'Security check failed: Suspicious or disguised file detected.' ||
+      r.error ===
+        'Security check failed: Suspicious or disguised file detected.' ||
       r.error === SECURITY_CHECK_FAILED_MESSAGE)
   ) {
     return true;
@@ -377,7 +405,10 @@ function mapError(r: UploadErrorResponse): string {
     case 'DISGUISED_FILE':
       return 'File format mismatch or damaged file. Please export as standard PDF or image.';
     case 'DISGUISED_EXECUTABLE':
-      return r.error ?? 'Files with executable or script extension patterns (.exe, .ts, .py, etc.) are not allowed.';
+      return (
+        r.error ??
+        'Files with executable or script extension patterns (.exe, .ts, .py, etc.) are not allowed.'
+      );
     case 'SCAN_UNAVAILABLE':
       return 'Kiosk antivirus scanner is temporarily unavailable. Please retry in a few moments.';
     case 'SCAN_FAILED':
@@ -966,12 +997,11 @@ async function uploadPendingFiles(): Promise<void> {
 
   for (const qf of pending) {
     if (isSessionUnavailable) break;
-    if (!documentConversionEnabled && isWordDocument(qf.file.name, qf.file.type)) {
-      updateItemStatus(
-        qf,
-        'error',
-        'Word document conversion is disabled.',
-      );
+    if (
+      !documentConversionEnabled &&
+      isWordDocument(qf.file.name, qf.file.type)
+    ) {
+      updateItemStatus(qf, 'error', 'Word document conversion is disabled.');
       errorCount++;
       continue;
     }
