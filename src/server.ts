@@ -267,7 +267,7 @@ io.on('connection', (socket) => {
 
 async function startHttpServer(): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    server.listen(PORT, '0.0.0.0', () => {
+    server.listen(PORT, () => {
       const localIP = getLocalIPv4();
       if (localIP) {
         console.log(`[BOOT] HTTP server ready: http://${localIP}:${PORT}`);

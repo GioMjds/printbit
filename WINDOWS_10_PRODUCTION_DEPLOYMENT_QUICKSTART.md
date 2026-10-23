@@ -185,7 +185,7 @@ Lock the device to Microsoft Edge so users cannot access the desktop or settings
 1. Go to **Settings > Accounts > Family & other users > Set up assigned access** (or **Kiosk**).
 2. Select the **`printbit`** local user created in Step 3.
 3. Select **Microsoft Edge** as the kiosk app.
-4. When prompted for the URL, enter: `http://192.168.4.2:3000/loading` (or `http://127.0.0.1:3000/loading`).
+4. When prompted for the URL, enter: `http://127.0.0.1:3000/loading` (Always use loopback `127.0.0.1`. Do not use `192.168.4.2` here as Wi-Fi does not associate until after boot).
 
 ---
 

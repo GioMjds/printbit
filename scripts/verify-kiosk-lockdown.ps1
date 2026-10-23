@@ -43,6 +43,7 @@ $checks = @()
 $policyExplorer  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer'
 $policyEdgeUi    = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI'
 $policyEdgeBrowser = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+$policyEdgeLoopback= 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\LoopbackNetworkAllowedForUrls'
 $policySystem    = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System'
 $legacyExplorer  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer'
 $legacySystem    = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
@@ -76,6 +77,30 @@ $checks += [pscustomobject]@{ Name = 'Edge browser swipe-nav blocked';Passed = (
 $checks += [pscustomobject]@{ Name = 'Edge first-run exp hidden';     Passed = ($hideFirstRun -eq 1);              Detail = "HideFirstRunExperience=$hideFirstRun" }
 $checks += [pscustomobject]@{ Name = 'Edge telemetry disabled';       Passed = ($metricsReporting -eq 0);          Detail = "MetricsReportingEnabled=$metricsReporting" }
 $checks += [pscustomobject]@{ Name = 'Edge background mode disabled'; Passed = ($backgroundMode -eq 0);            Detail = "BackgroundModeEnabled=$backgroundMode" }
+
+# Edge AppContainer loopback exemption check
+$exemptList = & CheckNetIsolation.exe LoopbackExempt -s 2>$null
+$isEdgeExempt = ($exemptList -match 'Microsoft\.MicrosoftEdge\.Stable_8wekyb3d8bbwe' -or $exemptList -match 'Microsoft\.MicrosoftEdge_8wekyb3d8bbwe')
+$checks += [pscustomobject]@{
+  Name = 'Edge AppContainer loopback exempt'
+  Passed = [bool]$isEdgeExempt
+  Detail = if ($isEdgeExempt) { "Loopback exemption confirmed" } else { "Not exempt. Run pnpm run lockdown:apply" }
+}
+
+# Edge loopback whitelist policy check
+$hasLoopbackUrls = $false
+if (Test-Path $policyEdgeLoopback) {
+  $props = Get-ItemProperty -Path $policyEdgeLoopback -ErrorAction SilentlyContinue
+  if ($props -and ($props.'1' -eq 'http://127.0.0.1:3000' -or $props.'2' -eq 'http://localhost:3000')) {
+    $hasLoopbackUrls = $true
+  }
+}
+$checks += [pscustomobject]@{
+  Name = 'Edge LoopbackNetworkAllowedForUrls'
+  Passed = $hasLoopbackUrls
+  Detail = if ($hasLoopbackUrls) { "Loopback URLs whitelisted" } else { "Missing LoopbackNetworkAllowedForUrls policy" }
+}
+
 $checks += [pscustomobject]@{ Name = 'Settings/Control Panel blocked';Passed = ($noControlPanel -eq 1);           Detail = "NoControlPanel=$noControlPanel" }
 $checks += [pscustomobject]@{ Name = 'Windows shortcut keys blocked'; Passed = ($noWinKeys -eq 1);                Detail = "NoWinKeys=$noWinKeys" }
 $checks += [pscustomobject]@{ Name = 'Alt+Tab blocked';               Passed = ($noAltTab -eq 1);                 Detail = "NoAltTab=$noAltTab" }

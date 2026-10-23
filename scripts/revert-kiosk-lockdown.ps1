@@ -31,6 +31,7 @@ function Remove-RegistryValueIfExists {
 $policyExplorer    = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer'
 $policyEdgeUi      = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI'
 $policyEdgeBrowser = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+$policyEdgeLoopback= 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\LoopbackNetworkAllowedForUrls'
 $policySystem      = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System'
 $legacyExplorer    = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer'
 $legacySystem      = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
@@ -50,6 +51,11 @@ Remove-RegistryValueIfExists -Path $policyEdgeBrowser -Name 'HideFirstRunExperie
 Remove-RegistryValueIfExists -Path $policyEdgeBrowser -Name 'MetricsReportingEnabled'
 Remove-RegistryValueIfExists -Path $policyEdgeBrowser -Name 'AutoImportAtFirstRun'
 Remove-RegistryValueIfExists -Path $policyEdgeBrowser -Name 'BackgroundModeEnabled'
+
+if (Test-Path $policyEdgeLoopback) {
+  Remove-Item -Path $policyEdgeLoopback -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Remove-RegistryValueIfExists -Path $legacyExplorer    -Name 'NoControlPanel'
 Remove-RegistryValueIfExists -Path $legacyExplorer    -Name 'NoWinKeys'
 Remove-RegistryValueIfExists -Path $legacyExplorer    -Name 'NoAltTab'

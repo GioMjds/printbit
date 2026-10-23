@@ -112,7 +112,7 @@ if ($taskRegistered) {
     }
 }
 
-# 3. Check Edge Policies
+# 3. Check Edge Policies & Loopback Exemption
 $edgePolicyKey = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
 if (Test-Path $edgePolicyKey) {
     $hideFirstRunProp = Get-ItemProperty -Path $edgePolicyKey -Name 'HideFirstRunExperience' -ErrorAction SilentlyContinue
@@ -122,12 +122,34 @@ if (Test-Path $edgePolicyKey) {
         Passed = ($hideFirstRun -eq 1)
         Detail = "HideFirstRunExperience=$hideFirstRun"
     }
+
+    $edgeLoopbackKey = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\LoopbackNetworkAllowedForUrls'
+    $hasLoopbackUrls = $false
+    if (Test-Path $edgeLoopbackKey) {
+        $props = Get-ItemProperty -Path $edgeLoopbackKey -ErrorAction SilentlyContinue
+        if ($props -and ($props.'1' -eq 'http://127.0.0.1:3000' -or $props.'2' -eq 'http://localhost:3000')) {
+            $hasLoopbackUrls = $true
+        }
+    }
+    $checks += [pscustomobject]@{
+        Name = 'Edge LoopbackNetworkAllowedForUrls policy'
+        Passed = $hasLoopbackUrls
+        Detail = if ($hasLoopbackUrls) { 'Loopback origins whitelisted' } else { 'Missing LoopbackNetworkAllowedForUrls. Run pnpm run lockdown:apply.' }
+    }
 } else {
     $checks += [pscustomobject]@{
         Name = 'Edge kiosk policies applied'
         Passed = $false
         Detail = "Key $edgePolicyKey not found. Run pnpm run lockdown:apply."
     }
+}
+
+$exemptList = & CheckNetIsolation.exe LoopbackExempt -s 2>$null
+$isEdgeExempt = ($exemptList -match 'Microsoft\.MicrosoftEdge\.Stable_8wekyb3d8bbwe' -or $exemptList -match 'Microsoft\.MicrosoftEdge_8wekyb3d8bbwe')
+$checks += [pscustomobject]@{
+    Name = 'Edge AppContainer loopback exemption'
+    Passed = [bool]$isEdgeExempt
+    Detail = if ($isEdgeExempt) { 'Loopback exemption confirmed' } else { 'Not exempt. Run pnpm run lockdown:apply.' }
 }
 
 # 4. Check Current Runtime Status

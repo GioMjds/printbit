@@ -118,8 +118,51 @@ try {
         -ArgumentList @("/c", "`"$nodePath`" `"$ServerBundlePath`" >> `"$LogPath`" 2>&1") `
         -WorkingDirectory $ProjectDir `
         -WindowStyle Hidden `
-        -PassThru `
-        -Wait
+        -PassThru
+
+    # Wait for server port 3000 to become responsive
+    $serverPort = 3000
+    $maxWaitSec = 45
+    $startWait = [DateTime]::UtcNow
+    $isReady = $false
+    Write-StartupLog "Waiting up to $maxWaitSec seconds for server to accept connections on port $serverPort..."
+
+    while (([DateTime]::UtcNow - $startWait).TotalSeconds -lt $maxWaitSec) {
+        if ($proc.HasExited) {
+            break
+        }
+        $tcp = $null
+        try {
+            $tcp = New-Object System.Net.Sockets.TcpClient
+            $tcp.Connect("127.0.0.1", $serverPort)
+            $isReady = $true
+            break
+        } catch {
+            Start-Sleep -Milliseconds 500
+        } finally {
+            if ($null -ne $tcp) { $tcp.Dispose() }
+        }
+    }
+
+    if ($isReady) {
+        Write-StartupLog "Server is healthy and accepting connections on port $serverPort."
+        # If Assigned Access launched Edge before port 3000 opened, Edge is frozen on the 'No internet' error.
+        # Terminating Edge causes Windows Assigned Access to immediately relaunch Edge cleanly into /loading.
+        $edgeProcesses = @(Get-Process -Name "msedge" -ErrorAction SilentlyContinue)
+        if ($edgeProcesses.Count -gt 0) {
+            Write-StartupLog "Assigned Access launched Edge ($($edgeProcesses.Count) process(es)) before server was ready. Recycling Edge for clean reload..."
+            Stop-Process -Name "msedge" -Force -ErrorAction SilentlyContinue
+            Write-StartupLog "Edge recycled. Assigned Access shell will relaunch Edge directly to /loading."
+        }
+    } else {
+        if ($proc.HasExited) {
+            Write-StartupLog "WARNING: Server process exited before port $serverPort became responsive."
+        } else {
+            Write-StartupLog "WARNING: Server did not respond on port $serverPort within $maxWaitSec seconds; proceeding to wait."
+        }
+    }
+
+    $proc.WaitForExit()
     $exitCode = $proc.ExitCode
     if ($null -ne $exitCode -and $exitCode -ne 0) {
         $message = "[PrintBit] Compiled server exited with code $exitCode."

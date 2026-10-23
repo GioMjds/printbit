@@ -10,6 +10,8 @@
   - Restrict Settings/Control Panel and Task Manager
   - Block common escape shortcuts where policy supports it
   - Block USB mass storage access
+  - Exempt Edge AppContainer from loopback restrictions for Assigned Access
+  - Whitelist local loopback origins in Microsoft Edge enterprise policy
   - Optionally disable Windows keys through Scancode Map
 
   A reboot is recommended after applying.
@@ -55,6 +57,7 @@ function Set-BinaryValue {
 $policyExplorer    = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer'
 $policyEdgeUi      = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI'
 $policyEdgeBrowser = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+$policyEdgeLoopback= 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\LoopbackNetworkAllowedForUrls'
 $policySystem      = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System'
 $legacyExplorer    = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer'
 $legacySystem      = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
@@ -79,6 +82,26 @@ Set-DwordValue -Path $policyEdgeBrowser -Name 'HideFirstRunExperience'     -Valu
 Set-DwordValue -Path $policyEdgeBrowser -Name 'MetricsReportingEnabled'    -Value 0
 Set-DwordValue -Path $policyEdgeBrowser -Name 'AutoImportAtFirstRun'       -Value 4
 Set-DwordValue -Path $policyEdgeBrowser -Name 'BackgroundModeEnabled'      -Value 0
+
+# AppContainer loopback exemption for Microsoft Edge (Required for Assigned Access kiosk mode)
+Write-Host "[PrintBit] Applying Edge AppContainer loopback exemptions..." -ForegroundColor Cyan
+$edgePackages = @(
+  'Microsoft.MicrosoftEdge.Stable_8wekyb3d8bbwe',
+  'Microsoft.MicrosoftEdge_8wekyb3d8bbwe'
+)
+foreach ($pkg in $edgePackages) {
+  try {
+    & CheckNetIsolation.exe LoopbackExempt -a -n="$pkg" 2>$null | Out-Null
+  } catch {
+    Write-Warning "[PrintBit] Failed to apply loopback exemption for $pkg : $($_.Exception.Message)"
+  }
+}
+
+# Whitelist local origins in Edge Local Network Access / loopback enterprise policies
+Ensure-RegistryKey -Path $policyEdgeLoopback
+New-ItemProperty -Path $policyEdgeLoopback -Name '1' -Value 'http://127.0.0.1:3000' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $policyEdgeLoopback -Name '2' -Value 'http://localhost:3000' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $policyEdgeLoopback -Name '3' -Value 'http://192.168.4.2:3000' -PropertyType String -Force | Out-Null
 
 # Settings / shell / shortcut hardening
 Set-DwordValue -Path $legacyExplorer -Name 'NoControlPanel' -Value 1
@@ -115,7 +138,7 @@ if ($DisableWinKeys) {
 Ensure-RegistryKey -Path $printBitState
 Set-DwordValue -Path $printBitState -Name 'Applied' -Value 1
 New-ItemProperty -Path $printBitState -Name 'AppliedAtUtc' -Value ([DateTime]::UtcNow.ToString('o')) -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $printBitState -Name 'Version'      -Value '3' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $printBitState -Name 'Version'      -Value '4' -PropertyType String -Force | Out-Null
 
 Write-Host ""
 Write-Host "[PrintBit] [OK] Lockdown policies applied."  -ForegroundColor Green
