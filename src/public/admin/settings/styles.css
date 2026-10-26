@@ -382,3 +382,12 @@ select.field__input option {
   }
 }
 
+.push-btn-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0 24px 20px 24px;
+}
+
+

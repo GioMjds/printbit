@@ -3,9 +3,12 @@ import {
   SettingsResponse,
   SummaryResponse,
   apiFetch,
+  getAdminPushStatus,
   initAuth,
+  registerAdminPush,
   setAdminPin,
   setMessage,
+  unregisterAdminPush,
   updateSidebarBadges,
 } from '../shared';
 
@@ -1122,7 +1125,119 @@ function showRefreshError(error: unknown): void {
   );
 }
 
+// ── Push Notification Settings UI ──────────────────────────────────────────
+const pushStatusBadge = document.getElementById('pushStatusBadge') as HTMLElement | null;
+const enablePushBtn = document.getElementById('enablePushBtn') as HTMLButtonElement | null;
+const testPushBtn = document.getElementById('testPushBtn') as HTMLButtonElement | null;
+const disablePushBtn = document.getElementById('disablePushBtn') as HTMLButtonElement | null;
+const pushMetaText = document.getElementById('pushMetaText') as HTMLElement | null;
+
+async function refreshPushSettingsUI(): Promise<void> {
+  if (!pushStatusBadge) return;
+  const status = await getAdminPushStatus();
+
+  if (status === 'subscribed') {
+    pushStatusBadge.textContent = '🟢 Active (Subscribed)';
+    pushStatusBadge.style.background = 'rgba(74, 222, 128, 0.15)';
+    pushStatusBadge.style.color = '#4ade80';
+    enablePushBtn?.classList.add('hidden');
+    disablePushBtn?.classList.remove('hidden');
+    testPushBtn?.classList.remove('hidden');
+  } else if (status === 'blocked') {
+    pushStatusBadge.textContent = '🔴 Permission Blocked';
+    pushStatusBadge.style.background = 'rgba(248, 113, 113, 0.15)';
+    pushStatusBadge.style.color = '#f87171';
+    enablePushBtn?.classList.remove('hidden');
+    disablePushBtn?.classList.add('hidden');
+    testPushBtn?.classList.add('hidden');
+  } else if (status === 'unsupported') {
+    pushStatusBadge.textContent = '⚪ Not Supported';
+    enablePushBtn?.classList.add('hidden');
+    disablePushBtn?.classList.add('hidden');
+    testPushBtn?.classList.add('hidden');
+  } else {
+    pushStatusBadge.textContent = '🟡 Not Subscribed';
+    pushStatusBadge.style.background = 'rgba(251, 191, 36, 0.15)';
+    pushStatusBadge.style.color = '#fbbf24';
+    enablePushBtn?.classList.remove('hidden');
+    disablePushBtn?.classList.add('hidden');
+    testPushBtn?.classList.add('hidden');
+  }
+
+  try {
+    const res = await apiFetch('/api/admin/push/status');
+    if (res.ok) {
+      const data = await res.json();
+      if (pushMetaText) {
+        pushMetaText.textContent = `Total registered operator devices: ${data.subscriptionCount ?? 0}`;
+      }
+    }
+  } catch {
+    // Ignore server push status fetch failure
+  }
+}
+
+let pushEventsInitialized = false;
+function initPushSettingsEvents(): void {
+  if (pushEventsInitialized) return;
+  pushEventsInitialized = true;
+
+  enablePushBtn?.addEventListener('click', async () => {
+    if (!enablePushBtn) return;
+    enablePushBtn.disabled = true;
+    enablePushBtn.textContent = 'Enabling...';
+    const res = await registerAdminPush();
+    enablePushBtn.disabled = false;
+    enablePushBtn.textContent = '🔔 Enable Push on this Device';
+    if (res.ok) {
+      setMessage('Push notifications enabled for this device.');
+      void refreshPushSettingsUI();
+    } else {
+      setMessage(res.error || 'Failed to enable push notifications.');
+    }
+  });
+
+  disablePushBtn?.addEventListener('click', async () => {
+    if (!disablePushBtn) return;
+    disablePushBtn.disabled = true;
+    await unregisterAdminPush();
+    disablePushBtn.disabled = false;
+    setMessage('Device unsubscribed from push alerts.');
+    void refreshPushSettingsUI();
+  });
+
+  testPushBtn?.addEventListener('click', async () => {
+    if (!testPushBtn) return;
+    testPushBtn.disabled = true;
+    testPushBtn.textContent = 'Sending...';
+    try {
+      const reg = await navigator.serviceWorker?.ready;
+      const sub = await reg?.pushManager?.getSubscription();
+      if (!sub) {
+        setMessage('No active subscription found on this device.');
+        return;
+      }
+      const res = await apiFetch('/api/admin/push/test', {
+        method: 'POST',
+        body: JSON.stringify({ endpoint: sub.endpoint }),
+      });
+      if (res.ok) {
+        setMessage('Test push notification sent! Check your notification tray.');
+      } else {
+        setMessage('Failed to send test push.');
+      }
+    } catch (err: any) {
+      setMessage(err?.message || 'Error triggering test push.');
+    } finally {
+      testPushBtn.disabled = false;
+      testPushBtn.textContent = '📡 Send Test Push';
+    }
+  });
+}
+
 initAuth(async (signal) => {
+  initPushSettingsEvents();
+  void refreshPushSettingsUI();
   await loadData({ applyToForm: true });
   if (signal.aborted) return;
   await loadAlertStats().catch(showRefreshError);
@@ -1131,5 +1246,6 @@ initAuth(async (signal) => {
   refreshTimer = window.setInterval(() => {
     void loadData({ applyToForm: !settingsDirty }).catch(showRefreshError);
     void loadAlertStats().catch(showRefreshError);
+    void refreshPushSettingsUI();
   }, 10_000);
 });

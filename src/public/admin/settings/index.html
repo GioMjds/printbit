@@ -1231,6 +1231,30 @@
                 </div>
               </div>
 
+              <!-- Push Notifications & Hardware Alerts -->
+              <div class="sg" id="pushNotificationsCard">
+                <div class="sg__head">
+                  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M8 16a2 2 0 002-2H6a2 2 0 002 2zM8 1.918l-.797.161A4.002 4.002 0 004 6c0 .628-.134 2.197-.45 3.564-.067.294-.167.59-.285.883h9.47c-.118-.293-.218-.589-.285-.883C12.134 8.197 12 6.628 12 6a4.002 4.002 0 00-3.203-3.921L8 1.917zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 7.6 3 6a5 5 0 0110 0c0 1.6.32 4.2 1.22 6z" />
+                  </svg>
+                  <h3 class="sg__title">Push Notifications &amp; Hardware Alerts</h3>
+                  <span class="badge" id="pushStatusBadge" style="margin-left: auto; font-size: 0.75rem; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.08);">Checking...</span>
+                </div>
+                <div style="padding: 20px 24px 12px;">
+                  <p class="field__hint" style="margin-bottom: 16px; font-size: 13px; line-height: 1.5;">
+                    Receive instant OS push notifications on your phone or desktop PWA when Paper Jam, Paper Out, Printer Offline, or Coin Hopper Empty occurs on the kiosk.
+                  </p>
+                </div>
+                <div class="push-btn-row">
+                  <button type="button" class="btn-pwa-install" id="enablePushBtn">🔔 Enable Push on this Device</button>
+                  <button type="button" class="btn-pwa-install" id="testPushBtn">📡 Send Test Push</button>
+                  <button type="button" class="btn-pwa-install" id="disablePushBtn" style="color: #f87171; border-color: rgba(248, 113, 113, 0.4); background: rgba(248, 113, 113, 0.1);">Unsubscribe Device</button>
+                </div>
+                <div style="padding: 0 24px 20px;">
+                  <div class="field__hint" id="pushMetaText" style="font-size: 0.8rem; color: #94a3b8;"></div>
+                </div>
+              </div>
+
               <div class="settings-footer">
                 <button type="submit" class="save-btn">
                   <svg

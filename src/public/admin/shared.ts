@@ -885,7 +885,7 @@ export async function registerAdminPush(): Promise<{ ok: boolean; error?: string
     const applicationServerKey = urlB64ToUint8Array(data.publicKey);
     const subscription = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey,
+      applicationServerKey: applicationServerKey as unknown as BufferSource,
     });
 
     const subRes = await apiFetch('/api/admin/push/subscribe', {
