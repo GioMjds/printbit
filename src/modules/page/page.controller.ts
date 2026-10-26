@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io';
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import path from 'node:path';
 import { requireAdminLocalAccess } from '@/middleware/admin-auth';
 import type { SessionStore } from '@/services/session';
@@ -104,6 +104,12 @@ export class PageController {
       ['/api/settings/idle-timeout', '/api/page/settings'],
       this.handleIdleTimeout.bind(this),
     );
+
+    this.router.get('/', (req: Request, res: Response, next: NextFunction) => {
+      const host = (req.headers['x-forwarded-host'] || req.headers.host || '') as string;
+      if (host.includes('admin.printbitkiosk.com')) return res.redirect('/admin/dashboard');
+      return next();
+    });
 
     // Redirect /admin to /admin/dashboard
     this.router.get(

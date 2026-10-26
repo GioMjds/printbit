@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-26-kiosk-hardware-alerts-web-push-design.md`
 
 ## Global Constraints
+
 - Target domain: `admin.printbitkiosk.com`.
 - Zero external paid push services (pure W3C Push API + VAPID RFC 8292).
 - Automatic dead endpoint cleanup on HTTP 404/410 responses from push services.
@@ -23,6 +24,7 @@
 ### Task 1: Add Dependencies & Database Schema for Push Notifications
 
 **Files:**
+
 - Modify: `package.json`
 - Modify: `src/core/database/models/admin.model.ts`
 - Modify: `src/modules/admin/admin.schema.ts`
@@ -30,14 +32,19 @@
 - Test: `src/services/__tests__/push-schema.spec.ts`
 
 **Interfaces:**
+
 - Produces: `AdminPushSubscriptionEntry`, `PushNotificationSettings`, `db.data.adminPushSubscriptions`, `db.data.settings.pushNotifications`
 
 - [ ] **Step 1: Write the failing test for schema and defaults**
 
 Create `src/services/__tests__/push-schema.spec.ts`:
+
 ```ts
 import { db } from '../db';
-import type { AdminPushSubscriptionEntry, PushNotificationSettings } from '@/modules/admin/admin.schema';
+import type {
+  AdminPushSubscriptionEntry,
+  PushNotificationSettings,
+} from '@/modules/admin/admin.schema';
 
 describe('Push Notification Database Schema', () => {
   it('initializes adminPushSubscriptions array in db', async () => {
@@ -59,12 +66,14 @@ Expected: FAIL due to missing properties on `db.data`.
 - [ ] **Step 3: Install `web-push` and add schema definitions**
 
 Install dependencies:
+
 ```bash
 pnpm add web-push
 pnpm add -D @types/web-push
 ```
 
 Update `src/modules/admin/admin.schema.ts`:
+
 ```ts
 export interface VapidKeys {
   publicKey: string;
@@ -91,6 +100,7 @@ export interface AdminPushSubscriptionEntry {
 ```
 
 Add to `AdminSettings` in `src/modules/admin/admin.schema.ts`:
+
 ```ts
 pushNotifications: PushNotificationSettings;
 ```
@@ -114,10 +124,12 @@ git commit -m "feat(push): add web-push dependency and database schema for push 
 ### Task 2: Implement AdminPushService with VAPID Key Lifecycle and Dispatch
 
 **Files:**
+
 - Create: `src/services/admin-push.service.ts`
 - Create: `src/services/__tests__/admin-push.service.spec.ts`
 
 **Interfaces:**
+
 - Produces: `adminPushService` singleton
   - `getPublicKey(): string`
   - `subscribe(sub: PushSubscriptionJSON, userAgent?: string): Promise<AdminPushSubscriptionEntry>`
@@ -129,8 +141,12 @@ git commit -m "feat(push): add web-push dependency and database schema for push 
 - [ ] **Step 1: Write the failing unit tests for AdminPushService**
 
 Create `src/services/__tests__/admin-push.service.spec.ts`:
+
 ```ts
-import { AdminPushService, type KioskCriticalAlert } from '../admin-push.service';
+import {
+  AdminPushService,
+  type KioskCriticalAlert,
+} from '../admin-push.service';
 import webpush from 'web-push';
 
 jest.mock('web-push');
@@ -270,7 +286,10 @@ import { randomUUID } from 'node:crypto';
 import { db } from './db';
 import { anomalyService } from './anomaly';
 import type { Server } from 'socket.io';
-import type { AdminPushSubscriptionEntry, VapidKeys } from '@/modules/admin/admin.schema';
+import type {
+  AdminPushSubscriptionEntry,
+  VapidKeys,
+} from '@/modules/admin/admin.schema';
 
 export interface KioskCriticalAlert {
   code: 'PAPER_JAM' | 'PAPER_OUT' | 'PRINTER_OFFLINE' | 'HOPPER_EMPTY';
@@ -296,8 +315,10 @@ export class AdminPushService {
     this.deps = {
       getDbData: deps.getDbData ?? (() => db.data),
       writeDb: deps.writeDb ?? (() => db.write()),
-      emitSocket: deps.emitSocket ?? ((event, payload) => this.io?.emit(event, payload)),
-      reportAnomaly: deps.reportAnomaly ?? ((input) => anomalyService.report(input)),
+      emitSocket:
+        deps.emitSocket ?? ((event, payload) => this.io?.emit(event, payload)),
+      reportAnomaly:
+        deps.reportAnomaly ?? ((input) => anomalyService.report(input)),
     };
   }
 
@@ -317,7 +338,11 @@ export class AdminPushService {
       void this.deps.writeDb();
     }
     const keys = data.settings.pushNotifications.vapidKeys;
-    webpush.setVapidDetails('mailto:admin@printbitkiosk.com', keys.publicKey, keys.privateKey);
+    webpush.setVapidDetails(
+      'mailto:admin@printbitkiosk.com',
+      keys.publicKey,
+      keys.privateKey,
+    );
     return keys;
   }
 
@@ -325,12 +350,17 @@ export class AdminPushService {
     return this.ensureVapidKeys().publicKey;
   }
 
-  async subscribe(sub: { endpoint: string; keys: { p256dh: string; auth: string } }, userAgent = 'Unknown'): Promise<AdminPushSubscriptionEntry> {
+  async subscribe(
+    sub: { endpoint: string; keys: { p256dh: string; auth: string } },
+    userAgent = 'Unknown',
+  ): Promise<AdminPushSubscriptionEntry> {
     const data = this.deps.getDbData();
     if (!data) throw new Error('Database not initialized');
     if (!data.adminPushSubscriptions) data.adminPushSubscriptions = [];
 
-    const existingIndex = data.adminPushSubscriptions.findIndex((s) => s.endpoint === sub.endpoint);
+    const existingIndex = data.adminPushSubscriptions.findIndex(
+      (s) => s.endpoint === sub.endpoint,
+    );
     const nowIso = new Date().toISOString();
 
     if (existingIndex >= 0) {
@@ -357,7 +387,9 @@ export class AdminPushService {
     const data = this.deps.getDbData();
     if (!data || !data.adminPushSubscriptions) return false;
     const initialLen = data.adminPushSubscriptions.length;
-    data.adminPushSubscriptions = data.adminPushSubscriptions.filter((s) => s.endpoint !== endpoint);
+    data.adminPushSubscriptions = data.adminPushSubscriptions.filter(
+      (s) => s.endpoint !== endpoint,
+    );
     if (data.adminPushSubscriptions.length !== initialLen) {
       await this.deps.writeDb();
       return true;
@@ -365,10 +397,14 @@ export class AdminPushService {
     return false;
   }
 
-  async broadcastCriticalAlert(alert: KioskCriticalAlert): Promise<{ sent: number; pruned: number }> {
+  async broadcastCriticalAlert(
+    alert: KioskCriticalAlert,
+  ): Promise<{ sent: number; pruned: number }> {
     const nowMs = Date.now();
     const lastAlert = this.lastAlertTimestamps.get(alert.code) ?? 0;
-    const cooldownMs = (this.deps.getDbData()?.settings?.pushNotifications?.cooldownSeconds ?? 30) * 1000;
+    const cooldownMs =
+      (this.deps.getDbData()?.settings?.pushNotifications?.cooldownSeconds ??
+        30) * 1000;
 
     if (nowMs - lastAlert < cooldownMs) {
       return { sent: 0, pruned: 0 };
@@ -421,7 +457,7 @@ export class AdminPushService {
               keys: sub.keys,
             },
             payload,
-            { urgency: 'high', TTL: 86400 }
+            { urgency: 'high', TTL: 86400 },
           );
           sentCount++;
           sub.lastNotifiedAt = new Date().toISOString();
@@ -430,12 +466,14 @@ export class AdminPushService {
             deadEndpoints.add(sub.endpoint);
           }
         }
-      })
+      }),
     );
 
     let prunedCount = 0;
     if (deadEndpoints.size > 0) {
-      data.adminPushSubscriptions = data.adminPushSubscriptions.filter((s) => !deadEndpoints.has(s.endpoint));
+      data.adminPushSubscriptions = data.adminPushSubscriptions.filter(
+        (s) => !deadEndpoints.has(s.endpoint),
+      );
       prunedCount = deadEndpoints.size;
     }
     await this.deps.writeDb();
@@ -445,7 +483,9 @@ export class AdminPushService {
 
   async sendTestNotification(endpoint: string): Promise<boolean> {
     const data = this.deps.getDbData();
-    const sub = data?.adminPushSubscriptions?.find((s) => s.endpoint === endpoint);
+    const sub = data?.adminPushSubscriptions?.find(
+      (s) => s.endpoint === endpoint,
+    );
     if (!sub) return false;
 
     this.ensureVapidKeys();
@@ -461,7 +501,7 @@ export class AdminPushService {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: sub.keys },
         payload,
-        { urgency: 'high', TTL: 3600 }
+        { urgency: 'high', TTL: 3600 },
       );
       return true;
     } catch {
@@ -495,10 +535,12 @@ git commit -m "feat(push): implement AdminPushService with VAPID lifecycle, prun
 ### Task 3: Add Admin Push Controller Endpoints & Authentication
 
 **Files:**
+
 - Modify: `src/modules/admin/admin.controller.ts`
 - Create: `src/modules/admin/__tests__/admin-push.routes.spec.ts`
 
 **Interfaces:**
+
 - Produces API routes:
   - `GET /api/admin/push/vapid-public-key`
   - `POST /api/admin/push/subscribe` (requires `requireAdminPin`)
@@ -509,6 +551,7 @@ git commit -m "feat(push): implement AdminPushService with VAPID lifecycle, prun
 - [ ] **Step 1: Write failing API route test**
 
 Create `src/modules/admin/__tests__/admin-push.routes.spec.ts`:
+
 ```ts
 import request from 'supertest';
 import express from 'express';
@@ -529,7 +572,9 @@ describe('Admin Push Routes', () => {
   });
 
   it('GET /api/admin/push/vapid-public-key returns publicKey', async () => {
-    (adminPushService.getPublicKey as jest.Mock).mockReturnValue('mock-public-key');
+    (adminPushService.getPublicKey as jest.Mock).mockReturnValue(
+      'mock-public-key',
+    );
     // Test endpoint
   });
 });
@@ -543,6 +588,7 @@ Expected: FAIL
 - [ ] **Step 3: Implement controller endpoints in `src/modules/admin/admin.controller.ts`**
 
 In `src/modules/admin/admin.controller.ts`, add route handlers:
+
 ```ts
 this.router.get('/push/vapid-public-key', (req, res) => {
   try {
@@ -557,7 +603,9 @@ this.router.post('/push/subscribe', requireAdminPin, async (req, res) => {
   try {
     const { subscription } = req.body;
     if (!subscription?.endpoint || !subscription?.keys) {
-      return res.status(400).json({ success: false, error: 'Invalid subscription object.' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Invalid subscription object.' });
     }
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const entry = await adminPushService.subscribe(subscription, userAgent);
@@ -570,7 +618,10 @@ this.router.post('/push/subscribe', requireAdminPin, async (req, res) => {
 this.router.post('/push/unsubscribe', requireAdminPin, async (req, res) => {
   try {
     const { endpoint } = req.body;
-    if (!endpoint) return res.status(400).json({ success: false, error: 'Endpoint required.' });
+    if (!endpoint)
+      return res
+        .status(400)
+        .json({ success: false, error: 'Endpoint required.' });
     await adminPushService.unsubscribe(endpoint);
     return res.json({ success: true });
   } catch (err: any) {
@@ -581,7 +632,10 @@ this.router.post('/push/unsubscribe', requireAdminPin, async (req, res) => {
 this.router.post('/push/test', requireAdminPin, async (req, res) => {
   try {
     const { endpoint } = req.body;
-    if (!endpoint) return res.status(400).json({ success: false, error: 'Endpoint required.' });
+    if (!endpoint)
+      return res
+        .status(400)
+        .json({ success: false, error: 'Endpoint required.' });
     const ok = await adminPushService.sendTestNotification(endpoint);
     return res.json({ success: ok });
   } catch (err: any) {
@@ -616,6 +670,7 @@ git commit -m "feat(push): add admin push subscription and test endpoints"
 ### Task 4: Hook Hardware Fault Triggers (Paper Jam, Paper Out, Offline, Hopper)
 
 **Files:**
+
 - Modify: `src/services/printer-state-projection.ts`
 - Modify: `src/services/worker-print-lifecycle.ts`
 - Modify: `src/services/hopper.ts`
@@ -623,14 +678,18 @@ git commit -m "feat(push): add admin push subscription and test endpoints"
 - Modify: `src/modules/printer/printer-error-guide.spec.ts`
 
 **Interfaces:**
+
 - Calls: `adminPushService.broadcastCriticalAlert`, `adminPushService.clearAlert`
 
 - [ ] **Step 1: Write test verifying Paper Jam dispatches critical alert**
 
 Update `src/modules/printer/printer-error-guide.spec.ts`:
+
 ```ts
 it('dispatches critical push alert on paper jam print event while preserving customer guide modal', async () => {
-  const spy = jest.spyOn(adminPushService, 'broadcastCriticalAlert').mockResolvedValue({ sent: 1, pruned: 0 });
+  const spy = jest
+    .spyOn(adminPushService, 'broadcastCriticalAlert')
+    .mockResolvedValue({ sent: 1, pruned: 0 });
   // Call handlePrinterStatusUpdate with code 8 / paper jam
   // Expect spy to have been called with { code: 'PAPER_JAM', severity: 'critical' }
 });
@@ -644,12 +703,14 @@ Expected: FAIL because paper jam was previously ignored with early return.
 - [ ] **Step 3: Update trigger points**
 
 In `src/services/printer-state-projection.ts`:
+
 ```ts
 if (translated.code === 'PAPER_JAM_PRINT') {
   void adminPushService.broadcastCriticalAlert({
     code: 'PAPER_JAM',
     title: '🚨 Kiosk Paper Jam Detected!',
-    message: 'Paper is jammed in the kiosk printer. Physical clearance required.',
+    message:
+      'Paper is jammed in the kiosk printer. Physical clearance required.',
     severity: 'critical',
   });
   return;
@@ -657,13 +718,15 @@ if (translated.code === 'PAPER_JAM_PRINT') {
 ```
 
 Add clear event handler in `printer-state-projection.ts`:
+
 ```ts
 onPaperJamCleared: () => {
   adminPushService.clearAlert('PAPER_JAM');
-}
+};
 ```
 
 In `src/services/worker-print-lifecycle.ts`:
+
 ```ts
 if (isPaperOut) {
   void adminPushService.broadcastCriticalAlert({
@@ -695,9 +758,11 @@ git commit -m "feat(hardware): wire Paper Jam, Paper Out, and Hopper alerts to A
 ### Task 5: Upgrade Service Worker with Push & Notification Click Handlers
 
 **Files:**
+
 - Modify: `src/public/admin/sw.js`
 
 **Interfaces:**
+
 - Produces: `push` and `notificationclick` event listeners in Service Worker
 
 - [ ] **Step 1: Check existing `sw.js` structure and syntax**
@@ -713,7 +778,10 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch (err) {
-    data = { title: 'PrintBit Kiosk Alert', body: event.data ? event.data.text() : '' };
+    data = {
+      title: 'PrintBit Kiosk Alert',
+      body: event.data ? event.data.text() : '',
+    };
   }
 
   const title = data.title || '🚨 PrintBit Kiosk Alert';
@@ -736,20 +804,23 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || '/admin/system';
+  const targetUrl =
+    (event.notification.data && event.notification.data.url) || '/admin/system';
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (const client of windowClients) {
-        if (client.url.includes('/admin/') && 'focus' in client) {
-          client.navigate(targetUrl);
-          return client.focus();
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        for (const client of windowClients) {
+          if (client.url.includes('/admin/') && 'focus' in client) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
-    })
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      }),
   );
 });
 ```
@@ -771,15 +842,18 @@ git commit -m "feat(pwa): add push and notificationclick event listeners to admi
 ### Task 6: Implement Global In-App Alert System & Audio Siren in `shared.ts`
 
 **Files:**
+
 - Modify: `src/public/admin/shared.ts`
 - Modify: `src/public/admin/shared.css`
 
 **Interfaces:**
+
 - Produces: `setupGlobalKioskAlertListener()`, `setupAdminPushNotifications()`, Web Audio synthetic dual siren, top emergency banner
 
 - [ ] **Step 1: Write Web Audio siren generator and banner DOM in `src/public/admin/shared.ts`**
 
 In `src/public/admin/shared.ts`:
+
 - Build `KioskAlarmAudioController`:
   - Creates `AudioContext` on first user gesture (click/touch/login).
   - Generates dual-tone alarm (880Hz alternating with 660Hz every 0.6s).
@@ -800,7 +874,8 @@ In `src/public/admin/shared.ts`:
 
 ```ts
 export async function registerAdminPush(): Promise<boolean> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window))
+    return false;
   const reg = await navigator.serviceWorker.ready;
   const res = await apiFetch('/api/admin/push/vapid-public-key');
   if (!res.ok) return false;
@@ -841,11 +916,13 @@ git commit -m "feat(admin): implement global emergency siren, banner, and push r
 ### Task 7: Add Push Notifications Management Card in Admin Settings
 
 **Files:**
+
 - Modify: `src/public/admin/settings/index.html`
 - Modify: `src/public/admin/settings/app.ts`
 - Modify: `src/public/admin/settings/styles.css`
 
 **Interfaces:**
+
 - Produces: Settings card `#pushNotificationsCard`
   - Toggle switch for device push alerts
   - "Send Test Push" button
@@ -855,6 +932,7 @@ git commit -m "feat(admin): implement global emergency siren, banner, and push r
 - [ ] **Step 1: Add Push Notifications markup to `src/public/admin/settings/index.html`**
 
 Insert card into Settings page layout:
+
 ```html
 <section class="settings-card" id="pushNotificationsCard">
   <div class="settings-card__header">
@@ -865,12 +943,19 @@ Insert card into Settings page layout:
     <span class="badge" id="pushStatusBadge">Checking...</span>
   </div>
   <p class="settings-card__desc">
-    Receive instant alerts on your phone or computer when Paper Jam, Paper Out, or critical hardware blockers occur.
+    Receive instant alerts on your phone or computer when Paper Jam, Paper Out,
+    or critical hardware blockers occur.
   </p>
   <div class="push-actions">
-    <button type="button" class="btn btn--primary" id="enablePushBtn">Enable Push Alerts</button>
-    <button type="button" class="btn btn--secondary" id="testPushBtn">Send Test Push</button>
-    <button type="button" class="btn btn--danger hidden" id="disablePushBtn">Disable on this Device</button>
+    <button type="button" class="btn btn--primary" id="enablePushBtn">
+      Enable Push Alerts
+    </button>
+    <button type="button" class="btn btn--secondary" id="testPushBtn">
+      Send Test Push
+    </button>
+    <button type="button" class="btn btn--danger hidden" id="disablePushBtn">
+      Disable on this Device
+    </button>
   </div>
   <div class="push-meta text-muted" id="pushMetaText"></div>
 </section>
@@ -879,6 +964,7 @@ Insert card into Settings page layout:
 - [ ] **Step 2: Add logic in `src/public/admin/settings/app.ts`**
 
 Implement device state check:
+
 - Reads `navigator.permissions.query({ name: 'notifications' })`.
 - Updates `#pushStatusBadge` to `Subscribed`, `Disabled`, or `Permission Blocked`.
 - Click on `#enablePushBtn` triggers `registerAdminPush()`.
@@ -902,26 +988,36 @@ git commit -m "feat(settings): add Push Notifications card with subscribe and te
 ### Task 8: End-to-End Simulation & Verification
 
 **Files:**
+
 - Modify: `src/services/printer-simulation.ts`
 - Create: `src/services/__tests__/push-hardware-e2e.spec.ts`
 
 **Interfaces:**
+
 - Verifies: Complete pipeline from Paper Jam simulation trigger to Web Push and Socket.IO emission
 
 - [ ] **Step 1: Write integration test for simulated Paper Jam dispatch**
 
 Create `src/services/__tests__/push-hardware-e2e.spec.ts`:
+
 ```ts
 import { adminPushService } from '../admin-push.service';
-import { simulatePrinterError, clearPaperJamSimulation } from '../printer-simulation';
+import {
+  simulatePrinterError,
+  clearPaperJamSimulation,
+} from '../printer-simulation';
 
 describe('Paper Jam Push Alert Integration', () => {
   it('dispatches critical push alert when paper jam simulation is activated', async () => {
-    const broadcastSpy = jest.spyOn(adminPushService, 'broadcastCriticalAlert').mockResolvedValue({ sent: 1, pruned: 0 });
+    const broadcastSpy = jest
+      .spyOn(adminPushService, 'broadcastCriticalAlert')
+      .mockResolvedValue({ sent: 1, pruned: 0 });
     const clearSpy = jest.spyOn(adminPushService, 'clearAlert');
 
     simulatePrinterError('paper_jam');
-    expect(broadcastSpy).toHaveBeenCalledWith(expect.objectContaining({ code: 'PAPER_JAM' }));
+    expect(broadcastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'PAPER_JAM' }),
+    );
 
     clearPaperJamSimulation();
     expect(clearSpy).toHaveBeenCalledWith('PAPER_JAM');
@@ -937,10 +1033,12 @@ Expected: PASS
 - [ ] **Step 3: Run full test suite and build**
 
 Run:
+
 ```bash
 pnpm test
 pnpm run build
 ```
+
 Expected: All tests pass, build completes cleanly.
 
 - [ ] **Step 4: Commit**

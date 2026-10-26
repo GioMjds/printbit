@@ -157,9 +157,9 @@ function escapeHtml(str: string): string {
 
 function connectSocket(): void {
   if (typeof io !== 'function' || socket) return;
-  const pin = sessionStorage.getItem('adminPin') ?? '';
+  const token = sessionStorage.getItem('adminSessionToken') ?? '';
   try {
-    socket = io({ auth: { pin }, reconnectionDelay: 2000 });
+    socket = io({ auth: { token }, reconnectionDelay: 2000 });
     socket.on('admin:new_log', (entry: unknown) => {
       if (!entry || typeof entry !== 'object') return;
       const logEntry = entry as LogsResponse['logs'][number];

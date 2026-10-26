@@ -89,7 +89,12 @@ export function authenticateControlSocket(
     return { kind: 'kiosk' };
   }
 
-  const adminToken = getSafeString(cookies.adminToken, MAX_TOKEN_LENGTH);
+  const auth = getPlainRecord(handshake.auth);
+  const authToken = auth
+    ? getSafeString(auth.token ?? auth.adminToken, MAX_TOKEN_LENGTH)
+    : null;
+  const adminToken =
+    getSafeString(cookies.adminToken, MAX_TOKEN_LENGTH) || authToken;
   if (adminToken && deps.isAdminSession(adminToken)) {
     return { kind: 'admin' };
   }

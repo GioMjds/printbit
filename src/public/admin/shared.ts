@@ -451,6 +451,15 @@ export async function ensureAuth(): Promise<boolean> {
     credentials: 'include',
   });
 
+  if (response.ok) {
+    try {
+      const data = (await response.json()) as { sessionToken?: string };
+      if (data.sessionToken) setAdminToken(data.sessionToken);
+    } catch {
+      // Ignore JSON parse errors
+    }
+  }
+
   return response.ok;
 }
 

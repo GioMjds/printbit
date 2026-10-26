@@ -190,6 +190,7 @@ export interface AdminSettings {
   scannerDpi: ScannerDpiSettings;
   developerMode: DeveloperModeSettings;
   pipelineSettings?: PipelineSettings;
+  pushNotifications: PushNotificationSettings;
 }
 
 export interface AdminLogEntry {
@@ -199,4 +200,27 @@ export interface AdminLogEntry {
   type: string;
   message: string;
   meta?: LogMeta;
+}
+
+export interface VapidKeys {
+  publicKey: string;
+  privateKey: string;
+}
+
+export interface PushNotificationSettings {
+  enabled: boolean;
+  vapidKeys?: VapidKeys;
+  cooldownSeconds: number;
+}
+
+export interface AdminPushSubscriptionEntry {
+  id: string;
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  userAgent: string;
+  createdAt: string;
+  lastNotifiedAt: string | null;
 }

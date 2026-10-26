@@ -361,8 +361,8 @@ function connectSocket(): void {
   cleanupLiveUpdates();
   if (socket) return;
 
-  const pin = sessionStorage.getItem('adminPin') ?? '';
-  const nextSocket = io({ auth: { pin }, reconnectionDelay: 2000 });
+  const token = sessionStorage.getItem('adminSessionToken') ?? '';
+  const nextSocket = io({ auth: { token }, reconnectionDelay: 2000 });
   nextSocket.on('adminAnomalyIncident', handleSocketIncident);
   nextSocket.on('adminAnomalyCount', handleSocketCount);
   socket = nextSocket;

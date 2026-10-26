@@ -1018,9 +1018,8 @@ declare const io: (opts?: {
 let socket: ReturnType<typeof io> | null = null;
 
 function connectSocket(): void {
-  // initAuth stores the PIN in sessionStorage under the key used by shared.ts
-  const pin = sessionStorage.getItem('adminPin') ?? '';
-  socket = io({ auth: { pin }, reconnectionDelay: 2000 });
+  const token = sessionStorage.getItem('adminSessionToken') ?? '';
+  socket = io({ auth: { token }, reconnectionDelay: 2000 });
 
   // Live printer card update (emitted by Phase 2 health monitor)
   socket.on('printerStatusChanged', (payload: unknown) => {

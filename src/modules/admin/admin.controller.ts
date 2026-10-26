@@ -902,7 +902,7 @@ export class AdminController {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return res.json({ ok: true });
+    return res.json({ ok: true, sessionToken });
   };
 
   private handleVerifyPin = async (req: Request, res: Response) => {
@@ -956,21 +956,34 @@ export class AdminController {
         'ui_blocking_disabled',
         'UI blocking mode disabled via staff unlock.',
       );
-      return res.json({ valid: true, disabled: true, token: sessionToken });
+      return res.json({
+        valid: true,
+        disabled: true,
+        token: sessionToken,
+        sessionToken,
+      });
     }
 
-    return res.json({ valid: true, token: sessionToken });
+    return res.json({ valid: true, token: sessionToken, sessionToken });
   };
 
-  private handleLogout = async (_req: Request, res: Response) => {
-    destroyAdminSession();
+  private handleLogout = async (req: Request, res: Response) => {
+    const headerToken = req.get('x-admin-token') || undefined;
+    const cookieToken =
+      (req.cookies?.['adminToken'] as string | undefined) || undefined;
+    const token = headerToken ?? cookieToken;
+    destroyAdminSession(token);
     await this.adminService.appendAdminLog('admin_logout', 'Admin logged out.');
     res.clearCookie('adminToken');
     return res.json({ ok: true });
   };
 
-  private handleVerify = (_req: Request, res: Response) => {
-    res.json({ ok: true });
+  private handleVerify = (req: Request, res: Response) => {
+    const headerToken = req.get('x-admin-token') || undefined;
+    const cookieToken =
+      (req.cookies?.['adminToken'] as string | undefined) || undefined;
+    const sessionToken = headerToken ?? cookieToken;
+    res.json({ ok: true, sessionToken });
   };
 
   // ── Summary and status handlers ────────────────────────────────────────────

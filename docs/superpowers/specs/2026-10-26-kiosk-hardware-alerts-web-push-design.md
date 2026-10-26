@@ -10,6 +10,7 @@
 ## 1. Context & Motivation
 
 PrintBit kiosk operations require immediate intervention when physical hardware blockers arise, specifically:
+
 1. **Paper Jam (`PAPER_JAM_PRINT`)**: The customer cannot print or scan; physical clearing by staff/operator is required.
 2. **Paper Out (`PAPER_TRAY_EMPTY`)**: The printer cannot feed paper; the tray needs replenishment.
 3. **Printer Disconnected / Offline (`PRINTER_OFFLINE`)**: Communication or USB connection lost.
@@ -18,6 +19,7 @@ PrintBit kiosk operations require immediate intervention when physical hardware 
 Previously, Paper Jam events were partially isolated within customer recovery screens and excluded from persistent anomaly alerts. Furthermore, operator notifications were passive, requiring someone to actively refresh or inspect the Anomaly Alerts page.
 
 With the kiosk admin portal now accessible via its registered domain `admin.printbitkiosk.com` over HTTPS and configured as a Progressive Web Application (PWA), operators can install the app on mobile phones and desktop computers. This subsystem implements a **hybrid alerting pipeline**:
+
 - **Native Web Push**: Sends instant OS-level push notifications to registered operator devices even when the admin browser tab is closed or mobile device is locked.
 - **In-App Emergency Alarm**: Provides a persistent, flashing top-banner and audible synthetic alarm siren across all open admin pages (`/admin/*`) via Socket.IO.
 - **Anomaly Audit Recording**: Automatically logs every critical incident in the database for auditing and resolution tracking.
@@ -62,6 +64,7 @@ With the kiosk admin portal now accessible via its registered domain `admin.prin
 ```
 
 ### Event Resolution / Clear Flow
+
 1. Operator physically clears the jammed paper or loads paper into the tray.
 2. Sensors report status back to normal (`printer:paper-jam-cleared` or `printer:ready`).
 3. Backend emits `admin:kiosk-alert-cleared` with fault details.
@@ -73,6 +76,7 @@ With the kiosk admin portal now accessible via its registered domain `admin.prin
 ## 3. Backend Subsystem Specification
 
 ### 3.1 Dependencies & VAPID Keypair
+
 - Package: `web-push` and `@types/web-push`.
 - Key Generation:
   - If `db.data.settings.pushNotifications.vapidKeys` is absent, generate a new pair via `webpush.generateVAPIDKeys()`.
@@ -80,7 +84,9 @@ With the kiosk admin portal now accessible via its registered domain `admin.prin
   - Set VAPID contact details to `mailto:admin@printbitkiosk.com`.
 
 ### 3.2 Database Storage Model
+
 New storage slice in `db.data.adminPushSubscriptions`:
+
 ```ts
 export interface AdminPushSubscriptionEntry {
   id: string;
@@ -96,7 +102,9 @@ export interface AdminPushSubscriptionEntry {
 ```
 
 ### 3.3 AdminPushService (`src/services/admin-push.service.ts`)
+
 Methods:
+
 - `getPublicKey(): string`: Returns VAPID public key in base64url string format.
 - `subscribe(sub: PushSubscriptionJSON, userAgent?: string): Promise<AdminPushSubscriptionEntry>`: Inserts or updates subscription indexed by `endpoint`.
 - `unsubscribe(endpoint: string): Promise<boolean>`: Removes matching subscription.
@@ -122,6 +130,7 @@ Methods:
 - `clearAlert(code: string): void`: Emits `io.emit('admin:kiosk-alert-cleared', { code })`.
 
 ### 3.4 Integration Points in Kiosk Core
+
 1. **`src/services/printer-state-projection.ts`**:
    - Update `translateHardwarePrinterError`: Remove silent `return` on `PAPER_JAM_PRINT`.
    - On `PAPER_JAM_PRINT`: Trigger `adminPushService.broadcastCriticalAlert({ code: 'PAPER_JAM', title: '🚨 Kiosk Paper Jam Detected!', message: 'Paper is jammed inside the printer. Please open printer and remove jammed paper.', severity: 'critical' })`.
@@ -133,7 +142,9 @@ Methods:
    - When hopper status reports empty or dispense stall: Call `adminPushService.broadcastCriticalAlert({ code: 'HOPPER_EMPTY', title: '⚠️ Coin Hopper Empty!', message: 'Kiosk coin hopper is empty. Change cannot be dispensed.', severity: 'critical' })`.
 
 ### 3.5 Admin Controller API Endpoints
+
 All modifying endpoints protected by `requireAdminPin`:
+
 - `GET /api/admin/push/vapid-public-key` -> `{ success: true, publicKey: string }`
 - `POST /api/admin/push/subscribe` -> `{ success: true, subscription: AdminPushSubscriptionEntry }`
 - `POST /api/admin/push/unsubscribe` -> `{ success: true }`
@@ -145,7 +156,9 @@ All modifying endpoints protected by `requireAdminPin`:
 ## 4. Frontend PWA & Service Worker Specification
 
 ### 4.1 Service Worker (`src/public/admin/sw.js`)
+
 Add push event listeners:
+
 ```js
 self.addEventListener('push', (event) => {
   let data = {};
@@ -166,8 +179,8 @@ self.addEventListener('push', (event) => {
     vibrate: [300, 100, 300, 100, 500],
     data: {
       url: data.url || '/admin/system',
-      timestamp: data.timestamp || Date.now()
-    }
+      timestamp: data.timestamp || Date.now(),
+    },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -178,22 +191,25 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = event.notification.data?.url || '/admin/system';
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (const client of windowClients) {
-        if (client.url.includes('/admin/') && 'focus' in client) {
-          client.navigate(targetUrl);
-          return client.focus();
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        for (const client of windowClients) {
+          if (client.url.includes('/admin/') && 'focus' in client) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
-    })
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      }),
   );
 });
 ```
 
 ### 4.2 Shared In-App Alert System (`src/public/admin/shared.ts`)
+
 1. **Socket.IO Central Hub**:
    - Establish single Socket.IO connection across all admin pages if script is loaded.
    - Listen for `admin:kiosk-critical-alert`:
@@ -218,11 +234,13 @@ self.addEventListener('notificationclick', (event) => {
      - Send subscription to `POST /api/admin/push/subscribe`.
    - Automatic Prompt:
      - After successful login, if `Notification.permission === 'default'`, show polite prompt banner:
-       *"Enable push notifications on this device to get alerted immediately when paper jams or runs out."*
+       _"Enable push notifications on this device to get alerted immediately when paper jams or runs out."_
      - If accepted, register immediately and show confirmation toast.
 
 ### 4.3 Settings Management Page (`src/public/admin/settings/`)
+
 Add a new **Push Notification Subscriptions** card:
+
 - Current Device Status indicator:
   - 🟢 **Subscribed**: PWA will receive hardware alert pushes.
   - 🟡 **Not Subscribed**: Button to "Enable Notifications".
@@ -236,19 +254,20 @@ Add a new **Push Notification Subscriptions** card:
 
 ## 5. Security, Resilience & Edge Cases
 
-| Challenge | Mitigation |
-|---|---|
-| **Stale / Dead Subscriptions** | Google FCM / Apple APNs return HTTP 410 Gone when an operator uninstalls the PWA or resets browser data. `AdminPushService` catches 410 and 404 responses and automatically prunes the subscription from `db.data.adminPushSubscriptions`. |
-| **Notification Flooding** | A 30-second deduplication cooldown is enforced per alert code (`PAPER_JAM`, `PAPER_OUT`, etc.) unless an explicit clear event intervenes. |
-| **Audio Autoplay Restrictions** | Modern browsers block audio autoplay until user interacts with the page. The audio context is lazily resumed on the first click or touch event during login or dashboard navigation. |
-| **iOS PWA Web Push Restrictions** | On iOS 16.4+, Web Push is supported only when the website has been added to the Home Screen. If iOS browser tab detects lack of `PushManager`, the prompt displays: *"Add PrintBit Admin to your Home Screen first to enable push notifications."* |
-| **Authentication on API** | All subscription modifications and test triggers require a valid admin session token (`x-admin-token` or cookie). The public VAPID key is public information and safe for unauthenticated read. |
+| Challenge                         | Mitigation                                                                                                                                                                                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Stale / Dead Subscriptions**    | Google FCM / Apple APNs return HTTP 410 Gone when an operator uninstalls the PWA or resets browser data. `AdminPushService` catches 410 and 404 responses and automatically prunes the subscription from `db.data.adminPushSubscriptions`.         |
+| **Notification Flooding**         | A 30-second deduplication cooldown is enforced per alert code (`PAPER_JAM`, `PAPER_OUT`, etc.) unless an explicit clear event intervenes.                                                                                                          |
+| **Audio Autoplay Restrictions**   | Modern browsers block audio autoplay until user interacts with the page. The audio context is lazily resumed on the first click or touch event during login or dashboard navigation.                                                               |
+| **iOS PWA Web Push Restrictions** | On iOS 16.4+, Web Push is supported only when the website has been added to the Home Screen. If iOS browser tab detects lack of `PushManager`, the prompt displays: _"Add PrintBit Admin to your Home Screen first to enable push notifications."_ |
+| **Authentication on API**         | All subscription modifications and test triggers require a valid admin session token (`x-admin-token` or cookie). The public VAPID key is public information and safe for unauthenticated read.                                                    |
 
 ---
 
 ## 6. Verification & Test Plan
 
 ### Automated Tests
+
 1. **Unit Tests (`src/services/__tests__/admin-push.service.test.ts`)**:
    - Test VAPID key generation and persistent storage.
    - Test subscription registration and idempotent upsert.
@@ -263,6 +282,7 @@ Add a new **Push Notification Subscriptions** card:
    - Verify `PAPER_TRAY_EMPTY` in `WorkerPrintLifecycle` calls `broadcastCriticalAlert`.
 
 ### Manual End-to-End Tests
+
 1. **PWA Setup**: Open `https://admin.printbitkiosk.com` on a mobile device and install to home screen.
 2. **Permission & Subscription**: Log in with Admin PIN. Accept notification prompt. Verify Settings card turns green.
 3. **Test Push**: Tap "Send Test Push" in Settings. Verify notification appears in device notification center with vibration.
