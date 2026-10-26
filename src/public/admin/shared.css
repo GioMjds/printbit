@@ -944,3 +944,39 @@ body.kiosk-offline .action-btn {
   50% { box-shadow: 0 6px 24px rgba(239, 68, 68, 0.6); }
   100% { box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3); }
 }
+
+.btn-pwa-login-install {
+  width: 100%;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #c7d2fe;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-pwa-login-install:hover {
+  background: rgba(99, 102, 241, 0.3);
+  color: #ffffff;
+  border-color: #6366f1;
+}
+
+.pwa-ios-install-hint {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-align: center;
+}

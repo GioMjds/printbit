@@ -168,17 +168,29 @@ export class AdminPushService {
     await Promise.all(
       subscriptions.map(async (sub) => {
         try {
+          const isApple = sub.endpoint.includes('push.apple.com');
           await webpush.sendNotification(
             {
               endpoint: sub.endpoint,
               keys: sub.keys,
             },
             payload,
-            { urgency: 'high', TTL: 86400 },
+            {
+              urgency: 'high',
+              topic: 'kiosk-hardware-alert',
+              TTL: 86400,
+              headers: isApple
+                ? {
+                    'apns-push-type': 'alert',
+                    'apns-priority': '10',
+                  }
+                : undefined,
+            },
           );
           sentCount++;
           sub.lastNotifiedAt = new Date().toISOString();
         } catch (err: any) {
+          console.error('[ADMIN-PUSH] Delivery failed for device (' + sub.id + ', agent: ' + sub.userAgent + '):', err?.statusCode || err?.message);
           if (err.statusCode === 404 || err.statusCode === 410) {
             deadEndpoints.add(sub.endpoint);
           }
@@ -215,13 +227,25 @@ export class AdminPushService {
     });
 
     try {
+      const isApple = sub.endpoint.includes('push.apple.com');
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: sub.keys },
         payload,
-        { urgency: 'high', TTL: 3600 },
+        {
+          urgency: 'high',
+          topic: 'kiosk-test-alert',
+          TTL: 3600,
+          headers: isApple
+            ? {
+                'apns-push-type': 'alert',
+                'apns-priority': '10',
+              }
+            : undefined,
+        },
       );
       return true;
-    } catch {
+    } catch (err: any) {
+      console.error('[ADMIN-PUSH] Test push failed for device (' + sub.id + '):', err?.statusCode || err?.message);
       return false;
     }
   }

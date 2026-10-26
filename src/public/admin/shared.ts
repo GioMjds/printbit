@@ -635,6 +635,7 @@ export function initAuth(arg: InitAuthArg): () => void {
       setAdminSessionHint(true);
 
       showDashboard(true);
+      triggerPostAuthPushPrompt();
       await options.onSuccess(signal);
       if (operation !== authOperation || signal.aborted) return false;
       return true;
@@ -700,6 +701,7 @@ export function initAuth(arg: InitAuthArg): () => void {
       if (authenticated) {
         setAdminSessionHint(true);
         showDashboard(true);
+        triggerPostAuthPushPrompt();
         await options.onSuccess(startupSignal);
         return;
       }
@@ -800,43 +802,72 @@ export function initPWA(): void {
       deferredPrompt = null;
       removeInstallButton();
     });
+    showIosInstallHint();
   }
 
   // 4. Global Kiosk Emergency Alert Listener (Socket.IO + Audio Siren)
   initGlobalKioskAlertListener();
 }
 
-function showInstallButton(): void {
-  if (document.getElementById('pwaInstallBtn')) return;
-  const actionsContainer = document.querySelector(
-    '.topbar__actions, .admin-header__actions, nav, .topbar',
-  );
-  if (!actionsContainer) return;
-
-  const btn = document.createElement('button');
-  btn.id = 'pwaInstallBtn';
-  btn.type = 'button';
-  btn.className = 'btn-pwa-install';
-  btn.innerHTML = '<span>📲 Install App</span>';
-  btn.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    try {
-      const choice = await deferredPrompt.userChoice;
-      if (choice?.outcome === 'accepted') {
-        removeInstallButton();
-      }
-    } catch {
-      // Ignore user choice errors
+async function triggerInstallPrompt(): Promise<void> {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  try {
+    const choice = await deferredPrompt.userChoice;
+    if (choice?.outcome === 'accepted') {
+      removeInstallButton();
     }
-    deferredPrompt = null;
-  });
-  actionsContainer.prepend(btn);
+  } catch {
+    // Ignore user choice errors
+  }
+  deferredPrompt = null;
+}
+
+function showInstallButton(): void {
+  const authCard = document.querySelector('.auth-card');
+  if (authCard && !document.getElementById('pwaLoginInstallBtn')) {
+    const loginBtn = document.createElement('button');
+    loginBtn.id = 'pwaLoginInstallBtn';
+    loginBtn.type = 'button';
+    loginBtn.className = 'btn-pwa-login-install';
+    loginBtn.innerHTML = '<span>📲 Install Admin App on Phone</span>';
+    loginBtn.addEventListener('click', triggerInstallPrompt);
+    authCard.appendChild(loginBtn);
+  }
+
+  if (!document.getElementById('pwaInstallBtn')) {
+    const actionsContainer = document.querySelector(
+      '.topbar__actions, .admin-header__actions, nav, .topbar',
+    );
+    if (actionsContainer) {
+      const btn = document.createElement('button');
+      btn.id = 'pwaInstallBtn';
+      btn.type = 'button';
+      btn.className = 'btn-pwa-install';
+      btn.innerHTML = '<span>📲 Install App</span>';
+      btn.addEventListener('click', triggerInstallPrompt);
+      actionsContainer.prepend(btn);
+    }
+  }
 }
 
 function removeInstallButton(): void {
-  const btn = document.getElementById('pwaInstallBtn');
-  btn?.remove();
+  document.getElementById('pwaInstallBtn')?.remove();
+  document.getElementById('pwaLoginInstallBtn')?.remove();
+  document.getElementById('pwaIosInstallHint')?.remove();
+}
+
+function showIosInstallHint(): void {
+  const isIos = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (!isIos || document.getElementById('pwaIosInstallHint')) return;
+  const authCard = document.querySelector('.auth-card');
+  if (authCard) {
+    const hint = document.createElement('div');
+    hint.id = 'pwaIosInstallHint';
+    hint.className = 'pwa-ios-install-hint';
+    hint.innerHTML = '<span>📲 <strong>Install App on iPhone:</strong> Tap <strong>Share</strong> (⎋) below, then <strong>Add to Home Screen</strong>.</span>';
+    authCard.appendChild(hint);
+  }
 }
 
 function showUpdateToast(worker: ServiceWorker): void {
@@ -868,9 +899,36 @@ function urlB64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export async function registerAdminPush(): Promise<{ ok: boolean; error?: string }> {
+  const isIos = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (isIos) {
+      return {
+        ok: false,
+        error: 'On iPhone/iPad, push notifications require adding this app to your Home Screen first (tap Share > Add to Home Screen).',
+      };
+    }
     return { ok: false, error: 'Push notifications are not supported on this browser.' };
   }
+
+  if ('Notification' in window) {
+    if (Notification.permission === 'denied') {
+      return {
+        ok: false,
+        error: 'Notifications are blocked. Please enable them in your phone browser site settings.',
+      };
+    }
+    if (Notification.permission === 'default') {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          return { ok: false, error: 'Notification permission was not granted.' };
+        }
+      } catch (permErr: any) {
+        return { ok: false, error: permErr?.message || 'Permission request failed.' };
+      }
+    }
+  }
+
   try {
     const reg = await navigator.serviceWorker.ready;
     const res = await apiFetch('/api/admin/push/vapid-public-key');
@@ -936,6 +994,7 @@ class KioskAlarmAudioController {
   private ctx: AudioContext | null = null;
   private intervalId: number | null = null;
   private isMuted = false;
+  private activeOsc: OscillatorNode | null = null;
 
   private initCtx(): AudioContext | null {
     if (!this.ctx && typeof window !== 'undefined') {
@@ -948,6 +1007,23 @@ class KioskAlarmAudioController {
     return this.ctx;
   }
 
+  unlock(): void {
+    const ctx = this.initCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      void ctx.resume();
+    }
+    try {
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch {
+      // Ignore
+    }
+  }
+
   start(): void {
     if (this.isMuted || this.intervalId !== null) return;
     const playBeep = () => {
@@ -957,13 +1033,19 @@ class KioskAlarmAudioController {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(880, now);
-      osc.frequency.setValueAtTime(660, now + 0.2);
+      this.activeOsc = osc;
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(960, now);
+      osc.frequency.setValueAtTime(770, now + 0.25);
       gain.gain.setValueAtTime(0.18, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
       osc.connect(gain);
       gain.connect(ctx.destination);
+      osc.onended = () => {
+        if (this.activeOsc === osc) {
+          this.activeOsc = null;
+        }
+      };
       osc.start(now);
       osc.stop(now + 0.45);
     };
@@ -977,15 +1059,23 @@ class KioskAlarmAudioController {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    this.isMuted = false;
+    if (this.activeOsc) {
+      try {
+        this.activeOsc.stop();
+      } catch {
+        // Ignore if already stopped
+      }
+      this.activeOsc = null;
+    }
   }
 
   mute(): void {
     this.isMuted = true;
-    if (this.intervalId !== null) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
+    this.stop();
+  }
+
+  unmute(): void {
+    this.isMuted = false;
   }
 }
 
@@ -994,10 +1084,9 @@ export const kioskAlarmAudio = new KioskAlarmAudioController();
 export function initGlobalKioskAlertListener(): void {
   if (typeof window === 'undefined') return;
 
-  // Unlock AudioContext on first user interaction
+  // Silently unlock AudioContext on first user interaction without sounding alarm
   const unlockAudio = () => {
-    kioskAlarmAudio.start();
-    kioskAlarmAudio.stop();
+    kioskAlarmAudio.unlock();
     window.removeEventListener('click', unlockAudio);
     window.removeEventListener('touchstart', unlockAudio);
   };
@@ -1017,11 +1106,16 @@ export function initGlobalKioskAlertListener(): void {
     socket.on('admin:kiosk-alert-cleared', () => {
       hideEmergencyBanner();
       kioskAlarmAudio.stop();
+      kioskAlarmAudio.unmute();
     });
   }
+}
 
-  // Show polite push notification prompt toast if permission is default
-  if ('Notification' in window && Notification.permission === 'default') {
+export function triggerPostAuthPushPrompt(): void {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    void registerAdminPush();
+  } else if (Notification.permission === 'default') {
     showPushPromptToast();
   }
 }

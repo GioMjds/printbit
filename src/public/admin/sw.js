@@ -171,17 +171,24 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || '🚨 PrintBit Kiosk Alert';
+  const timestamp = data.timestamp || Date.now();
+  const alertCode = data.code ? String(data.code).toLowerCase() : 'alert';
   const options = {
     body: data.body || 'A critical hardware event occurred on the kiosk.',
     icon: '/admin/icons/icon-192x192.png',
-    badge: '/admin/icons/favicon.svg',
-    tag: data.tag || 'kiosk-hardware-alert',
+    badge: '/admin/icons/icon-192x192.png',
+    tag: 'kiosk-' + alertCode + '-' + timestamp,
     renotify: true,
     requireInteraction: true,
-    vibrate: [300, 100, 300, 100, 500],
+    silent: false,
+    vibrate: [400, 150, 400, 150, 600],
+    actions: [
+      { action: 'open', title: '🔍 Inspect System' }
+    ],
     data: {
       url: data.url || '/admin/system',
-      timestamp: data.timestamp || Date.now(),
+      timestamp: timestamp,
+      code: data.code,
     },
   };
 
