@@ -5,6 +5,7 @@ import {
 } from './printer-state-projection';
 import { printerErrorStateManager } from './printer-error-state';
 import { unlockOwnedCoinSlot, lockCoinSlot } from './hardware-state-projection';
+import { adminPushService } from './admin-push.service';
 
 export type SimulatedPrinterError =
   | 'low_ink'
@@ -132,6 +133,12 @@ export function simulatePrinterError(
           canRetry: false,
           canDismiss: false,
         },
+      });
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_JAM',
+        title: '🚨 Kiosk Paper Jam Detected!',
+        message: 'Paper jam detected in the printer.',
+        severity: 'critical',
       });
       break;
     }
@@ -292,6 +299,7 @@ export function clearPrinterSimulation(): PrinterSimulationState {
     timestampUtc: new Date().toISOString(),
   });
 
+  adminPushService.clearAlert('PAPER_JAM');
   io?.emit('printer:simulation-state', { activeError: null, message: null });
   io?.emit('printer:simulation-cleared', {});
   io?.emit('printer:low-ink-warning', { active: false });
@@ -322,6 +330,7 @@ export function clearPaperJamSimulation(): PrinterSimulationState {
     timestampUtc: new Date().toISOString(),
   });
 
+  adminPushService.clearAlert('PAPER_JAM');
   io?.emit('printer:simulation-state', { activeError: null, message: null });
   io?.emit('printer:simulation-cleared', { redirectHome: true });
   io?.emit('printer:paper-jam-cleared', { redirectHome: true });

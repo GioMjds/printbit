@@ -6,6 +6,7 @@ import {
   buildAnomalyFingerprint,
   mapHopperErrorSeverity,
 } from './anomaly';
+import { adminPushService } from './admin-push.service';
 import { getHopperStatus } from './hardware-state-projection';
 import {
   sendWorkerRequest,
@@ -814,6 +815,15 @@ class HopperService {
         attempts: performedAttempts,
       },
     });
+
+    if (lastErrorCode === HopperErrorCode.EMPTY) {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'HOPPER_EMPTY',
+        title: '⚠️ Coin Hopper Empty!',
+        message: 'Kiosk coin hopper is empty. Change cannot be dispensed.',
+        severity: 'critical',
+      });
+    }
 
     return {
       ok: false,

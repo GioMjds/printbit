@@ -8,6 +8,7 @@ import {
   isCoinSlotLockedBy,
 } from './hardware-state-projection';
 import { anomalyService } from './anomaly';
+import { adminPushService } from './admin-push.service';
 import { translateHardwarePrinterError } from './printer-error-translation';
 
 type SocketIoEmitter = { emit: (event: string, ...args: unknown[]) => void } | Server;
@@ -31,6 +32,10 @@ export function handlePrinterStatusUpdate(
   const isHealthy = normalized === 'ready' || normalized === 'healthy';
 
   if (isHealthy) {
+    adminPushService.clearAlert('PAPER_JAM');
+    adminPushService.clearAlert('PAPER_OUT');
+    adminPushService.clearAlert('PRINTER_OFFLINE');
+
     const { cleared, state } = printerErrorStateManager.recordHealthyPoll();
     const active = printerErrorStateManager.getActiveError();
     if (cleared || (isCoinSlotLockedBy('printer-error-guide') && !active)) {
@@ -49,7 +54,17 @@ export function handlePrinterStatusUpdate(
       errorCode,
     });
 
-    if (translated.tier === 'None' || translated.code === 'PAPER_JAM_PRINT') {
+    if (translated.code === 'PAPER_JAM_PRINT') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_JAM',
+        title: '🚨 Kiosk Paper Jam Detected!',
+        message: 'Paper is jammed in the kiosk printer. Physical clearance required.',
+        severity: 'critical',
+      });
+      return;
+    }
+
+    if (translated.tier === 'None') {
       return;
     }
 

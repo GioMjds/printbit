@@ -25,6 +25,7 @@ import {
 import { registerAppModules } from '@/app.module';
 import { getJobProcessor } from '@/modules/print-queue';
 import { initDB } from '@/core/database/db';
+import { adminPushService } from '@/services/admin-push.service';
 import { detectDefaultPrinter } from '@/services/printer';
 import { detectScanner } from '@/services/scanner';
 import { startScanStorageCleanup } from '@/services/scan-storage';
@@ -447,6 +448,7 @@ async function initializeBackgroundSubsystems(): Promise<void> {
   });
   anomalyService.setSocketIo(io);
   adminService.setSocketIo(io);
+  adminPushService.setSocketIo(io);
 
   // 4. Trusted time check and monitor (non-blocking background sync)
   void (async () => {

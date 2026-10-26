@@ -23,6 +23,7 @@ import {
 import { evaluateConsumablesForecastAlerts } from '@/modules/admin/consumables.service';
 import { estimateInkUsageByJob } from '@/services/consumable-estimator';
 import { getTrustedTimestamp } from '@/services/time-source';
+import { adminPushService } from './admin-push.service';
 import type { WorkerPrintEvent } from './worker-return-pipe';
 import { jobStore } from './job-store';
 
@@ -426,10 +427,22 @@ async function processWorkerReturnPrintEvent(input: {
       errorCode = 'PAPER_TRAY_EMPTY';
       userMsg = 'Printer Out of Paper. Please load paper and click Resume.';
       hint = 'Please load paper into the rear tray, then press Resume to retry.';
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_OUT',
+        title: '⚠️ Kiosk Paper Out!',
+        message: 'Printer rear paper tray is empty. Please load paper.',
+        severity: 'critical',
+      });
     } else if (isJam) {
       errorCode = 'PAPER_JAM_PRINT';
       userMsg = 'Paper jam detected in the printer.';
       hint = 'Please clear the jammed paper, then click Resume.';
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_JAM',
+        title: '🚨 Kiosk Paper Jam Detected!',
+        message: 'Paper is jammed in the kiosk printer. Physical clearance required.',
+        severity: 'critical',
+      });
     } else if (isDoor) {
       errorCode = 'PRINTER_DOOR_OPEN';
       userMsg = 'Printer door or cover is open.';
