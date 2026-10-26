@@ -819,3 +819,128 @@ body.kiosk-offline .action-btn {
   gap: 12px;
   font-size: 0.88rem;
 }
+
+/* ── Kiosk Critical Emergency Banner ────────────────────────────── */
+.kiosk-emergency-banner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 99999;
+  background: linear-gradient(90deg, #991b1b, #dc2626, #b91c1c);
+  border-bottom: 2px solid #f87171;
+  color: #ffffff;
+  padding: 12px 20px;
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4);
+  animation: pulse-border 1.5s infinite;
+}
+
+.kiosk-emergency-banner.hidden {
+  display: none !important;
+}
+
+.kiosk-emergency-banner__content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.kiosk-emergency-banner__text {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.kiosk-emergency-banner__text strong {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kiosk-emergency-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-emergency-action {
+  background: #ffffff;
+  color: #991b1b;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 0.82rem;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.btn-emergency-action:hover {
+  background: #fee2e2;
+  transform: translateY(-1px);
+}
+
+.btn-emergency-mute {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-emergency-mute:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+#pwaPushPromptToast {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 10000;
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #f8fafc;
+  padding: 14px 18px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 440px;
+}
+
+#pwaPushPromptToast.hidden {
+  display: none !important;
+}
+
+.btn-push-enable {
+  background: #3b82f6;
+  border: none;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-push-later {
+  background: transparent;
+  border: 1px solid #475569;
+  color: #94a3b8;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3); }
+  50% { box-shadow: 0 6px 24px rgba(239, 68, 68, 0.6); }
+  100% { box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3); }
+}

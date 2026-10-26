@@ -801,6 +801,9 @@ export function initPWA(): void {
       removeInstallButton();
     });
   }
+
+  // 4. Global Kiosk Emergency Alert Listener (Socket.IO + Audio Siren)
+  initGlobalKioskAlertListener();
 }
 
 function showInstallButton(): void {
@@ -848,5 +851,240 @@ function showUpdateToast(worker: ServiceWorker): void {
   document.getElementById('pwaReloadBtn')?.addEventListener('click', () => {
     worker.postMessage({ type: 'SKIP_WAITING' });
     window.location.reload();
+  });
+}
+
+// ── Web Push Notification & Emergency Alarm Subsystem ────────────────────
+
+function urlB64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+export async function registerAdminPush(): Promise<{ ok: boolean; error?: string }> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return { ok: false, error: 'Push notifications are not supported on this browser.' };
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const res = await apiFetch('/api/admin/push/vapid-public-key');
+    if (!res.ok) {
+      return { ok: false, error: 'Failed to retrieve VAPID public key from kiosk.' };
+    }
+    const data = await res.json();
+    if (!data.publicKey) {
+      return { ok: false, error: 'Kiosk did not provide a valid public key.' };
+    }
+
+    const applicationServerKey = urlB64ToUint8Array(data.publicKey);
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+
+    const subRes = await apiFetch('/api/admin/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ subscription }),
+    });
+
+    if (!subRes.ok) {
+      return { ok: false, error: 'Failed to save subscription on kiosk server.' };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Permission denied or registration failed.' };
+  }
+}
+
+export async function unregisterAdminPush(): Promise<boolean> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return true;
+    await apiFetch('/api/admin/push/unsubscribe', {
+      method: 'POST',
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    });
+    return await sub.unsubscribe();
+  } catch {
+    return false;
+  }
+}
+
+export async function getAdminPushStatus(): Promise<'subscribed' | 'unsubscribed' | 'blocked' | 'unsupported'> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    return 'unsupported';
+  }
+  if (Notification.permission === 'denied') return 'blocked';
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    return sub ? 'subscribed' : 'unsubscribed';
+  } catch {
+    return 'unsubscribed';
+  }
+}
+
+class KioskAlarmAudioController {
+  private ctx: AudioContext | null = null;
+  private intervalId: number | null = null;
+  private isMuted = false;
+
+  private initCtx(): AudioContext | null {
+    if (!this.ctx && typeof window !== 'undefined') {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      void this.ctx.resume();
+    }
+    return this.ctx;
+  }
+
+  start(): void {
+    if (this.isMuted || this.intervalId !== null) return;
+    const playBeep = () => {
+      if (this.isMuted) return;
+      const ctx = this.initCtx();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.setValueAtTime(660, now + 0.2);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.45);
+    };
+
+    playBeep();
+    this.intervalId = window.setInterval(playBeep, 1200);
+  }
+
+  stop(): void {
+    if (this.intervalId !== null) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    this.isMuted = false;
+  }
+
+  mute(): void {
+    this.isMuted = true;
+    if (this.intervalId !== null) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  }
+}
+
+export const kioskAlarmAudio = new KioskAlarmAudioController();
+
+export function initGlobalKioskAlertListener(): void {
+  if (typeof window === 'undefined') return;
+
+  // Unlock AudioContext on first user interaction
+  const unlockAudio = () => {
+    kioskAlarmAudio.start();
+    kioskAlarmAudio.stop();
+    window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('touchstart', unlockAudio);
+  };
+  window.addEventListener('click', unlockAudio, { once: true });
+  window.addEventListener('touchstart', unlockAudio, { once: true });
+
+  // Connect Socket.IO for in-app alert if available
+  const ioGlobal = (window as any).io;
+  if (typeof ioGlobal === 'function') {
+    const socket = ioGlobal();
+
+    socket.on('admin:kiosk-critical-alert', (alert: any) => {
+      showEmergencyBanner(alert);
+      kioskAlarmAudio.start();
+    });
+
+    socket.on('admin:kiosk-alert-cleared', () => {
+      hideEmergencyBanner();
+      kioskAlarmAudio.stop();
+    });
+  }
+
+  // Show polite push notification prompt toast if permission is default
+  if ('Notification' in window && Notification.permission === 'default') {
+    showPushPromptToast();
+  }
+}
+
+function showEmergencyBanner(alert: { title?: string; message?: string; code?: string }): void {
+  let banner = document.getElementById('kioskEmergencyBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'kioskEmergencyBanner';
+    banner.className = 'kiosk-emergency-banner';
+    document.body.prepend(banner);
+  }
+
+  banner.innerHTML = `
+    <div class="kiosk-emergency-banner__content">
+      <span class="pulse-icon">🚨</span>
+      <div class="kiosk-emergency-banner__text">
+        <strong>${alert.title || 'CRITICAL KIOSK ALERT'}</strong>: ${alert.message || 'Immediate physical intervention required.'}
+      </div>
+      <div class="kiosk-emergency-banner__actions">
+        <a href="/admin/system" class="btn-emergency-action">Inspect System</a>
+        <button type="button" class="btn-emergency-mute" id="muteAlarmBtn">Mute Alarm</button>
+      </div>
+    </div>
+  `;
+  banner.classList.remove('hidden');
+
+  document.getElementById('muteAlarmBtn')?.addEventListener('click', () => {
+    kioskAlarmAudio.mute();
+    const btn = document.getElementById('muteAlarmBtn');
+    if (btn) btn.textContent = 'Muted';
+  });
+}
+
+function hideEmergencyBanner(): void {
+  const banner = document.getElementById('kioskEmergencyBanner');
+  if (banner) {
+    banner.classList.add('hidden');
+  }
+}
+
+function showPushPromptToast(): void {
+  if (document.getElementById('pwaPushPromptToast')) return;
+  const toast = document.createElement('div');
+  toast.id = 'pwaPushPromptToast';
+  toast.innerHTML = `
+    <span>🔔 <strong>Enable Push Alerts?</strong> Get notified on phone/PC when Paper Jam or Paper Out occurs.</span>
+    <button type="button" class="btn-push-enable" id="pushEnableNowBtn">Enable</button>
+    <button type="button" class="btn-push-later" id="pushDismissPromptBtn">Later</button>
+  `;
+  document.body.appendChild(toast);
+
+  document.getElementById('pushEnableNowBtn')?.addEventListener('click', async () => {
+    toast.remove();
+    const res = await registerAdminPush();
+    if (res.ok) {
+      setMessage('Push notifications enabled for this device.');
+    } else {
+      setMessage(res.error || 'Failed to enable push notifications.');
+    }
+  });
+
+  document.getElementById('pushDismissPromptBtn')?.addEventListener('click', () => {
+    toast.remove();
   });
 }
