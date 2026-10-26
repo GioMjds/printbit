@@ -58,6 +58,7 @@ import {
   DEFAULT_SCAN_FILENAME_FORMAT,
   validateScanFilenameFormatSettings,
 } from '@/services/scan-filename';
+import { adminPushService } from '@/services/admin-push.service';
 import { getScannerStatus } from '@/services/scanner';
 import {
   getDocumentConversionStatus,
@@ -499,6 +500,37 @@ export class AdminController {
       requireAdminLocalAccess,
       requireAdminPin,
       this.handleGetStatus,
+    );
+
+    // ── Push Notification routes ───────────────────────────────────────────────
+    this.router.get(
+      '/push/vapid-public-key',
+      requireAdminLocalAccess,
+      this.handleGetVapidPublicKey,
+    );
+    this.router.post(
+      '/push/subscribe',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handlePushSubscribe,
+    );
+    this.router.post(
+      '/push/unsubscribe',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handlePushUnsubscribe,
+    );
+    this.router.post(
+      '/push/test',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handlePushTest,
+    );
+    this.router.get(
+      '/push/status',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleGetPushStatus,
     );
     this.router.post(
       '/system/shutdown',
@@ -4181,6 +4213,99 @@ export class AdminController {
       }
       console.error('[ADMIN] Failed to dismiss pending refund', error);
       return res.status(500).json({ error: 'Failed to dismiss refund.' });
+    }
+  };
+
+  private handleGetVapidPublicKey = async (_req: Request, res: Response) => {
+    try {
+      const publicKey = adminPushService.getPublicKey();
+      return res.json({ success: true, publicKey });
+    } catch (err: any) {
+      console.error('[ADMIN] Failed to get VAPID public key', err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message || 'Failed to retrieve public key.' });
+    }
+  };
+
+  private handlePushSubscribe = async (req: Request, res: Response) => {
+    try {
+      const { subscription } = req.body ?? {};
+      if (
+        !subscription?.endpoint ||
+        !subscription?.keys?.p256dh ||
+        !subscription?.keys?.auth
+      ) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Invalid subscription object.' });
+      }
+      const userAgent = (req.headers['user-agent'] as string) || 'Unknown';
+      const entry = await adminPushService.subscribe(subscription, userAgent);
+      return res.json({ success: true, subscription: entry });
+    } catch (err: any) {
+      console.error('[ADMIN] Failed to register push subscription', err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message || 'Failed to register subscription.' });
+    }
+  };
+
+  private handlePushUnsubscribe = async (req: Request, res: Response) => {
+    try {
+      const { endpoint } = req.body ?? {};
+      if (!endpoint || typeof endpoint !== 'string') {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Endpoint is required.' });
+      }
+      const removed = await adminPushService.unsubscribe(endpoint);
+      return res.json({ success: true, removed });
+    } catch (err: any) {
+      console.error('[ADMIN] Failed to remove push subscription', err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message || 'Failed to remove subscription.' });
+    }
+  };
+
+  private handlePushTest = async (req: Request, res: Response) => {
+    try {
+      const { endpoint } = req.body ?? {};
+      if (!endpoint || typeof endpoint !== 'string') {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Endpoint is required.' });
+      }
+      const ok = await adminPushService.sendTestNotification(endpoint);
+      if (!ok) {
+        return res
+          .status(404)
+          .json({ success: false, error: 'Subscription not found or delivery failed.' });
+      }
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('[ADMIN] Failed to send test push notification', err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message || 'Failed to send test push.' });
+    }
+  };
+
+  private handleGetPushStatus = async (_req: Request, res: Response) => {
+    try {
+      const subscriptions = db.data?.adminPushSubscriptions || [];
+      const enabled = db.data?.settings.pushNotifications?.enabled ?? true;
+      return res.json({
+        success: true,
+        enabled,
+        subscriptionCount: subscriptions.length,
+      });
+    } catch (err: any) {
+      console.error('[ADMIN] Failed to get push status', err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message || 'Failed to get push status.' });
     }
   };
 }
