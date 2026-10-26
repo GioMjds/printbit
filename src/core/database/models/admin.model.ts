@@ -1,6 +1,17 @@
 import { getSqliteDb, withTransaction } from '../sqlite-storage';
 import { LogMeta, TrustedTimestampMeta, SupportedLanguage } from '../shared.schema';
 import { AnomalySeverity } from './anomaly-incident.model';
+import {
+  PushNotificationSettings,
+  AdminPushSubscriptionEntry,
+  VapidKeys,
+} from '@/modules/admin/admin.schema';
+
+export {
+  PushNotificationSettings,
+  AdminPushSubscriptionEntry,
+  VapidKeys,
+};
 
 export type AdminLockout = {
   failedAttempts: number;
@@ -185,6 +196,7 @@ export interface AdminSettings {
   uiBlocking: UiBlockingSettings;
   scannerDpi: ScannerDpiSettings;
   developerMode: DeveloperModeSettings;
+  pushNotifications: PushNotificationSettings;
 }
 
 export interface AdminLogEntry {

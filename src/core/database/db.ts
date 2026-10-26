@@ -1,5 +1,54 @@
-import { finiteOr } from '@/utils';
 import { ANALYSIS_ALGORITHM_VERSION } from '@/services/document-analysis';
+import { finiteOr } from '@/utils';
+import {
+  ConsumableInkSnapshotEntry,
+  ConsumableInkSnapshotSupply,
+  ConsumableUsageEventEntry,
+  InkHistoryEntry,
+  InkRefillBaseline,
+} from './models/consumables.model';
+import {
+  FeedbackCategory,
+  FeedbackEntry,
+  FeedbackSessionEntry,
+  FeedbackStatus,
+} from './models/feedback.model';
+import {
+  FinancialEventType,
+  FinancialLedgerEntry,
+  OwedChangeEntry,
+  PendingRefundEntry,
+} from './models/payment.model';
+import { PrintJobEntry, PrintJobState } from './models/print-job.model';
+import {
+  ReceiptAccessTokenEntry,
+  ReceiptChangeSnapshot,
+  ReceiptChangeState,
+  ReceiptDetailsSnapshot,
+  ReceiptMode,
+  ReceiptPrintConfigurationSnapshot,
+  ReceiptRecordEntry,
+  ReceiptRecordStatus,
+} from './models/receipt.model';
+import {
+  RecoveryLifecycleState,
+  RecoveryReconciliationAction,
+  RecoverySessionEntry,
+  RecoverySessionPhase,
+  RecoveryState,
+} from './models/recovery.model';
+import {
+  ReportIssueAttachmentEntry,
+  ReportIssueCategory,
+  ReportIssueEntry,
+  ReportIssueSessionEntry,
+  ReportIssueStatus,
+} from './models/report-issue.model';
+import {
+  SpoolerLifecycleRecord,
+  SpoolerLifecycleState,
+  SpoolerLifecycleTransitionEntry,
+} from './models/spooler-lifecycle.model';
 import {
   clearStalePricingAnalysisCache,
   initSqliteStorage,
@@ -7,187 +56,79 @@ import {
   readRuntimeState,
   writeRuntimeState,
 } from './sqlite-storage';
-import { PrintJobState, PrintJobEntry } from './models/print-job.model';
-import {
-  SpoolerLifecycleState,
-  SpoolerLifecycleTransitionEntry,
-  SpoolerLifecycleRecord,
-} from './models/spooler-lifecycle.model';
-import {
-  OwedChangeEntry,
-  PendingRefundEntry,
-  FinancialEventType,
-  FinancialLedgerEntry,
-} from './models/payment.model';
-import {
-  ReceiptMode,
-  ReceiptRecordStatus,
-  ReceiptChangeState,
-  ReceiptChangeSnapshot,
-  ReceiptDetailsSnapshot,
-  ReceiptPrintConfigurationSnapshot,
-  ReceiptRecordEntry,
-  ReceiptAccessTokenEntry,
-} from './models/receipt.model';
-import {
-  ConsumableUsageEventEntry,
-  ConsumableInkSnapshotSupply,
-  ConsumableInkSnapshotEntry,
-  InkHistoryEntry,
-  InkRefillBaseline,
-} from './models/consumables.model';
-import {
-  RecoverySessionPhase,
-  RecoveryReconciliationAction,
-  RecoverySessionEntry,
-  RecoveryLifecycleState,
-  RecoveryState,
-} from './models/recovery.model';
-import {
-  FeedbackCategory,
-  FeedbackStatus,
-  FeedbackEntry,
-  FeedbackSessionEntry,
-} from './models/feedback.model';
-import {
-  ReportIssueCategory,
-  ReportIssueStatus,
-  ReportIssueSessionEntry,
-  ReportIssueAttachmentEntry,
-  ReportIssueEntry,
-} from './models/report-issue.model';
 
 import {
   AdminLockout,
-  PricingSettings,
-  PricingEngineRoundingMode,
-  CoverageTier,
-  CoverageTierRates,
-  PricingEnginePaperProfile,
-  PaperPricingProfile,
-  PricingEngineBulkDiscountTier,
-  PricingEngineSettings,
-  InkTelemetryUnknownPolicy,
-  InkMonitoringSettings,
-  ConsumablesForecastingSettings,
+  AdminLogEntry,
+  AdminSettings,
+  AlertDashboardSettings,
+  AlertDedupeSettings,
+  AlertEmailSettings,
+  AlertSettings,
   ConsumableEstimationCoefficients,
   ConsumableEstimationSettings,
-  AdminSettings,
+  ConsumablesForecastingSettings,
+  CoverageTier,
+  CoverageTierRates,
+  DeveloperModeSettings,
+  InkMonitoringSettings,
+  InkTelemetryUnknownPolicy,
   KioskPreferences,
-  AlertDashboardSettings,
-  AlertEmailSettings,
-  AlertDedupeSettings,
-  AlertSettings,
-  AdminLogEntry,
+  PaperPricingProfile,
   PipelineSettings,
+  PricingEngineBulkDiscountTier,
+  PricingEnginePaperProfile,
+  PricingEngineRoundingMode,
+  PricingEngineSettings,
+  PricingSettings,
   PrintLimitsSettings,
+  ScannerDpiSettings,
+  SupportedDpi,
   UiBlockingMode,
   UiBlockingSettings,
-  SupportedDpi,
-  ScannerDpiSettings,
-  DeveloperModeSettings,
+  AdminPushSubscriptionEntry,
+  PushNotificationSettings,
+  VapidKeys,
 } from './models/admin.model';
 
 import {
   AlertChannel,
-  AnomalySeverity,
-  AnomalyStatus,
   AnomalyCategory,
   AnomalyIncidentEntry,
+  AnomalySeverity,
+  AnomalyStatus,
 } from './models/anomaly-incident.model';
 
-import { SupportedLanguage, PrintQuality } from './shared.schema';
+import { PrintQuality, SupportedLanguage } from './shared.schema';
 
 export {
-  AdminLockout,
-  PricingSettings,
-  PricingEngineRoundingMode,
-  CoverageTier,
-  CoverageTierRates,
-  PricingEnginePaperProfile,
-  PaperPricingProfile,
-  PricingEngineBulkDiscountTier,
-  PricingEngineSettings,
-  InkTelemetryUnknownPolicy,
-  InkMonitoringSettings,
-  ConsumablesForecastingSettings,
-  ConsumableEstimationCoefficients,
-  ConsumableEstimationSettings,
-  AdminSettings,
-  KioskPreferences,
-  AlertDashboardSettings,
-  AlertEmailSettings,
-  AlertDedupeSettings,
-  AlertSettings,
-  AdminLogEntry,
-  PipelineSettings,
-  PrintLimitsSettings,
-  UiBlockingMode,
+  AdminLockout, AdminLogEntry, AdminSettings, AlertDashboardSettings, AlertDedupeSettings, AlertEmailSettings, AlertSettings, ConsumableEstimationCoefficients,
+  ConsumableEstimationSettings, ConsumablesForecastingSettings, CoverageTier,
+  CoverageTierRates, DeveloperModeSettings, InkMonitoringSettings, InkTelemetryUnknownPolicy, KioskPreferences, PaperPricingProfile, PipelineSettings, PricingEngineBulkDiscountTier, PricingEnginePaperProfile, PricingEngineRoundingMode, PricingEngineSettings, PricingSettings, PrintLimitsSettings, ScannerDpiSettings, SupportedDpi, UiBlockingMode,
   UiBlockingSettings,
-  SupportedDpi,
-  ScannerDpiSettings,
-  DeveloperModeSettings,
+  AdminPushSubscriptionEntry,
+  PushNotificationSettings,
+  VapidKeys
 };
 
-export {
-  AlertChannel,
-  AnomalySeverity,
-  AnomalyStatus,
-  AnomalyCategory,
-  AnomalyIncidentEntry,
-};
+  export {
+    AlertChannel, AnomalyCategory,
+    AnomalyIncidentEntry, AnomalySeverity,
+    AnomalyStatus
+  };
 
-export { SupportedLanguage, PrintQuality };
+  export { PrintQuality, SupportedLanguage };
 
-export { PrintJobState, PrintJobEntry };
-export {
-  SpoolerLifecycleState,
-  SpoolerLifecycleTransitionEntry,
-  SpoolerLifecycleRecord,
-};
-export {
-  OwedChangeEntry,
-  PendingRefundEntry,
-  FinancialEventType,
-  FinancialLedgerEntry,
-};
-export {
-  ReceiptMode,
-  ReceiptRecordStatus,
-  ReceiptChangeState,
-  ReceiptChangeSnapshot,
-  ReceiptDetailsSnapshot,
-  ReceiptPrintConfigurationSnapshot,
-  ReceiptRecordEntry,
-  ReceiptAccessTokenEntry,
-};
-export {
-  ConsumableUsageEventEntry,
-  ConsumableInkSnapshotSupply,
-  ConsumableInkSnapshotEntry,
-  InkHistoryEntry,
-  InkRefillBaseline,
-};
-export {
-  RecoverySessionPhase,
-  RecoveryReconciliationAction,
-  RecoverySessionEntry,
-  RecoveryLifecycleState,
-  RecoveryState,
-};
-export {
-  FeedbackCategory,
-  FeedbackStatus,
-  FeedbackEntry,
-  FeedbackSessionEntry,
-};
-export {
-  ReportIssueCategory,
-  ReportIssueStatus,
-  ReportIssueSessionEntry,
-  ReportIssueAttachmentEntry,
-  ReportIssueEntry,
-};
+  export {
+    ConsumableInkSnapshotEntry, ConsumableInkSnapshotSupply, ConsumableUsageEventEntry, FeedbackCategory, FeedbackEntry,
+    FeedbackSessionEntry, FeedbackStatus, FinancialEventType,
+    FinancialLedgerEntry, InkHistoryEntry,
+    InkRefillBaseline, OwedChangeEntry,
+    PendingRefundEntry, PrintJobEntry, PrintJobState, ReceiptAccessTokenEntry, ReceiptChangeSnapshot, ReceiptChangeState, ReceiptDetailsSnapshot, ReceiptMode, ReceiptPrintConfigurationSnapshot,
+    ReceiptRecordEntry, ReceiptRecordStatus, RecoveryLifecycleState, RecoveryReconciliationAction,
+    RecoverySessionEntry, RecoverySessionPhase, RecoveryState, ReportIssueAttachmentEntry, ReportIssueCategory, ReportIssueEntry, ReportIssueSessionEntry, ReportIssueStatus, SpoolerLifecycleRecord, SpoolerLifecycleState,
+    SpoolerLifecycleTransitionEntry
+  };
 
 export type PrintMode = 'print' | 'copy' | 'scan';
 export type ColorMode = 'colored' | 'grayscale';
@@ -260,6 +201,7 @@ export type Schema = {
   receiptRecords: ReceiptRecordEntry[];
   receiptAccessTokens: ReceiptAccessTokenEntry[];
   inkRefillBaseline: InkRefillBaseline;
+  adminPushSubscriptions: AdminPushSubscriptionEntry[];
 };
 
 export const defaultPricingEngine: PricingEngineSettings = {
@@ -394,6 +336,10 @@ const DEFAULT_DATA: Schema = {
       enabled: false,
       environmentTag: 'test',
     },
+    pushNotifications: {
+      enabled: true,
+      cooldownSeconds: 30,
+    },
   },
   coinStats: {
     one: 0,
@@ -457,6 +403,7 @@ const DEFAULT_DATA: Schema = {
     bwPages: 0,
     updatedAt: null,
   },
+  adminPushSubscriptions: [],
 };
 
 /**
@@ -607,7 +554,10 @@ export function normalizePaperProfile(
     paperCost: normalizeProfilePrice(raw.paperCost, fallback.paperCost),
     bwPrint: {
       low: normalizeProfilePrice(bwCandidate.low, fallback.bwPrint.low),
-      medium: normalizeProfilePrice(bwCandidate.medium, fallback.bwPrint.medium),
+      medium: normalizeProfilePrice(
+        bwCandidate.medium,
+        fallback.bwPrint.medium,
+      ),
       high: normalizeProfilePrice(bwCandidate.high, fallback.bwPrint.high),
       very_high: normalizeProfilePrice(
         bwCandidate.very_high,
@@ -620,7 +570,10 @@ export function normalizePaperProfile(
         colorCandidate.medium,
         fallback.colorPrint.medium,
       ),
-      high: normalizeProfilePrice(colorCandidate.high, fallback.colorPrint.high),
+      high: normalizeProfilePrice(
+        colorCandidate.high,
+        fallback.colorPrint.high,
+      ),
       very_high: normalizeProfilePrice(
         colorCandidate.very_high,
         fallback.colorPrint.very_high,
@@ -639,7 +592,8 @@ export function normalizePricingEngine(
   ) as Record<string, unknown>;
 
   const rawProfiles = (
-    typeof candidate.paperProfiles === 'object' && candidate.paperProfiles !== null
+    typeof candidate.paperProfiles === 'object' &&
+    candidate.paperProfiles !== null
       ? candidate.paperProfiles
       : {}
   ) as Record<string, unknown>;
@@ -660,7 +614,9 @@ export function normalizePricingEngine(
       ),
     },
     bulkDiscountTiers: normalizePricingEngineBulkDiscountTiers(
-      candidate.bulkDiscountTiers as PricingEngineBulkDiscountTier[] | undefined,
+      candidate.bulkDiscountTiers as
+        | PricingEngineBulkDiscountTier[]
+        | undefined,
       defaultPricingEngine.bulkDiscountTiers,
     ),
     rounding: 'whole_peso_total_only',
@@ -673,7 +629,7 @@ export function normalizePricingEngine(
     duplexEnabled:
       typeof candidate.duplexEnabled === 'boolean'
         ? candidate.duplexEnabled
-        : defaultPricingEngine.duplexEnabled ?? false,
+        : (defaultPricingEngine.duplexEnabled ?? false),
   };
 }
 
@@ -690,6 +646,7 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
   const uiBlocking = data?.settings?.uiBlocking;
   const scannerDpi = data?.settings?.scannerDpi;
   const developerMode = data?.settings?.developerMode;
+  const pushNotifications = data?.settings?.pushNotifications;
   const normalizedPaperTrayCapacitySheets = Math.max(
     1,
     Math.floor(
@@ -1269,7 +1226,8 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
           finiteOr(
             pricing?.copyBwPerPage,
             pricing?.copyPerPage ??
-              (DEFAULT_DATA.settings.pricing.copyBwPerPage ?? 3),
+              DEFAULT_DATA.settings.pricing.copyBwPerPage ??
+              3,
           ),
         ),
         copyColorPerPage: wholePeso(
@@ -1555,7 +1513,8 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
       scanFilenameFormat: {
         prefix:
           typeof scanFilenameFormat?.prefix === 'string'
-            ? scanFilenameFormat.prefix.trim() || DEFAULT_DATA.settings.scanFilenameFormat.prefix
+            ? scanFilenameFormat.prefix.trim() ||
+              DEFAULT_DATA.settings.scanFilenameFormat.prefix
             : DEFAULT_DATA.settings.scanFilenameFormat.prefix,
         dateFormat:
           scanFilenameFormat?.dateFormat === 'YYYY-MM-DD' ||
@@ -1580,7 +1539,8 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
             ? scanFilenameFormat.customPatternEnabled
             : DEFAULT_DATA.settings.scanFilenameFormat.customPatternEnabled,
         customPattern:
-          typeof scanFilenameFormat?.customPattern === 'string' && scanFilenameFormat.customPattern.trim()
+          typeof scanFilenameFormat?.customPattern === 'string' &&
+          scanFilenameFormat.customPattern.trim()
             ? scanFilenameFormat.customPattern.trim()
             : DEFAULT_DATA.settings.scanFilenameFormat.customPattern,
       },
@@ -1660,6 +1620,31 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
             ? developerMode.enabled
             : DEFAULT_DATA.settings.developerMode.enabled,
         environmentTag: 'test',
+      },
+      pushNotifications: {
+        enabled:
+          typeof pushNotifications?.enabled === 'boolean'
+            ? pushNotifications.enabled
+            : DEFAULT_DATA.settings.pushNotifications.enabled,
+        cooldownSeconds: Math.max(
+          0,
+          Math.floor(
+            finiteOr(
+              pushNotifications?.cooldownSeconds,
+              DEFAULT_DATA.settings.pushNotifications.cooldownSeconds,
+            ),
+          ),
+        ),
+        vapidKeys:
+          typeof pushNotifications?.vapidKeys?.publicKey === 'string' &&
+          typeof pushNotifications?.vapidKeys?.privateKey === 'string' &&
+          pushNotifications.vapidKeys.publicKey.trim() !== '' &&
+          pushNotifications.vapidKeys.privateKey.trim() !== ''
+            ? {
+                publicKey: pushNotifications.vapidKeys.publicKey.trim(),
+                privateKey: pushNotifications.vapidKeys.privateKey.trim(),
+              }
+            : undefined,
       },
     },
     coinStats: {
@@ -1781,6 +1766,9 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
           ? data.inkRefillBaseline.updatedAt
           : null,
     },
+    adminPushSubscriptions: Array.isArray(data?.adminPushSubscriptions)
+      ? data.adminPushSubscriptions
+      : DEFAULT_DATA.adminPushSubscriptions,
   };
 }
 
@@ -1840,8 +1828,6 @@ export async function initDB() {
 // ── Balance mutex ─────────────────────────────────────────────────────────────
 export { withBalanceLock } from './balance-lock';
 export {
-  type IdempotencyEntry,
-  acquireIdempotencyKey,
-  storeIdempotencyKey,
-  releaseIdempotencyKey,
+  acquireIdempotencyKey, releaseIdempotencyKey, storeIdempotencyKey, type IdempotencyEntry
 } from './idempotency';
+
