@@ -35,7 +35,7 @@
 
 - Produces: `AdminPushSubscriptionEntry`, `PushNotificationSettings`, `db.data.adminPushSubscriptions`, `db.data.settings.pushNotifications`
 
-- [ ] **Step 1: Write the failing test for schema and defaults**
+- [x] **Step 1: Write the failing test for schema and defaults**
 
 Create `src/services/__tests__/push-schema.spec.ts`:
 
@@ -58,12 +58,12 @@ describe('Push Notification Database Schema', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm jest src/services/__tests__/push-schema.spec.ts -v`  
 Expected: FAIL due to missing properties on `db.data`.
 
-- [ ] **Step 3: Install `web-push` and add schema definitions**
+- [x] **Step 3: Install `web-push` and add schema definitions**
 
 Install dependencies:
 
@@ -107,12 +107,12 @@ pushNotifications: PushNotificationSettings;
 
 Update `src/services/db.ts` to include `adminPushSubscriptions: AdminPushSubscriptionEntry[]` and `pushNotifications` defaults in database initialization.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm jest src/services/__tests__/push-schema.spec.ts -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json pnpm-lock.yaml src/modules/admin/admin.schema.ts src/services/db.ts src/services/__tests__/push-schema.spec.ts
@@ -138,7 +138,7 @@ git commit -m "feat(push): add web-push dependency and database schema for push 
   - `sendTestNotification(endpoint: string): Promise<boolean>`
   - `clearAlert(code: string): void`
 
-- [ ] **Step 1: Write the failing unit tests for AdminPushService**
+- [x] **Step 1: Write the failing unit tests for AdminPushService**
 
 Create `src/services/__tests__/admin-push.service.spec.ts`:
 
@@ -273,12 +273,12 @@ describe('AdminPushService', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm jest src/services/__tests__/admin-push.service.spec.ts -v`  
 Expected: FAIL with module not found.
 
-- [ ] **Step 3: Implement `src/services/admin-push.service.ts`**
+- [x] **Step 3: Implement `src/services/admin-push.service.ts`**
 
 ```ts
 import webpush from 'web-push';
@@ -518,12 +518,12 @@ export class AdminPushService {
 export const adminPushService = new AdminPushService();
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm jest src/services/__tests__/admin-push.service.spec.ts -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/admin-push.service.ts src/services/__tests__/admin-push.service.spec.ts
@@ -548,7 +548,7 @@ git commit -m "feat(push): implement AdminPushService with VAPID lifecycle, prun
   - `POST /api/admin/push/test` (requires `requireAdminPin`)
   - `GET /api/admin/push/status` (requires `requireAdminPin`)
 
-- [ ] **Step 1: Write failing API route test**
+- [x] **Step 1: Write failing API route test**
 
 Create `src/modules/admin/__tests__/admin-push.routes.spec.ts`:
 
@@ -580,12 +580,12 @@ describe('Admin Push Routes', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm jest src/modules/admin/__tests__/admin-push.routes.spec.ts -v`  
 Expected: FAIL
 
-- [ ] **Step 3: Implement controller endpoints in `src/modules/admin/admin.controller.ts`**
+- [x] **Step 3: Implement controller endpoints in `src/modules/admin/admin.controller.ts`**
 
 In `src/modules/admin/admin.controller.ts`, add route handlers:
 
@@ -653,12 +653,12 @@ this.router.get('/push/status', requireAdminPin, (req, res) => {
 });
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm jest src/modules/admin/__tests__/admin-push.routes.spec.ts -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/modules/admin/admin.controller.ts src/modules/admin/__tests__/admin-push.routes.spec.ts
@@ -681,7 +681,7 @@ git commit -m "feat(push): add admin push subscription and test endpoints"
 
 - Calls: `adminPushService.broadcastCriticalAlert`, `adminPushService.clearAlert`
 
-- [ ] **Step 1: Write test verifying Paper Jam dispatches critical alert**
+- [x] **Step 1: Write test verifying Paper Jam dispatches critical alert**
 
 Update `src/modules/printer/printer-error-guide.spec.ts`:
 
@@ -695,12 +695,12 @@ it('dispatches critical push alert on paper jam print event while preserving cus
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm jest src/modules/printer/printer-error-guide.spec.ts -v`  
 Expected: FAIL because paper jam was previously ignored with early return.
 
-- [ ] **Step 3: Update trigger points**
+- [x] **Step 3: Update trigger points**
 
 In `src/services/printer-state-projection.ts`:
 
@@ -741,12 +741,12 @@ if (isPaperOut) {
 In `src/server.ts`:
 Initialize `adminPushService.setSocketIo(io);`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm jest src/modules/printer/printer-error-guide.spec.ts -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/printer-state-projection.ts src/services/worker-print-lifecycle.ts src/services/hopper.ts src/server.ts src/modules/printer/printer-error-guide.spec.ts
@@ -765,11 +765,11 @@ git commit -m "feat(hardware): wire Paper Jam, Paper Out, and Hopper alerts to A
 
 - Produces: `push` and `notificationclick` event listeners in Service Worker
 
-- [ ] **Step 1: Check existing `sw.js` structure and syntax**
+- [x] **Step 1: Check existing `sw.js` structure and syntax**
 
 Verify cache names, fetch listeners, and prepare insertion of push listeners.
 
-- [ ] **Step 2: Add `push` and `notificationclick` listeners to `src/public/admin/sw.js`**
+- [x] **Step 2: Add `push` and `notificationclick` listeners to `src/public/admin/sw.js`**
 
 ```javascript
 // ── Push Notification Handlers ─────────────────────────────
@@ -825,12 +825,12 @@ self.addEventListener('notificationclick', (event) => {
 });
 ```
 
-- [ ] **Step 3: Verify Service Worker syntax and precache balance**
+- [x] **Step 3: Verify Service Worker syntax and precache balance**
 
 Run: `node -c src/public/admin/sw.js`  
 Expected: Clean exit code 0 without syntax errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/public/admin/sw.js
@@ -850,7 +850,7 @@ git commit -m "feat(pwa): add push and notificationclick event listeners to admi
 
 - Produces: `setupGlobalKioskAlertListener()`, `setupAdminPushNotifications()`, Web Audio synthetic dual siren, top emergency banner
 
-- [ ] **Step 1: Write Web Audio siren generator and banner DOM in `src/public/admin/shared.ts`**
+- [x] **Step 1: Write Web Audio siren generator and banner DOM in `src/public/admin/shared.ts`**
 
 In `src/public/admin/shared.ts`:
 
@@ -870,7 +870,7 @@ In `src/public/admin/shared.ts`:
     - Stop alarm siren audio.
     - Remove emergency banner.
 
-- [ ] **Step 2: Add Push Registration Helper in `src/public/admin/shared.ts`**
+- [x] **Step 2: Add Push Registration Helper in `src/public/admin/shared.ts`**
 
 ```ts
 export async function registerAdminPush(): Promise<boolean> {
@@ -895,16 +895,16 @@ export async function registerAdminPush(): Promise<boolean> {
 }
 ```
 
-- [ ] **Step 3: Add CSS styling for emergency banner in `src/public/admin/shared.css`**
+- [x] **Step 3: Add CSS styling for emergency banner in `src/public/admin/shared.css`**
 
 Add styles for `#emergencyAlertBanner`, blinking animation, and button controls.
 
-- [ ] **Step 4: Build client assets to verify TypeScript compilation**
+- [x] **Step 4: Build client assets to verify TypeScript compilation**
 
 Run: `pnpm run build`  
 Expected: Successful compilation without errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/public/admin/shared.ts src/public/admin/shared.css
@@ -929,7 +929,7 @@ git commit -m "feat(admin): implement global emergency siren, banner, and push r
   - Status indicator (Active / Blocked / Unsubscribed)
   - Registered device count
 
-- [ ] **Step 1: Add Push Notifications markup to `src/public/admin/settings/index.html`**
+- [x] **Step 1: Add Push Notifications markup to `src/public/admin/settings/index.html`**
 
 Insert card into Settings page layout:
 
@@ -961,7 +961,7 @@ Insert card into Settings page layout:
 </section>
 ```
 
-- [ ] **Step 2: Add logic in `src/public/admin/settings/app.ts`**
+- [x] **Step 2: Add logic in `src/public/admin/settings/app.ts`**
 
 Implement device state check:
 
@@ -971,12 +971,12 @@ Implement device state check:
 - Click on `#testPushBtn` calls `POST /api/admin/push/test`.
 - Click on `#disablePushBtn` unregisters push subscription.
 
-- [ ] **Step 3: Build client assets and test in browser**
+- [x] **Step 3: Build client assets and test in browser**
 
 Run: `pnpm run build`  
 Expected: Clean build.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/public/admin/settings/index.html src/public/admin/settings/app.ts src/public/admin/settings/styles.css
@@ -996,7 +996,7 @@ git commit -m "feat(settings): add Push Notifications card with subscribe and te
 
 - Verifies: Complete pipeline from Paper Jam simulation trigger to Web Push and Socket.IO emission
 
-- [ ] **Step 1: Write integration test for simulated Paper Jam dispatch**
+- [x] **Step 1: Write integration test for simulated Paper Jam dispatch**
 
 Create `src/services/__tests__/push-hardware-e2e.spec.ts`:
 
@@ -1025,12 +1025,12 @@ describe('Paper Jam Push Alert Integration', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it passes**
+- [x] **Step 2: Run test to verify it passes**
 
 Run: `pnpm jest src/services/__tests__/push-hardware-e2e.spec.ts -v`  
 Expected: PASS
 
-- [ ] **Step 3: Run full test suite and build**
+- [x] **Step 3: Run full test suite and build**
 
 Run:
 
@@ -1041,7 +1041,7 @@ pnpm run build
 
 Expected: All tests pass, build completes cleanly.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/services/printer-simulation.ts src/services/__tests__/push-hardware-e2e.spec.ts
