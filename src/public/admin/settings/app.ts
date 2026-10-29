@@ -11,6 +11,7 @@ import {
   unregisterAdminPush,
   updateSidebarBadges,
 } from '../shared';
+import { updateDirtyBarState } from './dirty-bar-helper';
 
 const settingsForm = document.getElementById('settingsForm') as HTMLFormElement;
 const settingAdminPin = document.getElementById(
@@ -180,6 +181,10 @@ const testEmailAlertBtn = document.getElementById(
 ) as HTMLButtonElement | null;
 
 const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
+const stickyBar = document.getElementById('settingsStickyBar');
+const discardChangesBtn = document.getElementById(
+  'discardChangesBtn',
+) as HTMLButtonElement | null;
 let refreshTimer: number | null = null;
 let loadedAdminLocalOnly: boolean = false;
 let currentDeveloperModeEnabled: boolean = false;
@@ -617,15 +622,24 @@ async function loadData(
   const settings = (await res.json()) as SettingsResponse;
   if (applyToForm) {
     applySettings(settings);
+    settingsDirty = false;
+    updateDirtyBarState(stickyBar, false);
   }
 }
 
 settingsForm.addEventListener('input', () => {
   settingsDirty = true;
+  updateDirtyBarState(stickyBar, true);
 });
 
 settingsForm.addEventListener('change', () => {
   settingsDirty = true;
+  updateDirtyBarState(stickyBar, true);
+});
+
+settingsForm.addEventListener('reset', () => {
+  settingsDirty = false;
+  updateDirtyBarState(stickyBar, false);
 });
 
 settingsForm.addEventListener('submit', (e) => {
@@ -1075,6 +1089,7 @@ settingsForm.addEventListener('submit', (e) => {
         throw new Error(serverError || 'Failed to save settings.');
       }
       settingsDirty = false;
+      updateDirtyBarState(stickyBar, false);
       if (newPin) setAdminPin(newPin);
       await loadData({ applyToForm: true });
       await loadAlertStats();
@@ -1090,11 +1105,19 @@ settingsForm.addEventListener('submit', (e) => {
 refreshBtn.addEventListener('click', () => {
   setMessage('Refreshing...');
   settingsDirty = false;
+  updateDirtyBarState(stickyBar, false);
   void Promise.all([loadData({ applyToForm: true }), loadAlertStats()])
     .then(() => setMessage('Settings refreshed.'))
     .catch((e: unknown) =>
       setMessage(e instanceof Error ? e.message : 'Refresh failed.'),
     );
+});
+
+discardChangesBtn?.addEventListener('click', () => {
+  settingsDirty = false;
+  updateDirtyBarState(stickyBar, false);
+  void loadData({ applyToForm: true });
+  setMessage('Changes discarded.');
 });
 
 testEmailAlertBtn?.addEventListener('click', () => {

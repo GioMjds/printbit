@@ -50,12 +50,20 @@
   grid-column: 1/-1;
 }
 
-.field__hint {
-  font-size: 11px;
-  color: var(--ink-muted);
-  opacity: 0.7;
+.field__hint,
+.setting-help,
+.form-hint,
+.field-desc {
+  font-size: 13px !important;
+  color: rgba(215, 233, 255, 0.82) !important;
+  opacity: 1;
   margin: 0;
   line-height: 1.4;
+}
+
+.setting-help, .form-hint, .field-desc {
+  font-size: 13px !important;
+  color: rgba(215, 233, 255, 0.82) !important;
 }
 
 .field__lbl {
@@ -74,12 +82,15 @@
   font-family: "Plus Jakarta Sans", sans-serif;
   font-size: 14px;
   padding: 12px 16px;
+  min-height: 44px;
+  box-sizing: border-box;
   outline: none;
   width: 100%;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 select.field__input {
   background-color: rgba(10, 10, 20, 0.6);
+  min-height: 44px;
   cursor: pointer;
   appearance: auto;
 }
@@ -173,15 +184,19 @@ select.field__input option {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-height: 44px;
   cursor: pointer;
   font-size: 13px;
   color: var(--white);
   user-select: none;
 }
 
-.checkbox-input {
-  width: 18px;
-  height: 18px;
+.checkbox-input,
+.field input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
   accent-color: var(--indigo);
   cursor: pointer;
 }
@@ -356,15 +371,18 @@ select.field__input option {
 }
 
 .field__wrap--table .field__affix {
-  height: 40px;
+  height: 44px;
+  min-height: 44px;
   padding: 0 12px;
   font-size: 13px;
 }
 
 .field__input--table {
+  min-height: 44px;
   padding: 8px 12px;
   font-size: 14px;
   font-weight: 600;
+  box-sizing: border-box;
 }
 
 .pricing-additional-grid {
@@ -389,5 +407,92 @@ select.field__input option {
   flex-wrap: wrap;
   padding: 0 24px 20px 24px;
 }
+
+/* Mobile Sticky Save/Discard Bar (≤860px) */
+.settings-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  background: rgba(11, 10, 26, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(167, 170, 225, 0.16);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.settings-sticky-bar .btn-discard {
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(167, 170, 225, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--white);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-sticky-bar .btn-discard:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(167, 170, 225, 0.4);
+}
+
+.settings-sticky-bar .btn-save {
+  min-height: 44px;
+  padding: 10px 22px;
+  border-radius: 8px;
+  border: none;
+  background: var(--indigo);
+  color: var(--white);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-sticky-bar .btn-save:hover {
+  background: #7c82d6;
+}
+
+.settings-sticky-bar .btn-save:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 480px) {
+  .settings-sticky-bar .btn-discard,
+  .settings-sticky-bar .btn-save {
+    flex: 1;
+  }
+}
+
+@media (min-width: 861px) {
+  .settings-sticky-bar {
+    display: none !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .settings-form {
+    padding-bottom: 72px;
+  }
+}
+
 
 
