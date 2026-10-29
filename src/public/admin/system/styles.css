@@ -532,6 +532,54 @@
   }
 }
 
+@media (max-width: 860px) {
+  .status-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .status-card--mono {
+    grid-column: span 1;
+  }
+
+  .status-card {
+    padding: 0;
+  }
+
+  .status-card__head {
+    min-height: 44px;
+    padding: 12px 14px;
+    margin-bottom: 0;
+    cursor: pointer;
+  }
+
+  .status-card__head:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    border-radius: 12px;
+  }
+
+  .status-card .status-card__value {
+    padding: 0 14px 12px;
+  }
+
+  .status-card:not(.is-expanded) .status-card__details,
+  .status-card:not(.is-expanded) .status-card__body,
+  .status-card:not(.is-expanded) .status-card__sub,
+  .status-card:not(.is-expanded) .status-detail-list {
+    display: none !important;
+  }
+
+  .status-card.is-expanded .status-card__details,
+  .status-card.is-expanded .status-card__body,
+  .status-card.is-expanded .status-card__sub,
+  .status-card.is-expanded .status-detail-list {
+    display: block;
+    padding: 14px;
+    border-top: 1px solid var(--border);
+  }
+}
+
 @media (max-width: 760px) {
   .status-grid {
     grid-template-columns: 1fr;
