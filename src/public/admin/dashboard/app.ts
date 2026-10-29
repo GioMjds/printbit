@@ -3,10 +3,17 @@ import {
   apiFetch,
   formatBytes,
   initAuth,
+  notifyAdminDataUpdated,
   peso,
   setMessage,
   updateSidebarBadges,
 } from '../shared';
+import {
+  deriveAttentionQueue,
+  deriveStatusBannerState,
+  renderAttentionQueue,
+  renderStatusBanner,
+} from '../overview-queue';
 
 const earningsToday = document.getElementById('earningsToday') as HTMLElement;
 const jobsTotal = document.getElementById('jobsTotal') as HTMLElement;
@@ -18,6 +25,14 @@ const storageBytes = document.getElementById('storageBytes') as HTMLElement;
 const owedChangeOpen = document.getElementById(
   'owedChangeOpen',
 ) as HTMLElement | null;
+
+// ── Triage Banner and Attention Queue elements ───────────
+const statusBanner = document.getElementById('statusBanner');
+const attentionQueue = document.getElementById('attentionQueue');
+const machineHealthStrip = document.getElementById(
+  'machineHealthStrip',
+) as HTMLDetailsElement | null;
+
 // ── Ink tank gauge elements ──────────────────────────────
 const inkAlertBanner = document.getElementById(
   'inkAlertBanner',
@@ -80,7 +95,6 @@ function formatNumber(n: number): string {
 function applyInkEstimation(summary: SummaryResponse): void {
   const est = summary.inkEstimation;
   if (!est) {
-    // No ink estimation data — hide the panel alert
     if (inkAlertBanner) inkAlertBanner.classList.add('hidden');
     if (inkAlertBadge) inkAlertBadge.textContent = '';
     return;
@@ -101,9 +115,13 @@ function applyInkEstimation(summary: SummaryResponse): void {
     const pagesEl = document.getElementById(`inkPages${id}`);
     const tankEl = document.getElementById(`inkTank${id}`);
 
-    if (fillEl) fillEl.style.height = `${tank.remainingPercent}%`;
-    if (percentEl)
+    if (fillEl) {
+      fillEl.style.height = `${tank.remainingPercent}%`;
+      fillEl.style.width = `${tank.remainingPercent}%`;
+    }
+    if (percentEl) {
       percentEl.textContent = `${tank.remainingPercent.toFixed(1)}%`;
+    }
     if (pagesEl) {
       pagesEl.textContent = `${formatNumber(tank.pagesUsed)} / ${formatNumber(tank.maxPages)} pages`;
     }
@@ -244,25 +262,49 @@ function applySummary(summary: SummaryResponse): void {
   if (openAlertBadgeMob) openAlertBadgeMob.textContent = openCount;
 
   const total = summary.jobStats.total || 1;
-  if (barPrint)
+  if (barPrint) {
     barPrint.style.width = `${Math.round((summary.jobStats.print / total) * 100)}%`;
-  if (barCopy)
+  }
+  if (barCopy) {
     barCopy.style.width = `${Math.round((summary.jobStats.copy / total) * 100)}%`;
-  if (barScan)
+  }
+  if (barScan) {
     barScan.style.width = `${Math.round((summary.jobStats.scan / total) * 100)}%`;
+  }
   applyConsumablesForecast(summary);
   applyInkEstimation(summary);
   updateSidebarBadges(summary);
+
+  // Render Status Banner & Attention Queue
+  if (statusBanner) {
+    const bannerState = deriveStatusBannerState(summary, false);
+    renderStatusBanner(statusBanner, bannerState);
+  }
+  if (attentionQueue) {
+    const queueItems = deriveAttentionQueue(summary);
+    renderAttentionQueue(attentionQueue, queueItems);
+  }
+
+  // Notify shell ticker that data updated
+  notifyAdminDataUpdated();
 }
 
 async function loadData(): Promise<void> {
-  const res = await apiFetch('/api/admin/summary');
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('Invalid admin PIN.');
-    throw new Error('Failed to load dashboard data.');
+  try {
+    const res = await apiFetch('/api/admin/summary');
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Invalid admin PIN.');
+      throw new Error('Failed to load dashboard data.');
+    }
+    const summary = (await res.json()) as SummaryResponse;
+    applySummary(summary);
+  } catch (err) {
+    if (statusBanner) {
+      const offlineState = deriveStatusBannerState(null, true);
+      renderStatusBanner(statusBanner, offlineState);
+    }
+    throw err;
   }
-  const summary = (await res.json()) as SummaryResponse;
-  applySummary(summary);
 }
 
 refreshBtn.addEventListener('click', () => {
@@ -318,7 +360,30 @@ clearStorageBtn.addEventListener('click', () => {
     );
 });
 
+if (attentionQueue) {
+  attentionQueue.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest<HTMLAnchorElement>(
+      '.queue-row__action-btn',
+    );
+    if (!target) return;
+    const href = target.getAttribute('href');
+    if (href === '#machineHealthStrip' && machineHealthStrip) {
+      machineHealthStrip.open = true;
+    }
+  });
+}
+
+window.addEventListener('hashchange', () => {
+  if (window.location.hash === '#machineHealthStrip' && machineHealthStrip) {
+    machineHealthStrip.open = true;
+  }
+});
+
 function showRefreshError(error: unknown): void {
+  if (statusBanner) {
+    const offlineState = deriveStatusBannerState(null, true);
+    renderStatusBanner(statusBanner, offlineState);
+  }
   setMessage(
     error instanceof Error ? error.message : 'Automatic refresh failed.',
   );
