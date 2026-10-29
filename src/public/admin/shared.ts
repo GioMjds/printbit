@@ -1,3 +1,10 @@
+import {
+  computeTotalNavBadge,
+  createUpdatedTicker,
+  DrawerController,
+  UpdatedTicker,
+} from './drawer';
+
 export type InkTankEstimate = {
   pagesUsed: number;
   maxPages: number;
@@ -524,6 +531,17 @@ export function updateSidebarBadges(summary: SummaryResponse): void {
   setBadge('openReportBadgeMob', openReports);
   setBadge('openAlertBadge', openAlerts);
   setBadge('openAlertBadgeMob', openAlerts);
+
+  const menuBadgeEl = document.getElementById('menuBadge');
+  if (menuBadgeEl) {
+    const totalBadge = computeTotalNavBadge(openAlerts, openReports, openFeedback);
+    menuBadgeEl.textContent = totalBadge.label;
+    if (totalBadge.visible) {
+      menuBadgeEl.classList.remove('hidden');
+    } else {
+      menuBadgeEl.classList.add('hidden');
+    }
+  }
 }
 
 export type InitAuthOptions = {
@@ -538,6 +556,49 @@ export type InitAuthOptions = {
 export type InitAuthArg =
   | ((signal: AbortSignal) => void | Promise<void>)
   | InitAuthOptions;
+
+let activeUpdatedTicker: UpdatedTicker | null = null;
+let activeDrawerController: DrawerController | null = null;
+
+export function initAdminShell(): void {
+  const drawerEl = document.querySelector<HTMLElement>('.sidebar');
+  const scrimEl = document.getElementById('drawerScrim');
+  const triggerEl = document.getElementById('menuBtn');
+
+  if (drawerEl && scrimEl && !activeDrawerController) {
+    activeDrawerController = new DrawerController({
+      drawerEl,
+      scrimEl,
+      triggerEl,
+    });
+
+    if (triggerEl) {
+      triggerEl.addEventListener('click', () => {
+        activeDrawerController?.toggle();
+      });
+    }
+
+    const navBtns = drawerEl.querySelectorAll<HTMLElement>('.nav-btn');
+    navBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeDrawerController?.close();
+      });
+    });
+  }
+
+  const updatedLabelEl = document.getElementById('updatedAgoLabel');
+  if (updatedLabelEl && !activeUpdatedTicker) {
+    activeUpdatedTicker = createUpdatedTicker((text) => {
+      updatedLabelEl.textContent = text;
+    });
+  }
+}
+
+export function notifyAdminDataUpdated(): void {
+  if (activeUpdatedTicker) {
+    activeUpdatedTicker.setUpdatedNow();
+  }
+}
 
 /**
  * Initialises the auth gate UI. Call once from each admin sub-page.
@@ -690,6 +751,7 @@ export function initAuth(arg: InitAuthArg): () => void {
 
   // Initialize PWA features (service worker, offline banner, install trigger)
   initPWA();
+  initAdminShell();
 
   // On startup, check for an existing valid session (httpOnly cookie sent
   // automatically) and show the dashboard immediately if authenticated.

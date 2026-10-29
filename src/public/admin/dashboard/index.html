@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="/globals.css" />
     <link rel="stylesheet" href="/admin/shared.css" />
     <link rel="stylesheet" href="/admin/dashboard/styles.css" />
-      <script>
+    <script>
       if (
         sessionStorage.getItem('printbit.adminSessionActive') ||
         sessionStorage.getItem('adminSessionToken')
@@ -179,6 +179,7 @@
           </div>
         </div>
         <nav class="sidebar__nav">
+          <div class="nav-group-header">Monitor</div>
           <a href="/admin/dashboard" class="nav-btn nav-btn--active">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
@@ -197,7 +198,73 @@
             </svg>
             <span>Earnings</span>
           </a>
+          <a href="/admin/alerts" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
+              />
+            </svg>
+            <span>Anomaly Alerts</span>
+            <span
+              class="nav-count-badge"
+              id="openAlertBadge"
+              aria-label="open anomaly count"
+            ></span>
+          </a>
 
+          <div class="nav-group-header">Support</div>
+          <a href="/admin/report" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span>Reports</span>
+            <span
+              class="nav-count-badge"
+              id="openReportBadge"
+              aria-label="open reports count"
+            ></span>
+          </a>
+          <a href="/admin/feedback" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 010 2H6a1 1 0 01-1-1zm1 3a1 1 0 000 2h3a1 1 0 000-2H6z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span>Feedback</span>
+            <span
+              class="nav-count-badge"
+              id="openBadge"
+              aria-label="open feedback count"
+            ></span>
+          </a>
+
+          <div class="nav-group-header">Records</div>
+          <a href="/admin/logs" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h6a1 1 0 010 2H4a1 1 0 01-1-1z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span>System Logs</span>
+          </a>
+          <a href="/admin/transactions" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                d="M4 2h9l3 3v13a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm0 2v13h11V6h-2a1 1 0 01-1-1V3H4zm3 4a1 1 0 100 2h5a1 1 0 100-2H7zm0 4a1 1 0 100 2h5a1 1 0 100-2H7z"
+              />
+            </svg>
+            <span>Transaction Logs</span>
+          </a>
+
+          <div class="nav-group-header">Machine</div>
           <a href="/admin/system" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
@@ -218,65 +285,9 @@
             </svg>
             <span>Settings</span>
           </a>
-          <a href="/admin/logs" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                fill-rule="evenodd"
-                d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h6a1 1 0 010 2H4a1 1 0 01-1-1z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>System Logs</span>
-          </a>
-          <a href="/admin/transactions" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                d="M4 2h9l3 3v13a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm0 2v13h11V6h-2a1 1 0 01-1-1V3H4zm3 4a1 1 0 100 2h5a1 1 0 100-2H7zm0 4a1 1 0 100 2h5a1 1 0 100-2H7z"
-              />
-            </svg>
-            <span>Transaction Logs</span>
-          </a>
-          <a href="/admin/feedback" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                fill-rule="evenodd"
-                d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 010 2H6a1 1 0 01-1-1zm1 3a1 1 0 000 2h3a1 1 0 000-2H6z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>Feedback</span>
-            <span
-              class="nav-count-badge"
-              id="openBadge"
-              aria-label="open feedback count"
-            ></span>
-          </a>
-          <a href="/admin/report" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                fill-rule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>Reports</span>
-            <span class="nav-count-badge" id="openReportBadge" aria-label="open reports count"></span></a>
-          <a href="/admin/alerts" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
-              />
-            </svg>
-            <span>Anomaly Alerts</span>
-            <span
-              class="nav-count-badge"
-              id="openAlertBadge"
-              aria-label="open anomaly count"
-            ></span>
-          </a>
         </nav>
         <div class="sidebar__foot">
-          <button id="logoutBtn" class="lock-btn">
+          <button id="logoutBtn" class="lock-btn" type="button">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
@@ -289,10 +300,21 @@
         </div>
       </aside>
 
-      <main class="main">
+      <div id="drawerScrim" class="drawer-scrim hidden"></div>
+
+      <div class="main">
         <header class="topbar">
           <div class="topbar__left">
-            <h2 class="topbar__title">Overview</h2>
+            <button id="menuBtn" class="topbar-menu-btn" aria-label="Open navigation menu" type="button">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+              </svg>
+              <span id="menuBadge" class="topbar-menu-badge hidden" aria-hidden="true"></span>
+            </button>
+            <div class="topbar__titles">
+              <h2 class="topbar__title">Overview</h2>
+              <span id="updatedAgoLabel" class="topbar__updated-label">Updated just now</span>
+            </div>
           </div>
           <div class="topbar__right">
             <p
@@ -301,7 +323,7 @@
               role="alert"
               aria-live="polite"
             ></p>
-            <button id="refreshBtn" class="topbar-btn">
+            <button id="refreshBtn" class="topbar-btn" type="button">
               <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path
                   fill-rule="evenodd"
@@ -325,8 +347,29 @@
               </p>
             </section>
 
+            <!-- Status Banner (Triage) -->
+            <div id="statusBanner" class="status-banner status-banner--green" role="region" aria-label="Kiosk status">
+              <div class="status-banner__sigil" aria-hidden="true">
+                <span class="status-banner__dot"></span>
+              </div>
+              <div class="status-banner__body">
+                <h3 class="status-banner__title">All clear</h3>
+                <p class="status-banner__desc">Machine running normally. No open issues.</p>
+              </div>
+            </div>
+
+            <!-- Attention Queue -->
+            <div id="attentionQueue" class="attention-queue" role="region" aria-label="Items needing attention">
+              <div class="queue-empty">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="queue-empty__icon" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 011.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+                <span>Nothing needs you right now.</span>
+              </div>
+            </div>
+
+            <!-- KPI + Ink side-by-side row -->
             <div class="kpi-ink-row">
-              <!-- Left: KPI cards -->
               <div class="kpi-ink-row__left">
                 <div class="kpi-row">
                   <div class="kpi kpi--today">
@@ -386,65 +429,71 @@
                 </div>
               </div>
 
-              <!-- Right: Ink Tank Levels -->
+              <!-- Right: Machine Health (ink panel on desktop, collapsible strip on mobile) -->
               <div class="kpi-ink-row__right">
-                <div class="ink-panel panel" id="inkPanel">
-                  <div class="panel__head ink-panel__head">
-                    <h3 class="panel__title">
-                      <svg viewBox="0 0 20 20" fill="currentColor" class="ink-panel__icon" aria-hidden="true">
-                        <path d="M10 2a1 1 0 01.894.553l3.5 7A1 1 0 0113.5 11h-7a1 1 0 01-.894-1.447l3.5-7A1 1 0 0110 2zm0 12a3 3 0 100 6 3 3 0 000-6z"/>
+                <details id="machineHealthStrip" class="panel ink-panel overview-strip" open>
+                  <summary class="overview-strip__summary">
+                    <div class="overview-strip__header">
+                      <div class="overview-strip__title-wrap">
+                        <h3 class="panel__title">Machine Health</h3>
+                        <span class="ink-panel__badge" id="inkAlertBadge"></span>
+                      </div>
+                      <div class="overview-strip__badges">
+                        <svg viewBox="0 0 20 20" fill="currentColor" class="overview-strip__chevron" aria-hidden="true">
+                          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                  </summary>
+                  <div class="overview-strip__content panel__body">
+                    <div id="inkAlertBanner" class="ink-alert-banner hidden">
+                      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                       </svg>
-                      Ink Tank Levels
-                    </h3>
-                    <span class="ink-panel__badge" id="inkAlertBadge"></span>
-                  </div>
-                  <div id="inkAlertBanner" class="ink-alert-banner hidden">
-                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                    </svg>
-                    <span id="inkAlertText">Ink running low — consider refilling soon.</span>
-                  </div>
-                  <div class="ink-tanks ink-tanks--two">
-                    <div class="ink-tank" id="inkTankGrayscale">
-                      <div class="ink-tank__gauge">
-                        <div class="ink-tank__track">
-                          <div class="ink-tank__fill ink-tank__fill--grayscale" id="inkFillGrayscale" style="height:100%"></div>
-                          <div class="ink-tank__threshold" style="bottom:30%"></div>
-                        </div>
-                        <div class="ink-tank__scale">
-                          <span>100%</span><span>50%</span><span>0%</span>
-                        </div>
-                      </div>
-                      <div class="ink-tank__info">
-                        <span class="ink-tank__percent" id="inkPercentGrayscale">100%</span>
-                        <span class="ink-tank__name">Grayscale</span>
-                        <span class="ink-tank__pages" id="inkPagesGrayscale">0 / 4,500 pages</span>
-                      </div>
+                      <span id="inkAlertText">Ink running low — consider refilling soon.</span>
                     </div>
-                    <div class="ink-tank" id="inkTankColor">
-                      <div class="ink-tank__gauge">
-                        <div class="ink-tank__track">
-                          <div class="ink-tank__fill ink-tank__fill--color" id="inkFillColor" style="height:100%"></div>
-                          <div class="ink-tank__threshold" style="bottom:30%"></div>
+                    <div class="ink-tanks ink-tanks--two">
+                      <div class="ink-tank" id="inkTankGrayscale">
+                        <div class="ink-tank__gauge">
+                          <div class="ink-tank__track">
+                            <div class="ink-tank__fill ink-tank__fill--grayscale" id="inkFillGrayscale" style="height:100%"></div>
+                            <div class="ink-tank__threshold" style="bottom:30%"></div>
+                          </div>
+                          <div class="ink-tank__scale">
+                            <span>100%</span><span>50%</span><span>0%</span>
+                          </div>
                         </div>
-                        <div class="ink-tank__scale">
-                          <span>100%</span><span>50%</span><span>0%</span>
+                        <div class="ink-tank__info">
+                          <span class="ink-tank__percent" id="inkPercentGrayscale">100%</span>
+                          <span class="ink-tank__name">Grayscale</span>
+                          <span class="ink-tank__pages" id="inkPagesGrayscale">0 / 4,500 pages</span>
                         </div>
                       </div>
-                      <div class="ink-tank__info">
-                        <span class="ink-tank__percent" id="inkPercentColor">100%</span>
-                        <span class="ink-tank__name">Colored</span>
-                        <span class="ink-tank__pages" id="inkPagesColor">0 / 7,500 pages</span>
+                      <div class="ink-tank" id="inkTankColor">
+                        <div class="ink-tank__gauge">
+                          <div class="ink-tank__track">
+                            <div class="ink-tank__fill ink-tank__fill--color" id="inkFillColor" style="height:100%"></div>
+                            <div class="ink-tank__threshold" style="bottom:30%"></div>
+                          </div>
+                          <div class="ink-tank__scale">
+                            <span>100%</span><span>50%</span><span>0%</span>
+                          </div>
+                        </div>
+                        <div class="ink-tank__info">
+                          <span class="ink-tank__percent" id="inkPercentColor">100%</span>
+                          <span class="ink-tank__name">Colored</span>
+                          <span class="ink-tank__pages" id="inkPagesColor">0 / 7,500 pages</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                </details>
               </div>
             </div>
 
-
             <div class="panel-row">
-              <div class="panel">
+              <!-- Job Breakdown Panel -->
+              <div class="panel" id="jobBreakdownPanel">
                 <div class="panel__head">
                   <h3 class="panel__title">Job Breakdown</h3>
                 </div>
@@ -507,12 +556,26 @@
                   </div>
                 </div>
               </div>
-              <div class="panel">
-                <div class="panel__head">
-                  <h3 class="panel__title">Machine Controls</h3>
-                </div>
-                <div class="panel__body panel__body--actions">
-                  <button id="resetBalanceBtn" class="ctrl-btn ctrl-btn--amber">
+
+              <!-- Collapsible Maintenance Controls Strip -->
+              <details id="maintenanceStrip" class="overview-strip panel" open>
+                <summary class="overview-strip__summary">
+                  <div class="overview-strip__header">
+                    <div class="overview-strip__title-wrap">
+                      <svg viewBox="0 0 20 20" fill="currentColor" class="overview-strip__icon overview-strip__icon--wrench" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                      </svg>
+                      <h3 class="panel__title">Machine Controls</h3>
+                    </div>
+                    <div class="overview-strip__badges">
+                      <svg viewBox="0 0 20 20" fill="currentColor" class="overview-strip__chevron" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </summary>
+                <div class="overview-strip__content panel__body panel__body--actions">
+                  <button id="resetBalanceBtn" class="ctrl-btn ctrl-btn--amber" type="button">
                     <svg
                       viewBox="0 0 20 20"
                       fill="currentColor"
@@ -527,7 +590,7 @@
                     Reset Balance
                     <span class="ctrl-btn__sub">Zeroes coin counter</span>
                   </button>
-                  <button id="resetInkBtn" class="ctrl-btn ctrl-btn--indigo">
+                  <button id="resetInkBtn" class="ctrl-btn ctrl-btn--indigo" type="button">
                     <svg
                       viewBox="0 0 20 20"
                       fill="currentColor"
@@ -544,7 +607,7 @@
                       >Track pages from full refill</span
                     >
                   </button>
-                  <button id="clearStorageBtn" class="ctrl-btn ctrl-btn--red">
+                  <button id="clearStorageBtn" class="ctrl-btn ctrl-btn--red" type="button">
                     <svg
                       viewBox="0 0 20 20"
                       fill="currentColor"
@@ -562,11 +625,11 @@
                     >
                   </button>
                 </div>
-              </div>
+              </details>
             </div>
           </section>
         </div>
-      </main>
+      </div>
     </div>
 
     <script src="/admin/dashboard/app.js"></script>

@@ -9,6 +9,7 @@ import {
   buildPrinterSelectionOptions,
   type PrinterSelectionInput,
 } from './printer-selection';
+import { attachSubsystemCardToggles } from './subsystem-toggle';
 
 // ── DOM refs ────────────────────────────────────────
 
@@ -1107,6 +1108,7 @@ function showRefreshError(error: unknown): void {
 }
 
 initAuth(async (signal) => {
+  attachSubsystemCardToggles();
   await loadData();
   if (signal.aborted) return;
   await loadPrinterSelection();

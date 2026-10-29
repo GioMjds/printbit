@@ -179,6 +179,7 @@
           </div>
         </div>
         <nav class="sidebar__nav">
+          <div class="nav-group-header">Monitor</div>
           <a href="/admin/dashboard" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
@@ -197,7 +198,73 @@
             </svg>
             <span>Earnings</span>
           </a>
-          
+          <a href="/admin/alerts" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
+              />
+            </svg>
+            <span>Anomaly Alerts</span>
+            <span
+              class="nav-count-badge"
+              id="openAlertBadge"
+              aria-label="open anomaly count"
+            ></span>
+          </a>
+
+          <div class="nav-group-header">Support</div>
+          <a href="/admin/report" class="nav-btn nav-btn--active">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span>Reports</span>
+            <span
+              class="nav-count-badge"
+              id="openReportBadge"
+              aria-label="open reports count"
+            ></span>
+          </a>
+          <a href="/admin/feedback" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 010 2H6a1 1 0 01-1-1zm1 3a1 1 0 000 2h3a1 1 0 000-2H6z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span>Feedback</span>
+            <span
+              class="nav-count-badge"
+              id="openBadge"
+              aria-label="open feedback count"
+            ></span>
+          </a>
+
+          <div class="nav-group-header">Records</div>
+          <a href="/admin/logs" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h6a1 1 0 010 2H4a1 1 0 01-1-1z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span>System Logs</span>
+          </a>
+          <a href="/admin/transactions" class="nav-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                d="M4 2h9l3 3v13a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm0 2v13h11V6h-2a1 1 0 01-1-1V3H4zm3 4a1 1 0 100 2h5a1 1 0 100-2H7zm0 4a1 1 0 100 2h5a1 1 0 100-2H7z"
+              />
+            </svg>
+            <span>Transaction Logs</span>
+          </a>
+
+          <div class="nav-group-header">Machine</div>
           <a href="/admin/system" class="nav-btn">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
@@ -218,67 +285,6 @@
             </svg>
             <span>Settings</span>
           </a>
-          <a href="/admin/logs" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                fill-rule="evenodd"
-                d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h6a1 1 0 010 2H4a1 1 0 01-1-1z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>System Logs</span>
-          </a>
-          <a href="/admin/transactions" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                d="M4 2h9l3 3v13a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm0 2v13h11V6h-2a1 1 0 01-1-1V3H4zm3 4a1 1 0 100 2h5a1 1 0 100-2H7zm0 4a1 1 0 100 2h5a1 1 0 100-2H7z"
-              />
-            </svg>
-            <span>Transaction Logs</span>
-          </a>
-          <a href="/admin/feedback" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                fill-rule="evenodd"
-                d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 010 2H6a1 1 0 01-1-1zm1 3a1 1 0 000 2h3a1 1 0 000-2H6z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>Feedback</span>
-            <span
-              class="nav-count-badge"
-              id="openBadge"
-              aria-label="open feedback count"
-            ></span>
-          </a>
-          <a href="/admin/report" class="nav-btn nav-btn--active">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                fill-rule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>Reports</span>
-            <span
-              class="nav-count-badge"
-              id="openReportBadge"
-              aria-label="open reports count"
-            ></span>
-          </a>
-          <a href="/admin/alerts" class="nav-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
-              />
-            </svg>
-            <span>Anomaly Alerts</span>
-            <span
-              class="nav-count-badge"
-              id="openAlertBadge"
-              aria-label="open anomaly count"
-            ></span>
-          </a>
         </nav>
         <div class="sidebar__foot">
           <button id="logoutBtn" class="lock-btn">
@@ -294,10 +300,21 @@
         </div>
       </aside>
 
+      <div id="drawerScrim" class="drawer-scrim hidden"></div>
+
       <div class="main">
         <header class="topbar">
           <div class="topbar__left">
-            <h2 class="topbar__title">Issue Reports</h2>
+            <button id="menuBtn" class="topbar-menu-btn" aria-label="Open navigation menu">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true">
+                <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+              </svg>
+              <span id="menuBadge" class="topbar-menu-badge hidden"></span>
+            </button>
+            <div class="topbar__titles">
+              <h2 class="topbar__title">Issue Reports</h2>
+              <span id="updatedAgoLabel" class="topbar__updated-label">Updated just now</span>
+            </div>
           </div>
           <div class="topbar__right">
             <p

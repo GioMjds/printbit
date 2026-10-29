@@ -3,10 +3,17 @@ import {
   apiFetch,
   formatBytes,
   initAuth,
+  notifyAdminDataUpdated,
   peso,
   setMessage,
   updateSidebarBadges,
 } from '../shared';
+import {
+  deriveAttentionQueue,
+  deriveStatusBannerState,
+  renderAttentionQueue,
+  renderStatusBanner,
+} from '../overview-queue';
 
 const earningsToday = document.getElementById('earningsToday') as HTMLElement;
 const jobsTotal = document.getElementById('jobsTotal') as HTMLElement;
@@ -18,6 +25,17 @@ const storageBytes = document.getElementById('storageBytes') as HTMLElement;
 const owedChangeOpen = document.getElementById(
   'owedChangeOpen',
 ) as HTMLElement | null;
+
+// ── Triage Banner and Attention Queue elements ───────────
+const statusBanner = document.getElementById('statusBanner');
+const attentionQueue = document.getElementById('attentionQueue');
+const machineHealthStrip = document.getElementById(
+  'machineHealthStrip',
+) as HTMLDetailsElement | null;
+const maintenanceStrip = document.getElementById(
+  'maintenanceStrip',
+) as HTMLDetailsElement | null;
+
 // ── Ink tank gauge elements ──────────────────────────────
 const inkAlertBanner = document.getElementById(
   'inkAlertBanner',
@@ -34,21 +52,6 @@ const owedChangeHint = document.getElementById(
 const barPrint = document.getElementById('barPrint') as HTMLElement | null;
 const barCopy = document.getElementById('barCopy') as HTMLElement | null;
 const barScan = document.getElementById('barScan') as HTMLElement | null;
-const forecastPaperDays = document.getElementById(
-  'forecastPaperDays',
-) as HTMLElement | null;
-const forecastPaperStock = document.getElementById(
-  'forecastPaperStock',
-) as HTMLElement | null;
-const forecastPaperStatus = document.getElementById(
-  'forecastPaperStatus',
-) as HTMLElement | null;
-const forecastAlert = document.getElementById(
-  'forecastAlert',
-) as HTMLElement | null;
-const forecastInkList = document.getElementById(
-  'forecastInkList',
-) as HTMLElement | null;
 
 const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 const resetBalanceBtn = document.getElementById(
@@ -58,12 +61,6 @@ const resetInkBtn = document.getElementById('resetInkBtn') as HTMLButtonElement;
 const clearStorageBtn = document.getElementById(
   'clearStorageBtn',
 ) as HTMLButtonElement;
-const openAlertBadge = document.getElementById(
-  'openAlertBadge',
-) as HTMLElement | null;
-const openAlertBadgeMob = document.getElementById(
-  'openAlertBadgeMob',
-) as HTMLElement | null;
 
 let refreshTimer: number | null = null;
 
@@ -80,7 +77,6 @@ function formatNumber(n: number): string {
 function applyInkEstimation(summary: SummaryResponse): void {
   const est = summary.inkEstimation;
   if (!est) {
-    // No ink estimation data — hide the panel alert
     if (inkAlertBanner) inkAlertBanner.classList.add('hidden');
     if (inkAlertBadge) inkAlertBadge.textContent = '';
     return;
@@ -101,9 +97,13 @@ function applyInkEstimation(summary: SummaryResponse): void {
     const pagesEl = document.getElementById(`inkPages${id}`);
     const tankEl = document.getElementById(`inkTank${id}`);
 
-    if (fillEl) fillEl.style.height = `${tank.remainingPercent}%`;
-    if (percentEl)
+    if (fillEl) {
+      fillEl.style.height = `${tank.remainingPercent}%`;
+      fillEl.style.width = `${tank.remainingPercent}%`;
+    }
+    if (percentEl) {
       percentEl.textContent = `${tank.remainingPercent.toFixed(1)}%`;
+    }
     if (pagesEl) {
       pagesEl.textContent = `${formatNumber(tank.pagesUsed)} / ${formatNumber(tank.maxPages)} pages`;
     }
@@ -131,94 +131,6 @@ function applyInkEstimation(summary: SummaryResponse): void {
   }
 }
 
-function formatDaysRemaining(daysRemaining: number | null): string {
-  if (daysRemaining === null) return '--';
-  if (daysRemaining < 1) return '<1 day';
-  if (daysRemaining < 10) return `${daysRemaining.toFixed(1)} days`;
-  return `${Math.round(daysRemaining)} days`;
-}
-
-function applyConsumablesForecast(summary: SummaryResponse): void {
-  const forecast = summary.consumables;
-  if (!forecast) {
-    if (forecastPaperDays) forecastPaperDays.textContent = '--';
-    if (forecastPaperStock) forecastPaperStock.textContent = '--';
-    if (forecastPaperStatus) forecastPaperStatus.textContent = 'Unavailable';
-    if (forecastAlert) {
-      forecastAlert.textContent = 'Consumables forecast is unavailable.';
-      forecastAlert.classList.remove('consumables-alert--active');
-    }
-    if (forecastInkList) {
-      const empty = document.createElement('li');
-      empty.className = 'consumables-item consumables-item--muted';
-      empty.textContent = 'No ink forecast data available.';
-      forecastInkList.replaceChildren(empty);
-    }
-    return;
-  }
-
-  if (forecastPaperDays) {
-    forecastPaperDays.textContent = formatDaysRemaining(
-      forecast.paper.daysRemaining,
-    );
-  }
-  if (forecastPaperStock) {
-    forecastPaperStock.textContent = `${forecast.paper.currentSheets}/${forecast.paper.trayCapacitySheets} sheets`;
-  }
-  if (forecastPaperStatus) {
-    forecastPaperStatus.textContent = forecast.paper.status.replace('_', ' ');
-  }
-  if (forecastAlert) {
-    forecastAlert.textContent = forecast.alerts.withinThreshold
-      ? `At-risk: ${forecast.alerts.reasons.join(', ')}`
-      : `Healthy: no depletion risk within ${forecast.alertDaysThreshold} days.`;
-    forecastAlert.classList.toggle(
-      'consumables-alert--active',
-      forecast.alerts.withinThreshold,
-    );
-  }
-  if (forecastInkList) {
-    forecastInkList.replaceChildren();
-    if (forecast.inkSupplies.length === 0) {
-      const empty = document.createElement('li');
-      empty.className = 'consumables-item consumables-item--muted';
-      empty.textContent = 'No ink telemetry detected yet.';
-      forecastInkList.appendChild(empty);
-      return;
-    }
-    for (const supply of forecast.inkSupplies) {
-      const item = document.createElement('li');
-      item.className = 'consumables-item';
-      const isDepletionRisk =
-        supply.daysRemaining !== null &&
-        supply.daysRemaining <= forecast.alertDaysThreshold;
-      if (
-        supply.supplyStatus === 'low' ||
-        supply.supplyStatus === 'empty' ||
-        isDepletionRisk
-      ) {
-        item.classList.add('consumables-item--warn');
-      }
-
-      const name = document.createElement('span');
-      name.className = 'consumables-item__name';
-      name.textContent = `${supply.printerName} • ${supply.name}`;
-      const meta = document.createElement('span');
-      meta.className = 'consumables-item__meta';
-      const levelLabel =
-        supply.level === null
-          ? supply.supplyStatus === 'low' || supply.supplyStatus === 'empty'
-            ? supply.supplyStatus
-            : 'level unavailable'
-          : `${supply.level.toFixed(0)}%`;
-      meta.textContent = `${levelLabel} • ${formatDaysRemaining(supply.daysRemaining)}`;
-
-      item.append(name, meta);
-      forecastInkList.appendChild(item);
-    }
-  }
-}
-
 function applySummary(summary: SummaryResponse): void {
   earningsToday.textContent = peso(summary.earnings.today);
   jobsTotal.textContent = String(summary.jobStats.total);
@@ -236,33 +148,50 @@ function applySummary(summary: SummaryResponse): void {
         ? 'Manual change settlement required now.'
         : 'No unsettled change payouts.';
   }
-  const openCount =
-    summary.anomalyStats.openCount > 0
-      ? String(summary.anomalyStats.openCount)
-      : '';
-  if (openAlertBadge) openAlertBadge.textContent = openCount;
-  if (openAlertBadgeMob) openAlertBadgeMob.textContent = openCount;
 
   const total = summary.jobStats.total || 1;
-  if (barPrint)
+  if (barPrint) {
     barPrint.style.width = `${Math.round((summary.jobStats.print / total) * 100)}%`;
-  if (barCopy)
+  }
+  if (barCopy) {
     barCopy.style.width = `${Math.round((summary.jobStats.copy / total) * 100)}%`;
-  if (barScan)
+  }
+  if (barScan) {
     barScan.style.width = `${Math.round((summary.jobStats.scan / total) * 100)}%`;
-  applyConsumablesForecast(summary);
+  }
   applyInkEstimation(summary);
   updateSidebarBadges(summary);
+
+  // Render Status Banner & Attention Queue
+  if (statusBanner) {
+    const bannerState = deriveStatusBannerState(summary, false);
+    renderStatusBanner(statusBanner, bannerState);
+  }
+  if (attentionQueue) {
+    const queueItems = deriveAttentionQueue(summary);
+    renderAttentionQueue(attentionQueue, queueItems);
+  }
+
+  // Notify shell ticker that data updated
+  notifyAdminDataUpdated();
 }
 
 async function loadData(): Promise<void> {
-  const res = await apiFetch('/api/admin/summary');
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('Invalid admin PIN.');
-    throw new Error('Failed to load dashboard data.');
+  try {
+    const res = await apiFetch('/api/admin/summary');
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Invalid admin PIN.');
+      throw new Error('Failed to load dashboard data.');
+    }
+    const summary = (await res.json()) as SummaryResponse;
+    applySummary(summary);
+  } catch (err) {
+    if (statusBanner) {
+      const offlineState = deriveStatusBannerState(null, true);
+      renderStatusBanner(statusBanner, offlineState);
+    }
+    throw err;
   }
-  const summary = (await res.json()) as SummaryResponse;
-  applySummary(summary);
 }
 
 refreshBtn.addEventListener('click', () => {
@@ -318,7 +247,50 @@ clearStorageBtn.addEventListener('click', () => {
     );
 });
 
+if (attentionQueue) {
+  attentionQueue.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest<HTMLAnchorElement>(
+      '.queue-row__action-btn',
+    );
+    if (!target) return;
+    const href = target.getAttribute('href');
+    if (href === '#machineHealthStrip' && machineHealthStrip) {
+      machineHealthStrip.open = true;
+    }
+  });
+}
+
+function initStrips(): void {
+  const isDesktop = window.innerWidth > 860;
+  if (machineHealthStrip) {
+    machineHealthStrip.open =
+      isDesktop || window.location.hash === '#machineHealthStrip';
+  }
+  if (maintenanceStrip) {
+    maintenanceStrip.open = isDesktop;
+  }
+}
+
+initStrips();
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 860) {
+    if (machineHealthStrip && !machineHealthStrip.open) machineHealthStrip.open = true;
+    if (maintenanceStrip && !maintenanceStrip.open) maintenanceStrip.open = true;
+  }
+});
+
+window.addEventListener('hashchange', () => {
+  if (window.location.hash === '#machineHealthStrip' && machineHealthStrip) {
+    machineHealthStrip.open = true;
+  }
+});
+
 function showRefreshError(error: unknown): void {
+  if (statusBanner) {
+    const offlineState = deriveStatusBannerState(null, true);
+    renderStatusBanner(statusBanner, offlineState);
+  }
   setMessage(
     error instanceof Error ? error.message : 'Automatic refresh failed.',
   );

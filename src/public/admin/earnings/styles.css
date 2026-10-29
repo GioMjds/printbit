@@ -468,36 +468,102 @@
   color: var(--white);
   font-weight: 700;
 }
-@media (max-width: 640px) {
+/* ─── Grid layouts ─────────────────────────────────────────────────────────── */
+.analytics-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.earnings-breakdown-grid {
+  display: grid;
+  gap: 12px;
+}
+
+/* ─── Mobile responsive (≤860px) ───────────────────────────────────────────── */
+@media (max-width: 860px) {
   .earnings-deck {
     grid-template-columns: 1fr;
-    padding: 0.875rem;
-    gap: 0.875rem;
+    padding: 14px;
+    gap: 12px;
   }
+
   .earnings-deck__summary {
     grid-column: 1;
     grid-row: 1;
   }
+
   .view-switch {
+    display: flex;
+    width: 100%;
+    margin-top: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+    box-sizing: border-box;
     grid-column: 1;
     grid-row: 2;
   }
+
+  .view-switch__btn {
+    flex: 1;
+    min-height: 44px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .service-mix {
     grid-column: 1;
     grid-row: 3;
   }
+
   .earnings-deck__amount {
-    font-size: 2.5rem;
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
   }
+
+  .analytics-grid,
+  .earnings-breakdown-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .earnings-trend,
+  .earnings-chart,
+  .chart-container,
+  .earnings-breakdown-chart {
+    width: 100%;
+    min-height: 220px;
+  }
+
   .earnings-trend {
-    padding: 0.875rem;
+    padding: 14px;
   }
+
   .earnings-trend__header {
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
   }
+
   .anchor-controls {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .anchor-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .anchor-btn--calendar {
+    min-height: 44px;
+    padding: 0 14px;
   }
 }

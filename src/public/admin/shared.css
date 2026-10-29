@@ -446,6 +446,107 @@ html.admin-session-active #adminDashboard.hidden {
   letter-spacing: -0.4px;
 }
 
+/* Topbar hamburger button (mobile drawer trigger) */
+.topbar-menu-btn {
+  display: none;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid var(--border-2);
+  border-radius: 12px;
+  color: var(--white);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 130ms,
+    border-color 130ms,
+    transform 120ms;
+}
+.topbar-menu-btn:hover {
+  background: rgba(125, 211, 252, 0.14);
+  border-color: rgba(125, 211, 252, 0.4);
+}
+.topbar-menu-btn:active {
+  transform: scale(0.96);
+}
+.topbar-menu-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Aggregated notification count badge on menu trigger */
+.topbar-menu-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--red, #f87171);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(248, 113, 113, 0.6);
+  border: 1.5px solid #0b0a1a;
+}
+.topbar-menu-badge.hidden,
+.topbar-menu-badge:empty {
+  display: none !important;
+}
+
+/* Topbar title & updated label stack */
+.topbar__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.topbar__titles .topbar__title {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.topbar__updated-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(199, 210, 254, 0.75);
+  line-height: 1.2;
+}
+
+/* Slide-out drawer scrim backdrop */
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 998;
+  transition: opacity 0.25s ease;
+}
+.drawer-scrim.hidden {
+  display: none !important;
+}
+
+/* Drawer navigation section headers */
+.nav-group-header {
+  padding: 12px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: rgba(199, 210, 254, 0.65);
+}
+
+
 .live-pill {
   display: inline-flex;
   align-items: center;
@@ -654,42 +755,81 @@ html.admin-session-active #adminDashboard.hidden {
   line-height: 1.5;
 }
 
-/* Responsive — sidebar collapse */
+/* Responsive — mobile drawer navigation shell */
 @media (max-width: 860px) {
-  .sidebar {
-    width: 60px;
-  }
-  .sidebar__brand {
-    padding: 16px 12px;
+  .topbar-menu-btn {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
   }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 78vw;
+    max-width: 320px;
+    z-index: 999;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.6);
+  }
+
+  .sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .sidebar__brand {
+    padding: 0 20px;
+    justify-content: flex-start;
+  }
+
   .sidebar__names,
-  .sidebar__env,
+  .sidebar__env {
+    display: block !important;
+  }
+
+  .nav-btn {
+    min-height: 44px;
+    justify-content: flex-start;
+    padding: 10px 14px;
+  }
+
   .nav-btn > span:not(.nav-count-badge) {
+    display: inline !important;
+  }
+
+  .nav-btn .nav-count-badge:not(:empty) {
+    display: inline-flex !important;
+    margin-left: auto;
+  }
+
+  .lock-btn {
+    min-height: 44px;
+    justify-content: flex-start;
+    padding: 10px 14px;
+    background: rgba(248, 113, 113, 0.16);
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    color: var(--red);
+  }
+
+  .lock-btn span {
+    display: inline !important;
+  }
+
+  .admin-page-hero {
+    padding: 12px 14px;
+  }
+
+  .admin-page-hero__kicker,
+  .admin-page-hero__desc {
     display: none !important;
   }
-  .sidebar__logomark {
-    width: 32px;
-    height: 32px;
-  }
-  .nav-btn {
-    justify-content: center;
-    padding: 10px;
-  }
-  .nav-btn svg {
-    width: 18px;
-    height: 18px;
-  }
-  .lock-btn span {
-    display: none;
-  }
-  .lock-btn {
-    justify-content: center;
-    padding: 10px;
-  }
-  .lock-btn svg {
-    width: 16px;
-    height: 16px;
+
+  .admin-page-hero__title {
+    font-size: 18px;
+    line-height: 1.2;
   }
 }
 
@@ -703,9 +843,61 @@ html.admin-session-active #adminDashboard.hidden {
   .topbar-btn span {
     display: none;
   }
-  /* Hide badge indicators on mobile */
-  .nav-count-badge {
-    display: none !important;
+
+  /* Card transformation for tabular lists */
+  .logs-table,
+  .logs-table tbody,
+  .logs-table tr,
+  .logs-table td {
+    display: block;
+    width: 100%;
+  }
+  .logs-table thead {
+    display: none;
+  }
+  .logs-table tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+
+  /* Sticky / scrollable horizontal chip filter rows */
+  .logs-filter-bar,
+  .ri-filters,
+  .fb-filters,
+  .tx-quick-chips {
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    gap: 8px;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .logs-filter-chip,
+  .filter-btn,
+  .fb-filter-btn {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  /* Unified touch inbox list (.ri-list, .fb-list) */
+  .ri-list,
+  .fb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ri-item,
+  .fb-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    min-height: 44px;
   }
 }
 
@@ -716,19 +908,6 @@ html.admin-session-active #adminDashboard.hidden {
 @media (max-width: 480px) {
   .shell {
     height: 100dvh;
-  }
-  .sidebar {
-    display: flex !important;
-    width: 68px;
-  }
-  .sidebar__brand {
-    padding: 10px 8px;
-  }
-  .sidebar__nav {
-    padding: 8px;
-  }
-  .sidebar__foot {
-    padding: 8px;
   }
   .content {
     padding: 14px;

@@ -352,6 +352,101 @@
   .fb-stat__value {
     font-size: 1.4rem;
   }
+
+  /* Scrollable horizontal chip filter rows */
+  .fb-filters {
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    gap: 8px;
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-radius: 12px;
+  }
+  .fb-filters::-webkit-scrollbar {
+    display: none;
+  }
+  .filter-btn,
+  .fb-filter-btn {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 13px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Inbox list and touch cards */
+  .fb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .fb-card,
+  .fb-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    min-height: 44px;
+  }
+  .fb-card__body {
+    padding: 12px 14px;
+  }
+  .fb-card__actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 6px;
+  }
+  .fb-action-btn {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Primary action: single prominent button */
+  .fb-action-btn--review,
+  .fb-action-btn--resolve {
+    background: rgba(74, 222, 128, 0.2) !important;
+    color: #4ade80 !important;
+    border: 1.5px solid rgba(74, 222, 128, 0.45) !important;
+    font-weight: 700 !important;
+    min-height: 44px;
+    padding: 8px 16px;
+    box-shadow: 0 0 12px rgba(74, 222, 128, 0.15);
+  }
+
+  /* Destructive action: separated with warning color */
+  #purgeBtn,
+  .fb-action-btn--delete {
+    border-color: rgba(248, 113, 113, 0.45) !important;
+    color: var(--red) !important;
+    background: rgba(248, 113, 113, 0.12) !important;
+    font-weight: 700;
+    min-height: 44px;
+  }
+  #purgeBtn:hover,
+  .fb-action-btn--delete:hover {
+    background: rgba(248, 113, 113, 0.25) !important;
+    border-color: var(--red) !important;
+  }
+
+  .fb-pagination__btn {
+    min-height: 44px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* ── Admin-wide command deck polish ─────────────────────────── */
@@ -371,6 +466,38 @@
 }
 
 /* ── Status chips & action badge ────────────────────────────── */
+
+.status-chip--new::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+  flex-shrink: 0;
+}
+
+.status-chip--reviewed::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+
+.status-chip--archived::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+  flex-shrink: 0;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
