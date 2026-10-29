@@ -843,6 +843,62 @@ html.admin-session-active #adminDashboard.hidden {
   .topbar-btn span {
     display: none;
   }
+
+  /* Card transformation for tabular lists */
+  .logs-table,
+  .logs-table tbody,
+  .logs-table tr,
+  .logs-table td {
+    display: block;
+    width: 100%;
+  }
+  .logs-table thead {
+    display: none;
+  }
+  .logs-table tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+
+  /* Sticky / scrollable horizontal chip filter rows */
+  .logs-filter-bar,
+  .ri-filters,
+  .fb-filters,
+  .tx-quick-chips {
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    gap: 8px;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .logs-filter-chip,
+  .filter-btn,
+  .fb-filter-btn {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  /* Unified touch inbox list (.ri-list, .fb-list) */
+  .ri-list,
+  .fb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ri-item,
+  .fb-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    min-height: 44px;
+  }
 }
 
 .mob-nav {
