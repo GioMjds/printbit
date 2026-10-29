@@ -32,6 +32,9 @@ const attentionQueue = document.getElementById('attentionQueue');
 const machineHealthStrip = document.getElementById(
   'machineHealthStrip',
 ) as HTMLDetailsElement | null;
+const maintenanceStrip = document.getElementById(
+  'maintenanceStrip',
+) as HTMLDetailsElement | null;
 
 // ── Ink tank gauge elements ──────────────────────────────
 const inkAlertBanner = document.getElementById(
@@ -372,6 +375,26 @@ if (attentionQueue) {
     }
   });
 }
+
+function initStrips(): void {
+  const isDesktop = window.innerWidth > 860;
+  if (machineHealthStrip) {
+    machineHealthStrip.open =
+      isDesktop || window.location.hash === '#machineHealthStrip';
+  }
+  if (maintenanceStrip) {
+    maintenanceStrip.open = isDesktop;
+  }
+}
+
+initStrips();
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 860) {
+    if (machineHealthStrip && !machineHealthStrip.open) machineHealthStrip.open = true;
+    if (maintenanceStrip && !maintenanceStrip.open) maintenanceStrip.open = true;
+  }
+});
 
 window.addEventListener('hashchange', () => {
   if (window.location.hash === '#machineHealthStrip' && machineHealthStrip) {

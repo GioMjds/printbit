@@ -249,6 +249,42 @@
   transform: scale(0.96);
 }
 
+/* ── KPI + Ink side-by-side row ──────────────────────────── */
+.kpi-ink-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.kpi-ink-row__left {
+  min-width: 0;
+}
+
+.kpi-ink-row__right {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi-ink-row__right .ink-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi-ink-row__right .ink-panel .overview-strip__content {
+  flex: 1;
+}
+
+/* Inside the left column, kpi-row is 2-col */
+.kpi-ink-row__left .kpi-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  height: 100%;
+}
+
 /* ── KPI Row ──────────────────────────────────────────────── */
 .kpi-row {
   display: grid;
@@ -388,18 +424,28 @@
 .overview-strip__summary {
   display: block;
   list-style: none;
-  cursor: pointer;
-  user-select: none;
   background: transparent;
-  transition: background 150ms ease;
+  padding: 0;
+  margin: 0;
 }
 
 .overview-strip__summary::-webkit-details-marker {
   display: none;
 }
 
-.overview-strip__summary:hover {
-  background: rgba(125, 211, 252, 0.05);
+@media (min-width: 861px) {
+  details.overview-strip > summary.overview-strip__summary {
+    pointer-events: none;
+    cursor: default;
+  }
+
+  .overview-strip__chevron {
+    display: none !important;
+  }
+
+  .overview-strip__icon {
+    display: none !important;
+  }
 }
 
 .overview-strip__header {
@@ -483,7 +529,7 @@
 .panel-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 20px;
 }
 
 .panel {
@@ -960,6 +1006,51 @@
 
 /* ── Responsive Mobile (≤860px) ───────────────────────────── */
 @media (max-width: 860px) {
+  .kpi-ink-row {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .kpi-ink-row__left {
+    width: 100%;
+  }
+
+  .kpi-ink-row__left .kpi-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px;
+    height: auto;
+  }
+
+  /* 2-up stat pair: hide storage and owed change on mobile */
+  .kpi--storage,
+  .kpi--owed {
+    display: none !important;
+  }
+
+  .kpi-ink-row__right {
+    width: 100%;
+  }
+
+  details.overview-strip > summary.overview-strip__summary {
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    transition: background 150ms ease;
+  }
+
+  details.overview-strip > summary.overview-strip__summary:hover {
+    background: rgba(125, 211, 252, 0.05);
+  }
+
+  .overview-strip__chevron {
+    display: block !important;
+  }
+
+  .overview-strip__icon {
+    display: block !important;
+  }
+
   /* 2-up stat pair */
   .kpi-row {
     grid-template-columns: repeat(2, 1fr) !important;
