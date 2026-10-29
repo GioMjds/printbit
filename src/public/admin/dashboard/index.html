@@ -453,50 +453,38 @@
                       </svg>
                       <span id="inkAlertText">Ink running low — consider refilling soon.</span>
                     </div>
-                    <div class="machine-health-body">
-                      <div class="ink-tanks ink-tanks--two">
-                        <div class="ink-tank" id="inkTankGrayscale">
-                          <div class="ink-tank__gauge">
-                            <div class="ink-tank__track">
-                              <div class="ink-tank__fill ink-tank__fill--grayscale" id="inkFillGrayscale" style="height:100%"></div>
-                              <div class="ink-tank__threshold" style="bottom:30%"></div>
-                            </div>
-                            <div class="ink-tank__scale">
-                              <span>100%</span><span>50%</span><span>0%</span>
-                            </div>
+                    <div class="ink-tanks ink-tanks--two">
+                      <div class="ink-tank" id="inkTankGrayscale">
+                        <div class="ink-tank__gauge">
+                          <div class="ink-tank__track">
+                            <div class="ink-tank__fill ink-tank__fill--grayscale" id="inkFillGrayscale" style="height:100%"></div>
+                            <div class="ink-tank__threshold" style="bottom:30%"></div>
                           </div>
-                          <div class="ink-tank__info">
-                            <span class="ink-tank__percent" id="inkPercentGrayscale">100%</span>
-                            <span class="ink-tank__name">Grayscale</span>
-                            <span class="ink-tank__pages" id="inkPagesGrayscale">0 / 4,500 pages</span>
+                          <div class="ink-tank__scale">
+                            <span>100%</span><span>50%</span><span>0%</span>
                           </div>
                         </div>
-                        <div class="ink-tank" id="inkTankColor">
-                          <div class="ink-tank__gauge">
-                            <div class="ink-tank__track">
-                              <div class="ink-tank__fill ink-tank__fill--color" id="inkFillColor" style="height:100%"></div>
-                              <div class="ink-tank__threshold" style="bottom:30%"></div>
-                            </div>
-                            <div class="ink-tank__scale">
-                              <span>100%</span><span>50%</span><span>0%</span>
-                            </div>
-                          </div>
-                          <div class="ink-tank__info">
-                            <span class="ink-tank__percent" id="inkPercentColor">100%</span>
-                            <span class="ink-tank__name">Colored</span>
-                            <span class="ink-tank__pages" id="inkPagesColor">0 / 7,500 pages</span>
-                          </div>
+                        <div class="ink-tank__info">
+                          <span class="ink-tank__percent" id="inkPercentGrayscale">100%</span>
+                          <span class="ink-tank__name">Grayscale</span>
+                          <span class="ink-tank__pages" id="inkPagesGrayscale">0 / 4,500 pages</span>
                         </div>
                       </div>
-                      <div class="consumables-block">
-                        <div class="consumables-paper">
-                          <div class="consumables-paper__days" id="forecastPaperDays">--</div>
-                          <div class="consumables-paper__label">Paper Stock Forecast</div>
-                          <div class="consumables-paper__stock" id="forecastPaperStock">--</div>
-                          <div class="consumables-paper__status" id="forecastPaperStatus">Ready</div>
+                      <div class="ink-tank" id="inkTankColor">
+                        <div class="ink-tank__gauge">
+                          <div class="ink-tank__track">
+                            <div class="ink-tank__fill ink-tank__fill--color" id="inkFillColor" style="height:100%"></div>
+                            <div class="ink-tank__threshold" style="bottom:30%"></div>
+                          </div>
+                          <div class="ink-tank__scale">
+                            <span>100%</span><span>50%</span><span>0%</span>
+                          </div>
                         </div>
-                        <p class="consumables-alert" id="forecastAlert">Forecast pending telemetry...</p>
-                        <ul class="consumables-list" id="forecastInkList"></ul>
+                        <div class="ink-tank__info">
+                          <span class="ink-tank__percent" id="inkPercentColor">100%</span>
+                          <span class="ink-tank__name">Colored</span>
+                          <span class="ink-tank__pages" id="inkPagesColor">0 / 7,500 pages</span>
+                        </div>
                       </div>
                     </div>
                   </div>

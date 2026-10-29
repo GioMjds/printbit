@@ -84,18 +84,6 @@ export function deriveAttentionQueue(summary: SummaryResponse | null): QueueItem
     });
   }
 
-  // 5. Paper running out (Warning)
-  if (summary.consumables?.alerts?.withinThreshold) {
-    items.push({
-      id: 'paper-warning',
-      severity: 'warning',
-      title: 'Paper Running Low',
-      subtitle: summary.consumables.alerts.reasons[0] || 'Paper stock nearing replenishment point',
-      actionLabel: 'Open Machine Health',
-      targetHref: '#machineHealthStrip',
-    });
-  }
-
   // Sort: Critical first, then Warning
   return items.sort((a, b) => {
     if (a.severity === 'critical' && b.severity !== 'critical') return -1;

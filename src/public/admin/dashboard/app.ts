@@ -52,21 +52,6 @@ const owedChangeHint = document.getElementById(
 const barPrint = document.getElementById('barPrint') as HTMLElement | null;
 const barCopy = document.getElementById('barCopy') as HTMLElement | null;
 const barScan = document.getElementById('barScan') as HTMLElement | null;
-const forecastPaperDays = document.getElementById(
-  'forecastPaperDays',
-) as HTMLElement | null;
-const forecastPaperStock = document.getElementById(
-  'forecastPaperStock',
-) as HTMLElement | null;
-const forecastPaperStatus = document.getElementById(
-  'forecastPaperStatus',
-) as HTMLElement | null;
-const forecastAlert = document.getElementById(
-  'forecastAlert',
-) as HTMLElement | null;
-const forecastInkList = document.getElementById(
-  'forecastInkList',
-) as HTMLElement | null;
 
 const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
 const resetBalanceBtn = document.getElementById(
@@ -152,94 +137,6 @@ function applyInkEstimation(summary: SummaryResponse): void {
   }
 }
 
-function formatDaysRemaining(daysRemaining: number | null): string {
-  if (daysRemaining === null) return '--';
-  if (daysRemaining < 1) return '<1 day';
-  if (daysRemaining < 10) return `${daysRemaining.toFixed(1)} days`;
-  return `${Math.round(daysRemaining)} days`;
-}
-
-function applyConsumablesForecast(summary: SummaryResponse): void {
-  const forecast = summary.consumables;
-  if (!forecast) {
-    if (forecastPaperDays) forecastPaperDays.textContent = '--';
-    if (forecastPaperStock) forecastPaperStock.textContent = '--';
-    if (forecastPaperStatus) forecastPaperStatus.textContent = 'Unavailable';
-    if (forecastAlert) {
-      forecastAlert.textContent = 'Consumables forecast is unavailable.';
-      forecastAlert.classList.remove('consumables-alert--active');
-    }
-    if (forecastInkList) {
-      const empty = document.createElement('li');
-      empty.className = 'consumables-item consumables-item--muted';
-      empty.textContent = 'No ink forecast data available.';
-      forecastInkList.replaceChildren(empty);
-    }
-    return;
-  }
-
-  if (forecastPaperDays) {
-    forecastPaperDays.textContent = formatDaysRemaining(
-      forecast.paper.daysRemaining,
-    );
-  }
-  if (forecastPaperStock) {
-    forecastPaperStock.textContent = `${forecast.paper.currentSheets}/${forecast.paper.trayCapacitySheets} sheets`;
-  }
-  if (forecastPaperStatus) {
-    forecastPaperStatus.textContent = forecast.paper.status.replace('_', ' ');
-  }
-  if (forecastAlert) {
-    forecastAlert.textContent = forecast.alerts.withinThreshold
-      ? `At-risk: ${forecast.alerts.reasons.join(', ')}`
-      : `Healthy: no depletion risk within ${forecast.alertDaysThreshold} days.`;
-    forecastAlert.classList.toggle(
-      'consumables-alert--active',
-      forecast.alerts.withinThreshold,
-    );
-  }
-  if (forecastInkList) {
-    forecastInkList.replaceChildren();
-    if (forecast.inkSupplies.length === 0) {
-      const empty = document.createElement('li');
-      empty.className = 'consumables-item consumables-item--muted';
-      empty.textContent = 'No ink telemetry detected yet.';
-      forecastInkList.appendChild(empty);
-      return;
-    }
-    for (const supply of forecast.inkSupplies) {
-      const item = document.createElement('li');
-      item.className = 'consumables-item';
-      const isDepletionRisk =
-        supply.daysRemaining !== null &&
-        supply.daysRemaining <= forecast.alertDaysThreshold;
-      if (
-        supply.supplyStatus === 'low' ||
-        supply.supplyStatus === 'empty' ||
-        isDepletionRisk
-      ) {
-        item.classList.add('consumables-item--warn');
-      }
-
-      const name = document.createElement('span');
-      name.className = 'consumables-item__name';
-      name.textContent = `${supply.printerName} • ${supply.name}`;
-      const meta = document.createElement('span');
-      meta.className = 'consumables-item__meta';
-      const levelLabel =
-        supply.level === null
-          ? supply.supplyStatus === 'low' || supply.supplyStatus === 'empty'
-            ? supply.supplyStatus
-            : 'level unavailable'
-          : `${supply.level.toFixed(0)}%`;
-      meta.textContent = `${levelLabel} • ${formatDaysRemaining(supply.daysRemaining)}`;
-
-      item.append(name, meta);
-      forecastInkList.appendChild(item);
-    }
-  }
-}
-
 function applySummary(summary: SummaryResponse): void {
   earningsToday.textContent = peso(summary.earnings.today);
   jobsTotal.textContent = String(summary.jobStats.total);
@@ -274,7 +171,6 @@ function applySummary(summary: SummaryResponse): void {
   if (barScan) {
     barScan.style.width = `${Math.round((summary.jobStats.scan / total) * 100)}%`;
   }
-  applyConsumablesForecast(summary);
   applyInkEstimation(summary);
   updateSidebarBadges(summary);
 
