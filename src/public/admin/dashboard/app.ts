@@ -61,12 +61,6 @@ const resetInkBtn = document.getElementById('resetInkBtn') as HTMLButtonElement;
 const clearStorageBtn = document.getElementById(
   'clearStorageBtn',
 ) as HTMLButtonElement;
-const openAlertBadge = document.getElementById(
-  'openAlertBadge',
-) as HTMLElement | null;
-const openAlertBadgeMob = document.getElementById(
-  'openAlertBadgeMob',
-) as HTMLElement | null;
 
 let refreshTimer: number | null = null;
 
@@ -154,12 +148,6 @@ function applySummary(summary: SummaryResponse): void {
         ? 'Manual change settlement required now.'
         : 'No unsettled change payouts.';
   }
-  const openCount =
-    summary.anomalyStats.openCount > 0
-      ? String(summary.anomalyStats.openCount)
-      : '';
-  if (openAlertBadge) openAlertBadge.textContent = openCount;
-  if (openAlertBadgeMob) openAlertBadgeMob.textContent = openCount;
 
   const total = summary.jobStats.total || 1;
   if (barPrint) {
