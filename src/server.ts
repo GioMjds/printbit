@@ -81,6 +81,7 @@ import {
   startHeartbeatReporter,
   stopHeartbeatReporter,
 } from '@/services/heartbeat-reporter';
+import { startCloudSync, stopCloudSync } from '@/services/cloud-sync';
 
 const app = express();
 const server = http.createServer(app);
@@ -451,6 +452,7 @@ async function initializeBackgroundSubsystems(): Promise<void> {
     isHotspotRunning,
   });
   startHeartbeatReporter();
+  startCloudSync();
   anomalyService.setSocketIo(io);
   adminService.setSocketIo(io);
   adminPushService.setSocketIo(io);
@@ -819,6 +821,7 @@ async function gracefulShutdown(signal: NodeJS.Signals): Promise<void> {
   stopTrustedTimeMonitor();
   stopWatchdogHealthMonitor();
   stopHeartbeatReporter();
+  stopCloudSync();
   try {
     await paymentAcceptorGate.shutdown();
   } catch (error) {
