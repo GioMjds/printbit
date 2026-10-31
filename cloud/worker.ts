@@ -1,6 +1,8 @@
 export interface Env {
   PRINTBIT_STATE: KVNamespace;
   SYNC_SECRET?: string;
+  KIOSK_ORIGIN?: string;
+  OFFLINE_THRESHOLD_MS?: string;
 }
 
 export interface KioskTelemetryPayload {
@@ -527,9 +529,53 @@ function renderDashboardHtml(status: KioskStatusResponse): string {
 </html>`;
 }
 
+async function loadKioskStatus(
+  env: Env,
+  kioskId: string = 'printbit-kiosk-01',
+  thresholdMs: number = 90000,
+): Promise<KioskStatusResponse> {
+  let raw = await env.PRINTBIT_STATE.get(`kiosk:${kioskId}`);
+  if (!raw) {
+    raw = await env.PRINTBIT_STATE.get('kiosk:latest');
+  }
+
+  if (!raw) {
+    return createEmptyStatus(kioskId);
+  }
+
+  try {
+    const data = JSON.parse(raw) as KioskTelemetryPayload;
+    const ts = data.timestamp ? new Date(data.timestamp).getTime() : 0;
+    const ageMs = ts > 0 ? Math.max(0, Date.now() - ts) : Infinity;
+    const isOnline = ageMs < thresholdMs;
+
+    return {
+      isOnline,
+      ageMs,
+      kioskId: data.kioskId || kioskId,
+      timestamp: data.timestamp,
+      status: data.status,
+      uptimeSec: data.uptimeSec,
+      hardware: data.hardware || {},
+      summary: {
+        earningsToday: data.summary?.earningsToday ?? 0,
+        jobsToday: data.summary?.jobsToday ?? 0,
+        owedChange: data.summary?.owedChange ?? 0,
+        inkGrayscale: data.summary?.inkGrayscale ?? 100,
+        inkColor: data.summary?.inkColor ?? 100,
+        issues: data.summary?.issues || [],
+      },
+      data,
+    };
+  } catch {
+    return createEmptyStatus(kioskId);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const thresholdMs = parseInt(env.OFFLINE_THRESHOLD_MS || '90000', 10);
 
     // CORS preflight
     if (request.method === 'OPTIONS') {
@@ -606,42 +652,7 @@ export default {
       }
 
       const kioskId = url.searchParams.get('kioskId') || 'printbit-kiosk-01';
-      let raw = await env.PRINTBIT_STATE.get(`kiosk:${kioskId}`);
-      if (!raw) {
-        raw = await env.PRINTBIT_STATE.get('kiosk:latest');
-      }
-
-      if (!raw) {
-        const fallback: KioskStatusResponse = createEmptyStatus(kioskId);
-        return new Response(JSON.stringify(fallback), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-        });
-      }
-
-      const data = JSON.parse(raw) as KioskTelemetryPayload;
-      const ts = data.timestamp ? new Date(data.timestamp).getTime() : 0;
-      const ageMs = ts > 0 ? Math.max(0, Date.now() - ts) : Infinity;
-      const isOnline = ageMs < 90000;
-
-      const statusResponse: KioskStatusResponse = {
-        isOnline,
-        ageMs,
-        kioskId: data.kioskId || kioskId,
-        timestamp: data.timestamp,
-        status: data.status,
-        uptimeSec: data.uptimeSec,
-        hardware: data.hardware || {},
-        summary: {
-          earningsToday: data.summary?.earningsToday ?? 0,
-          jobsToday: data.summary?.jobsToday ?? 0,
-          owedChange: data.summary?.owedChange ?? 0,
-          inkGrayscale: data.summary?.inkGrayscale ?? 100,
-          inkColor: data.summary?.inkColor ?? 100,
-          issues: data.summary?.issues || [],
-        },
-        data,
-      };
+      const statusResponse = await loadKioskStatus(env, kioskId, thresholdMs);
 
       return new Response(JSON.stringify(statusResponse), {
         status: 200,
@@ -649,45 +660,78 @@ export default {
       });
     }
 
-    // 3. Fallback: GET /* serves self-contained dashboard HTML page
-    const kioskId = url.searchParams.get('kioskId') || 'printbit-kiosk-01';
-    let raw = await env.PRINTBIT_STATE.get(`kiosk:${kioskId}`);
-    if (!raw) {
-      raw = await env.PRINTBIT_STATE.get('kiosk:latest');
+    // 3. Explicit edge status page: GET /status or GET /edge
+    if (url.pathname === '/status' || url.pathname === '/edge') {
+      const kioskId = url.searchParams.get('kioskId') || 'printbit-kiosk-01';
+      const initialStatus = await loadKioskStatus(env, kioskId, thresholdMs);
+      const html = renderDashboardHtml(initialStatus);
+      return new Response(html, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+        },
+      });
     }
 
-    let initialStatus: KioskStatusResponse;
-    if (raw) {
+    // 4. Smart Proxy: If KIOSK_ORIGIN is configured, forward to kiosk tunnel
+    if (env.KIOSK_ORIGIN && env.KIOSK_ORIGIN.trim()) {
       try {
-        const data = JSON.parse(raw) as KioskTelemetryPayload;
-        const ts = data.timestamp ? new Date(data.timestamp).getTime() : 0;
-        const ageMs = ts > 0 ? Math.max(0, Date.now() - ts) : Infinity;
-        initialStatus = {
-          isOnline: ageMs < 90000,
-          ageMs,
-          kioskId: data.kioskId || kioskId,
-          timestamp: data.timestamp,
-          status: data.status,
-          uptimeSec: data.uptimeSec,
-          hardware: data.hardware || {},
-          summary: {
-            earningsToday: data.summary?.earningsToday ?? 0,
-            jobsToday: data.summary?.jobsToday ?? 0,
-            owedChange: data.summary?.owedChange ?? 0,
-            inkGrayscale: data.summary?.inkGrayscale ?? 100,
-            inkColor: data.summary?.inkColor ?? 100,
-            issues: data.summary?.issues || [],
-          },
-          data,
-        };
+        const originBase = new URL(env.KIOSK_ORIGIN.trim());
+        const targetUrl = new URL(url.pathname + url.search, originBase);
+
+        const proxyHeaders = new Headers(request.headers);
+        proxyHeaders.set('X-Forwarded-Host', url.host);
+        proxyHeaders.set('X-Forwarded-Proto', url.protocol.replace(':', ''));
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        const proxyReq = new Request(targetUrl.toString(), {
+          method: request.method,
+          headers: proxyHeaders,
+          body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
+          redirect: 'manual',
+          signal: controller.signal,
+        });
+
+        const originRes = await fetch(proxyReq);
+        clearTimeout(timeoutId);
+
+        // Gateway down errors from Cloudflare Tunnel: 502 Bad Gateway, 503 Unavailable, 504 Timeout, 530 Origin DNS/Down
+        const isGatewayDown = [502, 503, 504, 530].includes(originRes.status);
+        if (!isGatewayDown) {
+          return originRes;
+        }
       } catch {
-        initialStatus = createEmptyStatus(kioskId);
+        // Fetch failed or timed out: kiosk machine powered off or offline
       }
-    } else {
-      initialStatus = createEmptyStatus(kioskId);
     }
 
-    const html = renderDashboardHtml(initialStatus);
+    // 5. Fallback: Kiosk is offline or KIOSK_ORIGIN not set
+    const kioskId = url.searchParams.get('kioskId') || 'printbit-kiosk-01';
+    const fallbackStatus = await loadKioskStatus(env, kioskId, thresholdMs);
+
+    // If API request, return clean JSON fallback so admin frontend does not crash on HTML
+    if (url.pathname.startsWith('/api/')) {
+      return new Response(
+        JSON.stringify({
+          error: 'Kiosk is currently offline or unreachable',
+          isOnline: false,
+          kioskId: fallbackStatus.kioskId,
+          lastSeen: fallbackStatus.timestamp,
+          ageMs: fallbackStatus.ageMs,
+          summary: fallbackStatus.summary,
+        }),
+        {
+          status: 503,
+          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+        },
+      );
+    }
+
+    // Otherwise render Always-On Edge dashboard HTML
+    const html = renderDashboardHtml(fallbackStatus);
     return new Response(html, {
       status: 200,
       headers: {

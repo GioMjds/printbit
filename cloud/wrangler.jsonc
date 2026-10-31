@@ -9,6 +9,10 @@
 			"id": "774d0fa71c3c4120a28caf459363898a"
 		}
 	],
+	"vars": {
+		"KIOSK_ORIGIN": "https://kiosk-origin.printbitkiosk.com",
+		"OFFLINE_THRESHOLD_MS": "90000"
+	},
 	"observability": {
 		"enabled": true
 	}
