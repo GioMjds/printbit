@@ -463,33 +463,6 @@ export interface EdgePrinterStatus {
   queueStatus: string;
 }
 
-export interface EdgeJobActionResult {
-  success: boolean;
-  error?: string;
-  noOp?: boolean;
-  alreadyInState?: boolean;
-}
-
-export async function cancelPrintJobViaEdge(
-  _printerName: string,
-  _spoolerJobId: number,
-): Promise<EdgeJobActionResult> {
-  return { success: true };
-}
-
-export async function pausePrintJobViaEdge(
-  _printerName: string,
-  _spoolerJobId: number,
-): Promise<EdgeJobActionResult> {
-  return { success: true };
-}
-
-export async function resumePrintJobViaEdge(
-  _printerName: string,
-  _spoolerJobId: number,
-): Promise<EdgeJobActionResult> {
-  return { success: true };
-}
 
 export async function getPrinterStatusViaEdge(
   printerName?: string,

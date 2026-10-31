@@ -15,9 +15,6 @@ export class PrinterController {
     this.router.get('/active-error', this.getActiveError);
     this.router.get('/simulation-status', this.getSimulationStatus);
     this.router.post('/preflight', this.preflight);
-    this.router.post('/pause', this.pauseJob);
-    this.router.post('/resume', this.resumeJob);
-    this.router.post('/cancel-remaining', this.cancelRemainingJob);
   }
 
   public getSimulationStatus = (_req: Request, res: Response): void => {
@@ -73,53 +70,4 @@ export class PrinterController {
       });
     }
   };
-
-  private pauseJob = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { spoolerCorrelationKey } = req.body ?? {};
-      if (!isValidCorrelationKey(spoolerCorrelationKey)) {
-        res.status(400).json({ error: 'Invalid or missing spoolerCorrelationKey' });
-        return;
-      }
-      await this.printerService.pauseJob(spoolerCorrelationKey);
-      res.json({ success: true });
-    } catch (error) {
-      console.error('[PRINTER_CTRL] Failed to pause job:', error);
-      res.status(500).json({ error: 'Failed to pause job' });
-    }
-  };
-
-  private resumeJob = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { spoolerCorrelationKey } = req.body ?? {};
-      if (!isValidCorrelationKey(spoolerCorrelationKey)) {
-        res.status(400).json({ error: 'Invalid or missing spoolerCorrelationKey' });
-        return;
-      }
-      await this.printerService.resumeJob(spoolerCorrelationKey);
-      res.json({ success: true });
-    } catch (error) {
-      console.error('[PRINTER_CTRL] Failed to resume job:', error);
-      res.status(500).json({ error: 'Failed to resume job' });
-    }
-  };
-
-  private cancelRemainingJob = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { spoolerCorrelationKey } = req.body ?? {};
-      if (!isValidCorrelationKey(spoolerCorrelationKey)) {
-        res.status(400).json({ error: 'Invalid or missing spoolerCorrelationKey' });
-        return;
-      }
-      await this.printerService.cancelRemaining(spoolerCorrelationKey);
-      res.json({ success: true });
-    } catch (error) {
-      console.error('[PRINTER_CTRL] Failed to cancel remaining pages:', error);
-      res.status(500).json({ error: 'Failed to cancel remaining pages' });
-    }
-  };
-}
-
-function isValidCorrelationKey(key: string): key is string {
-  return typeof key === 'string' && key.length <= 255 && /^[a-zA-Z0-9-_]+$/.test(key);
 }
