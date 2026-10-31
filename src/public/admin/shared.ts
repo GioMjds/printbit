@@ -430,6 +430,42 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+let isKioskOnline = true;
+
+export function ensureTopbarOfflinePill(): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+  let pill = document.querySelector<HTMLElement>('.topbar-offline-pill');
+  if (!pill) {
+    const target =
+      document.querySelector('.topbar__titles') ||
+      document.querySelector('.topbar__left');
+    if (target) {
+      pill = document.createElement('span');
+      pill.className = `topbar-offline-pill ${isKioskOnline ? 'hidden' : ''}`;
+      pill.setAttribute('title', 'Kiosk machine is unreachable');
+      pill.innerHTML = '<span class="pill-dot"></span> OFFLINE';
+      target.appendChild(pill);
+    }
+  }
+  return pill;
+}
+
+export function setKioskOnlineState(online: boolean, reason?: string): void {
+  if (typeof document === 'undefined') return;
+  isKioskOnline = online;
+
+  document.body.classList.toggle('kiosk-offline', !online);
+
+  const pill = ensureTopbarOfflinePill();
+  if (pill) {
+    pill.classList.toggle('hidden', online);
+  }
+}
+
+export function isKioskReachable(): boolean {
+  return isKioskOnline;
+}
+
 export async function apiFetch(
   path: string,
   init: RequestInit = {},
@@ -440,7 +476,23 @@ export async function apiFetch(
   if (!headers.has('Content-Type') && init.body) {
     headers.set('Content-Type', 'application/json');
   }
-  return fetch(path, { ...init, headers, credentials: 'include' });
+  try {
+    const res = await fetch(path, { ...init, headers, credentials: 'include' });
+    if (
+      res.status === 502 ||
+      res.status === 503 ||
+      res.status === 504 ||
+      res.status === 530
+    ) {
+      setKioskOnlineState(false, 'Kiosk machine is unreachable or powered off.');
+    } else {
+      setKioskOnlineState(true);
+    }
+    return res;
+  } catch (err) {
+    setKioskOnlineState(false, 'Network connection to kiosk lost.');
+    throw err;
+  }
 }
 
 // ── Auth helpers ─────────────────────────────────────────────────
@@ -450,22 +502,35 @@ export async function ensureAuth(): Promise<boolean> {
   const token = getAdminToken();
   if (token) headers.set('x-admin-token', token);
 
-  const response = await fetch('/api/admin/verify', {
-    method: 'POST',
-    headers,
-    credentials: 'include',
-  });
+  try {
+    const response = await fetch('/api/admin/verify', {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+    });
 
-  if (response.ok) {
-    try {
-      const data = (await response.json()) as { sessionToken?: string };
-      if (data.sessionToken) setAdminToken(data.sessionToken);
-    } catch {
-      // Ignore JSON parse errors
+    if (
+      response.status === 502 ||
+      response.status === 503 ||
+      response.status === 504 ||
+      response.status === 530
+    ) {
+      setKioskOnlineState(false, 'Kiosk machine is unreachable or powered off.');
+    } else if (response.ok) {
+      setKioskOnlineState(true);
+      try {
+        const data = (await response.json()) as { sessionToken?: string };
+        if (data.sessionToken) setAdminToken(data.sessionToken);
+      } catch {
+        // Ignore JSON parse errors
+      }
     }
-  }
 
-  return response.ok;
+    return response.ok;
+  } catch {
+    setKioskOnlineState(false, 'Network connection to kiosk lost.');
+    return false;
+  }
 }
 
 let messageEl: HTMLElement | null = null;
@@ -860,26 +925,20 @@ let deferredPrompt: BeforeInstallPromptEvent | null = null;
 export function initPWA(): void {
   if (typeof window === 'undefined') return;
 
-  // 1. Offline banner management
-  let banner = document.getElementById('adminOfflineBanner');
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = 'adminOfflineBanner';
-    banner.className = 'hidden';
-    banner.innerHTML =
-      '<span>⚠️ You are currently offline. Real-time telemetry and hardware controls are paused.</span>';
-    document.body.prepend(banner);
-  }
+  // 1. Topbar offline status indicator
+  ensureTopbarOfflinePill();
 
-  const updateOnlineStatus = () => {
-    const isOffline = !navigator.onLine;
-    document.body.classList.toggle('kiosk-offline', isOffline);
-    banner?.classList.toggle('hidden', !isOffline);
+  const updateBrowserOnlineStatus = () => {
+    if (!navigator.onLine) {
+      setKioskOnlineState(false, 'Your device is offline (no internet connection).');
+    }
   };
 
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
-  updateOnlineStatus();
+  window.addEventListener('online', updateBrowserOnlineStatus);
+  window.addEventListener('offline', updateBrowserOnlineStatus);
+  if (!navigator.onLine) {
+    setKioskOnlineState(false, 'Your device is offline.');
+  }
 
   // 2. Service Worker Registration
   if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {

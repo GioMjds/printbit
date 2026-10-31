@@ -11,7 +11,7 @@
 	],
 	"vars": {
 		"KIOSK_ORIGIN": "https://kiosk-origin.printbitkiosk.com",
-		"OFFLINE_THRESHOLD_MS": "90000"
+		"OFFLINE_THRESHOLD_MS": "45000"
 	},
 	"observability": {
 		"enabled": true

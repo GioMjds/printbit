@@ -921,34 +921,72 @@ html.admin-session-active #adminDashboard.hidden {
   }
 }
 
-/* PWA Offline Banner & Install UI */
-#adminOfflineBanner {
-  position: sticky;
-  top: 0;
-  z-index: 9999;
-  background: #dc2626;
-  color: #ffffff;
-  padding: 8px 16px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+/* Kiosk Offline State — Elegant Content Dimming & Safe Controls */
+body.kiosk-offline .content {
+  opacity: 0.55;
+  filter: grayscale(0.2);
+  transition: opacity 300ms ease, filter 300ms ease;
 }
 
-#adminOfflineBanner.hidden {
-  display: none !important;
+body.kiosk-offline .content .card,
+body.kiosk-offline .content .kpi,
+body.kiosk-offline .content form {
+  user-select: none;
 }
 
 body.kiosk-offline .btn-action,
 body.kiosk-offline button[data-mutation="true"],
 body.kiosk-offline .btn-danger,
-body.kiosk-offline .action-btn {
-  opacity: 0.5;
+body.kiosk-offline .action-btn,
+body.kiosk-offline #resetBalanceBtn {
+  opacity: 0.4;
   pointer-events: none;
   cursor: not-allowed;
+}
+
+/* Informational status banner stays sharp and interactive */
+body.kiosk-offline #statusBanner,
+body.kiosk-offline .status-banner {
+  opacity: 1 !important;
+  filter: none !important;
+  pointer-events: auto !important;
+}
+
+body.kiosk-offline #statusBanner a,
+body.kiosk-offline .status-banner a {
+  cursor: pointer !important;
+}
+
+/* Topbar offline pill badge */
+.topbar-offline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-left: 8px;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.topbar-offline-pill.hidden {
+  display: none !important;
+}
+
+.topbar-offline-pill .pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+  animation: pulse-live 1.6s ease-in-out infinite;
 }
 
 .btn-pwa-install {

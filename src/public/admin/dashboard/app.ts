@@ -3,6 +3,7 @@ import {
   apiFetch,
   formatBytes,
   initAuth,
+  isKioskReachable,
   peso,
   setMessage,
   updateSidebarBadges,
@@ -287,9 +288,12 @@ function showRefreshError(error: unknown): void {
     const offlineState = deriveStatusBannerState(null, true);
     renderStatusBanner(statusBanner, offlineState);
   }
-  setMessage(
-    error instanceof Error ? error.message : 'Automatic refresh failed.',
-  );
+  // Only toast error on first transition or active user action, not repetitive background polls
+  if (isKioskReachable()) {
+    setMessage(
+      error instanceof Error ? error.message : 'Automatic refresh failed.',
+    );
+  }
 }
 
 initAuth(async (signal) => {

@@ -81,7 +81,11 @@ import {
   startHeartbeatReporter,
   stopHeartbeatReporter,
 } from '@/services/heartbeat-reporter';
-import { startCloudSync, stopCloudSync } from '@/services/cloud-sync';
+import {
+  startCloudSync,
+  stopCloudSync,
+  sendCloudSyncShutdown,
+} from '@/services/cloud-sync';
 
 const app = express();
 const server = http.createServer(app);
@@ -822,6 +826,11 @@ async function gracefulShutdown(signal: NodeJS.Signals): Promise<void> {
   stopWatchdogHealthMonitor();
   stopHeartbeatReporter();
   stopCloudSync();
+  try {
+    await sendCloudSyncShutdown();
+  } catch {
+    // Non-fatal if offline push fails during shutdown
+  }
   try {
     await paymentAcceptorGate.shutdown();
   } catch (error) {

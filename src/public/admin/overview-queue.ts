@@ -6,6 +6,8 @@ export interface BannerState {
   tone: BannerTone;
   title: string;
   desc: string;
+  actionLabel?: string;
+  actionHref?: string;
 }
 
 export type QueueSeverity = 'critical' | 'warning';
@@ -98,9 +100,11 @@ export function deriveStatusBannerState(
 ): BannerState {
   if (isPollFailed || !summary) {
     return {
-      tone: 'grey',
-      title: "Can't reach kiosk",
-      desc: 'Automatic 10s poll failed. Reconnecting...',
+      tone: 'red',
+      title: 'Kiosk Machine Offline',
+      desc: 'Node.js server unreachable. Live hardware controls paused.',
+      actionLabel: 'View On-Cloud Edge',
+      actionHref: '/edge',
     };
   }
 
@@ -142,6 +146,7 @@ export function renderStatusBanner(bannerEl: HTMLElement, state: BannerState): v
     <div class="status-banner__body">
       <h3 class="status-banner__title">${state.title}</h3>
       <p class="status-banner__desc">${state.desc}</p>
+      ${state.actionLabel && state.actionHref ? `<a href="${state.actionHref}" class="status-banner__action">${state.actionLabel} &rarr;</a>` : ''}
     </div>
   `;
 }

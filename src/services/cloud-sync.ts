@@ -120,3 +120,47 @@ export function stopCloudSync(): void {
   }
   syncInFlight = false;
 }
+
+export async function sendCloudSyncShutdown(
+  customFetch: typeof fetch = fetch,
+): Promise<CloudSyncResult> {
+  const config = getCloudSyncConfig();
+  if (!config.enabled || !config.syncUrl) {
+    return { synced: false, status: 'skipped' };
+  }
+
+  const payload = {
+    ...gatherKioskSnapshot(),
+    status: 'offline',
+  };
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (config.secret) {
+    headers.Authorization = `Bearer ${config.secret}`;
+  }
+
+  try {
+    const res = await customFetch(config.syncUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(2000),
+    });
+
+    return {
+      synced: res.ok,
+      status: res.ok ? 'synced' : 'failed',
+      statusCode: res.status,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      synced: false,
+      status: 'failed',
+      error: message,
+    };
+  }
+}

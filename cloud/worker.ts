@@ -83,11 +83,29 @@ function formatUptime(uptimeSec?: number): string {
   return `${seconds}s`;
 }
 
+function formatManilaTimestamp(isoStr?: string): string {
+  if (!isoStr) return 'Never';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return 'Never';
+    return d.toLocaleString('en-US', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    }) + ' (PHT)';
+  } catch {
+    return isoStr;
+  }
+}
+
 function renderDashboardHtml(status: KioskStatusResponse): string {
   const isOnline = status.isOnline;
-  const lastSeenStr = status.timestamp
-    ? new Date(status.timestamp).toLocaleString()
-    : 'Never';
+  const lastSeenStr = formatManilaTimestamp(status.timestamp);
   const relativeAge = formatRelativeTime(status.ageMs);
 
   return `<!DOCTYPE html>
@@ -448,6 +466,26 @@ function renderDashboardHtml(status: KioskStatusResponse): string {
       return hr + 'h ' + (min % 60) + 'm ago';
     }
 
+    function formatManilaDate(isoStr) {
+      if (!isoStr) return 'Never';
+      try {
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return 'Never';
+        return d.toLocaleString('en-US', {
+          timeZone: 'Asia/Manila',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        }) + ' (PHT)';
+      } catch (e) {
+        return isoStr;
+      }
+    }
+
     function formatUptimeSec(uptimeSec) {
       if (!uptimeSec || uptimeSec <= 0) return '0s';
       const hours = Math.floor(uptimeSec / 3600);
@@ -484,7 +522,7 @@ function renderDashboardHtml(status: KioskStatusResponse): string {
       }
 
       lastSeenText.textContent = formatRelative(data.ageMs);
-      timestampText.textContent = data.timestamp ? new Date(data.timestamp).toLocaleString() : 'Never';
+      timestampText.textContent = formatManilaDate(data.timestamp);
 
       if (data.summary) {
         document.getElementById('earnings-value').textContent = '₱' + (data.summary.earningsToday || 0).toFixed(2);
@@ -529,6 +567,22 @@ function renderDashboardHtml(status: KioskStatusResponse): string {
 </html>`;
 }
 
+async function probeOriginAlive(origin: string): Promise<boolean> {
+  try {
+    const originUrl = new URL('/api/power-safety/status', origin.trim());
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(originUrl.toString(), {
+      method: 'GET',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return ![502, 504, 530].includes(res.status);
+  } catch {
+    return false;
+  }
+}
+
 async function loadKioskStatus(
   env: Env,
   kioskId: string = 'printbit-kiosk-01',
@@ -547,7 +601,7 @@ async function loadKioskStatus(
     const data = JSON.parse(raw) as KioskTelemetryPayload;
     const ts = data.timestamp ? new Date(data.timestamp).getTime() : 0;
     const ageMs = ts > 0 ? Math.max(0, Date.now() - ts) : Infinity;
-    const isOnline = ageMs < thresholdMs;
+    const isOnline = data.status !== 'offline' && ageMs < thresholdMs;
 
     return {
       isOnline,
@@ -654,6 +708,14 @@ export default {
       const kioskId = url.searchParams.get('kioskId') || 'printbit-kiosk-01';
       const statusResponse = await loadKioskStatus(env, kioskId, thresholdMs);
 
+      // If KV says online, but origin is configured, verify origin reachability
+      if (statusResponse.isOnline && env.KIOSK_ORIGIN && env.KIOSK_ORIGIN.trim()) {
+        const alive = await probeOriginAlive(env.KIOSK_ORIGIN);
+        if (!alive) {
+          statusResponse.isOnline = false;
+        }
+      }
+
       return new Response(JSON.stringify(statusResponse), {
         status: 200,
         headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
@@ -711,6 +773,11 @@ export default {
     // 5. Fallback: Kiosk is offline or KIOSK_ORIGIN not set
     const kioskId = url.searchParams.get('kioskId') || 'printbit-kiosk-01';
     const fallbackStatus = await loadKioskStatus(env, kioskId, thresholdMs);
+
+    // If origin is configured and proxy just failed, mark offline immediately
+    if (env.KIOSK_ORIGIN && env.KIOSK_ORIGIN.trim()) {
+      fallbackStatus.isOnline = false;
+    }
 
     // If API request, return clean JSON fallback so admin frontend does not crash on HTML
     if (url.pathname.startsWith('/api/')) {
