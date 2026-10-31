@@ -1,13 +1,16 @@
 # Kiosk Operational Readiness & Dead-Man Heartbeat Design
 
 ## 1. Overview & Problem Statement
+
 Currently, remote administrators rely solely on inbound Cloudflare Tunnel connectivity to port 3000 to determine if the physical PrintBit kiosk machine is "open" / operational.
 
 ### The Limitation
+
 - **Liveness vs. Readiness:** An HTTP 200 via Cloudflare Tunnel only proves the Windows machine is booted and the Node.js process is bound to port 3000. It does not verify whether the printer is operational (jammed, out of paper, spooler error), whether the coin acceptor or coin hopper is connected, or whether the C# .NET hardware service is running.
 - **Inbound Pull vs. Outbound Push:** If the kiosk suffers a power failure, circuit breaker trip, or Wi-Fi disconnection, the tunnel quietly fails. No notification is delivered until an administrator manually checks the URL or a customer complains.
 
 ### The Solution
+
 Implement an outbound **Dead-Man Heartbeat Reporter** within the local PrintBit kiosk software that pushes continuous operational readiness telemetry to an external cloud monitor (e.g., Healthchecks.io / Better Stack), which automatically fires Telegram/Discord alerts on failure or silence.
 
 ---
@@ -42,6 +45,7 @@ flowchart TD
 ```
 
 ### Component Roles
+
 1. **Health Aggregator (`watchdog-health.ts`):** Existing service monitoring `app`, `printer`, `serial`, and `hotspot`.
 2. **Heartbeat Reporter (`heartbeat-reporter.ts`):** New background service. Queries the aggregator every 30 seconds.
 3. **External Monitor (Cloud SaaS):** Expects a ping every 30 seconds with a 2-minute grace period. If no ping arrives or if `/fail` is called, dispatches a push notification to Telegram/Discord.
@@ -50,18 +54,19 @@ flowchart TD
 
 ## 3. Operational States & Alerting Matrix
 
-| State | Hardware Condition | Outbound Signal | Cloud Action | Alert Dispatched |
-|---|---|---|---|---|
-| **Healthy** | All subsystems operational | `POST <PING_URL>` (200 OK) | Reset dead-man timer | None (All Clear) |
-| **Degraded** | Online, but hardware service failed (printer paper out, serial disconnected) | `POST <PING_URL>/fail` + Diagnostic JSON | Log incident | "⚠️ PrintBit Degraded: [Reason]" |
-| **Offline** | Power lost, internet down, or Windows OS crash | No signal received for > 2 min | Dead-man timer expires | "🚨 PrintBit OFFLINE (Dead-man timeout)" |
-| **Recovered**| Machine back online and all hardware restored | `POST <PING_URL>` | Resolve incident | "✅ PrintBit Restored: All systems healthy" |
+| State         | Hardware Condition                                                           | Outbound Signal                          | Cloud Action           | Alert Dispatched                            |
+| ------------- | ---------------------------------------------------------------------------- | ---------------------------------------- | ---------------------- | ------------------------------------------- |
+| **Healthy**   | All subsystems operational                                                   | `POST <PING_URL>` (200 OK)               | Reset dead-man timer   | None (All Clear)                            |
+| **Degraded**  | Online, but hardware service failed (printer paper out, serial disconnected) | `POST <PING_URL>/fail` + Diagnostic JSON | Log incident           | "⚠️ PrintBit Degraded: [Reason]"            |
+| **Offline**   | Power lost, internet down, or Windows OS crash                               | No signal received for > 2 min           | Dead-man timer expires | "🚨 PrintBit OFFLINE (Dead-man timeout)"    |
+| **Recovered** | Machine back online and all hardware restored                                | `POST <PING_URL>`                        | Resolve incident       | "✅ PrintBit Restored: All systems healthy" |
 
 ---
 
 ## 4. Hardware Readiness Criteria
 
 A state is marked **Healthy** only when all of the following conditions pass:
+
 1. **Node.js Core (`app`):** Event loop responsive, process uptime valid.
 2. **Printer Subsystem (`printer`):** Connected, spooler active, not in `BLOCKED_STATUSES` (`paper_out`, `jammed`, `door_open`, `offline`, `error`), telemetry fresh (<90s).
 3. **Coin & Hopper Serial (`serial`):** Shared COM port is opened and communicating.
@@ -74,25 +79,23 @@ If any check fails, the status becomes **Degraded**, and the reporter dispatches
 
 ## 5. Configuration & Environment Variables
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `PRINTBIT_HEARTBEAT_ENABLED` | `false` | Enables/disables the outbound reporter (opt-in for production). |
-| `PRINTBIT_HEARTBEAT_PING_URL` | (unset) | Full heartbeat endpoint URL (e.g. `https://hc-ping.com/<uuid>`). |
-| `PRINTBIT_HEARTBEAT_INTERVAL_SEC` | `30` | Interval in seconds between pings (10–300). |
-| `PRINTBIT_HEARTBEAT_TIMEOUT_MS` | `5000` | AbortSignal timeout for outbound HTTP request. |
-| `PRINTBIT_HEARTBEAT_KIOSK_ID` | `printbit-kiosk-01` | Identifier sent in diagnostic payload. |
+| Variable                          | Default             | Purpose                                                          |
+| --------------------------------- | ------------------- | ---------------------------------------------------------------- |
+| `PRINTBIT_HEARTBEAT_ENABLED`      | `false`             | Enables/disables the outbound reporter (opt-in for production).  |
+| `PRINTBIT_HEARTBEAT_PING_URL`     | (unset)             | Full heartbeat endpoint URL (e.g. `https://hc-ping.com/<uuid>`). |
+| `PRINTBIT_HEARTBEAT_INTERVAL_SEC` | `30`                | Interval in seconds between pings (10–300).                      |
+| `PRINTBIT_HEARTBEAT_TIMEOUT_MS`   | `5000`              | AbortSignal timeout for outbound HTTP request.                   |
+| `PRINTBIT_HEARTBEAT_KIOSK_ID`     | `printbit-kiosk-01` | Identifier sent in diagnostic payload.                           |
 
 ### Diagnostic Payload (for `/fail` and optional POST body)
+
 ```json
 {
   "kioskId": "printbit-kiosk-01",
   "status": "degraded",
   "timestamp": "2026-10-31T03:00:00.000Z",
   "uptimeSec": 8420,
-  "issues": [
-    "Printer blocked: paper_out",
-    "Serial disconnected on COM6"
-  ],
+  "issues": ["Printer blocked: paper_out", "Serial disconnected on COM6"],
   "components": {
     "app": "healthy",
     "printer": "degraded",

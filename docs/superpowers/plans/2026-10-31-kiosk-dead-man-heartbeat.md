@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-31-kiosk-dead-man-heartbeat-design.md`
 
 ## Global Constraints
+
 - `PRINTBIT_HEARTBEAT_ENABLED` must default to `false` (opt-in for production).
 - Strict timeout of 5,000ms (`AbortSignal.timeout(5000)`) on all outgoing HTTP requests; never block the Node event loop.
 - No uncaught exceptions or server crashes on network failure (silently log at `warn` level).
@@ -22,12 +23,15 @@
 ### Task 1: Configuration Module for Dead-Man Heartbeat
 
 **Files:**
+
 - Create: `src/config/heartbeat.config.ts`
 - Modify: `src/config/index.ts`
 - Test: `src/config/__tests__/heartbeat.config.spec.ts`
 
 **Interfaces:**
+
 - Produces:
+
   ```typescript
   export interface HeartbeatConfig {
     enabled: boolean;
@@ -42,6 +46,7 @@
 - [ ] **Step 1: Write the failing test**
 
 Create `src/config/__tests__/heartbeat.config.spec.ts`:
+
 ```typescript
 import { getHeartbeatConfig } from '../heartbeat.config';
 
@@ -104,6 +109,7 @@ Expected: FAIL with "Cannot find module '../heartbeat.config'"
 - [ ] **Step 3: Implement minimal configuration code**
 
 Create `src/config/heartbeat.config.ts`:
+
 ```typescript
 export interface HeartbeatConfig {
   enabled: boolean;
@@ -125,13 +131,20 @@ export function getHeartbeatConfig(): HeartbeatConfig {
   const rawUrl = process.env.PRINTBIT_HEARTBEAT_PING_URL?.trim();
   const pingUrl = rawUrl && rawUrl.length > 0 ? rawUrl : null;
 
-  const rawInterval = parsePositiveInt(process.env.PRINTBIT_HEARTBEAT_INTERVAL_SEC, 30);
+  const rawInterval = parsePositiveInt(
+    process.env.PRINTBIT_HEARTBEAT_INTERVAL_SEC,
+    30,
+  );
   const intervalSec = Math.max(10, Math.min(300, rawInterval));
 
-  const rawTimeout = parsePositiveInt(process.env.PRINTBIT_HEARTBEAT_TIMEOUT_MS, 5000);
+  const rawTimeout = parsePositiveInt(
+    process.env.PRINTBIT_HEARTBEAT_TIMEOUT_MS,
+    5000,
+  );
   const timeoutMs = Math.max(1000, Math.min(30000, rawTimeout));
 
-  const kioskId = process.env.PRINTBIT_HEARTBEAT_KIOSK_ID?.trim() || 'printbit-kiosk-01';
+  const kioskId =
+    process.env.PRINTBIT_HEARTBEAT_KIOSK_ID?.trim() || 'printbit-kiosk-01';
 
   return {
     enabled,
@@ -144,6 +157,7 @@ export function getHeartbeatConfig(): HeartbeatConfig {
 ```
 
 Update `src/config/index.ts` to export heartbeat config:
+
 ```typescript
 export * from './heartbeat.config';
 ```
@@ -165,15 +179,18 @@ git commit -m "feat(config): add dead-man heartbeat configuration"
 ### Task 2: Heartbeat Reporter Core Service
 
 **Files:**
+
 - Create: `src/services/heartbeat-reporter.ts`
 - Modify: `src/services/index.ts`
 - Test: `src/services/__tests__/heartbeat-reporter.spec.ts`
 
 **Interfaces:**
+
 - Consumes:
   - `getHeartbeatConfig()` from `@/config/heartbeat.config`
   - `getWatchdogHealthSnapshot()` from `@/services/watchdog-health`
 - Produces:
+
   ```typescript
   export interface HeartbeatDiagnosticPayload {
     kioskId: string;
@@ -192,8 +209,14 @@ git commit -m "feat(config): add dead-man heartbeat configuration"
     error?: string;
   }
 
-  export function evaluateReadiness(): { isHealthy: boolean; issues: string[]; components: Record<string, string> };
-  export function sendHeartbeatOnce(fetchFn?: typeof fetch): Promise<HeartbeatSendResult>;
+  export function evaluateReadiness(): {
+    isHealthy: boolean;
+    issues: string[];
+    components: Record<string, string>;
+  };
+  export function sendHeartbeatOnce(
+    fetchFn?: typeof fetch,
+  ): Promise<HeartbeatSendResult>;
   export function startHeartbeatReporter(fetchFn?: typeof fetch): void;
   export function stopHeartbeatReporter(): void;
   ```
@@ -201,6 +224,7 @@ git commit -m "feat(config): add dead-man heartbeat configuration"
 - [ ] **Step 1: Write the failing test**
 
 Create `src/services/__tests__/heartbeat-reporter.spec.ts`:
+
 ```typescript
 import {
   evaluateReadiness,
@@ -237,10 +261,34 @@ describe('heartbeat-reporter', () => {
     mockWatchdog.getWatchdogHealthSnapshot.mockReturnValue({
       overall: 'healthy',
       components: {
-        app: { status: 'healthy', detail: 'App ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        printer: { status: 'healthy', detail: 'Printer ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        serial: { status: 'healthy', detail: 'Serial ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        hotspot: { status: 'healthy', detail: 'Hotspot ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
+        app: {
+          status: 'healthy',
+          detail: 'App ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        printer: {
+          status: 'healthy',
+          detail: 'Printer ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        serial: {
+          status: 'healthy',
+          detail: 'Serial ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        hotspot: {
+          status: 'healthy',
+          detail: 'Hotspot ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
       },
       externalWatchdog: {
         running: true,
@@ -265,10 +313,34 @@ describe('heartbeat-reporter', () => {
     mockWatchdog.getWatchdogHealthSnapshot.mockReturnValue({
       overall: 'degraded',
       components: {
-        app: { status: 'healthy', detail: 'App ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        printer: { status: 'degraded', detail: 'Printer blocked: paper_out', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        serial: { status: 'degraded', detail: 'Serial disconnected', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        hotspot: { status: 'healthy', detail: 'Hotspot ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
+        app: {
+          status: 'healthy',
+          detail: 'App ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        printer: {
+          status: 'degraded',
+          detail: 'Printer blocked: paper_out',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        serial: {
+          status: 'degraded',
+          detail: 'Serial disconnected',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        hotspot: {
+          status: 'healthy',
+          detail: 'Hotspot ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
       },
       externalWatchdog: {
         running: true,
@@ -293,12 +365,46 @@ describe('heartbeat-reporter', () => {
     mockWatchdog.getWatchdogHealthSnapshot.mockReturnValue({
       overall: 'healthy',
       components: {
-        app: { status: 'healthy', detail: 'App ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        printer: { status: 'healthy', detail: 'Printer ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        serial: { status: 'healthy', detail: 'Serial ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        hotspot: { status: 'healthy', detail: 'Hotspot ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
+        app: {
+          status: 'healthy',
+          detail: 'App ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        printer: {
+          status: 'healthy',
+          detail: 'Printer ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        serial: {
+          status: 'healthy',
+          detail: 'Serial ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        hotspot: {
+          status: 'healthy',
+          detail: 'Hotspot ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
       },
-      externalWatchdog: { running: true, watchdogPid: null, consecutiveFailures: 0, recoveryAttempts: 0, backoffDelayMs: 0, nextRecoveryAt: null, lastAction: '', lastError: null, lastUpdatedAt: '' },
+      externalWatchdog: {
+        running: true,
+        watchdogPid: null,
+        consecutiveFailures: 0,
+        recoveryAttempts: 0,
+        backoffDelayMs: 0,
+        nextRecoveryAt: null,
+        lastAction: '',
+        lastError: null,
+        lastUpdatedAt: '',
+      },
     });
 
     const mockFetch = jest.fn().mockResolvedValue({
@@ -306,7 +412,9 @@ describe('heartbeat-reporter', () => {
       status: 200,
     });
 
-    const result = await sendHeartbeatOnce(mockFetch as unknown as typeof fetch);
+    const result = await sendHeartbeatOnce(
+      mockFetch as unknown as typeof fetch,
+    );
     expect(result.sent).toBe(true);
     expect(result.status).toBe('healthy');
     expect(mockFetch).toHaveBeenCalledWith(
@@ -319,12 +427,46 @@ describe('heartbeat-reporter', () => {
     mockWatchdog.getWatchdogHealthSnapshot.mockReturnValue({
       overall: 'degraded',
       components: {
-        app: { status: 'healthy', detail: 'App ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        printer: { status: 'degraded', detail: 'Printer blocked: paper_out', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        serial: { status: 'healthy', detail: 'Serial ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        hotspot: { status: 'healthy', detail: 'Hotspot ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
+        app: {
+          status: 'healthy',
+          detail: 'App ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        printer: {
+          status: 'degraded',
+          detail: 'Printer blocked: paper_out',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        serial: {
+          status: 'healthy',
+          detail: 'Serial ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        hotspot: {
+          status: 'healthy',
+          detail: 'Hotspot ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
       },
-      externalWatchdog: { running: true, watchdogPid: null, consecutiveFailures: 0, recoveryAttempts: 0, backoffDelayMs: 0, nextRecoveryAt: null, lastAction: '', lastError: null, lastUpdatedAt: '' },
+      externalWatchdog: {
+        running: true,
+        watchdogPid: null,
+        consecutiveFailures: 0,
+        recoveryAttempts: 0,
+        backoffDelayMs: 0,
+        nextRecoveryAt: null,
+        lastAction: '',
+        lastError: null,
+        lastUpdatedAt: '',
+      },
     });
 
     const mockFetch = jest.fn().mockResolvedValue({
@@ -332,7 +474,9 @@ describe('heartbeat-reporter', () => {
       status: 200,
     });
 
-    const result = await sendHeartbeatOnce(mockFetch as unknown as typeof fetch);
+    const result = await sendHeartbeatOnce(
+      mockFetch as unknown as typeof fetch,
+    );
     expect(result.sent).toBe(true);
     expect(result.status).toBe('degraded');
     expect(mockFetch).toHaveBeenCalledWith(
@@ -354,7 +498,9 @@ describe('heartbeat-reporter', () => {
     });
 
     const mockFetch = jest.fn();
-    const result = await sendHeartbeatOnce(mockFetch as unknown as typeof fetch);
+    const result = await sendHeartbeatOnce(
+      mockFetch as unknown as typeof fetch,
+    );
     expect(result.sent).toBe(false);
     expect(result.status).toBe('skipped');
     expect(mockFetch).not.toHaveBeenCalled();
@@ -364,17 +510,53 @@ describe('heartbeat-reporter', () => {
     mockWatchdog.getWatchdogHealthSnapshot.mockReturnValue({
       overall: 'healthy',
       components: {
-        app: { status: 'healthy', detail: 'App ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        printer: { status: 'healthy', detail: 'Printer ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        serial: { status: 'healthy', detail: 'Serial ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        hotspot: { status: 'healthy', detail: 'Hotspot ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
+        app: {
+          status: 'healthy',
+          detail: 'App ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        printer: {
+          status: 'healthy',
+          detail: 'Printer ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        serial: {
+          status: 'healthy',
+          detail: 'Serial ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        hotspot: {
+          status: 'healthy',
+          detail: 'Hotspot ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
       },
-      externalWatchdog: { running: true, watchdogPid: null, consecutiveFailures: 0, recoveryAttempts: 0, backoffDelayMs: 0, nextRecoveryAt: null, lastAction: '', lastError: null, lastUpdatedAt: '' },
+      externalWatchdog: {
+        running: true,
+        watchdogPid: null,
+        consecutiveFailures: 0,
+        recoveryAttempts: 0,
+        backoffDelayMs: 0,
+        nextRecoveryAt: null,
+        lastAction: '',
+        lastError: null,
+        lastUpdatedAt: '',
+      },
     });
 
     const mockFetch = jest.fn().mockRejectedValue(new Error('Network timeout'));
 
-    const result = await sendHeartbeatOnce(mockFetch as unknown as typeof fetch);
+    const result = await sendHeartbeatOnce(
+      mockFetch as unknown as typeof fetch,
+    );
     expect(result.sent).toBe(false);
     expect(result.status).toBe('failed');
     expect(result.error).toBe('Network timeout');
@@ -390,6 +572,7 @@ Expected: FAIL with "Cannot find module '../heartbeat-reporter'"
 - [ ] **Step 3: Implement minimal HeartbeatReporter service**
 
 Create `src/services/heartbeat-reporter.ts`:
+
 ```typescript
 import { getHeartbeatConfig } from '@/config/heartbeat.config';
 import { getWatchdogHealthSnapshot } from '@/services/watchdog-health';
@@ -487,16 +670,22 @@ export async function sendHeartbeatOnce(
   }
 }
 
-export function startHeartbeatReporter(customFetch: typeof fetch = fetch): void {
+export function startHeartbeatReporter(
+  customFetch: typeof fetch = fetch,
+): void {
   if (reporterTimer) return;
 
   const config = getHeartbeatConfig();
   if (!config.enabled || !config.pingUrl) {
-    console.info('[HEARTBEAT-REPORTER] Outbound heartbeat reporter disabled (opt-in via PRINTBIT_HEARTBEAT_ENABLED).');
+    console.info(
+      '[HEARTBEAT-REPORTER] Outbound heartbeat reporter disabled (opt-in via PRINTBIT_HEARTBEAT_ENABLED).',
+    );
     return;
   }
 
-  console.info(`[HEARTBEAT-REPORTER] Starting outbound heartbeat reporter (interval: ${config.intervalSec}s).`);
+  console.info(
+    `[HEARTBEAT-REPORTER] Starting outbound heartbeat reporter (interval: ${config.intervalSec}s).`,
+  );
 
   void sendHeartbeatOnce(customFetch);
 
@@ -523,6 +712,7 @@ export function stopHeartbeatReporter(): void {
 ```
 
 Update `src/services/index.ts` to export the reporter functions:
+
 ```typescript
 export * from './heartbeat-reporter';
 ```
@@ -544,17 +734,20 @@ git commit -m "feat(services): implement outbound dead-man heartbeat reporter"
 ### Task 3: Admin Test Trigger Endpoint
 
 **Files:**
+
 - Modify: `src/modules/admin/admin.controller.ts`
 - Modify: `src/modules/admin/admin.module.ts`
 - Test: `src/modules/admin/__tests__/admin-heartbeat.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `sendHeartbeatOnce` and `getHeartbeatConfig` from `@/services/heartbeat-reporter` and `@/config/heartbeat.config`
 - Produces: `POST /api/admin/heartbeat/test` route (protected by admin authentication).
 
 - [ ] **Step 1: Write the failing test**
 
 Create `src/modules/admin/__tests__/admin-heartbeat.spec.ts`:
+
 ```typescript
 import express from 'express';
 import request from 'supertest';
@@ -564,7 +757,9 @@ import * as heartbeatReporter from '@/services/heartbeat-reporter';
 jest.mock('@/services/heartbeat-reporter');
 
 describe('POST /api/admin/heartbeat/test', () => {
-  const mockReporter = heartbeatReporter as jest.Mocked<typeof heartbeatReporter>;
+  const mockReporter = heartbeatReporter as jest.Mocked<
+    typeof heartbeatReporter
+  >;
   let app: express.Express;
 
   beforeEach(() => {
@@ -613,11 +808,13 @@ Expected: FAIL with 404 (route not found).
 - [ ] **Step 3: Implement admin test route**
 
 In `src/modules/admin/admin.controller.ts`, import `sendHeartbeatOnce`:
+
 ```typescript
 import { sendHeartbeatOnce } from '@/services/heartbeat-reporter';
 ```
 
 And in `setupRoutes()`:
+
 ```typescript
 this.router.post(
   '/heartbeat/test',
@@ -651,17 +848,20 @@ git commit -m "feat(admin): add heartbeat test endpoint for operators"
 ### Task 4: Server Lifecycle Wiring & Integration Verification
 
 **Files:**
+
 - Modify: `src/server.ts:445-455` & `src/server.ts:810-820`
 - Modify: `.env.example`
 - Modify: `API_DOCUMENTATION.md`
 - Test: Full type-check and test suite verification
 
 **Interfaces:**
+
 - Consumes: `startHeartbeatReporter` and `stopHeartbeatReporter` from `@/services/heartbeat-reporter`
 
 - [ ] **Step 1: Wire heartbeat reporter into server startup and shutdown**
 
 In `src/server.ts`, import functions:
+
 ```typescript
 import {
   startHeartbeatReporter,
@@ -670,11 +870,13 @@ import {
 ```
 
 In the background initialization phase of `startServer()` (around line 450):
+
 ```typescript
 startHeartbeatReporter();
 ```
 
 In the graceful shutdown handler of `server.ts` (around line 815, alongside `stopWatchdogHealthMonitor()`):
+
 ```typescript
 stopHeartbeatReporter();
 ```
@@ -682,6 +884,7 @@ stopHeartbeatReporter();
 - [ ] **Step 2: Document configuration in `.env.example`**
 
 Add the heartbeat block to `.env.example`:
+
 ```ini
 # ==========================================
 # Outbound Dead-Man Heartbeat
@@ -701,10 +904,12 @@ Add documentation for `POST /api/admin/heartbeat/test` under Admin Endpoints.
 - [ ] **Step 4: Run type-check and full tests to verify zero regressions**
 
 Run:
+
 ```bash
 pnpm exec tsc --noEmit --ignoreDeprecations 6.0
 pnpm test
 ```
+
 Expected: All TypeScript checks pass and Jest test suite passes.
 
 - [ ] **Step 5: Commit**
