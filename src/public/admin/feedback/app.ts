@@ -399,6 +399,7 @@ async function handleConfirmPurge(): Promise<void> {
 }
 
 function handleExportCsv(): void {
+  setMessage('Preparing feedback CSV export…');
   window.location.href = '/api/admin/feedback/export.csv';
 }
 

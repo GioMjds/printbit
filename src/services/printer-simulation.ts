@@ -82,7 +82,8 @@ export function simulatePrinterError(
         printError: {
           code: 'PAPER_TRAY_EMPTY',
           severity: 'recoverable',
-          userMessage: 'Printer is out of paper. Please load paper to continue.',
+          userMessage:
+            'Printer is out of paper. Please load paper to continue.',
           hint: 'Please call staff to load paper into the tray.',
           canRetry: true,
           canDismiss: false,
@@ -137,7 +138,8 @@ export function simulatePrinterError(
       void adminPushService.broadcastCriticalAlert({
         code: 'PAPER_JAM',
         title: '🚨 Kiosk Paper Jam Detected!',
-        message: 'Paper jam detected in the printer. Check the printer and clear the jam to continue printing.',
+        message:
+          'Paper jam detected in the printer. Check the printer and clear the jam to continue printing.',
         severity: 'critical',
       });
       break;
@@ -173,9 +175,10 @@ export function simulatePrinterError(
       void adminPushService.broadcastCriticalAlert({
         code: 'INK_OUT',
         title: '🚨 Kiosk Ink Tank Empty!',
-        message: 'Printer ink tank is empty. You need to refill the ink to continue printing.',
+        message:
+          'Printer ink tank is empty. You need to refill the ink to continue printing.',
         severity: 'critical',
-      })
+      });
       break;
     }
 
@@ -228,6 +231,13 @@ export function simulatePrinterError(
           canDismiss: false,
         },
       });
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PRINTER_OFFLINE',
+        title: '🚨 Kiosk Printer Offline!',
+        message:
+          'The kiosk printer is offline or disconnected. Please call staff to check the printer power and cable connections to continue printing.',
+        severity: 'critical',
+      });
       break;
     }
 
@@ -255,9 +265,10 @@ export function simulatePrinterError(
         },
       });
       void adminPushService.broadcastCriticalAlert({
-        code: 'PRINTER_OFFLINE',
+        code: 'SERVICE_REQUIRED',
         title: '🚨 Kiosk Printer Service Required!',
-        message: 'The kiosk printer requires service or maintenance. Please call staff for technical assistance to continue printing.',
+        message:
+          'The kiosk printer requires service or maintenance. Please call staff for technical assistance to continue printing.',
         severity: 'critical',
       });
       break;

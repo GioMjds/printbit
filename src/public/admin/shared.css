@@ -1153,3 +1153,41 @@ body.kiosk-offline .action-btn {
   line-height: 1.4;
   text-align: center;
 }
+
+
+/* ── Global Floating Toast Notification ─────────────────────────────────── */
+.admin-toast,
+.tx-toast {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(17, 20, 47, 0.95);
+  border: 1.5px solid #696fc7;
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.65),
+    0 0 20px rgba(105, 111, 199, 0.35);
+  color: #ffffff;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  z-index: 99999;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  box-sizing: border-box;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.admin-toast.hidden,
+.tx-toast.hidden {
+  display: none !important;
+}

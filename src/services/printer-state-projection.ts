@@ -11,7 +11,9 @@ import { anomalyService } from './anomaly';
 import { adminPushService } from './admin-push.service';
 import { translateHardwarePrinterError } from './printer-error-translation';
 
-type SocketIoEmitter = { emit: (event: string, ...args: unknown[]) => void } | Server;
+type SocketIoEmitter =
+  | { emit: (event: string, ...args: unknown[]) => void }
+  | Server;
 
 let printerGuideSocketIo: SocketIoEmitter | null = null;
 
@@ -45,7 +47,9 @@ export function handlePrinterStatusUpdate(
         });
       } else {
         unlockCoinSlot('printer-error-guide');
-        printerGuideSocketIo?.emit('printer:error-guide-update', { activeError: null });
+        printerGuideSocketIo?.emit('printer:error-guide-update', {
+          activeError: null,
+        });
       }
     }
   } else {
@@ -58,10 +62,41 @@ export function handlePrinterStatusUpdate(
       void adminPushService.broadcastCriticalAlert({
         code: 'PAPER_JAM',
         title: '🚨 Kiosk Paper Jam Detected!',
-        message: 'Paper is jammed in the kiosk printer. Physical clearance required.',
+        message:
+          'Paper jam detected in the printer. Check the printer and clear the jam to continue printing.',
         severity: 'critical',
       });
       return;
+    }
+
+    if (translated.code === 'E_INK_OUT') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'INK_OUT',
+        title: '🚨 Kiosk Ink Tank Empty!',
+        message:
+          'Printer ink tank is empty. You need to refill the ink to continue printing.',
+        severity: 'critical',
+      });
+    }
+
+    if (translated.code === 'E_OFFLINE') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PRINTER_OFFLINE',
+        title: '🚨 Kiosk Printer Offline!',
+        message:
+          'The kiosk printer is offline or disconnected. Please call staff to check the printer power and cable connections to continue printing.',
+        severity: 'critical',
+      });
+    }
+
+    if (translated.code === 'E_SERVICE') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'SERVICE_REQUIRED',
+        title: '🚨 Kiosk Printer Service Required!',
+        message:
+          'The kiosk printer requires service or maintenance. Please call staff for technical assistance to continue printing.',
+        severity: 'critical',
+      });
     }
 
     if (translated.tier === 'None') {
@@ -71,9 +106,15 @@ export function handlePrinterStatusUpdate(
     const prev = printerErrorStateManager.getActiveError();
     const isNewFault =
       !prev || prev.code !== translated.code || prev.status !== 'active';
-    const activeError = printerErrorStateManager.recordError(translated.code, jobId);
+    const activeError = printerErrorStateManager.recordError(
+      translated.code,
+      jobId,
+    );
 
-    if (translated.locksCoinSlot && !isCoinSlotLockedBy('printer-error-guide')) {
+    if (
+      translated.locksCoinSlot &&
+      !isCoinSlotLockedBy('printer-error-guide')
+    ) {
       lockCoinSlot('printer-error-guide', 'printer_error_' + translated.code);
     }
 
@@ -382,7 +423,7 @@ export async function runInkTelemetryDiagnostics(): Promise<InkTelemetryDiagnost
     ? printers.find(
         (p) => p.name === targetPrinterName || p.Name === targetPrinterName,
       )
-    : printers[0] ?? null;
+    : (printers[0] ?? null);
 
   const targetPrinterIdentity: TargetPrinterIdentity | null = targetPrinter
     ? {
@@ -617,7 +658,11 @@ export async function watchJobForMalfunction(
     pollTimer = setInterval(() => {
       if (settled) return;
       const snap = printerStateProjection.getSnapshot();
-      if (!snap.connected || snap.status === 'error' || snap.status === 'offline') {
+      if (
+        !snap.connected ||
+        snap.status === 'error' ||
+        snap.status === 'offline'
+      ) {
         const fault: PrinterFault = {
           timestamp: snap.lastCheckedAt || new Date().toISOString(),
           reason:

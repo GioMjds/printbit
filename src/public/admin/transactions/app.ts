@@ -2,7 +2,6 @@ import {
   LogsResponse,
   SummaryResponse,
   apiFetch,
-  setMessage,
   initAuth,
   updateSidebarBadges,
 } from '../shared';
@@ -41,7 +40,6 @@ const pageInfo = document.getElementById('pageInfo') as HTMLElement;
 const kpiTotalCount = document.getElementById('kpiTotalCount');
 const kpiTotalAmount = document.getElementById('kpiTotalAmount');
 const kpiDiscrepancyCount = document.getElementById('kpiDiscrepancyCount');
-const txToast = document.getElementById('txToast');
 
 // Filters & Search
 const applyFiltersBtn = document.getElementById(
@@ -296,7 +294,6 @@ let activeRefundState: RefundModalState | null = null;
 
 const PAGE_SIZE = 20;
 let refreshTimer: number | null = null;
-let toastTimer: number | null = null;
 let currentPage = 1;
 let totalLogs = 0;
 let allLogs: LogsResponse['logs'] = [];
@@ -427,16 +424,6 @@ const filterState = {
   quickFilter: 'all',
 } as FilterState;
 
-function showToast(msg: string): void {
-  setMessage(msg);
-  if (!txToast) return;
-  txToast.textContent = msg;
-  txToast.classList.remove('hidden');
-  if (toastTimer !== null) window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => {
-    txToast?.classList.add('hidden');
-  }, 3500);
-}
 
 function escapeHtml(str: string): string {
   return str

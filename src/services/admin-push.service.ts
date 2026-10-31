@@ -9,7 +9,7 @@ import type {
 } from '@/modules/admin/admin.schema';
 
 export interface KioskCriticalAlert {
-  code: 'PAPER_JAM' | 'PAPER_OUT' | 'PRINTER_OFFLINE' | 'HOPPER_EMPTY' | 'INK_OUT';
+  code: 'PAPER_JAM' | 'PAPER_OUT' | 'PRINTER_OFFLINE' | 'HOPPER_EMPTY' | 'INK_OUT' | 'SERVICE_REQUIRED';
   title: string;
   message: string;
   severity: 'critical' | 'warning';
@@ -49,17 +49,37 @@ export class AdminPushService {
     if (!data.settings.pushNotifications) {
       data.settings.pushNotifications = { enabled: true, cooldownSeconds: 30 };
     }
-    if (!data.settings.pushNotifications.vapidKeys) {
-      const keys = webpush.generateVAPIDKeys();
-      data.settings.pushNotifications.vapidKeys = keys;
-      void this.deps.writeDb();
+
+    const envPublicKey = process.env.VAPID_PUBLIC_KEY?.trim();
+    const envPrivateKey = process.env.VAPID_PRIVATE_KEY?.trim();
+    const subject =
+      process.env.VAPID_SUBJECT?.trim() || 'mailto:admin@printbitkiosk.com';
+
+    let keys: VapidKeys;
+
+    if (envPublicKey && envPrivateKey) {
+      keys = {
+        publicKey: envPublicKey,
+        privateKey: envPrivateKey,
+      };
+      if (
+        !data.settings.pushNotifications.vapidKeys ||
+        data.settings.pushNotifications.vapidKeys.publicKey !== keys.publicKey ||
+        data.settings.pushNotifications.vapidKeys.privateKey !== keys.privateKey
+      ) {
+        data.settings.pushNotifications.vapidKeys = keys;
+        void this.deps.writeDb();
+      }
+    } else {
+      if (!data.settings.pushNotifications.vapidKeys) {
+        const generated = webpush.generateVAPIDKeys();
+        data.settings.pushNotifications.vapidKeys = generated;
+        void this.deps.writeDb();
+      }
+      keys = data.settings.pushNotifications.vapidKeys;
     }
-    const keys = data.settings.pushNotifications.vapidKeys;
-    webpush.setVapidDetails(
-      'mailto:admin@printbitkiosk.com',
-      keys.publicKey,
-      keys.privateKey,
-    );
+
+    webpush.setVapidDetails(subject, keys.publicKey, keys.privateKey);
     return keys;
   }
 

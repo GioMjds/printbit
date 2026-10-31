@@ -498,6 +498,63 @@ function resolveVisibleMessageEl(): HTMLElement | null {
   return candidates[0];
 }
 
+let toastEl: HTMLElement | null = null;
+let toastTimer: number | null = null;
+
+export function resolveToastEl(): HTMLElement {
+  if (toastEl && document.body.contains(toastEl)) {
+    return toastEl;
+  }
+  toastEl = (document.getElementById('adminToast') ||
+    document.getElementById('txToast')) as HTMLElement | null;
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.id = 'adminToast';
+    toastEl.className = 'admin-toast hidden';
+    toastEl.setAttribute('role', 'status');
+    toastEl.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toastEl);
+  }
+  return toastEl;
+}
+
+export function hideToast(): void {
+  if (toastTimer !== null) {
+    window.clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  const el = resolveToastEl();
+  el.classList.add('hidden');
+}
+
+export function showToast(msg: string, durationMs: number = 3500): void {
+  // Synchronize topbar / visible status banner
+  messageEl = resolveVisibleMessageEl();
+  if (messageEl) {
+    messageEl.textContent = msg;
+    if (msg) {
+      messageEl.classList.remove('hidden');
+    }
+  }
+
+  if (!msg) {
+    hideToast();
+    return;
+  }
+
+  const el = resolveToastEl();
+  el.textContent = msg;
+  el.classList.remove('hidden');
+
+  if (toastTimer !== null) {
+    window.clearTimeout(toastTimer);
+  }
+  toastTimer = window.setTimeout(() => {
+    el.classList.add('hidden');
+    toastTimer = null;
+  }, durationMs);
+}
+
 export function setMessage(text: string): void {
   messageEl = resolveVisibleMessageEl();
   if (messageEl) {
@@ -510,6 +567,12 @@ export function setMessage(text: string): void {
     ) {
       messageEl.classList.add('hidden');
     }
+  }
+
+  if (text) {
+    showToast(text);
+  } else {
+    hideToast();
   }
 }
 
@@ -991,6 +1054,14 @@ export async function registerAdminPush(): Promise<{ ok: boolean; error?: string
     }
 
     const applicationServerKey = urlB64ToUint8Array(data.publicKey);
+    try {
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        await existing.unsubscribe();
+      }
+    } catch {
+      // Ignore unsubscribe error
+    }
     const subscription = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: applicationServerKey as unknown as BufferSource,
