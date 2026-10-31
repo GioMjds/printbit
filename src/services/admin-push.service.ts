@@ -9,7 +9,7 @@ import type {
 } from '@/modules/admin/admin.schema';
 
 export interface KioskCriticalAlert {
-  code: 'PAPER_JAM' | 'PAPER_OUT' | 'PRINTER_OFFLINE' | 'HOPPER_EMPTY';
+  code: 'PAPER_JAM' | 'PAPER_OUT' | 'PRINTER_OFFLINE' | 'HOPPER_EMPTY' | 'INK_OUT';
   title: string;
   message: string;
   severity: 'critical' | 'warning';

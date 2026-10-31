@@ -137,7 +137,7 @@ export function simulatePrinterError(
       void adminPushService.broadcastCriticalAlert({
         code: 'PAPER_JAM',
         title: '🚨 Kiosk Paper Jam Detected!',
-        message: 'Paper jam detected in the printer.',
+        message: 'Paper jam detected in the printer. Check the printer and clear the jam to continue printing.',
         severity: 'critical',
       });
       break;
@@ -170,6 +170,12 @@ export function simulatePrinterError(
           canDismiss: false,
         },
       });
+      void adminPushService.broadcastCriticalAlert({
+        code: 'INK_OUT',
+        title: '🚨 Kiosk Ink Tank Empty!',
+        message: 'Printer ink tank is empty. You need to refill the ink to continue printing.',
+        severity: 'critical',
+      })
       break;
     }
 
@@ -247,6 +253,12 @@ export function simulatePrinterError(
           canRetry: false,
           canDismiss: false,
         },
+      });
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PRINTER_OFFLINE',
+        title: '🚨 Kiosk Printer Service Required!',
+        message: 'The kiosk printer requires service or maintenance. Please call staff for technical assistance to continue printing.',
+        severity: 'critical',
       });
       break;
     }

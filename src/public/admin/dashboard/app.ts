@@ -3,7 +3,6 @@ import {
   apiFetch,
   formatBytes,
   initAuth,
-  notifyAdminDataUpdated,
   peso,
   setMessage,
   updateSidebarBadges,
@@ -171,9 +170,6 @@ function applySummary(summary: SummaryResponse): void {
     const queueItems = deriveAttentionQueue(summary);
     renderAttentionQueue(attentionQueue, queueItems);
   }
-
-  // Notify shell ticker that data updated
-  notifyAdminDataUpdated();
 }
 
 async function loadData(): Promise<void> {

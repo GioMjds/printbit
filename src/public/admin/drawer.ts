@@ -19,41 +19,6 @@ export function computeTotalNavBadge(
   return { rawCount: total, label: String(total), visible: true };
 }
 
-export interface UpdatedTicker {
-  setUpdatedNow(): void;
-  stop(): void;
-}
-
-export function createUpdatedTicker(
-  onTick: (text: string) => void,
-): UpdatedTicker {
-  let lastUpdatedMs: number = Date.now();
-  let intervalId: number | null = null;
-
-  function render(): void {
-    const elapsedSec = Math.floor((Date.now() - lastUpdatedMs) / 1000);
-    if (elapsedSec < 3) {
-      onTick('Updated just now');
-    } else {
-      onTick(`Updated ${elapsedSec}s ago`);
-    }
-  }
-
-  intervalId = window.setInterval(render, 1000);
-
-  return {
-    setUpdatedNow(): void {
-      lastUpdatedMs = Date.now();
-      render();
-    },
-    stop(): void {
-      if (intervalId !== null) {
-        window.clearInterval(intervalId);
-        intervalId = null;
-      }
-    },
-  };
-}
 
 export interface DrawerOptions {
   drawerEl: HTMLElement;

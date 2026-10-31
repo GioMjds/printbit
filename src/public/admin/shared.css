@@ -515,12 +515,6 @@ html.admin-session-active #adminDashboard.hidden {
   line-height: 1.2;
 }
 
-.topbar__updated-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(199, 210, 254, 0.75);
-  line-height: 1.2;
-}
 
 /* Slide-out drawer scrim backdrop */
 .drawer-scrim {

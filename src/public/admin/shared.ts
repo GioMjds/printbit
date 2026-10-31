@@ -1,8 +1,6 @@
 import {
   computeTotalNavBadge,
-  createUpdatedTicker,
   DrawerController,
-  UpdatedTicker,
 } from './drawer';
 
 export type InkTankEstimate = {
@@ -557,7 +555,6 @@ export type InitAuthArg =
   | ((signal: AbortSignal) => void | Promise<void>)
   | InitAuthOptions;
 
-let activeUpdatedTicker: UpdatedTicker | null = null;
 let activeDrawerController: DrawerController | null = null;
 
 export function initAdminShell(): void {
@@ -585,19 +582,10 @@ export function initAdminShell(): void {
       });
     });
   }
-
-  const updatedLabelEl = document.getElementById('updatedAgoLabel');
-  if (updatedLabelEl && !activeUpdatedTicker) {
-    activeUpdatedTicker = createUpdatedTicker((text) => {
-      updatedLabelEl.textContent = text;
-    });
-  }
 }
 
 export function notifyAdminDataUpdated(): void {
-  if (activeUpdatedTicker) {
-    activeUpdatedTicker.setUpdatedNow();
-  }
+  // No-op (updatedAgo ticker removed)
 }
 
 /**

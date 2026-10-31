@@ -471,7 +471,13 @@
 /* ─── Grid layouts ─────────────────────────────────────────────────────────── */
 .analytics-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
+  align-content: start;
+}
+
+.analytics-grid > * {
+  min-width: 0;
 }
 
 .earnings-breakdown-grid {
@@ -482,9 +488,7 @@
 /* ─── Mobile responsive (≤860px) ───────────────────────────────────────────── */
 @media (max-width: 860px) {
   .earnings-deck {
-    grid-template-columns: 1fr;
-    padding: 14px;
-    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .earnings-deck__summary {
@@ -530,8 +534,7 @@
 
   .analytics-grid,
   .earnings-breakdown-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .earnings-trend,

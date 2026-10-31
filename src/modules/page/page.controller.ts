@@ -90,7 +90,10 @@ export class PageController {
     this.router.get('/portal', this.handlePortal.bind(this));
 
     // Remote kiosk navigation triggered by ESP32 captive portal
-    this.router.all('/api/kiosk/navigate', this.handleRemoteNavigate.bind(this));
+    this.router.all(
+      '/api/kiosk/navigate',
+      this.handleRemoteNavigate.bind(this),
+    );
 
     // The launcher obtains a one-time credential over loopback, then Edge consumes it.
     this.router.post(
@@ -106,8 +109,14 @@ export class PageController {
     );
 
     this.router.get('/', (req: Request, res: Response, next: NextFunction) => {
-      const host = (req.headers['x-forwarded-host'] || req.headers.host || '') as string;
-      if (host.includes('admin.printbitkiosk.com')) return res.redirect('/admin/dashboard');
+      const host = (req.headers['x-forwarded-host'] ||
+        req.headers.host ||
+        '') as string;
+      if (
+        host.includes('admin.printbitkiosk.com') ||
+        host.includes('dev.printbitkiosk.com')
+      )
+        return res.redirect('/admin/dashboard');
       return next();
     });
 
@@ -246,19 +255,17 @@ export class PageController {
   }
 
   private handleIdleTimeout(_req: Request, res: Response): void {
-    const { idleTimeoutSeconds, idleScreenTimeoutSeconds } =
-      db.data!.settings;
+    const { idleTimeoutSeconds, idleScreenTimeoutSeconds } = db.data!.settings;
     res.json({
       idleTimeoutSeconds,
       idleScreenTimeoutSeconds,
       maxPagesPerSession:
         db.data?.settings?.printLimits?.maxPagesPerSession ?? 30,
-      uiBlocking:
-        db.data?.settings?.uiBlocking ?? {
-          enabled: false,
-          mode: 'maintenance',
-          customMessage: '',
-        },
+      uiBlocking: db.data?.settings?.uiBlocking ?? {
+        enabled: false,
+        mode: 'maintenance',
+        customMessage: '',
+      },
       developerMode: {
         enabled: Boolean(db.data?.settings?.developerMode?.enabled),
       },
