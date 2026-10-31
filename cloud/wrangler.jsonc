@@ -1,15 +1,15 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "printbit-admin-edge",
-  "main": "worker.ts",
-  "compatibility_date": "2026-10-01",
-  "kv_namespaces": [
-    {
-      "binding": "PRINTBIT_STATE",
-      "id": "printbit_state_kv"
-    }
-  ],
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "printbit-admin-edge",
+	"main": "worker.ts",
+	"compatibility_date": "2026-10-01",
+	"kv_namespaces": [
+		{
+			"binding": "PRINTBIT_STATE",
+			"id": "774d0fa71c3c4120a28caf459363898a"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
 }

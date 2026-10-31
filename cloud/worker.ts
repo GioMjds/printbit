@@ -83,7 +83,9 @@ function formatUptime(uptimeSec?: number): string {
 
 function renderDashboardHtml(status: KioskStatusResponse): string {
   const isOnline = status.isOnline;
-  const lastSeenStr = status.timestamp ? new Date(status.timestamp).toLocaleString() : 'Never';
+  const lastSeenStr = status.timestamp
+    ? new Date(status.timestamp).toLocaleString()
+    : 'Never';
   const relativeAge = formatRelativeTime(status.ageMs);
 
   return `<!DOCTYPE html>
@@ -409,7 +411,7 @@ function renderDashboardHtml(status: KioskStatusResponse): string {
         <div class="hw-badge">
           <span class="hw-name">${k}</span>
           <span class="hw-status ${v.toLowerCase()}">${v}</span>
-        </div>`
+        </div>`,
               )
               .join('')
       }
@@ -420,7 +422,9 @@ function renderDashboardHtml(status: KioskStatusResponse): string {
       ${
         status.summary.issues.length === 0
           ? '<div class="issue-none">✓ No active alerts. All components nominal.</div>'
-          : status.summary.issues.map((issue) => `<div class="issue-item">⚠️ ${issue}</div>`).join('')
+          : status.summary.issues
+              .map((issue) => `<div class="issue-item">⚠️ ${issue}</div>`)
+              .join('')
       }
     </div>
 
@@ -575,16 +579,19 @@ export default {
           {
             status: 200,
             headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-          }
+          },
         );
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return new Response(
-          JSON.stringify({ error: 'Invalid telemetry payload', details: message }),
+          JSON.stringify({
+            error: 'Invalid telemetry payload',
+            details: message,
+          }),
           {
             status: 400,
             headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-          }
+          },
         );
       }
     }
