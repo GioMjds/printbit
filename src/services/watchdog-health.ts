@@ -31,6 +31,7 @@ export interface WatchdogHealthSnapshot {
     WatchdogComponent,
     WatchdogComponentState & { stale: boolean; staleForMs: number }
   >;
+  overall: WatchdogStatus;
 }
 
 export interface WatchdogHealthMonitorDeps {
@@ -484,5 +485,6 @@ export function getWatchdogHealthSnapshot(): WatchdogHealthSnapshot {
     },
     externalWatchdog: { ...externalWatchdog },
     components: computed,
+    overall,
   };
 }
