@@ -77,6 +77,10 @@ import {
 } from '@/services/power-safety';
 import { getLocalIPv4 } from '@/utils/network';
 import { validateAdminSession } from '@/utils/admin-session';
+import {
+  startHeartbeatReporter,
+  stopHeartbeatReporter,
+} from '@/services/heartbeat-reporter';
 
 const app = express();
 const server = http.createServer(app);
@@ -446,6 +450,7 @@ async function initializeBackgroundSubsystems(): Promise<void> {
     getPrinterTelemetry,
     isHotspotRunning,
   });
+  startHeartbeatReporter();
   anomalyService.setSocketIo(io);
   adminService.setSocketIo(io);
   adminPushService.setSocketIo(io);
@@ -813,6 +818,7 @@ async function gracefulShutdown(signal: NodeJS.Signals): Promise<void> {
   console.log(`[SERVER] Received ${signal}. Shutting down gracefully...`);
   stopTrustedTimeMonitor();
   stopWatchdogHealthMonitor();
+  stopHeartbeatReporter();
   try {
     await paymentAcceptorGate.shutdown();
   } catch (error) {

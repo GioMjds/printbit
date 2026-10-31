@@ -79,6 +79,7 @@ import {
   requestWindowsRestart,
   requestWindowsShutdown,
 } from '@/services/windows-power';
+import { sendHeartbeatOnce } from '@/services/heartbeat-reporter';
 import { sendWorkerRequest } from '@/services/worker-command-pipe';
 import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
 import { hashPassword, verifyPassword } from '@/utils/hash';
@@ -591,6 +592,14 @@ export class AdminController {
       requireAdminLocalAccess,
       requireAdminPin,
       this.handleHopperSelfTest,
+    );
+
+    // ── Heartbeat routes ────────────────────────────────────────────────────────
+    this.router.post(
+      '/heartbeat/test',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleTestHeartbeat,
     );
 
     // ── Document Conversion routes ─────────────────────────────────────────────
@@ -1684,6 +1693,16 @@ export class AdminController {
   private handleHopperSelfTest = async (_req: Request, res: Response) => {
     const result = await this.deps.runHopperSelfTest();
     res.status(result.ok ? 200 : 503).json(result);
+  };
+
+  private handleTestHeartbeat = async (_req: Request, res: Response) => {
+    try {
+      const result = await sendHeartbeatOnce();
+      res.json({ success: true, result });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ success: false, error: message });
+    }
   };
 
   // ── Settings handlers ──────────────────────────────────────────────────────

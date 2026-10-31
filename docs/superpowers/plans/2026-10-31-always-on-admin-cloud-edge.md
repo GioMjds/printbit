@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-31-always-on-admin-cloud-edge-design.md`
 
 ## Global Constraints
+
 - `PRINTBIT_CLOUD_SYNC_ENABLED` must default to `false` (opt-in).
 - Outbound fetch requests must use strict `AbortSignal.timeout(5000)` to prevent blocking the Node event loop.
 - Network errors during sync must be caught gracefully and logged at `warn` level; never crash the server.
@@ -22,12 +23,14 @@
 ### Task 1: Cloudflare Worker Edge Service & Telemetry Store
 
 **Files:**
+
 - Create: `cloud/wrangler.jsonc`
 - Create: `cloud/worker.ts`
 - Create: `cloud/package.json`
 - Create: `cloud/tsconfig.json`
 
 **Interfaces:**
+
 - Produces:
   - `POST /api/telemetry/sync`: Ingests and saves snapshot to KV.
   - `GET /api/kiosk-status`: Returns calculated online status, age, and cached metrics.
@@ -36,6 +39,7 @@
 - [ ] **Step 1: Create Cloudflare Worker configuration**
 
 Create `cloud/wrangler.jsonc`:
+
 ```jsonc
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -45,16 +49,17 @@ Create `cloud/wrangler.jsonc`:
   "kv_namespaces": [
     {
       "binding": "PRINTBIT_STATE",
-      "id": "printbit_state_kv"
-    }
+      "id": "printbit_state_kv",
+    },
   ],
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
 }
 ```
 
 Create `cloud/package.json`:
+
 ```json
 {
   "name": "printbit-admin-edge",
@@ -73,6 +78,7 @@ Create `cloud/package.json`:
 ```
 
 Create `cloud/tsconfig.json`:
+
 ```json
 {
   "compilerOptions": {
@@ -91,6 +97,7 @@ Create `cloud/tsconfig.json`:
 - [ ] **Step 2: Implement Cloudflare Worker Edge router**
 
 Create `cloud/worker.ts`:
+
 ```typescript
 export interface Env {
   PRINTBIT_STATE: KVNamespace;
@@ -263,7 +270,10 @@ export default {
         const body = (await request.json()) as KioskTelemetryPayload;
         const kioskId = body.kioskId || 'printbit-kiosk-01';
         await env.PRINTBIT_STATE.put(`kiosk:${kioskId}`, JSON.stringify(body));
-        return Response.json({ ok: true, receivedAt: new Date().toISOString() });
+        return Response.json({
+          ok: true,
+          receivedAt: new Date().toISOString(),
+        });
       } catch (err) {
         return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
           status: 400,
@@ -288,7 +298,9 @@ export default {
 
       const data = JSON.parse(raw) as KioskTelemetryPayload;
       const lastSeenMs = Date.parse(data.timestamp);
-      const ageMs = Number.isFinite(lastSeenMs) ? Date.now() - lastSeenMs : Infinity;
+      const ageMs = Number.isFinite(lastSeenMs)
+        ? Date.now() - lastSeenMs
+        : Infinity;
       const isOnline = ageMs < 90_000;
 
       return Response.json({
@@ -323,12 +335,15 @@ git commit -m "feat(cloud): implement always-on Cloudflare Worker admin edge"
 ### Task 2: Kiosk Cloud Sync Configuration
 
 **Files:**
+
 - Create: `src/config/cloud-sync.config.ts`
 - Modify: `src/config/index.ts`
 - Test: `src/config/__tests__/cloud-sync.config.spec.ts`
 
 **Interfaces:**
+
 - Produces:
+
   ```typescript
   export interface CloudSyncConfig {
     enabled: boolean;
@@ -344,6 +359,7 @@ git commit -m "feat(cloud): implement always-on Cloudflare Worker admin edge"
 - [ ] **Step 1: Write the failing test**
 
 Create `src/config/__tests__/cloud-sync.config.spec.ts`:
+
 ```typescript
 import { getCloudSyncConfig } from '../cloud-sync.config';
 
@@ -375,14 +391,17 @@ describe('cloud-sync.config', () => {
 
   it('parses valid environment variables', () => {
     process.env.PRINTBIT_CLOUD_SYNC_ENABLED = 'true';
-    process.env.PRINTBIT_CLOUD_SYNC_URL = 'https://admin.printbitkiosk.com/api/telemetry/sync';
+    process.env.PRINTBIT_CLOUD_SYNC_URL =
+      'https://admin.printbitkiosk.com/api/telemetry/sync';
     process.env.PRINTBIT_CLOUD_SYNC_SECRET = 'secret-token-123';
     process.env.PRINTBIT_CLOUD_SYNC_INTERVAL_SEC = '45';
     process.env.PRINTBIT_CLOUD_SYNC_KIOSK_ID = 'campus-kiosk-02';
 
     const config = getCloudSyncConfig();
     expect(config.enabled).toBe(true);
-    expect(config.syncUrl).toBe('https://admin.printbitkiosk.com/api/telemetry/sync');
+    expect(config.syncUrl).toBe(
+      'https://admin.printbitkiosk.com/api/telemetry/sync',
+    );
     expect(config.secret).toBe('secret-token-123');
     expect(config.intervalSec).toBe(45);
     expect(config.kioskId).toBe('campus-kiosk-02');
@@ -398,6 +417,7 @@ Expected: FAIL with "Cannot find module '../cloud-sync.config'"
 - [ ] **Step 3: Implement minimal configuration code**
 
 Create `src/config/cloud-sync.config.ts`:
+
 ```typescript
 export interface CloudSyncConfig {
   enabled: boolean;
@@ -423,13 +443,20 @@ export function getCloudSyncConfig(): CloudSyncConfig {
   const rawSecret = process.env.PRINTBIT_CLOUD_SYNC_SECRET?.trim();
   const secret = rawSecret && rawSecret.length > 0 ? rawSecret : null;
 
-  const rawInterval = parsePositiveInt(process.env.PRINTBIT_CLOUD_SYNC_INTERVAL_SEC, 30);
+  const rawInterval = parsePositiveInt(
+    process.env.PRINTBIT_CLOUD_SYNC_INTERVAL_SEC,
+    30,
+  );
   const intervalSec = Math.max(10, Math.min(300, rawInterval));
 
-  const rawTimeout = parsePositiveInt(process.env.PRINTBIT_CLOUD_SYNC_TIMEOUT_MS, 5000);
+  const rawTimeout = parsePositiveInt(
+    process.env.PRINTBIT_CLOUD_SYNC_TIMEOUT_MS,
+    5000,
+  );
   const timeoutMs = Math.max(1000, Math.min(30000, rawTimeout));
 
-  const kioskId = process.env.PRINTBIT_CLOUD_SYNC_KIOSK_ID?.trim() || 'printbit-kiosk-01';
+  const kioskId =
+    process.env.PRINTBIT_CLOUD_SYNC_KIOSK_ID?.trim() || 'printbit-kiosk-01';
 
   return {
     enabled,
@@ -443,6 +470,7 @@ export function getCloudSyncConfig(): CloudSyncConfig {
 ```
 
 Update `src/config/index.ts`:
+
 ```typescript
 export * from './cloud-sync.config';
 ```
@@ -464,15 +492,18 @@ git commit -m "feat(config): add cloud-sync telemetry configuration"
 ### Task 3: Kiosk Outbound Telemetry Service
 
 **Files:**
+
 - Create: `src/services/cloud-sync.ts`
 - Modify: `src/services/index.ts`
 - Test: `src/services/__tests__/cloud-sync.spec.ts`
 
 **Interfaces:**
+
 - Consumes:
   - `getCloudSyncConfig()` from `@/config/cloud-sync.config`
   - `getWatchdogHealthSnapshot()` from `@/services/watchdog-health`
 - Produces:
+
   ```typescript
   export interface CloudSyncResult {
     synced: boolean;
@@ -481,7 +512,9 @@ git commit -m "feat(config): add cloud-sync telemetry configuration"
     error?: string;
   }
   export function gatherKioskSnapshot(): any;
-  export function sendCloudSyncOnce(fetchFn?: typeof fetch): Promise<CloudSyncResult>;
+  export function sendCloudSyncOnce(
+    fetchFn?: typeof fetch,
+  ): Promise<CloudSyncResult>;
   export function startCloudSync(fetchFn?: typeof fetch): void;
   export function stopCloudSync(): void;
   ```
@@ -489,6 +522,7 @@ git commit -m "feat(config): add cloud-sync telemetry configuration"
 - [ ] **Step 1: Write the failing test**
 
 Create `src/services/__tests__/cloud-sync.spec.ts`:
+
 ```typescript
 import {
   gatherKioskSnapshot,
@@ -526,12 +560,46 @@ describe('cloud-sync service', () => {
     mockWatchdog.getWatchdogHealthSnapshot.mockReturnValue({
       overall: 'healthy',
       components: {
-        app: { status: 'healthy', detail: 'App ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        printer: { status: 'healthy', detail: 'Printer ready', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        serial: { status: 'healthy', detail: 'Serial ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        hotspot: { status: 'healthy', detail: 'Hotspot ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
+        app: {
+          status: 'healthy',
+          detail: 'App ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        printer: {
+          status: 'healthy',
+          detail: 'Printer ready',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        serial: {
+          status: 'healthy',
+          detail: 'Serial ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        hotspot: {
+          status: 'healthy',
+          detail: 'Hotspot ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
       },
-      externalWatchdog: { running: true, watchdogPid: 1234, consecutiveFailures: 0, recoveryAttempts: 0, backoffDelayMs: 0, nextRecoveryAt: null, lastAction: 'ok', lastError: null, lastUpdatedAt: '' },
+      externalWatchdog: {
+        running: true,
+        watchdogPid: 1234,
+        consecutiveFailures: 0,
+        recoveryAttempts: 0,
+        backoffDelayMs: 0,
+        nextRecoveryAt: null,
+        lastAction: 'ok',
+        lastError: null,
+        lastUpdatedAt: '',
+      },
     });
 
     const snapshot = gatherKioskSnapshot();
@@ -544,12 +612,46 @@ describe('cloud-sync service', () => {
     mockWatchdog.getWatchdogHealthSnapshot.mockReturnValue({
       overall: 'healthy',
       components: {
-        app: { status: 'healthy', detail: 'ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        printer: { status: 'healthy', detail: 'ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        serial: { status: 'healthy', detail: 'ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
-        hotspot: { status: 'healthy', detail: 'ok', lastHeartbeatAt: '', staleAfterMs: 20000, context: {} },
+        app: {
+          status: 'healthy',
+          detail: 'ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        printer: {
+          status: 'healthy',
+          detail: 'ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        serial: {
+          status: 'healthy',
+          detail: 'ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
+        hotspot: {
+          status: 'healthy',
+          detail: 'ok',
+          lastHeartbeatAt: '',
+          staleAfterMs: 20000,
+          context: {},
+        },
       },
-      externalWatchdog: { running: true, watchdogPid: null, consecutiveFailures: 0, recoveryAttempts: 0, backoffDelayMs: 0, nextRecoveryAt: null, lastAction: '', lastError: null, lastUpdatedAt: '' },
+      externalWatchdog: {
+        running: true,
+        watchdogPid: null,
+        consecutiveFailures: 0,
+        recoveryAttempts: 0,
+        backoffDelayMs: 0,
+        nextRecoveryAt: null,
+        lastAction: '',
+        lastError: null,
+        lastUpdatedAt: '',
+      },
     });
 
     const mockFetch = jest.fn().mockResolvedValue({
@@ -557,7 +659,9 @@ describe('cloud-sync service', () => {
       status: 200,
     });
 
-    const result = await sendCloudSyncOnce(mockFetch as unknown as typeof fetch);
+    const result = await sendCloudSyncOnce(
+      mockFetch as unknown as typeof fetch,
+    );
     expect(result.synced).toBe(true);
     expect(result.status).toBe('synced');
     expect(mockFetch).toHaveBeenCalledWith(
@@ -583,7 +687,9 @@ describe('cloud-sync service', () => {
     });
 
     const mockFetch = jest.fn();
-    const result = await sendCloudSyncOnce(mockFetch as unknown as typeof fetch);
+    const result = await sendCloudSyncOnce(
+      mockFetch as unknown as typeof fetch,
+    );
     expect(result.synced).toBe(false);
     expect(result.status).toBe('skipped');
     expect(mockFetch).not.toHaveBeenCalled();
@@ -599,6 +705,7 @@ Expected: FAIL with "Cannot find module '../cloud-sync'"
 - [ ] **Step 3: Implement minimal CloudSync service**
 
 Create `src/services/cloud-sync.ts`:
+
 ```typescript
 import { getCloudSyncConfig } from '@/config/cloud-sync.config';
 import { getWatchdogHealthSnapshot } from '@/services/watchdog-health';
@@ -628,7 +735,10 @@ export function gatherKioskSnapshot() {
   }
 
   const earningsToday = db.data?.earnings || 0;
-  const jobsToday = (db.data?.jobStats?.print || 0) + (db.data?.jobStats?.copy || 0) + (db.data?.jobStats?.scan || 0);
+  const jobsToday =
+    (db.data?.jobStats?.print || 0) +
+    (db.data?.jobStats?.copy || 0) +
+    (db.data?.jobStats?.scan || 0);
 
   return {
     kioskId: config.kioskId,
@@ -679,7 +789,10 @@ export async function sendCloudSyncOnce(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn('[CLOUD-SYNC] Failed to push kiosk telemetry to edge:', message);
+    console.warn(
+      '[CLOUD-SYNC] Failed to push kiosk telemetry to edge:',
+      message,
+    );
     return {
       synced: false,
       status: 'failed',
@@ -696,7 +809,9 @@ export function startCloudSync(customFetch: typeof fetch = fetch): void {
     return;
   }
 
-  console.info(`[CLOUD-SYNC] Starting cloud telemetry sync to ${config.syncUrl} (every ${config.intervalSec}s).`);
+  console.info(
+    `[CLOUD-SYNC] Starting cloud telemetry sync to ${config.syncUrl} (every ${config.intervalSec}s).`,
+  );
   void sendCloudSyncOnce(customFetch);
 
   syncTimer = setInterval(async () => {
@@ -722,6 +837,7 @@ export function stopCloudSync(): void {
 ```
 
 Update `src/services/index.ts`:
+
 ```typescript
 export * from './cloud-sync';
 ```
@@ -743,22 +859,26 @@ git commit -m "feat(services): implement outbound cloud telemetry sync service"
 ### Task 4: Server Lifecycle Wiring & Environment Documentation
 
 **Files:**
+
 - Modify: `src/server.ts`
 - Modify: `.env.example`
 
 - [ ] **Step 1: Wire startCloudSync and stopCloudSync into server lifecycle**
 
 In `src/server.ts`, import functions:
+
 ```typescript
 import { startCloudSync, stopCloudSync } from '@/services/cloud-sync';
 ```
 
 In `initializeBackgroundSubsystems()`:
+
 ```typescript
 startCloudSync();
 ```
 
 In `gracefulShutdown()`:
+
 ```typescript
 stopCloudSync();
 ```
@@ -766,6 +886,7 @@ stopCloudSync();
 - [ ] **Step 2: Add configuration block to `.env.example`**
 
 In `.env.example`:
+
 ```ini
 # ==========================================
 # Cloud Edge Telemetry Sync (Always-On Admin)
@@ -782,10 +903,12 @@ PRINTBIT_CLOUD_SYNC_KIOSK_ID=printbit-kiosk-01
 - [ ] **Step 3: Run full type-check and test suite verification**
 
 Run:
+
 ```bash
 pnpm exec tsc --noEmit --ignoreDeprecations 6.0
 pnpm test
 ```
+
 Expected: PASS with 0 errors.
 
 - [ ] **Step 4: Commit**

@@ -54,14 +54,14 @@ export async function sendHeartbeatOnce(
     ? config.pingUrl
     : `${config.pingUrl.replace(/\/+$/, '')}/fail`;
 
-  const payload: HeartbeatDiagnosticPayload = {
+  const payload = {
     kioskId: config.kioskId,
     status: readiness.isHealthy ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     uptimeSec: Math.floor(process.uptime()),
     issues: readiness.issues,
     components: readiness.components,
-  };
+  } satisfies HeartbeatDiagnosticPayload;
 
   try {
     const res = await customFetch(targetUrl, {
