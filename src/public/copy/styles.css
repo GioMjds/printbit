@@ -186,17 +186,17 @@ body {
   flex-shrink: 0;
 }
 .preview-panel__eyebrow {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
   color: var(--lavender);
-  opacity: 0.6;
+  opacity: 0.85;
 }
 .preview-panel__status {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--ink-muted);
+  color: #cbd5e1;
   transition: color 300ms;
 }
 .preview-panel__status[data-status='loading'] {
@@ -304,16 +304,16 @@ body {
 }
 
 .placeholder-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-muted);
+  font-size: 17px;
+  font-weight: 600;
+  color: #e2e8f0;
   text-align: center;
-  line-height: 1.6;
-  max-width: 260px;
+  line-height: 1.55;
+  max-width: 380px;
 }
 .placeholder-label strong {
-  color: var(--lavender);
-  font-weight: 700;
+  color: #ffffff;
+  font-weight: 800;
 }
 
 /* ── Scanned result (shown by app.ts after success) ─────────── */
@@ -381,16 +381,16 @@ body {
 .preview-result__ready-badge {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   margin-top: 12px;
   flex-shrink: 0;
-  padding: 6px 14px;
+  padding: 8px 18px;
   border-radius: 20px;
-  background: rgba(74, 222, 128, 0.1);
-  border: 1px solid rgba(74, 222, 128, 0.25);
-  font-size: 14px;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1.5px solid rgba(74, 222, 128, 0.35);
+  font-size: 15px;
   font-weight: 700;
-  color: #a3e6ac;
+  color: #86efac;
 }
 .preview-result__ready-badge svg {
   width: 14px;
@@ -400,11 +400,17 @@ body {
 
 .preview-result__orientation-note {
   margin: 6px 0 0 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--lavender, #a7aae1);
-  opacity: 0.75;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #cbd5e1;
+  opacity: 0.9;
   text-align: center;
+}
+.preview-result__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 14px;
 }
 
 /* =============================================================
@@ -433,9 +439,11 @@ body {
 }
 
 .steps-panel__lead {
-  font-size: 13px;
-  color: var(--ink-muted);
+  font-size: 16px;
+  font-weight: 600;
+  color: #e2e8f0;
   line-height: 1.55;
+  margin-bottom: 14px;
 }
 .topbar-actions {
   display: flex;
@@ -604,17 +612,17 @@ body {
 }
 
 .step__number {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: rgba(105, 111, 199, 0.18);
-  border: 1.5px solid rgba(105, 111, 199, 0.35);
+  background: rgba(105, 111, 199, 0.25);
+  border: 1.5px solid rgba(105, 111, 199, 0.5);
   display: grid;
   place-items: center;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
-  color: var(--lavender);
+  color: #ffffff;
   margin-top: 2px;
 }
 
@@ -643,12 +651,13 @@ body {
   gap: 2px;
 }
 .step__title {
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 700;
+  color: #ffffff;
 }
 .step__desc {
-  font-size: 13px;
-  color: var(--ink-muted);
+  font-size: 15px;
+  color: #cbd5e1;
   line-height: 1.55;
 }
 
@@ -1201,9 +1210,9 @@ body {
 }
 
 .copy-footer__note {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
-  color: var(--ink-muted);
+  color: #e2e4ff;
 }
 
 .copy-footer__actions {
@@ -1212,95 +1221,117 @@ body {
   gap: 10px;
 }
 
-/* Check document button */
+/* Primary Check Document Button — centered at bottom of preview pane */
 .check-btn {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 13px 24px;
+  justify-content: center;
+  gap: 12px;
+  min-height: 58px;
+  min-width: 280px;
+  padding: 16px 36px;
   border: none;
-  border-radius: 16px;
-  background: rgba(167, 170, 225, 0.1);
-  border: 1.5px solid rgba(167, 170, 225, 0.22);
-  color: var(--lavender);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #696fc7 0%, #565cb8 100%);
+  color: #ffffff;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
+  letter-spacing: 0.3px;
   cursor: pointer;
-  transition:
-    background 150ms,
-    border-color 150ms,
-    transform 120ms;
+  box-shadow: 0 6px 24px rgba(105, 111, 199, 0.45);
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-tap-highlight-color: transparent;
+  animation: pulse-kiosk-indigo 2.8s ease-in-out infinite;
 }
 .check-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
+  transition: transform 160ms;
 }
-.check-btn:hover {
-  background: rgba(167, 170, 225, 0.17);
-  border-color: rgba(167, 170, 225, 0.4);
-  color: var(--white);
+.check-btn:not(:disabled):hover {
+  background: linear-gradient(135deg, #787ed9 0%, #6369c7 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 32px rgba(105, 111, 199, 0.6);
 }
-.check-btn:active {
+.check-btn:not(:disabled):hover svg {
+  transform: scale(1.1);
+}
+.check-btn:not(:disabled):active {
   transform: scale(0.97);
+  box-shadow: 0 2px 10px rgba(105, 111, 199, 0.4);
 }
 .check-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
+  animation: none;
 }
 
-/* Clear & Rescan button — appears after a successful scan; ghost style matching check-btn */
-.clear-rescan-btn {
+@keyframes pulse-kiosk-indigo {
+  0%,
+  100% {
+    box-shadow: 0 4px 20px rgba(105, 111, 199, 0.4);
+  }
+  50% {
+    box-shadow: 0 8px 30px rgba(105, 111, 199, 0.7);
+  }
+}
+
+/* Scan Again button — appears in preview result pane */
+.clear-rescan-btn,
+.rescan-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 9px;
-  padding: 13px 22px;
-  border: none;
+  min-height: 50px;
+  padding: 12px 26px;
   border-radius: 16px;
-  background: rgba(250, 128, 114, 0.08);
-  border: 1.5px solid rgba(250, 128, 114, 0.22);
-  color: rgba(250, 160, 150, 0.9);
+  border: 1.5px solid rgba(167, 170, 225, 0.28);
+  background: rgba(167, 170, 225, 0.1);
+  color: #f1f2ff;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
-  transition:
-    background 150ms,
-    border-color 150ms,
-    transform 120ms;
+  transition: all 140ms ease;
   -webkit-tap-highlight-color: transparent;
 }
-.clear-rescan-btn svg {
+.clear-rescan-btn svg,
+.rescan-btn svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
 }
-.clear-rescan-btn:hover {
-  background: rgba(250, 128, 114, 0.15);
-  border-color: rgba(250, 128, 114, 0.4);
-  color: #ffa07a;
+.clear-rescan-btn:hover,
+.rescan-btn:hover {
+  background: rgba(167, 170, 225, 0.2);
+  border-color: rgba(167, 170, 225, 0.5);
+  color: #ffffff;
 }
-.clear-rescan-btn:active {
+.clear-rescan-btn:active,
+.rescan-btn:active {
   transform: scale(0.97);
 }
 
-/* Continue button */
+/* Continue button — prominent next step button */
 .continue-btn {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 13px 28px;
+  gap: 12px;
+  min-height: 58px;
+  padding: 16px 36px;
   border: none;
-  border-radius: 16px;
-  background: #3a9e52;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   color: var(--white);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(58, 158, 82, 0.35);
+  box-shadow: 0 6px 24px rgba(34, 197, 94, 0.45);
   transition:
     background 160ms,
     transform 160ms cubic-bezier(0.34, 1.4, 0.64, 1),
@@ -1500,16 +1531,16 @@ body {
 }
 
 .source-size-card__title {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--white);
   letter-spacing: 0.2px;
 }
 
 .source-size-card__hint {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--ink-muted);
+  color: #b4b7eb;
 }
 
 .source-size-options {
@@ -1523,8 +1554,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 8px;
-  border-radius: 12px;
+  min-height: 52px;
+  padding: 12px 14px;
+  border-radius: 14px;
   background: rgba(167, 170, 225, 0.06);
   border: 1.5px solid rgba(167, 170, 225, 0.16);
   cursor: pointer;
@@ -1544,7 +1576,7 @@ body {
 }
 
 .source-size-option__label {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--lavender);
   text-align: center;

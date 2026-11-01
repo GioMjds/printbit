@@ -982,7 +982,7 @@ scanBtn.addEventListener('click', () => {
 });
 
 rescanBtn.addEventListener('click', () => {
-  if (!scanBtn.disabled) void startScan();
+  if (!scanBtn.disabled) clearScan();
 });
 
 function clearScan(): void {
