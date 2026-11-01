@@ -865,7 +865,7 @@ async function initSession(): Promise<void> {
       rawMsg.includes('Failed to fetch') ||
       rawMsg.includes('NetworkError');
     const message = isNetwork
-      ? 'Cannot reach kiosk. Make sure you are connected to PrintBit Wi-Fi (Keep Connected even without internet), then tap Retry.'
+      ? 'Cannot reach kiosk. Make sure you are connected to PrintBit Wi-Fi (Keep Connected even without internet) and turn off mobile data, then tap Retry.'
       : rawMsg || 'Could not connect to kiosk session.';
     setSessionUnavailable(
       message,
@@ -1098,7 +1098,7 @@ async function uploadPendingFiles(): Promise<void> {
     setStatus(
       securityErrorCount > 0
         ? 'Upload rejected: file format could not be verified. Please export as standard PDF or image and retry.'
-        : 'Upload failed. Make sure your phone is connected to PrintBit Wi-Fi (keep connected even without internet), then retry.',
+        : 'Upload failed. Make sure your phone is connected to PrintBit Wi-Fi (keep connected even without internet) and mobile data is off, then retry.',
       'error',
     );
     setAppState('session-ready');

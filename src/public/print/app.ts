@@ -75,6 +75,8 @@ type SessionResponse = {
   token: string;
   status: 'pending' | 'uploaded';
   uploadUrl: string;
+  /** True once a phone has claimed this session (backend support pending). */
+  phoneConnected?: boolean;
   remainingSeconds?: number;
   warningThresholdSeconds?: number;
   /** Single document (legacy) */
@@ -126,6 +128,7 @@ const uploadQrCanvas = document.getElementById(
 const startupWifiQrCanvas = document.getElementById(
   'startupWifiQrCanvas',
 ) as HTMLCanvasElement | null;
+const qrPanel = document.querySelector('.qr-panel') as HTMLElement | null;
 const filesEmpty = document.getElementById('filesEmpty') as HTMLElement | null;
 const fileList = document.getElementById('fileList') as HTMLUListElement | null;
 const filesCount = document.getElementById('filesCount') as HTMLElement | null;
@@ -191,7 +194,10 @@ const printLimitTipMessage = document.getElementById(
 
 let maxPagesPerSession =
   Number(sessionStorage.getItem('printbit.maxPagesPerSession')) || 30;
-sessionStorage.setItem('printbit.maxPagesPerSession', String(maxPagesPerSession));
+sessionStorage.setItem(
+  'printbit.maxPagesPerSession',
+  String(maxPagesPerSession),
+);
 
 function updatePrintLimitLabel(limit: number): void {
   const el =
@@ -226,6 +232,7 @@ async function fetchKioskSettings(): Promise<void> {
 void fetchKioskSettings();
 
 let activeSessionId = '';
+let phoneConnected = false;
 let activeSessionToken = '';
 let pollHandle: number | null = null;
 let selectedFilename = '';
@@ -259,6 +266,18 @@ function setSessionText(text: string): void {
 
 function setSessionActive(active: boolean): void {
   sessionDot?.classList.toggle('active', active);
+}
+
+/** Dims the QR once a phone has claimed this session (one phone per session). */
+function setPhoneConnected(connected: boolean): void {
+  phoneConnected = connected;
+  qrPanel?.classList.toggle('is-claimed', connected);
+  renderRefreshSessionButtonState();
+  if (qrStepLabelEl) {
+    qrStepLabelEl.textContent = connected
+      ? 'Phone connected'
+      : 'Scan upload QR';
+  }
 }
 
 function formatCountdown(totalSeconds: number): string {
@@ -338,7 +357,11 @@ function getNewSessionCooldownRemainingMs(): number {
 }
 
 function getRefreshSessionLabel(): string {
-  return knownFiles.size > 0 ? 'Clear & Start Over' : 'Refresh QR Code';
+  // The /upload page tells a blocked phone to tap "Clear & Start Over", so the
+  // button must carry that label whenever a phone owns the session.
+  return knownFiles.size > 0 || phoneConnected
+    ? 'Clear & Start Over'
+    : 'Refresh QR Code';
 }
 
 function renderRefreshSessionButtonState(): void {
@@ -347,7 +370,10 @@ function renderRefreshSessionButtonState(): void {
   const inCooldown = remainingMs > 0;
   const isDisabled = createSessionInFlight || inCooldown;
   refreshSessionBtn.disabled = isDisabled;
-  refreshSessionBtn.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+  refreshSessionBtn.setAttribute(
+    'aria-disabled',
+    isDisabled ? 'true' : 'false',
+  );
 
   if (!refreshSessionBtnLabel) return;
   if (createSessionInFlight) {
@@ -554,7 +580,8 @@ function setWaitingForFilesState(): void {
     continueBtn.setAttribute('aria-disabled', 'true');
   }
   if (footerHint) {
-    footerHint.classList.remove('ready');
+    footerHint.textContent = '';
+    footerHint.classList.remove('ready', 'error');
   }
   renderRefreshSessionButtonState();
 }
@@ -939,6 +966,7 @@ async function createSession(): Promise<void> {
     knownFiles = new Set<string>();
     deletingDocumentIds = new Set<string>();
     setSessionActive(false);
+    setPhoneConnected(false);
     setSessionText('Creating session…');
     setWaitingForFilesState();
 
@@ -1000,6 +1028,7 @@ async function checkUploadStatus(): Promise<void> {
       sessionStorage.removeItem('printbit.sessionId');
       sessionStorage.removeItem('printbit.sessionToken');
       setSessionActive(false);
+      setPhoneConnected(false);
       setSessionText('Session expired');
       setWaitingForFilesState();
       if (footerHint) {
@@ -1016,6 +1045,9 @@ async function checkUploadStatus(): Promise<void> {
   sessionWarningThresholdSeconds = session.warningThresholdSeconds ?? 60;
   sessionStorage.setItem('printbit.sessionToken', session.token);
   updateSessionCountdown(session.remainingSeconds);
+  if (typeof session.phoneConnected === 'boolean') {
+    setPhoneConnected(session.phoneConnected);
+  }
 
   // Never gate on status — session stays "uploaded" while accumulating
   // multiple files, so always read the full documents list.
@@ -1097,7 +1129,8 @@ function showConversionDialog(file?: UploadedFile | null): void {
   const isPdf = isPdfFilename(filename);
 
   if (preloadFileName) preloadFileName.textContent = filename;
-  if (preloadFileType) preloadFileType.textContent = getFriendlyFileType(filename);
+  if (preloadFileType)
+    preloadFileType.textContent = getFriendlyFileType(filename);
   if (preloadFileIcon) {
     preloadFileIcon.innerHTML = `<use href="#${iconIdForFile(filename)}"/>`;
   }
@@ -1152,7 +1185,8 @@ async function waitForDocumentAnalysis(
       if (!response.ok) {
         return {
           ready: false,
-          message: 'Your session expired. Start a new session and upload again.',
+          message:
+            'Your session expired. Start a new session and upload again.',
         };
       }
 
@@ -1164,10 +1198,14 @@ async function waitForDocumentAnalysis(
             ? [session.document]
             : [];
       const document = documents.find(
-        (candidate) => (candidate.documentId || candidate.filename) === documentId,
+        (candidate) =>
+          (candidate.documentId || candidate.filename) === documentId,
       );
       if (!document) {
-        return { ready: false, message: 'The selected file is no longer available.' };
+        return {
+          ready: false,
+          message: 'The selected file is no longer available.',
+        };
       }
       if (document.analysisStatus === 'completed') {
         return { ready: true, analysis: document.analysis, document };
@@ -1203,6 +1241,9 @@ function attachSocket(sid: string): void {
   const socket = ioFactory();
   attachedSessionId = sid;
   socket.emit('joinSession', sid);
+  socket.on('PhoneConnected', () => {
+    setPhoneConnected(true);
+  });
   socket.on('UploadStarted', (info: unknown) => {
     const filename =
       typeof info === 'string'
@@ -1445,7 +1486,7 @@ refreshSessionBtn?.addEventListener('click', () => {
     renderRefreshSessionButtonState();
     return;
   }
-  if (knownFiles.size > 0) {
+  if (knownFiles.size > 0 || phoneConnected) {
     showNewSessionDialog();
   } else {
     requestNewSession();
@@ -1537,10 +1578,7 @@ continueBtn?.addEventListener('click', async () => {
       }
       return;
     }
-    setConversionStatus(
-      'Document ready!',
-      'Opening print options…',
-    );
+    setConversionStatus('Document ready!', 'Opening print options…');
   }
   const destination =
     `/config?mode=print&sessionId=${encodeURIComponent(activeSessionId)}` +

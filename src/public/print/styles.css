@@ -206,7 +206,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 340px;
   gap: 24px;
-  padding: 20px 0 8px;
+  padding: 20px 0 24px;
   min-height: 0;
 }
 
@@ -331,6 +331,41 @@ body {
   border: 1px solid rgba(167, 170, 225, 0.12);
 }
 
+.qr-lock {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px;
+  text-align: center;
+  border-radius: 20px;
+  background: rgba(14, 13, 31, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--white);
+}
+.qr-lock svg {
+  width: 30px;
+  height: 30px;
+  color: var(--lavender);
+}
+.qr-lock strong {
+  font-size: 18px;
+  font-weight: 800;
+}
+.qr-lock span {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: #c5c8f8;
+}
+.qr-panel.is-claimed .qr-lock {
+  display: flex;
+}
+
 .qr-corner {
   position: absolute;
   width: 18px;
@@ -435,10 +470,10 @@ body {
 .upload-tip__text,
 .upload-tip p {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 500;
   line-height: 1.45;
-  color: var(--ink-muted);
+  color: #b9bce6;
   margin: 0;
   letter-spacing: 0.01em;
 }
@@ -448,6 +483,11 @@ body {
   font-weight: 700;
   color: var(--lavender);
   margin-right: 2px;
+}
+
+.upload-tip--one-phone {
+  background: rgba(105, 111, 199, 0.14);
+  border-color: rgba(167, 170, 225, 0.35);
 }
 
 .upload-tip--print-limit {
@@ -753,6 +793,12 @@ body {
   line-height: 1.35;
   color: var(--lavender);
 }
+.empty-step__text > .empty-step__hint {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffb775;
+}
 .empty-ssid {
   display: inline-block;
   padding: 1px 8px;
@@ -986,12 +1032,21 @@ body {
 }
 
 /* ── File list ────────────────────────────────────────────── */
+.files-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+}
 .file-list {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   list-style: none;
-  margin: 0;
-  padding: 12px;
+  padding: 0;
+  margin: 12px 0 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1037,7 +1092,6 @@ body {
 .file-item:hover {
   background: rgba(105, 111, 199, 0.12);
   border-color: rgba(105, 111, 199, 0.25);
-  transform: translateX(4px);
 }
 
 .file-item:active {
@@ -1199,70 +1253,95 @@ body {
   transform: scale(1);
 }
 
-/* ── Footer ───────────────────────────────────────────────── */
-.print-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 0 24px;
-  border-top: 1px solid rgba(167, 170, 225, 0.1);
-  flex-shrink: 0;
-}
-
+/* ── Status strip (replaces footer hint) ─────────────────── */
 .footer-hint {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink-muted);
+  flex-shrink: 0;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #c5c8f8;
+  border-bottom: 1px solid rgba(167, 170, 225, 0.1);
 }
-
+.footer-hint:empty {
+  display: none;
+}
 .footer-hint.ready {
   color: var(--lavender);
 }
-
 .footer-hint.error {
-  color: #f87171;
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.12);
+  border-bottom-color: rgba(248, 113, 113, 0.3);
 }
 
-/* Continue button */
+/* ── Primary CTA dock ─────────────────────────────────────── */
+/* Lives inside the files panel, directly under the list. */
+.continue-dock {
+  flex: 0 0 220px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  margin: 12px 12px 12px 0;
+}
+.file-list.hidden ~ .continue-dock {
+  display: none;
+}
+
 .continue-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 28px;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  /* Fills the file row (single file) but never grows past a comfortable size;
+     stays pinned to the top while a long list scrolls. */
+  flex: 1 1 auto;
+  min-height: 84px;
+  max-height: 104px;
+  position: sticky;
+  top: 12px;
+  padding: 12px 20px;
   border: none;
-  border-radius: 16px;
+  border-radius: 20px;
   background: var(--indigo);
   color: var(--white);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(105, 111, 199, 0.4);
-  transition:
-    transform 160ms cubic-bezier(0.34, 1.4, 0.64, 1),
-    box-shadow 160ms ease,
-    background 160ms ease;
+  box-shadow: 0 6px 24px rgba(105, 111, 199, 0.45);
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 120ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .continue-btn svg {
-  width: 20px;
-  height: 20px;
-  transition: transform 160ms ease;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
-.continue-btn:not(:disabled):hover {
-  background: #7c82d6;
-  transform: translateY(-3px);
-  box-shadow: 0 10px 32px rgba(105, 111, 199, 0.5);
-}
-
-.continue-btn:not(:disabled):hover svg {
-  transform: translateX(4px);
+@media (hover: hover) {
+  .continue-btn:not(:disabled):hover {
+    background: #7c82d6;
+  }
 }
 
 .continue-btn:not(:disabled):active {
-  transform: scale(0.97);
+  transform: scale(0.98);
+  background: #5b61b8;
+}
+
+.continue-btn:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 
 .continue-btn:disabled {
@@ -1282,6 +1361,33 @@ body {
   }
   50% {
     box-shadow: 0 6px 28px rgba(105, 111, 199, 0.6);
+  }
+}
+
+/* Narrow files panel (<1400px layout): stack the button under the row */
+@media (max-width: 1399px) {
+  .files-body {
+    flex-direction: column;
+    gap: 0;
+  }
+  .continue-dock {
+    flex: none;
+    margin: 0 12px 12px;
+  }
+  .continue-btn {
+    position: static;
+    flex: none;
+    min-height: 72px;
+  }
+  .file-list {
+    flex: 0 1 auto;
+    margin-right: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .continue-btn:not(:disabled) {
+    animation: none;
   }
 }
 
@@ -1652,11 +1758,6 @@ body {
   user-select: none;
 }
 
-.preload-file-pill:hover {
-  transform: translateY(-1px);
-  border-color: rgba(167, 170, 225, 0.4);
-}
-
 .preload-file-pill__icon-wrap {
   width: 28px;
   height: 28px;
@@ -2007,6 +2108,17 @@ body {
   font-size: 12px;
   line-height: 1.4;
   color: #c5c8f8;
+}
+.wifi-step-item--key {
+  padding: 8px 10px;
+  margin: 0 -10px;
+  border-radius: 10px;
+  background: rgba(255, 183, 117, 0.1);
+  border: 1px solid rgba(255, 183, 117, 0.35);
+}
+.wifi-step-item--key .wifi-step-num {
+  background: #ffb775;
+  color: #2c2b4b;
 }
 .wifi-step-num {
   width: 20px;

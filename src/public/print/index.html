@@ -103,10 +103,10 @@
             </svg>
             <span class="wifi-btn-text">QR code not opening? Check Wi-Fi</span>
           </button>
-          <div class="session-pill">
+          <!-- <div class="session-pill">
             <span class="session-dot" id="sessionDot"></span>
             <span id="sessionText">Starting…</span>
-          </div>
+          </div> -->
         </div>
       </header>
 
@@ -133,9 +133,16 @@
                   height="220"
                   aria-label="QR code to upload your file"
                 ></canvas>
+                <div class="qr-lock" id="qrLock" role="status" aria-live="polite">
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+                  </svg>
+                  <strong>Phone connected</strong>
+                  <span>This QR code is in use. Other phones can't join this session.</span>
+                </div>
               </div>
 
-              <div class="upload-tip">
+              <div class="upload-tip upload-tip--one-phone" role="note">
                 <svg
                   class="upload-tip__icon"
                   viewBox="0 0 20 20"
@@ -144,13 +151,13 @@
                 >
                   <path
                     fill-rule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z"
                     clip-rule="evenodd"
                   />
                 </svg>
                 <p class="upload-tip__text">
-                  <strong class="upload-tip__badge">Tip:</strong>
-                  PDFs process instantly. Word documents &amp; images will be converted to PDF automatically.
+                  <strong class="upload-tip__badge">One phone per session:</strong>
+                  The first phone to scan this code takes the session. Anyone else will be told it is already in use.
                 </p>
               </div>
 
@@ -174,6 +181,25 @@
                     selected page range multiplied by copies must stay within 30
                     pages.</span
                   >
+                </p>
+              </div>
+
+              <div class="upload-tip">
+                <svg
+                  class="upload-tip__icon"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <p class="upload-tip__text">
+                  <strong class="upload-tip__badge">Tip:</strong>
+                  PDFs process instantly. Word documents &amp; images will be converted to PDF automatically.
                 </p>
               </div>
 
@@ -227,6 +253,9 @@
             <span class="files-count" id="filesCount">0 files</span>
           </div>
 
+          <!-- Status / error strip (was in the footer) -->
+          <div class="footer-hint" id="footerHint" role="status" aria-live="polite"></div>
+
           <!-- Waiting state -->
           <div class="files-empty" id="filesEmpty" aria-live="polite">
   <div class="kiosk-assurance-badge">
@@ -262,6 +291,7 @@
         <strong>Join the Wi-Fi</strong>
         <span>Connect your phone to
           <span class="empty-ssid" id="emptyWifiSsid">PrintBit</span></span>
+        <span class="empty-step__hint">Page won't open? Turn off mobile data.</span>
       </div>
     </li>
     <li class="empty-step">
@@ -304,6 +334,7 @@
 </div>
 
           <!-- File list (populated by JS) — starts hidden so files-empty centres correctly -->
+          <div class="files-body">
           <ul
             class="file-list hidden"
             id="fileList"
@@ -311,33 +342,33 @@
             role="listbox"
             aria-multiselectable="false"
           ></ul>
+
+          <!-- Primary action: sits beside the file row, not at the screen edge -->
+          <div class="continue-dock">
+            <button
+              id="continueBtn"
+              type="button"
+              class="continue-btn"
+              disabled
+              aria-disabled="true"
+            >
+              <span>Continue</span>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </button>
+          </div>
+          </div>
         </section>
       </main>
-
-      <!-- Footer -->
-      <footer class="print-footer">
-        <div class="footer-hint" id="footerHint"></div>
-        <button
-          id="continueBtn"
-          type="button"
-          class="continue-btn"
-          disabled
-          aria-disabled="true"
-        >
-          <span>Continue to Print Options</span>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
-        </button>
-      </footer>
     </div>
     <!-- /page-shell -->
 
@@ -513,9 +544,9 @@
         aria-labelledby="nsTitle"
         aria-describedby="nsDesc"
       >
-        <h3 class="modal-title" id="nsTitle">Clear files and start over?</h3>
+        <h3 class="modal-title" id="nsTitle">Clear this session and start over?</h3>
         <p class="modal-subtitle" id="nsDesc">
-          All uploaded files in this session will be removed from the kiosk. This cannot be
+          The connected phone and any uploaded files will be removed from the kiosk. This cannot be
           undone.
         </p>
         <div class="modal-actions">
@@ -703,8 +734,15 @@
                   <span>If your phone prompts "No internet connection", choose <em>Keep Connected</em>. Save Canva or cloud files to your phone first.</span>
                 </div>
               </div>
-              <div class="wifi-step-item">
+              <div class="wifi-step-item wifi-step-item--key">
                 <span class="wifi-step-num">3</span>
+                <div class="wifi-step-text">
+                  <strong>Turn off mobile data</strong>
+                  <span>Phones prefer mobile data when the Wi-Fi has no internet, so the upload page can't open. Switch it off in your quick settings.</span>
+                </div>
+              </div>
+              <div class="wifi-step-item">
+                <span class="wifi-step-num">4</span>
                 <div class="wifi-step-text">
                   <strong>Re-scan upload QR</strong>
                   <span>Return and scan the upload QR code to send your files.</span>
