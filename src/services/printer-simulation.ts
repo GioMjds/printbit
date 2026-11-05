@@ -49,6 +49,12 @@ export function simulatePrinterError(
   switch (errorType) {
     case 'low_ink': {
       currentSimulation.message = 'Low Ink warning active on Homepage';
+      void adminPushService.broadcastCriticalAlert({
+        code: 'LOW_INK',
+        title: 'ℹ️ Kiosk Low Ink Warning',
+        message: 'Printer ink is running low. Please refill ink soon.',
+        severity: 'warning',
+      });
       io?.emit('printer:simulation-state', {
         activeError: 'low_ink',
         message: currentSimulation.message,
@@ -67,7 +73,14 @@ export function simulatePrinterError(
     case 'out_of_paper': {
       currentSimulation.message =
         'Printer is out of paper in confirm / printing';
+      lockCoinSlot('printer-error-guide', 'simulation_out_of_paper');
       handlePrinterStatusUpdate('out of paper', '4');
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_OUT',
+        title: '⚠️ Kiosk Paper Out!',
+        message: 'Printer is out of paper. Please load paper into the tray.',
+        severity: 'critical',
+      });
       io?.emit('printer:simulation-state', {
         activeError: 'out_of_paper',
         message: currentSimulation.message,
@@ -95,6 +108,13 @@ export function simulatePrinterError(
     case 'adf_error': {
       currentSimulation.message =
         'Clear the printer ADF error or paper jam, then proceed with scanning';
+      lockCoinSlot('printer-error-guide', 'simulation_adf_error');
+      void adminPushService.broadcastCriticalAlert({
+        code: 'ADF_ERROR',
+        title: '⚠️ Kiosk ADF Scanner Error!',
+        message: 'Printer ADF error or paper jam detected in document feeder.',
+        severity: 'warning',
+      });
       io?.emit('printer:simulation-state', {
         activeError: 'adf_error',
         message: currentSimulation.message,
@@ -185,7 +205,14 @@ export function simulatePrinterError(
     case 'cover_open': {
       currentSimulation.message =
         'Printer cover is open; customer must close it';
+      lockCoinSlot('printer-error-guide', 'simulation_cover_open');
       handlePrinterStatusUpdate('cover open', '7');
+      void adminPushService.broadcastCriticalAlert({
+        code: 'COVER_OPEN',
+        title: '⚠️ Kiosk Printer Cover Open!',
+        message: 'The printer cover is open. Please close cover to continue printing.',
+        severity: 'warning',
+      });
       io?.emit('printer:simulation-state', {
         activeError: 'cover_open',
         message: currentSimulation.message,
@@ -277,7 +304,14 @@ export function simulatePrinterError(
     case 'output_tray': {
       currentSimulation.message =
         'Output tray closed or full; customer must open or clear it';
+      lockCoinSlot('printer-error-guide', 'simulation_output_tray');
       handlePrinterStatusUpdate('output bin full', '11');
+      void adminPushService.broadcastCriticalAlert({
+        code: 'OUTPUT_TRAY',
+        title: '⚠️ Kiosk Output Tray Full / Closed!',
+        message: 'The printer output tray is closed or full. Please open or clear tray.',
+        severity: 'warning',
+      });
       io?.emit('printer:simulation-state', {
         activeError: 'output_tray',
         message: currentSimulation.message,
@@ -323,6 +357,16 @@ export function clearPrinterSimulation(): PrinterSimulationState {
   });
 
   adminPushService.clearAlert('PAPER_JAM');
+  adminPushService.clearAlert('PAPER_OUT');
+  adminPushService.clearAlert('PRINTER_OFFLINE');
+  adminPushService.clearAlert('COVER_OPEN');
+  adminPushService.clearAlert('OUTPUT_TRAY');
+  adminPushService.clearAlert('SERVICE_REQUIRED');
+  adminPushService.clearAlert('INK_OUT');
+  adminPushService.clearAlert('ADF_ERROR');
+  adminPushService.clearAlert('LOW_INK');
+  adminPushService.clearAlert('PAPER_SETUP');
+  adminPushService.clearAlert('PRINTER_HARDWARE_ERROR');
   io?.emit('printer:simulation-state', { activeError: null, message: null });
   io?.emit('printer:simulation-cleared', {});
   io?.emit('printer:low-ink-warning', { active: false });
@@ -354,6 +398,16 @@ export function clearPaperJamSimulation(): PrinterSimulationState {
   });
 
   adminPushService.clearAlert('PAPER_JAM');
+  adminPushService.clearAlert('PAPER_OUT');
+  adminPushService.clearAlert('PRINTER_OFFLINE');
+  adminPushService.clearAlert('COVER_OPEN');
+  adminPushService.clearAlert('OUTPUT_TRAY');
+  adminPushService.clearAlert('SERVICE_REQUIRED');
+  adminPushService.clearAlert('INK_OUT');
+  adminPushService.clearAlert('ADF_ERROR');
+  adminPushService.clearAlert('LOW_INK');
+  adminPushService.clearAlert('PAPER_SETUP');
+  adminPushService.clearAlert('PRINTER_HARDWARE_ERROR');
   io?.emit('printer:simulation-state', { activeError: null, message: null });
   io?.emit('printer:simulation-cleared', { redirectHome: true });
   io?.emit('printer:paper-jam-cleared', { redirectHome: true });

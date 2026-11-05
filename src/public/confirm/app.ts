@@ -3090,6 +3090,9 @@ function handleErrorGuideUpdate(
       syncPaymentLeaseState();
     }
   } else {
+    if (currentPrinterError?.code === 'PAPER_JAM_PRINT') {
+      return;
+    }
     clearPrinterError();
     if (isJobInterruptedState) {
       // Auto-clear of printer error must NOT navigate back to idle home when mid-job was interrupted!
@@ -3361,8 +3364,7 @@ if (typeof ioFactory !== 'function') {
     if (
       !isJobInterruptedState &&
       (!currentPrinterError ||
-      !isMaintenancePrintFailure(currentPrinterError.code) ||
-      currentPrinterError.code === 'PAPER_JAM_PRINT')
+      !isMaintenancePrintFailure(currentPrinterError.code))
     ) {
       clearPrinterError();
       if (maintenanceDoneBtn) {

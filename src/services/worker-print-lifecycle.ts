@@ -447,6 +447,19 @@ async function processWorkerReturnPrintEvent(input: {
       errorCode = 'PRINTER_DOOR_OPEN';
       userMsg = 'Printer door or cover is open.';
       hint = 'Please close all printer covers, then click Resume.';
+      void adminPushService.broadcastCriticalAlert({
+        code: 'COVER_OPEN',
+        title: '⚠️ Kiosk Printer Cover Open!',
+        message: 'Printer cover or door is open. Physical clearance required.',
+        severity: 'warning',
+      });
+    } else {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PRINTER_HARDWARE_ERROR',
+        title: '🚨 Kiosk Printer Hardware Error!',
+        message: userMsg,
+        severity: 'critical',
+      });
     }
 
     const printError = {

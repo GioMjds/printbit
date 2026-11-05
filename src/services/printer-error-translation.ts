@@ -46,7 +46,7 @@ export function translateHardwarePrinterError(input: {
       userMessage: 'Paper jam detected in the printer.',
       canRetry: true,
       canDismiss: false,
-      autoClear: true,
+      autoClear: false,
       locksCoinSlot: true,
       lookAtPrinterScreen: true,
     };

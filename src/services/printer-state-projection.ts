@@ -1,3 +1,4 @@
+import { getPrinterSimulationState } from './printer-simulation';
 import { EventEmitter } from 'node:events';
 import type { Server } from 'socket.io';
 import type { WorkerPrintEvent } from './worker-return-pipe';
@@ -34,9 +35,22 @@ export function handlePrinterStatusUpdate(
   const isHealthy = normalized === 'ready' || normalized === 'healthy';
 
   if (isHealthy) {
+    // If a simulation is active, healthy hardware polls must NOT clear simulation state or alerts!
+    if (getPrinterSimulationState().activeError !== null) {
+      return;
+    }
+
     adminPushService.clearAlert('PAPER_JAM');
     adminPushService.clearAlert('PAPER_OUT');
     adminPushService.clearAlert('PRINTER_OFFLINE');
+    adminPushService.clearAlert('COVER_OPEN');
+    adminPushService.clearAlert('OUTPUT_TRAY');
+    adminPushService.clearAlert('SERVICE_REQUIRED');
+    adminPushService.clearAlert('INK_OUT');
+    adminPushService.clearAlert('ADF_ERROR');
+    adminPushService.clearAlert('LOW_INK');
+    adminPushService.clearAlert('PAPER_SETUP');
+    adminPushService.clearAlert('PRINTER_HARDWARE_ERROR');
 
     const { cleared, state } = printerErrorStateManager.recordHealthyPoll();
     const active = printerErrorStateManager.getActiveError();
@@ -95,6 +109,60 @@ export function handlePrinterStatusUpdate(
         title: '🚨 Kiosk Printer Service Required!',
         message:
           'The kiosk printer requires service or maintenance. Please call staff for technical assistance to continue printing.',
+        severity: 'critical',
+      });
+    }
+
+    if (translated.code === 'E_NO_PAPER') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_OUT',
+        title: '⚠️ Kiosk Paper Out!',
+        message: 'Printer is out of paper. Please load paper into the tray.',
+        severity: 'critical',
+      });
+    }
+
+    if (translated.code === 'E_COVER_OPEN') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'COVER_OPEN',
+        title: '⚠️ Kiosk Printer Cover Open!',
+        message: 'The printer cover is open. Please close cover to continue printing.',
+        severity: 'warning',
+      });
+    }
+
+    if (translated.code === 'E_OUTPUT_TRAY') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'OUTPUT_TRAY',
+        title: '⚠️ Kiosk Output Tray Full / Closed!',
+        message: 'The printer output tray is closed or full. Please open or clear tray.',
+        severity: 'warning',
+      });
+    }
+
+    if (translated.code === 'E_PAPER_SETUP') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_SETUP',
+        title: '⚠️ Kiosk Paper Setup Prompt',
+        message: 'Printer requires paper size or type confirmation on screen.',
+        severity: 'warning',
+      });
+    }
+
+    if (translated.code === 'W_INK_LOW') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'LOW_INK',
+        title: 'ℹ️ Kiosk Ink Low Warning',
+        message: 'Printer ink is running low. Please prepare ink refill.',
+        severity: 'warning',
+      });
+    }
+
+    if (translated.code === 'E_UNKNOWN' || translated.code === 'E_STALL') {
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PRINTER_HARDWARE_ERROR',
+        title: '🚨 Kiosk Printer Hardware Error!',
+        message: translated.userMessage || 'Printer reported an unexpected hardware error.',
         severity: 'critical',
       });
     }
@@ -181,6 +249,10 @@ export class PrinterStateProjection extends EventEmitter {
     switch (evt.type) {
       case 'PrinterStatusSnapshot':
       case 'PrinterOnline':
+        if (getPrinterSimulationState().activeError !== null) {
+          // Do not allow background hardware events to overwrite active simulation state
+          break;
+        }
         if (
           evt.type === 'PrinterStatusSnapshot' &&
           evt.message?.toLowerCase().includes('offline')

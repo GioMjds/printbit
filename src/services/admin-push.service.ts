@@ -8,8 +8,23 @@ import type {
   VapidKeys,
 } from '@/modules/admin/admin.schema';
 
+export type KioskAlertCode =
+  | 'PAPER_JAM'
+  | 'PAPER_OUT'
+  | 'PRINTER_OFFLINE'
+  | 'HOPPER_EMPTY'
+  | 'INK_OUT'
+  | 'SERVICE_REQUIRED'
+  | 'COVER_OPEN'
+  | 'OUTPUT_TRAY'
+  | 'ADF_ERROR'
+  | 'LOW_INK'
+  | 'PAPER_SETUP'
+  | 'PRINTER_HARDWARE_ERROR'
+  | (string & {});
+
 export interface KioskCriticalAlert {
-  code: 'PAPER_JAM' | 'PAPER_OUT' | 'PRINTER_OFFLINE' | 'HOPPER_EMPTY' | 'INK_OUT' | 'SERVICE_REQUIRED';
+  code: KioskAlertCode;
   title: string;
   message: string;
   severity: 'critical' | 'warning';
@@ -155,15 +170,17 @@ export class AdminPushService {
     });
 
     // Record Anomaly Incident for audit trail
-    void this.deps.reportAnomaly({
-      type: `kiosk_hardware_${alert.code.toLowerCase()}`,
-      source: 'kiosk-hardware',
-      category: 'printer',
-      severity: alert.severity,
-      message: alert.message,
-      fingerprint: `kiosk-hardware-${alert.code}`,
-      context: { alertCode: alert.code },
-    });
+    if (this.deps.getDbData()?.anomalyIncidents) {
+      void this.deps.reportAnomaly({
+        type: `kiosk_hardware_${alert.code.toLowerCase()}`,
+        source: 'kiosk-hardware',
+        category: 'printer',
+        severity: alert.severity,
+        message: alert.message,
+        fingerprint: `kiosk-hardware-${alert.code}`,
+        context: { alertCode: alert.code },
+      }).catch(() => {});
+    }
 
     const data = this.deps.getDbData();
     if (!data || !data.settings.pushNotifications?.enabled) {

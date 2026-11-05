@@ -152,6 +152,15 @@ class AnomalyService {
   }
 
   async report(input: ReportAnomalyInput): Promise<ReportAnomalyResult> {
+    if (!db.data || !db.data.anomalyIncidents) {
+      return {
+        created: false,
+        incident: null as any,
+        notified: false,
+        channels: [],
+        dedupeSuppressed: false,
+      };
+    }
     const trustedNow = getTrustedTimestamp();
     const nowIso = trustedNow.timestamp;
     const nowMs = Date.parse(nowIso);

@@ -53,6 +53,7 @@ import {
   verifyTrustedClockSync,
 } from '@/services/time-source';
 import { getPrinterTelemetry } from '@/services/printer-state-projection';
+import { getPrinterSimulationState } from '@/services/printer-simulation';
 import {
   startWatchdogHealthMonitor,
   stopWatchdogHealthMonitor,
@@ -658,11 +659,13 @@ async function initializePrintBit(): Promise<void> {
         }
 
         if (evt.type === 'PrinterOnline') {
-          startupReadinessState.subsystems.printer = 'ready';
-          io.emit('printerStatusRestored', {
-            printerName: evt.printerName ?? null,
-            timestamp: evt.timestampUtc,
-          });
+          if (!getPrinterSimulationState().activeError) {
+            startupReadinessState.subsystems.printer = 'ready';
+            io.emit('printerStatusRestored', {
+              printerName: evt.printerName ?? null,
+              timestamp: evt.timestampUtc,
+            });
+          }
         }
 
         if (evt.type === 'PrinterError') {
@@ -670,6 +673,12 @@ async function initializePrintBit(): Promise<void> {
           const translated = translateHardwarePrinterError({
             message: evt.errorMessage ?? evt.message ?? null,
             errorCode: evt.errorCode ?? null,
+          });
+          void adminPushService.broadcastCriticalAlert({
+            code: translated.code === 'PAPER_JAM_PRINT' ? 'PAPER_JAM' : (translated.code === 'E_INK_OUT' ? 'INK_OUT' : (translated.code === 'E_OFFLINE' ? 'PRINTER_OFFLINE' : (translated.code === 'E_SERVICE' ? 'SERVICE_REQUIRED' : (translated.code === 'E_NO_PAPER' ? 'PAPER_OUT' : (translated.code === 'E_COVER_OPEN' ? 'COVER_OPEN' : (translated.code === 'E_OUTPUT_TRAY' ? 'OUTPUT_TRAY' : (translated.code === 'E_PAPER_SETUP' ? 'PAPER_SETUP' : 'PRINTER_HARDWARE_ERROR'))))))),
+            title: '🚨 Kiosk Printer Hardware Error!',
+            message: translated.userMessage || 'Hardware error detected on printer.',
+            severity: 'critical',
           });
           io.emit('printerMalfunction', {
             printError: {

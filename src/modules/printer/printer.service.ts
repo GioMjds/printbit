@@ -24,6 +24,8 @@ import {
 import { recordSpoolerLifecycleTransition } from '@/services/recovery';
 import { BLOCKED_STATUSES } from '@/utils';
 import { computeResubmitPlan, type ResubmitPlan } from './resubmit-plan';
+import { getPrinterSimulationState, type SimulatedPrinterError } from '@/services/printer-simulation';
+import type { PrinterErrorCode } from '@/shared/printer-error-catalog';
 import { printerErrorStateManager } from '@/services/printer-error-state';
 
 // Re-export so that `printer.service.ts` remains the canonical public
@@ -125,6 +127,44 @@ export class PrinterService {
     activeError: ReturnType<typeof printerErrorStateManager.getActiveError>;
     outOfService: boolean;
   } {
+    const sim = getPrinterSimulationState();
+    if (sim.activeError) {
+      const active = printerErrorStateManager.getActiveError();
+      if (active) {
+        return {
+          activeError: active,
+          outOfService: printerErrorStateManager.isKioskOutOfService(),
+        };
+      }
+      const codeMap: Record<SimulatedPrinterError, PrinterErrorCode | 'PAPER_JAM_PRINT'> = {
+        low_ink: 'W_INK_LOW',
+        ink_out: 'E_INK_OUT',
+        out_of_paper: 'E_NO_PAPER',
+        adf_error: 'E_UNKNOWN',
+        paper_jam: 'PAPER_JAM_PRINT',
+        cover_open: 'E_COVER_OPEN',
+        offline: 'E_OFFLINE',
+        service_required: 'E_SERVICE',
+        output_tray: 'E_OUTPUT_TRAY',
+      };
+      const code = codeMap[sim.activeError] ?? 'E_UNKNOWN';
+      return {
+        activeError: {
+          code: code as any,
+          tier: sim.activeError === 'paper_jam' ? 'Staff' : 'Customer',
+          autoClear: false,
+          locksCoinSlot: true,
+          lookAtPrinterScreen: true,
+          jobId: null,
+          jobRequiresStaff: false,
+          firstSeenAt: sim.timestamp ?? new Date().toISOString(),
+          lastSeenAt: sim.timestamp ?? new Date().toISOString(),
+          occurrences: 1,
+          status: 'active',
+        },
+        outOfService: false,
+      };
+    }
     return {
       activeError: printerErrorStateManager.getActiveError(),
       outOfService: printerErrorStateManager.isKioskOutOfService(),
@@ -132,6 +172,33 @@ export class PrinterService {
   }
 
   async getStatusResponse(): Promise<PrinterStatusResponse> {
+    const sim = getPrinterSimulationState();
+    if (sim.activeError) {
+      const simStatusMap: Record<SimulatedPrinterError, { status: string; blocked: boolean; connected?: boolean }> = {
+        low_ink: { status: 'Low Ink', blocked: false },
+        ink_out: { status: 'Ink Empty', blocked: true },
+        out_of_paper: { status: 'Out of Paper', blocked: true },
+        adf_error: { status: 'ADF Error', blocked: true },
+        paper_jam: { status: 'Paper Jam', blocked: true },
+        cover_open: { status: 'Cover Open', blocked: true },
+        offline: { status: 'Offline', blocked: true, connected: false },
+        service_required: { status: 'Service Required', blocked: true },
+        output_tray: { status: 'Output Tray', blocked: true },
+      };
+      const simInfo = simStatusMap[sim.activeError] ?? { status: 'Error', blocked: true };
+      return {
+        ready: !simInfo.blocked,
+        blocked: simInfo.blocked,
+        connected: simInfo.connected ?? true,
+        status: simInfo.status,
+        statusFlags: [simInfo.status],
+        printerName: 'Simulated Printer',
+        inkDetectionMethod: 'none',
+        inkTelemetryAvailable: true,
+        inkTelemetryReason: null,
+        lastCheckedAt: sim.timestamp ?? new Date().toISOString(),
+      };
+    }
     let telemetry = getPrinterTelemetry();
     if (
       telemetry.status === 'Checking…' ||

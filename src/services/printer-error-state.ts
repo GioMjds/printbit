@@ -1,3 +1,4 @@
+import { getPrinterSimulationState } from './printer-simulation';
 import {
   PRINTER_ERROR_CATALOG,
   type PrinterErrorCode,
@@ -90,6 +91,11 @@ export class PrinterErrorStateManager {
     }
 
     if (this.active.status === 'out_of_service') {
+      return { cleared: false, state: { ...this.active } };
+    }
+
+    // When simulating, healthy polls must NEVER auto-clear
+    if (getPrinterSimulationState().activeError !== null) {
       return { cleared: false, state: { ...this.active } };
     }
 
