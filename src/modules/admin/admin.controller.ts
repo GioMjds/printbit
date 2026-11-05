@@ -3034,6 +3034,9 @@ export class AdminController {
       'offline',
       'service_required',
       'output_tray',
+      'refill_a4',
+      'refill_short',
+      'refill_long',
     ];
     if (!errorType || !validErrors.includes(errorType)) {
       return res.status(400).json({

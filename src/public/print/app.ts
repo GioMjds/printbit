@@ -1518,10 +1518,6 @@ continueBtn?.addEventListener('click', async () => {
     setContinueButtonDisabled(true);
     return;
   }
-  if (footerHint) {
-    footerHint.textContent = `Proceeding to print options. You can print up to ${maxPagesPerSession} pages on the options screen.`;
-    footerHint.classList.add('ready');
-  }
   if (selectedFileRecord?.analysisStatus !== 'completed') {
     conversionWaitInFlight = true;
     setContinueButtonDisabled(true);

@@ -21,6 +21,9 @@ export type KioskAlertCode =
   | 'LOW_INK'
   | 'PAPER_SETUP'
   | 'PRINTER_HARDWARE_ERROR'
+  | 'PAPER_REFILL_A4'
+  | 'PAPER_REFILL_SHORT'
+  | 'PAPER_REFILL_LONG'
   | (string & {});
 
 export interface KioskCriticalAlert {

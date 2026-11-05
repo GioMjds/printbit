@@ -146,12 +146,22 @@ export class PrinterService {
         offline: 'E_OFFLINE',
         service_required: 'E_SERVICE',
         output_tray: 'E_OUTPUT_TRAY',
+        refill_a4: 'E_NO_PAPER',
+        refill_short: 'E_NO_PAPER',
+        refill_long: 'E_NO_PAPER',
       };
       const code = codeMap[sim.activeError] ?? 'E_UNKNOWN';
+      const isStaffTier =
+        sim.activeError === 'paper_jam' ||
+        sim.activeError === 'ink_out' ||
+        sim.activeError === 'offline' ||
+        sim.activeError === 'refill_a4' ||
+        sim.activeError === 'refill_short' ||
+        sim.activeError === 'refill_long';
       return {
         activeError: {
           code: code as any,
-          tier: sim.activeError === 'paper_jam' ? 'Staff' : 'Customer',
+          tier: isStaffTier ? 'Staff' : 'Customer',
           autoClear: false,
           locksCoinSlot: true,
           lookAtPrinterScreen: true,
@@ -184,6 +194,9 @@ export class PrinterService {
         offline: { status: 'Offline', blocked: true, connected: false },
         service_required: { status: 'Service Required', blocked: true },
         output_tray: { status: 'Output Tray', blocked: true },
+        refill_a4: { status: 'Refill A4 Bond', blocked: true },
+        refill_short: { status: 'Refill Short Bond', blocked: true },
+        refill_long: { status: 'Refill Long Bond', blocked: true },
       };
       const simInfo = simStatusMap[sim.activeError] ?? { status: 'Error', blocked: true };
       return {

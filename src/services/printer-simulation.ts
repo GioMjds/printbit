@@ -16,7 +16,10 @@ export type SimulatedPrinterError =
   | 'cover_open'
   | 'offline'
   | 'service_required'
-  | 'output_tray';
+  | 'output_tray'
+  | 'refill_a4'
+  | 'refill_short'
+  | 'refill_long';
 
 export interface PrinterSimulationState {
   activeError: SimulatedPrinterError | null;
@@ -333,6 +336,108 @@ export function simulatePrinterError(
       });
       break;
     }
+
+    case 'refill_a4': {
+      currentSimulation.message =
+        'Staff reminder: Refill A4 bond paper (Priority 1: A4)';
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_REFILL_A4',
+        title: '📄 Refill Reminder: A4 Bond Paper',
+        message:
+          'Staff reminder: A4 bond paper needs refill. Please prioritize loading A4 paper into the tray.',
+        severity: 'warning',
+      });
+      io?.emit('printer:simulation-state', {
+        activeError: 'refill_a4',
+        message: currentSimulation.message,
+      });
+      io?.emit('printerStatusChanged', {
+        connected: true,
+        status: 'Refill A4 Bond',
+        isOutOfPaper: true,
+      });
+      io?.emit('printerMalfunction', {
+        status: 'Refill A4 Bond',
+        printError: {
+          code: 'PAPER_TRAY_EMPTY',
+          severity: 'recoverable',
+          userMessage:
+            'A4 bond paper tray is empty. Staff reminder sent (Priority: A4).',
+          hint: 'Please call staff to load A4 bond paper into the tray.',
+          canRetry: true,
+          canDismiss: false,
+        },
+      });
+      break;
+    }
+
+    case 'refill_short': {
+      currentSimulation.message =
+        'Staff reminder: Refill Short bond paper (Priority 2: Short Bond)';
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_REFILL_SHORT',
+        title: '📄 Refill Reminder: Short Bond Paper',
+        message:
+          'Staff reminder: Short bond paper (Letter) needs refill. Please prioritize loading Short bond paper into the tray.',
+        severity: 'warning',
+      });
+      io?.emit('printer:simulation-state', {
+        activeError: 'refill_short',
+        message: currentSimulation.message,
+      });
+      io?.emit('printerStatusChanged', {
+        connected: true,
+        status: 'Refill Short Bond',
+        isOutOfPaper: true,
+      });
+      io?.emit('printerMalfunction', {
+        status: 'Refill Short Bond',
+        printError: {
+          code: 'PAPER_TRAY_EMPTY',
+          severity: 'recoverable',
+          userMessage:
+            'Short bond paper tray is empty. Staff reminder sent (Priority: Short Bond).',
+          hint: 'Please call staff to load Short bond paper into the tray.',
+          canRetry: true,
+          canDismiss: false,
+        },
+      });
+      break;
+    }
+
+    case 'refill_long': {
+      currentSimulation.message =
+        'Staff reminder: Refill Long bond paper (Priority 3: Long Bond)';
+      void adminPushService.broadcastCriticalAlert({
+        code: 'PAPER_REFILL_LONG',
+        title: '📄 Refill Reminder: Long Bond Paper',
+        message:
+          'Staff reminder: Long bond paper (Legal) needs refill. Please prioritize loading Long bond paper into the tray.',
+        severity: 'warning',
+      });
+      io?.emit('printer:simulation-state', {
+        activeError: 'refill_long',
+        message: currentSimulation.message,
+      });
+      io?.emit('printerStatusChanged', {
+        connected: true,
+        status: 'Refill Long Bond',
+        isOutOfPaper: true,
+      });
+      io?.emit('printerMalfunction', {
+        status: 'Refill Long Bond',
+        printError: {
+          code: 'PAPER_TRAY_EMPTY',
+          severity: 'recoverable',
+          userMessage:
+            'Long bond paper tray is empty. Staff reminder sent (Priority: Long Bond).',
+          hint: 'Please call staff to load Long bond paper into the tray.',
+          canRetry: true,
+          canDismiss: false,
+        },
+      });
+      break;
+    }
   }
 
   return { ...currentSimulation };
@@ -367,6 +472,9 @@ export function clearPrinterSimulation(): PrinterSimulationState {
   adminPushService.clearAlert('LOW_INK');
   adminPushService.clearAlert('PAPER_SETUP');
   adminPushService.clearAlert('PRINTER_HARDWARE_ERROR');
+  adminPushService.clearAlert('PAPER_REFILL_A4');
+  adminPushService.clearAlert('PAPER_REFILL_SHORT');
+  adminPushService.clearAlert('PAPER_REFILL_LONG');
   io?.emit('printer:simulation-state', { activeError: null, message: null });
   io?.emit('printer:simulation-cleared', {});
   io?.emit('printer:low-ink-warning', { active: false });
@@ -408,6 +516,9 @@ export function clearPaperJamSimulation(): PrinterSimulationState {
   adminPushService.clearAlert('LOW_INK');
   adminPushService.clearAlert('PAPER_SETUP');
   adminPushService.clearAlert('PRINTER_HARDWARE_ERROR');
+  adminPushService.clearAlert('PAPER_REFILL_A4');
+  adminPushService.clearAlert('PAPER_REFILL_SHORT');
+  adminPushService.clearAlert('PAPER_REFILL_LONG');
   io?.emit('printer:simulation-state', { activeError: null, message: null });
   io?.emit('printer:simulation-cleared', { redirectHome: true });
   io?.emit('printer:paper-jam-cleared', { redirectHome: true });

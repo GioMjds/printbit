@@ -154,6 +154,15 @@ const simServiceBtn = document.getElementById(
 const simOutputTrayBtn = document.getElementById(
   'simOutputTrayBtn',
 ) as HTMLButtonElement | null;
+const simRefillA4Btn = document.getElementById(
+  'simRefillA4Btn',
+) as HTMLButtonElement | null;
+const simRefillShortBtn = document.getElementById(
+  'simRefillShortBtn',
+) as HTMLButtonElement | null;
+const simRefillLongBtn = document.getElementById(
+  'simRefillLongBtn',
+) as HTMLButtonElement | null;
 const clearPrinterErrorsBtn = document.getElementById(
   'clearPrinterErrorsBtn',
 ) as HTMLButtonElement | null;
@@ -903,6 +912,9 @@ function updateSimulationBadge(activeError: string | null): void {
     offline: { label: 'Simulated: Printer Offline', danger: true },
     service_required: { label: 'Simulated: Service Required', danger: true },
     output_tray: { label: 'Simulated: Output Tray' },
+    refill_a4: { label: 'Simulated: Refill A4 Bond Paper (Priority 1)' },
+    refill_short: { label: 'Simulated: Refill Short Bond Paper (Priority 2)' },
+    refill_long: { label: 'Simulated: Refill Long Bond Paper (Priority 3)' },
   };
 
   const item = labels[activeError] || { label: `Simulated: ${activeError}` };
@@ -1002,6 +1014,9 @@ simCoverOpenBtn?.addEventListener('click', () => void triggerSimulation('cover_o
 simOfflineBtn?.addEventListener('click', () => void triggerSimulation('offline'));
 simServiceBtn?.addEventListener('click', () => void triggerSimulation('service_required'));
 simOutputTrayBtn?.addEventListener('click', () => void triggerSimulation('output_tray'));
+simRefillA4Btn?.addEventListener('click', () => void triggerSimulation('refill_a4'));
+simRefillShortBtn?.addEventListener('click', () => void triggerSimulation('refill_short'));
+simRefillLongBtn?.addEventListener('click', () => void triggerSimulation('refill_long'));
 clearPrinterErrorsBtn?.addEventListener('click', () => void triggerClearPrinterErrors());
 clearPaperJamBtn?.addEventListener('click', () => void triggerClearPaperJam());
 
