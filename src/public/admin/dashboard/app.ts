@@ -31,10 +31,10 @@ const statusBanner = document.getElementById('statusBanner');
 const attentionQueue = document.getElementById('attentionQueue');
 const machineHealthStrip = document.getElementById(
   'machineHealthStrip',
-) as HTMLDetailsElement | null;
+) as HTMLElement | null;
 const maintenanceStrip = document.getElementById(
   'maintenanceStrip',
-) as HTMLDetailsElement | null;
+) as HTMLElement | null;
 
 // ── Ink tank gauge elements ──────────────────────────────
 const inkAlertBanner = document.getElementById(
@@ -45,6 +45,12 @@ const inkAlertText = document.getElementById(
 ) as HTMLElement | null;
 const inkAlertBadge = document.getElementById(
   'inkAlertBadge',
+) as HTMLElement | null;
+const healthSummaryPill = document.getElementById(
+  'healthSummaryPill',
+) as HTMLElement | null;
+const healthSummaryPillText = document.getElementById(
+  'healthSummaryPillText',
 ) as HTMLElement | null;
 const owedChangeHint = document.getElementById(
   'owedChangeHint',
@@ -79,6 +85,10 @@ function applyInkEstimation(summary: SummaryResponse): void {
   if (!est) {
     if (inkAlertBanner) inkAlertBanner.classList.add('hidden');
     if (inkAlertBadge) inkAlertBadge.textContent = '';
+    if (healthSummaryPill && healthSummaryPillText) {
+      healthSummaryPill.className = 'overview-strip__pill overview-strip__pill--subtle';
+      healthSummaryPillText.textContent = 'No data';
+    }
     return;
   }
 
@@ -95,6 +105,8 @@ function applyInkEstimation(summary: SummaryResponse): void {
     const fillEl = document.getElementById(`inkFill${id}`);
     const percentEl = document.getElementById(`inkPercent${id}`);
     const pagesEl = document.getElementById(`inkPages${id}`);
+    const remainingEl = document.getElementById(`inkRemaining${id}`);
+    const statusEl = document.getElementById(`inkStatus${id}`);
     const tankEl = document.getElementById(`inkTank${id}`);
 
     if (fillEl) {
@@ -105,7 +117,17 @@ function applyInkEstimation(summary: SummaryResponse): void {
       percentEl.textContent = `${tank.remainingPercent.toFixed(1)}%`;
     }
     if (pagesEl) {
-      pagesEl.textContent = `${formatNumber(tank.pagesUsed)} / ${formatNumber(tank.maxPages)} pages`;
+      pagesEl.textContent = `${formatNumber(tank.pagesUsed)} / ${formatNumber(tank.maxPages)}`;
+    }
+    if (remainingEl) {
+      const pagesLeft = Math.max(0, tank.maxPages - tank.pagesUsed);
+      remainingEl.textContent = `~${formatNumber(pagesLeft)} pages`;
+    }
+    if (statusEl) {
+      statusEl.textContent = tank.alertTriggered ? 'Low Warning' : 'Optimal';
+      statusEl.className = `ink-tank__status ${
+        tank.alertTriggered ? 'ink-tank__status--alert' : 'ink-tank__status--ok'
+      }`;
     }
     if (tankEl) {
       tankEl.classList.toggle('ink-tank--alert', tank.alertTriggered);
@@ -113,6 +135,17 @@ function applyInkEstimation(summary: SummaryResponse): void {
     if (tank.alertTriggered) {
       alertCount += 1;
       lowNames.push(label);
+    }
+  }
+
+  // Update machine health summary pill
+  if (healthSummaryPill && healthSummaryPillText) {
+    if (est.anyAlertTriggered) {
+      healthSummaryPill.className = 'overview-strip__pill overview-strip__pill--warn';
+      healthSummaryPillText.textContent = 'Low Ink';
+    } else {
+      healthSummaryPill.className = 'overview-strip__pill overview-strip__pill--ok';
+      healthSummaryPillText.textContent = 'Normal';
     }
   }
 
@@ -200,48 +233,79 @@ refreshBtn.addEventListener('click', () => {
     );
 });
 
+async function runMachineAction(
+  btn: HTMLButtonElement,
+  confirmMsg: string,
+  inProgressMsg: string,
+  actionFn: () => Promise<void>,
+  successMsg: string,
+  failMsg: string,
+): Promise<void> {
+  if (!window.confirm(confirmMsg)) return;
+  const spinner = btn.querySelector('.ctrl-btn__spinner');
+  const arrow = btn.querySelector('.ctrl-btn__arrow');
+  btn.disabled = true;
+  btn.classList.add('is-loading');
+  if (spinner) spinner.classList.remove('hidden');
+  if (arrow) arrow.classList.add('hidden');
+  setMessage(inProgressMsg);
+
+  try {
+    await actionFn();
+    await loadData();
+    setMessage(successMsg);
+  } catch (err) {
+    setMessage(err instanceof Error ? err.message : failMsg);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('is-loading');
+    if (spinner) spinner.classList.add('hidden');
+    if (arrow) arrow.classList.remove('hidden');
+  }
+}
+
 resetBalanceBtn.addEventListener('click', () => {
-  if (!window.confirm('Reset machine balance to 0?')) return;
-  setMessage('Resetting balance...');
-  void apiFetch('/api/admin/balance/reset', { method: 'POST' })
-    .then(async (r) => {
+  void runMachineAction(
+    resetBalanceBtn,
+    'Reset machine balance to 0?',
+    'Resetting balance...',
+    async () => {
+      const r = await apiFetch('/api/admin/balance/reset', { method: 'POST' });
       if (!r.ok) throw new Error('Failed to reset balance.');
-      await loadData();
-      setMessage('Balance reset.');
-    })
-    .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : 'Failed to reset balance.'),
-    );
+    },
+    'Balance reset.',
+    'Failed to reset balance.',
+  );
 });
 
 resetInkBtn.addEventListener('click', () => {
-  if (!window.confirm('Reset page counters for new ink refill?')) return;
-  setMessage('Resetting ink counters...');
-  void apiFetch('/api/admin/printer/reset-ink-counters', { method: 'POST' })
-    .then(async (r) => {
+  void runMachineAction(
+    resetInkBtn,
+    'Reset page counters for new ink refill?',
+    'Resetting ink counters...',
+    async () => {
+      const r = await apiFetch('/api/admin/printer/reset-ink-counters', {
+        method: 'POST',
+      });
       if (!r.ok) throw new Error('Failed to reset ink counters.');
-      await loadData();
-      setMessage('Ink counters reset.');
-    })
-    .catch((e: unknown) =>
-      setMessage(
-        e instanceof Error ? e.message : 'Failed to reset ink counters.',
-      ),
-    );
+    },
+    'Ink counters reset.',
+    'Failed to reset ink counters.',
+  );
 });
 
 clearStorageBtn.addEventListener('click', () => {
-  if (!window.confirm('Clear uploaded files in storage?')) return;
-  setMessage('Clearing storage...');
-  void apiFetch('/api/admin/storage/clear', { method: 'POST' })
-    .then(async (r) => {
+  void runMachineAction(
+    clearStorageBtn,
+    'Clear uploaded files in storage? This cannot be undone.',
+    'Clearing storage...',
+    async () => {
+      const r = await apiFetch('/api/admin/storage/clear', { method: 'POST' });
       if (!r.ok) throw new Error('Failed to clear storage.');
-      await loadData();
-      setMessage('Storage cleared.');
-    })
-    .catch((e: unknown) =>
-      setMessage(e instanceof Error ? e.message : 'Failed to clear storage.'),
-    );
+    },
+    'Storage cleared.',
+    'Failed to clear storage.',
+  );
 });
 
 if (attentionQueue) {
@@ -252,34 +316,18 @@ if (attentionQueue) {
     if (!target) return;
     const href = target.getAttribute('href');
     if (href === '#machineHealthStrip' && machineHealthStrip) {
-      machineHealthStrip.open = true;
+      machineHealthStrip.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (href === '#maintenanceStrip' && maintenanceStrip) {
+      maintenanceStrip.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });
 }
 
-function initStrips(): void {
-  const isDesktop = window.innerWidth > 860;
-  if (machineHealthStrip) {
-    machineHealthStrip.open =
-      isDesktop || window.location.hash === '#machineHealthStrip';
-  }
-  if (maintenanceStrip) {
-    maintenanceStrip.open = isDesktop;
-  }
-}
-
-initStrips();
-
-window.addEventListener('resize', () => {
-  if (window.innerWidth > 860) {
-    if (machineHealthStrip && !machineHealthStrip.open) machineHealthStrip.open = true;
-    if (maintenanceStrip && !maintenanceStrip.open) maintenanceStrip.open = true;
-  }
-});
-
 window.addEventListener('hashchange', () => {
   if (window.location.hash === '#machineHealthStrip' && machineHealthStrip) {
-    machineHealthStrip.open = true;
+    machineHealthStrip.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (window.location.hash === '#maintenanceStrip' && maintenanceStrip) {
+    maintenanceStrip.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
 

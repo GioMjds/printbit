@@ -255,8 +255,6 @@ let createSessionInFlight = false;
 let conversionWaitCancelled = false;
 let conversionWaitInFlight = false;
 let conversionReturnFocus: HTMLElement | null = null;
-const refreshSessionDefaultLabel =
-  refreshSessionBtnLabel?.textContent?.trim() ?? 'Refresh QR Code';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -621,24 +619,6 @@ function selectFile(file: UploadedFile): void {
   if (continueBtn) {
     continueBtn.disabled = false;
     continueBtn.setAttribute('aria-disabled', 'false');
-  }
-
-  if (footerHint) {
-    const pageCount =
-      typeof file.pageCount === 'number'
-        ? file.pageCount
-        : typeof file.analysis?.pageCount === 'number'
-          ? file.analysis.pageCount
-          : typeof file.analysis?.totalPages === 'number'
-            ? file.analysis.totalPages
-            : undefined;
-
-    if (typeof pageCount === 'number' && pageCount > maxPagesPerSession) {
-      footerHint.textContent = `Document has ${pageCount} pages. You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
-    } else {
-      footerHint.textContent = `Selected "${file.filename}". You can print up to ${maxPagesPerSession} pages on the configuration screen.`;
-    }
-    footerHint.classList.add('ready');
   }
 }
 

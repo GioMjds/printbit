@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="google" content="notranslate" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <link rel="stylesheet" href="/globals.css" />
     <link rel="stylesheet" href="/shared/kiosk-transition.css" />
     <link rel="stylesheet" href="/shared/loading-animation.css" />
@@ -117,9 +120,7 @@
           <div class="qr-panel__inner">
             <div class="step-block">
               <div class="step-badge">
-                <span class="step-label" id="qrStepLabel"
-                  >Scan upload QR</span
-                >
+                <span class="step-label" id="qrStepLabel">Scan upload QR</span>
               </div>
 
               <div class="qr-frame">
@@ -133,12 +134,28 @@
                   height="220"
                   aria-label="QR code to upload your file"
                 ></canvas>
-                <div class="qr-lock" id="qrLock" role="status" aria-live="polite">
-                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+                <div
+                  class="qr-lock"
+                  id="qrLock"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                   <strong>Phone connected</strong>
-                  <span>This QR code is in use. Other phones can't join this session.</span>
+                  <span
+                    >This QR code is in use. Other phones can't join this
+                    session.</span
+                  >
                 </div>
               </div>
 
@@ -156,8 +173,11 @@
                   />
                 </svg>
                 <p class="upload-tip__text">
-                  <strong class="upload-tip__badge">One phone per session:</strong>
-                  The first phone to scan this code takes the session. Anyone else will be told it is already in use.
+                  <strong class="upload-tip__badge"
+                    >One phone per session:</strong
+                  >
+                  The first phone to scan this code takes the session. Anyone
+                  else will be told it is already in use.
                 </p>
               </div>
 
@@ -199,10 +219,10 @@
                 </svg>
                 <p class="upload-tip__text">
                   <strong class="upload-tip__badge">Tip:</strong>
-                  PDFs process instantly. Word documents &amp; images will be converted to PDF automatically.
+                  PDFs process instantly. Word documents &amp; images will be
+                  converted to PDF automatically.
                 </p>
               </div>
-
             </div>
 
             <div class="qr-actions">
@@ -254,118 +274,166 @@
           </div>
 
           <!-- Status / error strip (was in the footer) -->
-          <div class="footer-hint" id="footerHint" role="status" aria-live="polite"></div>
+          <div
+            class="footer-hint"
+            id="footerHint"
+            role="status"
+            aria-live="polite"
+          ></div>
 
           <!-- Waiting state -->
           <div class="files-empty" id="filesEmpty" aria-live="polite">
-  <div class="kiosk-assurance-badge">
-    <span class="assurance-beacon" aria-hidden="true"></span>
-    <span class="assurance-beacon-text">Kiosk ready &bull; Waiting for phone upload</span>
-  </div>
- 
-  <!-- Hero: phone → kiosk (decorative) -->
-  <svg class="empty-hero" viewBox="0 0 320 112" fill="none" aria-hidden="true">
-    <rect class="empty-hero__phone" x="22" y="6" width="54" height="100" rx="13" />
-    <rect class="empty-hero__phone-screen" x="30" y="20" width="38" height="62" rx="6" />
-    <circle class="empty-hero__phone-btn" cx="49" cy="94" r="3.5" />
-    <g class="empty-hero__dots">
-      <circle cx="116" cy="56" r="4" />
-      <circle cx="146" cy="56" r="4" />
-      <circle cx="176" cy="56" r="4" />
-      <circle cx="206" cy="56" r="4" />
-    </g>
-    <rect class="empty-hero__slot" x="242" y="14" width="62" height="84" rx="12" />
-    <path class="empty-hero__doc" d="M262 40h16l8 8v22a3 3 0 0 1-3 3h-21a3 3 0 0 1-3-3V43a3 3 0 0 1 3-3z" />
-    <path class="empty-hero__doc-fold" d="M278 40v8h8" />
-  </svg>
- 
-  <div class="empty-copy">
-    <h3 class="files-empty__title">Ready for your file</h3>
-    <p class="files-empty__sub">It will appear here the moment it reaches the kiosk.</p>
-  </div>
- 
-  <ol class="empty-steps" aria-label="How to upload from your phone">
-    <li class="empty-step">
-      <span class="empty-step__num" aria-hidden="true">1</span>
-      <div class="empty-step__text">
-        <strong>Join the Wi-Fi</strong>
-        <span>Connect your phone to
-          <span class="empty-ssid" id="emptyWifiSsid">PrintBit</span></span>
-        <span class="empty-step__hint">Page won't open? Turn off mobile data.</span>
-      </div>
-    </li>
-    <li class="empty-step">
-      <span class="empty-step__num" aria-hidden="true">2</span>
-      <div class="empty-step__text">
-        <strong>Scan the QR code</strong>
-        <span>Point your camera at the code on the left</span>
-      </div>
-    </li>
-    <li class="empty-step">
-      <span class="empty-step__num" aria-hidden="true">3</span>
-      <div class="empty-step__text">
-        <strong>Choose a file</strong>
-        <span>Pick a document or photo to send</span>
-      </div>
-    </li>
-  </ol>
- 
-  <div class="empty-formats">
-    <span class="empty-formats__label">Accepted</span>
-    <ul class="empty-formats__list">
-      <li class="empty-format">
-        <svg aria-hidden="true"><use href="#icon-pdf" /></svg>PDF
-      </li>
-      <li class="empty-format">
-        <svg aria-hidden="true"><use href="#icon-doc" /></svg>Word
-      </li>
-      <li class="empty-format">
-        <svg aria-hidden="true"><use href="#icon-img" /></svg>Photos
-      </li>
-    </ul>
-  </div>
- 
-  <p class="empty-privacy">
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-      <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zm3.707 5.763a1 1 0 00-1.414-1.414L9 9.586 7.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-    </svg>
-    Private &mdash; your files are wiped after printing
-  </p>
-</div>
+            <div class="kiosk-assurance-badge">
+              <span class="assurance-beacon" aria-hidden="true"></span>
+              <span class="assurance-beacon-text"
+                >Kiosk ready &bull; Waiting for phone upload</span
+              >
+            </div>
+
+            <!-- Hero: phone → kiosk (decorative) -->
+            <svg
+              class="empty-hero"
+              viewBox="0 0 320 112"
+              fill="none"
+              aria-hidden="true"
+            >
+              <rect
+                class="empty-hero__phone"
+                x="22"
+                y="6"
+                width="54"
+                height="100"
+                rx="13"
+              />
+              <rect
+                class="empty-hero__phone-screen"
+                x="30"
+                y="20"
+                width="38"
+                height="62"
+                rx="6"
+              />
+              <circle class="empty-hero__phone-btn" cx="49" cy="94" r="3.5" />
+              <g class="empty-hero__dots">
+                <circle cx="116" cy="56" r="4" />
+                <circle cx="146" cy="56" r="4" />
+                <circle cx="176" cy="56" r="4" />
+                <circle cx="206" cy="56" r="4" />
+              </g>
+              <rect
+                class="empty-hero__slot"
+                x="242"
+                y="14"
+                width="62"
+                height="84"
+                rx="12"
+              />
+              <path
+                class="empty-hero__doc"
+                d="M262 40h16l8 8v22a3 3 0 0 1-3 3h-21a3 3 0 0 1-3-3V43a3 3 0 0 1 3-3z"
+              />
+              <path class="empty-hero__doc-fold" d="M278 40v8h8" />
+            </svg>
+
+            <div class="empty-copy">
+              <h3 class="files-empty__title">Ready for your file</h3>
+              <p class="files-empty__sub">
+                It will appear here the moment it reaches the kiosk.
+              </p>
+            </div>
+
+            <ol class="empty-steps" aria-label="How to upload from your phone">
+              <li class="empty-step">
+                <span class="empty-step__num" aria-hidden="true">1</span>
+                <div class="empty-step__text">
+                  <strong>Join the Wi-Fi</strong>
+                  <span
+                    >Connect your phone to
+                    <span class="empty-ssid" id="emptyWifiSsid"
+                      >PrintBit</span
+                    ></span
+                  >
+                  <span class="empty-step__hint"
+                    >Page won't open? Turn off mobile data.</span
+                  >
+                </div>
+              </li>
+              <li class="empty-step">
+                <span class="empty-step__num" aria-hidden="true">2</span>
+                <div class="empty-step__text">
+                  <strong>Scan the QR code</strong>
+                  <span>Point your camera at the code on the left</span>
+                </div>
+              </li>
+              <li class="empty-step">
+                <span class="empty-step__num" aria-hidden="true">3</span>
+                <div class="empty-step__text">
+                  <strong>Choose a file</strong>
+                  <span>Pick a document or photo to send</span>
+                </div>
+              </li>
+            </ol>
+
+            <div class="empty-formats">
+              <span class="empty-formats__label">Accepted</span>
+              <ul class="empty-formats__list">
+                <li class="empty-format">
+                  <svg aria-hidden="true"><use href="#icon-pdf" /></svg>PDF
+                </li>
+                <li class="empty-format">
+                  <svg aria-hidden="true"><use href="#icon-doc" /></svg>Word
+                </li>
+                <li class="empty-format">
+                  <svg aria-hidden="true"><use href="#icon-img" /></svg>Photos
+                </li>
+              </ul>
+            </div>
+
+            <p class="empty-privacy">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zm3.707 5.763a1 1 0 00-1.414-1.414L9 9.586 7.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              Private &mdash; your files are wiped after printing
+            </p>
+          </div>
 
           <!-- File list (populated by JS) — starts hidden so files-empty centres correctly -->
           <div class="files-body">
-          <ul
-            class="file-list hidden"
-            id="fileList"
-            aria-label="Uploaded files"
-            role="listbox"
-            aria-multiselectable="false"
-          ></ul>
+            <ul
+              class="file-list hidden"
+              id="fileList"
+              aria-label="Uploaded files"
+              role="listbox"
+              aria-multiselectable="false"
+            ></ul>
 
-          <!-- Primary action: sits beside the file row, not at the screen edge -->
-          <div class="continue-dock">
-            <button
-              id="continueBtn"
-              type="button"
-              class="continue-btn"
-              disabled
-              aria-disabled="true"
-            >
-              <span>Continue</span>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
+            <!-- Primary action: docked to bottom-right -->
+            <div class="continue-dock">
+              <button
+                id="continueBtn"
+                type="button"
+                class="continue-btn"
+                disabled
+                aria-disabled="true"
               >
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-            </button>
-          </div>
+                <span>Continue</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </button>
+            </div>
           </div>
         </section>
       </main>
@@ -544,10 +612,12 @@
         aria-labelledby="nsTitle"
         aria-describedby="nsDesc"
       >
-        <h3 class="modal-title" id="nsTitle">Clear this session and start over?</h3>
+        <h3 class="modal-title" id="nsTitle">
+          Clear this session and start over?
+        </h3>
         <p class="modal-subtitle" id="nsDesc">
-          The connected phone and any uploaded files will be removed from the kiosk. This cannot be
-          undone.
+          The connected phone and any uploaded files will be removed from the
+          kiosk. This cannot be undone.
         </p>
         <div class="modal-actions">
           <button
@@ -609,11 +679,19 @@
             <div class="preload-fallback lottie-loading__fallback">
               <div class="preload-fallback__ring" aria-hidden="true"></div>
               <div class="preload-fallback__core" aria-hidden="true">
-                <svg class="preload-fallback__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                  <line x1="16" y1="13" x2="8" y2="13"/>
-                  <line x1="16" y1="17" x2="8" y2="17"/>
+                <svg
+                  class="preload-fallback__icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                  />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
                 </svg>
               </div>
             </div>
@@ -627,8 +705,12 @@
               </svg>
             </div>
             <div class="preload-file-pill__text">
-              <span class="preload-file-pill__name" id="preloadFileName">Document</span>
-              <span class="preload-file-pill__type" id="preloadFileType">PDF Document</span>
+              <span class="preload-file-pill__name" id="preloadFileName"
+                >Document</span
+              >
+              <span class="preload-file-pill__type" id="preloadFileType"
+                >PDF Document</span
+              >
             </div>
           </div>
 
@@ -638,20 +720,36 @@
           </div>
         </div>
 
-        <h3 class="modal-title" id="conversionTitle">Preparing your document</h3>
+        <h3 class="modal-title" id="conversionTitle">
+          Preparing your document
+        </h3>
         <p class="modal-subtitle" id="conversionMessage" aria-live="polite">
           Checking pages and print quality…
         </p>
 
         <p class="preload-assurance-text">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true">
-            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944z" clip-rule="evenodd"/>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            width="14"
+            height="14"
+            aria-hidden="true"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944z"
+              clip-rule="evenodd"
+            />
           </svg>
           Processed securely on kiosk &bull; Never stored after print
         </p>
 
         <div class="modal-actions">
-          <button type="button" class="modal-btn modal-btn--cancel" id="conversionCancel">
+          <button
+            type="button"
+            class="modal-btn modal-btn--cancel"
+            id="conversionCancel"
+          >
             Cancel
           </button>
         </div>
@@ -673,7 +771,14 @@
       >
         <div class="wifi-modal-header">
           <div class="wifi-modal-icon-badge" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <path d="M5 12.55a11 11 0 0 1 14.08 0" />
               <path d="M1.42 9a16 16 0 0 1 21.16 0" />
               <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
@@ -684,8 +789,12 @@
             <h3 class="modal-title wifi-modal-title" id="wifiModalTitle">
               QR Code Not Opening?
             </h3>
-            <p class="modal-subtitle wifi-modal-subtitle" id="wifiModalSubtitle">
-              If the upload page won't load on your phone, you might not be connected to the kiosk Wi-Fi yet.
+            <p
+              class="modal-subtitle wifi-modal-subtitle"
+              id="wifiModalSubtitle"
+            >
+              If the upload page won't load on your phone, you might not be
+              connected to the kiosk Wi-Fi yet.
             </p>
           </div>
         </div>
@@ -704,18 +813,24 @@
                 aria-label="PrintBit Wi-Fi QR Code"
               ></canvas>
             </div>
-            <p class="wifi-modal-qr-caption">Scan with phone camera to connect</p>
+            <p class="wifi-modal-qr-caption">
+              Scan with phone camera to connect
+            </p>
           </div>
 
           <div class="wifi-modal-info-section">
             <div class="wifi-credentials-card">
               <div class="wifi-credential-row">
                 <span class="wifi-credential-label">Network (SSID)</span>
-                <span class="wifi-credential-val" id="wifiSsidVal">PrintBit</span>
+                <span class="wifi-credential-val" id="wifiSsidVal"
+                  >PrintBit</span
+                >
               </div>
               <div class="wifi-credential-row">
                 <span class="wifi-credential-label">Password</span>
-                <span class="wifi-credential-val" id="wifiPasswordVal">Open (No password required)</span>
+                <span class="wifi-credential-val" id="wifiPasswordVal"
+                  >Open (No password required)</span
+                >
               </div>
             </div>
 
@@ -724,28 +839,42 @@
                 <span class="wifi-step-num">1</span>
                 <div class="wifi-step-text">
                   <strong>Connect to kiosk Wi-Fi</strong>
-                  <span>Scan the QR code above or join the network in your phone settings.</span>
+                  <span
+                    >Scan the QR code above or join the network in your phone
+                    settings.</span
+                  >
                 </div>
               </div>
               <div class="wifi-step-item">
                 <span class="wifi-step-num">2</span>
                 <div class="wifi-step-text">
                   <strong>Stay connected</strong>
-                  <span>If your phone prompts "No internet connection", choose <em>Keep Connected</em>. Save Canva or cloud files to your phone first.</span>
+                  <span
+                    >If your phone prompts "No internet connection", choose
+                    <em>Keep Connected</em>. Save Canva or cloud files to your
+                    phone first.</span
+                  >
                 </div>
               </div>
               <div class="wifi-step-item wifi-step-item--key">
                 <span class="wifi-step-num">3</span>
                 <div class="wifi-step-text">
                   <strong>Turn off mobile data</strong>
-                  <span>Phones prefer mobile data when the Wi-Fi has no internet, so the upload page can't open. Switch it off in your quick settings.</span>
+                  <span
+                    >Phones prefer mobile data when the Wi-Fi has no internet,
+                    so the upload page can't open. Switch it off in your quick
+                    settings.</span
+                  >
                 </div>
               </div>
               <div class="wifi-step-item">
                 <span class="wifi-step-num">4</span>
                 <div class="wifi-step-text">
                   <strong>Re-scan upload QR</strong>
-                  <span>Return and scan the upload QR code to send your files.</span>
+                  <span
+                    >Return and scan the upload QR code to send your
+                    files.</span
+                  >
                 </div>
               </div>
             </div>
@@ -776,11 +905,13 @@
       <div class="idle-warning-content">
         <div class="idle-warning-countdown-number" id="idleCountdown">20</div>
         <div class="idle-warning-countdown-label">seconds remaining</div>
-        <h2 id="idleWarningTitle" class="idle-warning-title">Session Timeout</h2>
-        <p class="idle-warning-subtitle">No activity detected. Your session will close soon.</p>
+        <h2 id="idleWarningTitle" class="idle-warning-title">
+          Session Timeout
+        </h2>
+        <p class="idle-warning-subtitle">
+          No activity detected. Your session will close soon.
+        </p>
         <div class="idle-warning-tap-hint">Tap anywhere to continue</div>
-      </div>
-    </div>
       </div>
     </div>
 
