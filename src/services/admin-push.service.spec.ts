@@ -14,7 +14,10 @@ import { AdminPushService } from './admin-push.service';
 
 const sendNotification = webpush.sendNotification as unknown as jest.Mock;
 
-function makeService(subs: Array<{ endpoint: string }>) {
+function makeService(
+  subs: Array<{ endpoint: string; deviceId?: string }>,
+  devices: Array<{ id: string; minSeverity: 'critical' | 'warning' }> = [],
+) {
   const data: any = {
     settings: {
       pushNotifications: {
@@ -23,6 +26,14 @@ function makeService(subs: Array<{ endpoint: string }>) {
         vapidKeys: { publicKey: 'pub', privateKey: 'priv' },
       },
     },
+    adminDevices: devices.map((d) => ({
+      id: d.id,
+      label: d.id,
+      tokenHash: 'h',
+      minSeverity: d.minSeverity,
+      createdAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString(),
+    })),
     adminPushSubscriptions: subs.map((s, i) => ({
       id: `id-${i}`,
       endpoint: s.endpoint,
@@ -30,6 +41,7 @@ function makeService(subs: Array<{ endpoint: string }>) {
       userAgent: 'jest',
       createdAt: new Date().toISOString(),
       lastNotifiedAt: null,
+      deviceId: s.deviceId,
     })),
   };
   const service = new AdminPushService({
@@ -117,5 +129,161 @@ describe('AdminPushService.hasSubscription', () => {
     const { service } = makeService([{ endpoint: 'https://fcm/1' }]);
     expect(service.hasSubscription('https://fcm/1')).toBe(true);
     expect(service.hasSubscription('https://fcm/2')).toBe(false);
+  });
+});
+
+describe('AdminPushService severity routing', () => {
+  beforeEach(() => sendNotification.mockReset());
+
+  const warningAlert = { ...alert, severity: 'warning' as const };
+
+  it('skips a critical-only device for a warning alert but delivers to an everything device', async () => {
+    sendNotification.mockResolvedValue({});
+    const { service, data } = makeService(
+      [
+        { endpoint: 'https://fcm/phone', deviceId: 'phone' },
+        { endpoint: 'https://fcm/laptop', deviceId: 'laptop' },
+      ],
+      [
+        { id: 'phone', minSeverity: 'critical' },
+        { id: 'laptop', minSeverity: 'warning' },
+      ],
+    );
+
+    const result = await service.broadcastCriticalAlert(warningAlert);
+
+    expect(result).toEqual({ sent: 1, pruned: 0, skipped: 1 });
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification.mock.calls[0][0].endpoint).toBe(
+      'https://fcm/laptop',
+    );
+    expect(data.adminPushSubscriptions).toHaveLength(2); // skipped is not pruned
+  });
+
+  it('delivers a critical alert to every device', async () => {
+    sendNotification.mockResolvedValue({});
+    const { service } = makeService(
+      [
+        { endpoint: 'https://fcm/phone', deviceId: 'phone' },
+        { endpoint: 'https://fcm/laptop', deviceId: 'laptop' },
+      ],
+      [
+        { id: 'phone', minSeverity: 'critical' },
+        { id: 'laptop', minSeverity: 'warning' },
+      ],
+    );
+
+    const result = await service.broadcastCriticalAlert(alert);
+
+    expect(result).toEqual({ sent: 2, pruned: 0, skipped: 0 });
+  });
+
+  it('fails open: legacy subscriptions and ones whose device is missing still get alerts', async () => {
+    sendNotification.mockResolvedValue({});
+    const { service } = makeService(
+      [
+        { endpoint: 'https://fcm/legacy' },
+        { endpoint: 'https://fcm/orphan', deviceId: 'gone' },
+      ],
+      [],
+    );
+
+    const result = await service.broadcastCriticalAlert(warningAlert);
+
+    expect(result.sent).toBe(2);
+    expect(result.skipped).toBe(0);
+  });
+});
+
+describe('AdminPushService ownership', () => {
+  beforeEach(() => sendNotification.mockReset());
+
+  it('subscribe links the subscription to the device and replaces its previous endpoint', async () => {
+    const { service, data } = makeService([
+      { endpoint: 'https://fcm/old', deviceId: 'phone' },
+    ]);
+
+    await service.subscribe(
+      { endpoint: 'https://fcm/new', keys: { p256dh: 'p', auth: 'a' } },
+      'phone',
+      'jest',
+    );
+
+    expect(data.adminPushSubscriptions.map((s: any) => s.endpoint)).toEqual([
+      'https://fcm/new',
+    ]);
+    expect(data.adminPushSubscriptions[0].deviceId).toBe('phone');
+  });
+
+  it('subscribe lets a device take over an endpoint owned by another device or nobody', async () => {
+    const { service, data } = makeService([
+      { endpoint: 'https://fcm/a', deviceId: 'old-device' },
+      { endpoint: 'https://fcm/b' },
+    ]);
+
+    await service.subscribe(
+      { endpoint: 'https://fcm/a', keys: { p256dh: 'p', auth: 'a' } },
+      'new-device',
+    );
+    await service.subscribe(
+      { endpoint: 'https://fcm/b', keys: { p256dh: 'p', auth: 'a' } },
+      'new-device',
+    );
+
+    const byEndpoint = Object.fromEntries(
+      data.adminPushSubscriptions.map((s: any) => [s.endpoint, s.deviceId]),
+    );
+    expect(byEndpoint['https://fcm/b']).toBe('new-device');
+    // the replace rule keeps one subscription per device
+    expect(
+      data.adminPushSubscriptions.filter(
+        (s: any) => s.deviceId === 'new-device',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('unsubscribe removes own, refuses foreign, reports absent', async () => {
+    const { service, data } = makeService([
+      { endpoint: 'https://fcm/a', deviceId: 'phone' },
+    ]);
+
+    expect(await service.unsubscribe('https://fcm/a', 'laptop')).toBe(
+      'forbidden',
+    );
+    expect(data.adminPushSubscriptions).toHaveLength(1);
+    expect(await service.unsubscribe('https://fcm/missing', 'phone')).toBe(
+      'absent',
+    );
+    expect(await service.unsubscribe('https://fcm/a', 'phone')).toBe('removed');
+    expect(data.adminPushSubscriptions).toHaveLength(0);
+  });
+
+  it('test push is refused for a foreign subscription and ignores minSeverity for the owner', async () => {
+    sendNotification.mockResolvedValue({});
+    const { service } = makeService(
+      [{ endpoint: 'https://fcm/a', deviceId: 'phone' }],
+      [{ id: 'phone', minSeverity: 'critical' }],
+    );
+
+    expect(await service.sendTestNotification('https://fcm/a', 'laptop')).toBe(
+      false,
+    );
+    expect(sendNotification).not.toHaveBeenCalled();
+    expect(await service.sendTestNotification('https://fcm/a', 'phone')).toBe(
+      true,
+    );
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('hasSubscription with a device id is true only for the owner', () => {
+    const { service } = makeService([
+      { endpoint: 'https://fcm/a', deviceId: 'phone' },
+      { endpoint: 'https://fcm/legacy' },
+    ]);
+
+    expect(service.hasSubscription('https://fcm/a', 'phone')).toBe(true);
+    expect(service.hasSubscription('https://fcm/a', 'laptop')).toBe(false);
+    expect(service.hasSubscription('https://fcm/legacy', 'phone')).toBe(false);
+    expect(service.hasSubscription('https://fcm/a')).toBe(true);
   });
 });
