@@ -43,7 +43,7 @@ interface AdminDeviceEntry {
 }
 ```
 
-`AdminPushSubscriptionEntry` gains a `deviceId: string`. Legacy entries without one are treated as receive-all until their device re-registers.
+`AdminPushSubscriptionEntry` gains an optional `deviceId?: string`. Legacy entries without one are treated as receive-all until their device re-registers.
 
 ## Login and Session Flow
 
@@ -102,7 +102,7 @@ Written test-first with jest:
 - Device service: create, reuse, bad secret rejected, revoke, cap eviction.
 - Auth fallback: an empty session map (simulated restart) with a valid cookie still passes.
 - Routing: a `warning` alert skips a critical-only device; a `critical` alert reaches all devices.
-- Ownership: another device gets 404 for subscribe, test and unsubscribe.
+- Ownership: another device gets 404 for test and unsubscribe. Subscribe may take over an endpoint only with matching keys or when the owning device no longer exists, otherwise it gets 409 `ENDPOINT_OWNED`.
 - The existing `admin-push.service.spec.ts` tests stay green.
 
 ## Out of Scope

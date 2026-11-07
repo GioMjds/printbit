@@ -112,7 +112,9 @@ export class AdminPushService {
         if (attempt >= PUSH_SEND_ATTEMPTS || !isTransientPushError(err)) {
           throw err;
         }
-        await new Promise((r) => setTimeout(r, this.deps.retryDelayMs * attempt));
+        await new Promise((r) =>
+          setTimeout(r, this.deps.retryDelayMs * attempt),
+        );
       }
     }
   }
@@ -142,7 +144,8 @@ export class AdminPushService {
       };
       if (
         !data.settings.pushNotifications.vapidKeys ||
-        data.settings.pushNotifications.vapidKeys.publicKey !== keys.publicKey ||
+        data.settings.pushNotifications.vapidKeys.publicKey !==
+          keys.publicKey ||
         data.settings.pushNotifications.vapidKeys.privateKey !== keys.privateKey
       ) {
         data.settings.pushNotifications.vapidKeys = keys;
@@ -182,7 +185,8 @@ export class AdminPushService {
         (d) => d.id === owned.deviceId,
       );
       const keysMatch =
-        owned.keys.p256dh === sub.keys.p256dh && owned.keys.auth === sub.keys.auth;
+        owned.keys.p256dh === sub.keys.p256dh &&
+        owned.keys.auth === sub.keys.auth;
       if (ownerExists && !keysMatch) throw new EndpointOwnedError();
     }
 
@@ -224,7 +228,9 @@ export class AdminPushService {
     deviceId: string,
   ): Promise<'removed' | 'absent' | 'forbidden'> {
     const data = this.deps.getDbData();
-    const sub = data?.adminPushSubscriptions?.find((s) => s.endpoint === endpoint);
+    const sub = data?.adminPushSubscriptions?.find(
+      (s) => s.endpoint === endpoint,
+    );
     if (!data || !sub) return 'absent';
     if (sub.deviceId && sub.deviceId !== deviceId) return 'forbidden';
     data.adminPushSubscriptions = data.adminPushSubscriptions.filter(
@@ -257,15 +263,17 @@ export class AdminPushService {
 
     // Record Anomaly Incident for audit trail
     if (this.deps.getDbData()?.anomalyIncidents) {
-      void this.deps.reportAnomaly({
-        type: `kiosk_hardware_${alert.code.toLowerCase()}`,
-        source: 'kiosk-hardware',
-        category: 'printer',
-        severity: alert.severity,
-        message: alert.message,
-        fingerprint: `kiosk-hardware-${alert.code}`,
-        context: { alertCode: alert.code },
-      }).catch(() => {});
+      void this.deps
+        .reportAnomaly({
+          type: `kiosk_hardware_${alert.code.toLowerCase()}`,
+          source: 'kiosk-hardware',
+          category: 'printer',
+          severity: alert.severity,
+          message: alert.message,
+          fingerprint: `kiosk-hardware-${alert.code}`,
+          context: { alertCode: alert.code },
+        })
+        .catch(() => {});
     }
 
     const data = this.deps.getDbData();
@@ -306,7 +314,14 @@ export class AdminPushService {
           sentCount++;
           sub.lastNotifiedAt = new Date().toISOString();
         } catch (err: any) {
-          console.error('[ADMIN-PUSH] Delivery failed for device (' + sub.id + ', agent: ' + sub.userAgent + '):', err?.statusCode || err?.message);
+          console.error(
+            '[ADMIN-PUSH] Delivery failed for device (' +
+              sub.id +
+              ', agent: ' +
+              sub.userAgent +
+              '):',
+            err?.statusCode || err?.message,
+          );
           if (DEAD_SUBSCRIPTION_STATUSES.has(err?.statusCode)) {
             deadEndpoints.add(sub.endpoint);
           }
@@ -336,7 +351,10 @@ export class AdminPushService {
     return { sent: sentCount, pruned: prunedCount, skipped: skippedCount };
   }
 
-  async sendTestNotification(endpoint: string, deviceId: string): Promise<boolean> {
+  async sendTestNotification(
+    endpoint: string,
+    deviceId: string,
+  ): Promise<boolean> {
     const data = this.deps.getDbData();
     const sub = data?.adminPushSubscriptions?.find(
       (s) => s.endpoint === endpoint,
@@ -372,7 +390,10 @@ export class AdminPushService {
       );
       return true;
     } catch (err: any) {
-      console.error('[ADMIN-PUSH] Test push failed for device (' + sub.id + '):', err?.statusCode || err?.message);
+      console.error(
+        '[ADMIN-PUSH] Test push failed for device (' + sub.id + '):',
+        err?.statusCode || err?.message,
+      );
       return false;
     }
   }
