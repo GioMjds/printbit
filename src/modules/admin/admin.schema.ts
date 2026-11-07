@@ -213,6 +213,17 @@ export interface PushNotificationSettings {
   cooldownSeconds: number;
 }
 
+export type AdminDeviceSeverity = 'critical' | 'warning';
+
+export interface AdminDeviceEntry {
+  id: string;
+  label: string;
+  tokenHash: string;
+  minSeverity: AdminDeviceSeverity;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
 export interface AdminPushSubscriptionEntry {
   id: string;
   endpoint: string;
@@ -223,4 +234,6 @@ export interface AdminPushSubscriptionEntry {
   userAgent: string;
   createdAt: string;
   lastNotifiedAt: string | null;
+  // Absent on subscriptions saved before device identity existed.
+  deviceId?: string;
 }

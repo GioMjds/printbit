@@ -4,12 +4,16 @@ import { AnomalySeverity } from './anomaly-incident.model';
 import {
   PushNotificationSettings,
   AdminPushSubscriptionEntry,
+  AdminDeviceEntry,
+  AdminDeviceSeverity,
   VapidKeys,
 } from '@/modules/admin/admin.schema';
 
 export {
   PushNotificationSettings,
   AdminPushSubscriptionEntry,
+  AdminDeviceEntry,
+  AdminDeviceSeverity,
   VapidKeys,
 };
 

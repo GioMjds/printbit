@@ -87,6 +87,7 @@ import {
   UiBlockingMode,
   UiBlockingSettings,
   AdminPushSubscriptionEntry,
+  AdminDeviceEntry,
   PushNotificationSettings,
   VapidKeys,
 } from './models/admin.model';
@@ -107,6 +108,7 @@ export {
   CoverageTierRates, DeveloperModeSettings, InkMonitoringSettings, InkTelemetryUnknownPolicy, KioskPreferences, PaperPricingProfile, PipelineSettings, PricingEngineBulkDiscountTier, PricingEnginePaperProfile, PricingEngineRoundingMode, PricingEngineSettings, PricingSettings, PrintLimitsSettings, ScannerDpiSettings, SupportedDpi, UiBlockingMode,
   UiBlockingSettings,
   AdminPushSubscriptionEntry,
+  AdminDeviceEntry,
   PushNotificationSettings,
   VapidKeys
 };
@@ -202,6 +204,7 @@ export type Schema = {
   receiptAccessTokens: ReceiptAccessTokenEntry[];
   inkRefillBaseline: InkRefillBaseline;
   adminPushSubscriptions: AdminPushSubscriptionEntry[];
+  adminDevices: AdminDeviceEntry[];
 };
 
 export const defaultPricingEngine: PricingEngineSettings = {
@@ -404,6 +407,7 @@ const DEFAULT_DATA: Schema = {
     updatedAt: null,
   },
   adminPushSubscriptions: [],
+  adminDevices: [],
 };
 
 /**
@@ -1769,6 +1773,9 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
     adminPushSubscriptions: Array.isArray(data?.adminPushSubscriptions)
       ? data.adminPushSubscriptions
       : DEFAULT_DATA.adminPushSubscriptions,
+    adminDevices: Array.isArray(data?.adminDevices)
+      ? data.adminDevices
+      : DEFAULT_DATA.adminDevices,
   };
 }
 

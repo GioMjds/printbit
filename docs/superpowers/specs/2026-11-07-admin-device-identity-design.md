@@ -35,8 +35,8 @@ New collection `adminDevices` in the db, added to `DEFAULT_DATA` and the normali
 ```ts
 interface AdminDeviceEntry {
   id: string;
-  label: string;                       // trimmed, max 40 chars
-  tokenHash: string;                   // sha256 of the cookie secret
+  label: string; // trimmed, max 40 chars
+  tokenHash: string; // sha256 of the cookie secret
   minSeverity: 'critical' | 'warning'; // default 'warning' (receives everything)
   createdAt: string;
   lastSeenAt: string;
