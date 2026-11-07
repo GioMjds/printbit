@@ -81,7 +81,14 @@ import {
 } from '@/services/windows-power';
 import { sendHeartbeatOnce } from '@/services/heartbeat-reporter';
 import { sendWorkerRequest } from '@/services/worker-command-pipe';
-import { destroyAdminSession } from '@/utils/admin-session';
+import {
+  destroyAdminSession,
+  destroySessionsForDevice,
+} from '@/utils/admin-session';
+import {
+  AdminDeviceValidationError,
+  adminDeviceService,
+} from '@/services/admin-device.service';
 import {
   clearAdminSessionCookies,
   establishAdminSession,
@@ -536,6 +543,26 @@ export class AdminController {
       requireAdminLocalAccess,
       requireAdminPin,
       this.handleGetPushStatus,
+    );
+
+    // ── Admin device routes ────────────────────────────────────────────────────
+    this.router.get(
+      '/devices',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleListDevices,
+    );
+    this.router.patch(
+      '/devices/:id',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleUpdateDevice,
+    );
+    this.router.delete(
+      '/devices/:id',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      this.handleRevokeDevice,
     );
     this.router.post(
       '/system/shutdown',
@@ -4248,8 +4275,19 @@ export class AdminController {
     }
   };
 
+  private static readonly DEVICE_REQUIRED = {
+    success: false,
+    code: 'DEVICE_REQUIRED',
+    error:
+      'This session is not registered as a device. Log out, log in again with the PIN, then retry.',
+  };
+
   private handlePushSubscribe = async (req: Request, res: Response) => {
     try {
+      const deviceId = res.locals.adminDeviceId as string | undefined;
+      if (!deviceId) {
+        return res.status(403).json(AdminController.DEVICE_REQUIRED);
+      }
       const { subscription } = req.body ?? {};
       if (
         !subscription?.endpoint ||
@@ -4261,7 +4299,11 @@ export class AdminController {
           .json({ success: false, error: 'Invalid subscription object.' });
       }
       const userAgent = (req.headers['user-agent'] as string) || 'Unknown';
-      const entry = await adminPushService.subscribe(subscription, userAgent);
+      const entry = await adminPushService.subscribe(
+        subscription,
+        deviceId,
+        userAgent,
+      );
       return res.json({ success: true, subscription: entry });
     } catch (err: any) {
       console.error('[ADMIN] Failed to register push subscription', err);
@@ -4273,14 +4315,23 @@ export class AdminController {
 
   private handlePushUnsubscribe = async (req: Request, res: Response) => {
     try {
+      const deviceId = res.locals.adminDeviceId as string | undefined;
+      if (!deviceId) {
+        return res.status(403).json(AdminController.DEVICE_REQUIRED);
+      }
       const { endpoint } = req.body ?? {};
       if (!endpoint || typeof endpoint !== 'string') {
         return res
           .status(400)
           .json({ success: false, error: 'Endpoint is required.' });
       }
-      const removed = await adminPushService.unsubscribe(endpoint);
-      return res.json({ success: true, removed });
+      const result = await adminPushService.unsubscribe(endpoint, deviceId);
+      if (result === 'forbidden') {
+        return res
+          .status(404)
+          .json({ success: false, error: 'Subscription not found.' });
+      }
+      return res.json({ success: true, removed: result === 'removed' });
     } catch (err: any) {
       console.error('[ADMIN] Failed to remove push subscription', err);
       return res
@@ -4291,13 +4342,17 @@ export class AdminController {
 
   private handlePushTest = async (req: Request, res: Response) => {
     try {
+      const deviceId = res.locals.adminDeviceId as string | undefined;
+      if (!deviceId) {
+        return res.status(403).json(AdminController.DEVICE_REQUIRED);
+      }
       const { endpoint } = req.body ?? {};
       if (!endpoint || typeof endpoint !== 'string') {
         return res
           .status(400)
           .json({ success: false, error: 'Endpoint is required.' });
       }
-      const ok = await adminPushService.sendTestNotification(endpoint);
+      const ok = await adminPushService.sendTestNotification(endpoint, deviceId);
       if (!ok) {
         return res
           .status(404)
@@ -4314,16 +4369,21 @@ export class AdminController {
 
   private handleGetPushStatus = async (req: Request, res: Response) => {
     try {
+      const deviceId = res.locals.adminDeviceId as string | undefined;
       const subscriptions = db.data?.adminPushSubscriptions || [];
       const enabled = db.data?.settings.pushNotifications?.enabled ?? true;
       const endpoint =
         typeof req.query.endpoint === 'string' ? req.query.endpoint : '';
+      const device = deviceId ? adminDeviceService.getById(deviceId) : null;
       return res.json({
         success: true,
         enabled,
         subscriptionCount: subscriptions.length,
+        device: device
+          ? { id: device.id, label: device.label, minSeverity: device.minSeverity }
+          : null,
         ...(endpoint
-          ? { registered: adminPushService.hasSubscription(endpoint) }
+          ? { registered: adminPushService.hasSubscription(endpoint, deviceId) }
           : {}),
       });
     } catch (err: any) {
@@ -4331,6 +4391,71 @@ export class AdminController {
       return res
         .status(500)
         .json({ success: false, error: err?.message || 'Failed to get push status.' });
+    }
+  };
+
+  // ── Admin device handlers ──────────────────────────────────────────────────
+
+  private handleListDevices = (_req: Request, res: Response) => {
+    try {
+      const currentId = res.locals.adminDeviceId as string | undefined;
+      return res.json({ success: true, devices: adminDeviceService.list(currentId) });
+    } catch (err: any) {
+      console.error('[ADMIN] Failed to list devices', err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message || 'Failed to list devices.' });
+    }
+  };
+
+  private handleUpdateDevice = async (req: Request, res: Response) => {
+    try {
+      const id = String(req.params.id ?? '');
+      const { label, minSeverity } = req.body ?? {};
+      const device = await adminDeviceService.update(id, { label, minSeverity });
+      if (!device) {
+        return res.status(404).json({ success: false, error: 'Device not found.' });
+      }
+      await this.adminService.appendAdminLog(
+        'admin_device_updated',
+        `Admin device "${device.label}" updated.`,
+      );
+      return res.json({
+        success: true,
+        device: { id: device.id, label: device.label, minSeverity: device.minSeverity },
+      });
+    } catch (err: any) {
+      if (err instanceof AdminDeviceValidationError) {
+        return res.status(400).json({ success: false, error: err.message });
+      }
+      console.error('[ADMIN] Failed to update device', err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message || 'Failed to update device.' });
+    }
+  };
+
+  private handleRevokeDevice = async (req: Request, res: Response) => {
+    try {
+      const id = String(req.params.id ?? '');
+      const revoked = await adminDeviceService.revoke(id);
+      if (!revoked) {
+        return res.status(404).json({ success: false, error: 'Device not found.' });
+      }
+      destroySessionsForDevice(id);
+      if (id === res.locals.adminDeviceId) {
+        clearAdminSessionCookies(res);
+      }
+      await this.adminService.appendAdminLog(
+        'admin_device_revoked',
+        'An admin device was revoked.',
+      );
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('[ADMIN] Failed to revoke device', err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message || 'Failed to revoke device.' });
     }
   };
 }
