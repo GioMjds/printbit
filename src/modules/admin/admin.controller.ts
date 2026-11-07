@@ -58,7 +58,10 @@ import {
   DEFAULT_SCAN_FILENAME_FORMAT,
   validateScanFilenameFormatSettings,
 } from '@/services/scan-filename';
-import { adminPushService } from '@/services/admin-push.service';
+import {
+  EndpointOwnedError,
+  adminPushService,
+} from '@/services/admin-push.service';
 import { getScannerStatus } from '@/services/scanner';
 import {
   getDocumentConversionStatus,
@@ -1029,21 +1032,16 @@ export class AdminController {
   };
 
   private handleLogout = async (req: Request, res: Response) => {
-    const headerToken = req.get('x-admin-token') || undefined;
-    const cookieToken =
-      (req.cookies?.['adminToken'] as string | undefined) || undefined;
-    const token = headerToken ?? cookieToken;
-    destroyAdminSession(token);
+    // Never call destroyAdminSession() without a token: it clears every session.
+    const token = res.locals.adminSessionToken as string | undefined;
+    if (token) destroyAdminSession(token);
     await this.adminService.appendAdminLog('admin_logout', 'Admin logged out.');
     clearAdminSessionCookies(res);
     return res.json({ ok: true });
   };
 
   private handleVerify = (req: Request, res: Response) => {
-    const headerToken = req.get('x-admin-token') || undefined;
-    const cookieToken =
-      (req.cookies?.['adminToken'] as string | undefined) || undefined;
-    const sessionToken = headerToken ?? cookieToken;
+    const sessionToken = res.locals.adminSessionToken as string | undefined;
     res.json({ ok: true, sessionToken });
   };
 
@@ -4306,6 +4304,11 @@ export class AdminController {
       );
       return res.json({ success: true, subscription: entry });
     } catch (err: any) {
+      if (err instanceof EndpointOwnedError) {
+        return res
+          .status(409)
+          .json({ success: false, code: err.code, error: err.message });
+      }
       console.error('[ADMIN] Failed to register push subscription', err);
       return res
         .status(500)
@@ -4383,7 +4386,11 @@ export class AdminController {
           ? { id: device.id, label: device.label, minSeverity: device.minSeverity }
           : null,
         ...(endpoint
-          ? { registered: adminPushService.hasSubscription(endpoint, deviceId) }
+          ? {
+              registered: deviceId
+                ? adminPushService.hasSubscription(endpoint, deviceId)
+                : false,
+            }
           : {}),
       });
     } catch (err: any) {

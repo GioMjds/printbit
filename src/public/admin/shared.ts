@@ -522,6 +522,8 @@ export async function ensureAuth(): Promise<boolean> {
       setKioskOnlineState(false, 'Kiosk machine is unreachable or powered off.');
     } else if (response.ok) {
       setKioskOnlineState(true);
+      const headerToken = response.headers.get('x-admin-session-token');
+      if (headerToken) setAdminToken(headerToken);
       try {
         const data = (await response.json()) as { sessionToken?: string };
         if (data.sessionToken) setAdminToken(data.sessionToken);

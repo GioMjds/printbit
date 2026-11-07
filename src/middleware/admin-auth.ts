@@ -1,6 +1,17 @@
 import type { RequestHandler } from 'express';
 import { db } from '@/services/db';
-import {  ADMIN_SESSION_COOKIE_OPTIONS,  createAdminSession,  getAdminSessionDeviceId,  validateAdminSession,} from '@/utils/admin-session';import {  ADMIN_DEVICE_COOKIE,  adminDeviceService,} from '@/services/admin-device.service';
+import {
+  ADMIN_SESSION_COOKIE_OPTIONS,
+  createAdminSession,
+  destroyAdminSession,
+  getAdminSessionDeviceId,
+  validateAdminSession,
+} from '@/utils/admin-session';
+import {
+  ADMIN_DEVICE_COOKIE,
+  DEVICE_COOKIE_OPTIONS,
+  adminDeviceService,
+} from '@/services/admin-device.service';
 
 function isPrivateIpv4(ip: string): boolean {
   if (ip.startsWith('10.')) return true;
@@ -43,23 +54,49 @@ export const requireAdminPin: RequestHandler = async (req, res, next) => {
   const headerToken = req.get('x-admin-token') || undefined;
   const cookieToken =
     (req.cookies?.['adminToken'] as string | undefined) || undefined;
-  const token = headerToken ?? cookieToken;
-  if (token && validateAdminSession(token)) {
-    res.locals.adminDeviceId = getAdminSessionDeviceId(token);
+  const deviceCookie = req.cookies?.[ADMIN_DEVICE_COOKIE] as unknown;
+
+  // Try the header token first, then the cookie token, so a stale header does
+  // not mint a new session while a fresh cookie session exists.
+  const candidates = [headerToken, cookieToken].filter(
+    (t, i, all): t is string => !!t && all.indexOf(t) === i,
+  );
+  for (const token of candidates) {
+    if (!validateAdminSession(token)) continue;
+    const deviceId = getAdminSessionDeviceId(token);
+    if (deviceId) {
+      if (!adminDeviceService.getById(deviceId)) {
+        // Session must not outlive its device.
+        destroyAdminSession(token);
+        continue;
+      }
+      const touched = await adminDeviceService
+        .touch(deviceId)
+        .catch(() => false);
+      if (touched && typeof deviceCookie === 'string') {
+        res.cookie(ADMIN_DEVICE_COOKIE, deviceCookie, DEVICE_COOKIE_OPTIONS);
+      }
+    }
+    res.locals.adminDeviceId = deviceId;
+    res.locals.adminSessionToken = token;
     return next();
   }
 
   // Session missing or unknown (server restart, expiry): re-derive it from
   // the persisted device cookie.
   const device = await adminDeviceService
-    .verifyCookie(req.cookies?.[ADMIN_DEVICE_COOKIE])
+    .verifyCookie(deviceCookie)
     .catch(() => null);
   if (device) {
     const sessionToken = createAdminSession(device.id);
     res.cookie('adminToken', sessionToken, ADMIN_SESSION_COOKIE_OPTIONS);
+    if (typeof deviceCookie === 'string') {
+      res.cookie(ADMIN_DEVICE_COOKIE, deviceCookie, DEVICE_COOKIE_OPTIONS);
+    }
     // Lets a client holding a stale x-admin-token header switch to the new one.
     res.setHeader('x-admin-session-token', sessionToken);
     res.locals.adminDeviceId = device.id;
+    res.locals.adminSessionToken = sessionToken;
     return next();
   }
 

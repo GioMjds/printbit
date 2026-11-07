@@ -9,12 +9,14 @@ import {
   defaultLabelFromUserAgent,
 } from './admin-device.service';
 
-function makeService() {
+function makeService(onWrite?: (data: any) => void) {
   const data: any = { adminDevices: [], adminPushSubscriptions: [] };
   let nowMs = 1_000_000;
   const service = new AdminDeviceService({
     getDbData: () => data,
-    writeDb: async () => {},
+    writeDb: async () => {
+      onWrite?.(data);
+    },
     now: () => nowMs,
   });
   return {
@@ -119,6 +121,32 @@ describe('AdminDeviceService.enroll / verifyCookie', () => {
     advance(6 * 60 * 1000);
     await service.verifyCookie(cookieValue);
     expect(data.adminDevices[0].lastSeenAt).not.toBe(first);
+  });
+});
+
+describe('AdminDeviceService.touch', () => {
+  it('writes only when idle over 5 minutes and reports whether it did', async () => {
+    const { service, data, advance } = makeService();
+    const { device } = await service.enroll('Phone', 'ua');
+    const first = data.adminDevices[0].lastSeenAt;
+    advance(60 * 1000);
+    expect(await service.touch(device.id)).toBe(false);
+    expect(data.adminDevices[0].lastSeenAt).toBe(first);
+    advance(6 * 60 * 1000);
+    expect(await service.touch(device.id)).toBe(true);
+    expect(data.adminDevices[0].lastSeenAt).not.toBe(first);
+    expect(await service.touch('missing')).toBe(false);
+  });
+
+  it('verifyCookie returns null when the device is removed during the touch write', async () => {
+    let armed = false;
+    const { service, advance } = makeService((d) => {
+      if (armed) d.adminDevices = [];
+    });
+    const { cookieValue } = await service.enroll('Phone', 'ua');
+    advance(6 * 60 * 1000);
+    armed = true;
+    expect(await service.verifyCookie(cookieValue)).toBeNull();
   });
 });
 

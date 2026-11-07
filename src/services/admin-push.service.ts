@@ -53,6 +53,13 @@ function isTransientPushError(err: any): boolean {
   return status === 429 || status >= 500;
 }
 
+export class EndpointOwnedError extends Error {
+  readonly code = 'ENDPOINT_OWNED';
+  constructor() {
+    super('This push endpoint is registered to another device.');
+  }
+}
+
 export class AdminPushService {
   private io: Server | null = null;
   private lastAlertTimestamps = new Map<string, number>();
@@ -167,6 +174,18 @@ export class AdminPushService {
     if (!data) throw new Error('Database not initialized');
     if (!data.adminPushSubscriptions) data.adminPushSubscriptions = [];
 
+    const owned = data.adminPushSubscriptions.find(
+      (s) => s.endpoint === sub.endpoint,
+    );
+    if (owned?.deviceId && owned.deviceId !== deviceId) {
+      const ownerExists = (data.adminDevices ?? []).some(
+        (d) => d.id === owned.deviceId,
+      );
+      const keysMatch =
+        owned.keys.p256dh === sub.keys.p256dh && owned.keys.auth === sub.keys.auth;
+      if (ownerExists && !keysMatch) throw new EndpointOwnedError();
+    }
+
     // One subscription per device: drop the device's previous endpoints.
     data.adminPushSubscriptions = data.adminPushSubscriptions.filter(
       (s) => s.endpoint === sub.endpoint || s.deviceId !== deviceId,
@@ -176,9 +195,9 @@ export class AdminPushService {
       (s) => s.endpoint === sub.endpoint,
     );
     if (existing) {
-      // Presenting the endpoint with its keys proves possession, so the caller
-      // may take the subscription over (e.g. after a logout/login created a
-      // new device record for the same browser).
+      // Takeover needs proof: the presented keys equal the stored ones, or the
+      // owning device no longer exists (both checked above). E.g. after a
+      // logout/login created a new device record for the same browser.
       existing.keys = sub.keys;
       existing.userAgent = userAgent;
       existing.deviceId = deviceId;
@@ -296,7 +315,8 @@ export class AdminPushService {
     );
 
     // Nothing delivered: free the cooldown so the next occurrence can retry.
-    if (sentCount === 0) {
+    // (All-skipped by routing is not a failure: keep the cooldown.)
+    if (targets.length > 0 && sentCount === 0) {
       if (previousAlertTs === undefined) {
         this.lastAlertTimestamps.delete(alert.code);
       } else {

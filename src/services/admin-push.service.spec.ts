@@ -10,7 +10,7 @@ jest.mock('./db', () => ({ db: { data: null, write: jest.fn() } }));
 jest.mock('./anomaly', () => ({ anomalyService: { report: jest.fn() } }));
 
 import webpush from 'web-push';
-import { AdminPushService } from './admin-push.service';
+import { AdminPushService, EndpointOwnedError } from './admin-push.service';
 
 const sendNotification = webpush.sendNotification as unknown as jest.Mock;
 
@@ -213,6 +213,72 @@ describe('AdminPushService ownership', () => {
       'https://fcm/new',
     ]);
     expect(data.adminPushSubscriptions[0].deviceId).toBe('phone');
+  });
+
+  it('keeps the cooldown when every subscription is skipped', async () => {
+    const { service } = makeService(
+      [
+        { endpoint: 'https://fcm/a', deviceId: 'd1' },
+        { endpoint: 'https://fcm/b', deviceId: 'd1' },
+      ],
+      [{ id: 'd1', minSeverity: 'critical' }],
+    );
+    const warn = { ...alert, severity: 'warning' as const };
+    expect(await service.broadcastCriticalAlert(warn)).toEqual({
+      sent: 0,
+      pruned: 0,
+      skipped: 2,
+    });
+    expect(await service.broadcastCriticalAlert(warn)).toEqual({
+      sent: 0,
+      pruned: 0,
+      skipped: 0,
+    });
+  });
+
+  it('takeover with different keys is refused and leaves the stored sub untouched', async () => {
+    const { service, data } = makeService(
+      [{ endpoint: 'https://fcm/a', deviceId: 'old-device' }],
+      [{ id: 'old-device', minSeverity: 'warning' }],
+    );
+    await expect(
+      service.subscribe(
+        { endpoint: 'https://fcm/a', keys: { p256dh: 'x', auth: 'y' } },
+        'new-device',
+      ),
+    ).rejects.toBeInstanceOf(EndpointOwnedError);
+    expect(data.adminPushSubscriptions[0].deviceId).toBe('old-device');
+    expect(data.adminPushSubscriptions[0].keys).toEqual({
+      p256dh: 'p',
+      auth: 'a',
+    });
+  });
+
+  it('takeover with matching keys works', async () => {
+    const { service, data } = makeService(
+      [{ endpoint: 'https://fcm/a', deviceId: 'old-device' }],
+      [{ id: 'old-device', minSeverity: 'warning' }],
+    );
+    await service.subscribe(
+      { endpoint: 'https://fcm/a', keys: { p256dh: 'p', auth: 'a' } },
+      'new-device',
+    );
+    expect(data.adminPushSubscriptions[0].deviceId).toBe('new-device');
+  });
+
+  it('takeover of an orphan-owned endpoint works with different keys', async () => {
+    const { service, data } = makeService([
+      { endpoint: 'https://fcm/a', deviceId: 'deleted-device' },
+    ]);
+    await service.subscribe(
+      { endpoint: 'https://fcm/a', keys: { p256dh: 'x', auth: 'y' } },
+      'new-device',
+    );
+    expect(data.adminPushSubscriptions[0].deviceId).toBe('new-device');
+    expect(data.adminPushSubscriptions[0].keys).toEqual({
+      p256dh: 'x',
+      auth: 'y',
+    });
   });
 
   it('subscribe lets a device take over an endpoint owned by another device or nobody', async () => {

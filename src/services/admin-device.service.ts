@@ -170,11 +170,26 @@ export class AdminDeviceService {
     const lastSeen = Date.parse(device.lastSeenAt);
     const idleMs = Number.isFinite(lastSeen) ? now - lastSeen : Infinity;
     if (idleMs > DEVICE_COOKIE_TTL_MS) return null;
-    if (idleMs > TOUCH_INTERVAL_MS) {
-      device.lastSeenAt = new Date(now).toISOString();
-      await this.deps.writeDb();
-    }
-    return device;
+    await this.touchDevice(device);
+    // The device may have been revoked while the write was in flight.
+    return this.getById(device.id) ? device : null;
+  }
+
+  private async touchDevice(device: AdminDeviceEntry): Promise<boolean> {
+    const now = this.deps.now();
+    const lastSeen = Date.parse(device.lastSeenAt);
+    const idleMs = Number.isFinite(lastSeen) ? now - lastSeen : Infinity;
+    if (idleMs <= TOUCH_INTERVAL_MS) return false;
+    device.lastSeenAt = new Date(now).toISOString();
+    await this.deps.writeDb();
+    return true;
+  }
+
+  /** Throttled lastSeenAt bump (5 min). Resolves true only if it wrote. */
+  async touch(id: string): Promise<boolean> {
+    const device = this.getById(id);
+    if (!device) return false;
+    return this.touchDevice(device);
   }
 
   async resolveOrEnroll(
