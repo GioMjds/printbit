@@ -81,7 +81,11 @@ import {
 } from '@/services/windows-power';
 import { sendHeartbeatOnce } from '@/services/heartbeat-reporter';
 import { sendWorkerRequest } from '@/services/worker-command-pipe';
-import { createAdminSession, destroyAdminSession } from '@/utils/admin-session';
+import { destroyAdminSession } from '@/utils/admin-session';
+import {
+  clearAdminSessionCookies,
+  establishAdminSession,
+} from '@/utils/admin-login';
 import { hashPassword, verifyPassword } from '@/utils/hash';
 import {
   MAX_ATTEMPTS,
@@ -935,13 +939,7 @@ export class AdminController {
     }
 
     await clearLockout();
-    const sessionToken = createAdminSession();
-
-    res.cookie('adminToken', sessionToken, {
-      httpOnly: true,
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
-    });
+    const sessionToken = await establishAdminSession(req, res);
 
     return res.json({ ok: true, sessionToken });
   };
@@ -974,12 +972,7 @@ export class AdminController {
       return res.status(401).json({ valid: false, error: 'Invalid PIN' });
     }
 
-    const sessionToken = createAdminSession();
-    res.cookie('adminToken', sessionToken, {
-      httpOnly: true,
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
-    });
+    const sessionToken = await establishAdminSession(req, res);
 
     if (req.body?.action === 'disable_ui_blocking') {
       if (!db.data!.settings.uiBlocking) {
@@ -1015,7 +1008,7 @@ export class AdminController {
     const token = headerToken ?? cookieToken;
     destroyAdminSession(token);
     await this.adminService.appendAdminLog('admin_logout', 'Admin logged out.');
-    res.clearCookie('adminToken');
+    clearAdminSessionCookies(res);
     return res.json({ ok: true });
   };
 
