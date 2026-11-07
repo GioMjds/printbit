@@ -1198,12 +1198,232 @@ async function refreshPushSettingsUI(): Promise<void> {
   } catch {
     // Ignore server push status fetch failure
   }
+
+  void refreshAdminDevicesUI();
+}
+
+// ── Admin Devices UI ───────────────────────────────────────────────────────
+interface AdminDeviceRow {
+  id: string;
+  label: string;
+  minSeverity: 'critical' | 'warning';
+  lastSeenAt: string;
+  isCurrent: boolean;
+  hasPush: boolean;
+}
+
+const adminDevicesList = document.getElementById(
+  'adminDevicesList',
+) as HTMLElement | null;
+const adminDevicesEmpty = document.getElementById(
+  'adminDevicesEmpty',
+) as HTMLElement | null;
+const DEVICE_NAME_PROMPTED_KEY = 'printbit.deviceNamePrompted';
+
+async function patchDevice(
+  id: string,
+  body: { label?: string; minSeverity?: 'critical' | 'warning' },
+): Promise<boolean> {
+  const res = await apiFetch(`/api/admin/devices/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    setMessage(data?.error || 'Failed to update device.');
+  }
+  return res.ok;
+}
+
+function renderAdminDevices(devices: AdminDeviceRow[]): void {
+  if (!adminDevicesList) return;
+  adminDevicesList.replaceChildren();
+  if (adminDevicesEmpty) {
+    adminDevicesEmpty.textContent =
+      devices.length === 0 ? 'No devices registered yet.' : '';
+  }
+
+  for (const device of devices) {
+    const row = document.createElement('div');
+    row.dataset.deviceId = device.id;
+    row.style.cssText =
+      'display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);';
+
+    const label = document.createElement('input');
+    label.type = 'text';
+    label.className = 'field__input';
+    label.maxLength = 40;
+    label.value = device.label;
+    label.setAttribute('aria-label', 'Device name');
+    label.style.cssText = 'flex:1 1 160px;min-width:140px;';
+    label.dataset.field = 'label';
+
+    const severity = document.createElement('select');
+    severity.className = 'field__input';
+    severity.setAttribute('aria-label', 'Alert level');
+    severity.dataset.field = 'severity';
+    for (const [value, text] of [
+      ['warning', 'Everything'],
+      ['critical', 'Critical only'],
+    ] as const) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = text;
+      option.selected = device.minSeverity === value;
+      severity.appendChild(option);
+    }
+
+    const meta = document.createElement('span');
+    meta.className = 'field__hint';
+    meta.style.cssText = 'font-size:0.75rem;color:#94a3b8;';
+    const lastSeen = new Date(device.lastSeenAt);
+    meta.textContent = [
+      device.isCurrent ? 'This device' : '',
+      device.hasPush ? 'Push on' : 'Push off',
+      Number.isNaN(lastSeen.getTime())
+        ? ''
+        : `Seen ${lastSeen.toLocaleString()}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+    const revoke = document.createElement('button');
+    revoke.type = 'button';
+    revoke.className = 'btn-pwa-install';
+    revoke.dataset.action = 'revoke';
+    revoke.textContent = 'Revoke';
+    revoke.style.cssText =
+      'color:#f87171;border-color:rgba(248,113,113,0.4);background:rgba(248,113,113,0.1);';
+
+    row.append(label, severity, meta, revoke);
+    adminDevicesList.appendChild(row);
+  }
+}
+
+async function refreshAdminDevicesUI(): Promise<void> {
+  if (!adminDevicesList) return;
+  // Do not clobber a name the user is typing.
+  if (adminDevicesList.contains(document.activeElement)) return;
+  try {
+    const res = await apiFetch('/api/admin/devices');
+    if (!res.ok) return;
+    const data = await res.json();
+    renderAdminDevices(Array.isArray(data.devices) ? data.devices : []);
+  } catch {
+    // Ignore device list refresh failure
+  }
+}
+
+let adminDevicesEventsInitialized = false;
+function initAdminDevicesEvents(): void {
+  if (adminDevicesEventsInitialized || !adminDevicesList) return;
+  adminDevicesEventsInitialized = true;
+
+  adminDevicesList.addEventListener('change', async (event) => {
+    const target = event.target as HTMLInputElement | HTMLSelectElement;
+    const id =
+      target.closest<HTMLElement>('[data-device-id]')?.dataset.deviceId;
+    if (!id) return;
+    if (target.dataset.field === 'label') {
+      const value = target.value.trim();
+      if (!value) {
+        void refreshAdminDevicesUI();
+        return;
+      }
+      if (await patchDevice(id, { label: value }))
+        setMessage('Device renamed.');
+    } else if (target.dataset.field === 'severity') {
+      const minSeverity = target.value === 'critical' ? 'critical' : 'warning';
+      if (await patchDevice(id, { minSeverity }))
+        setMessage('Alert level updated.');
+    }
+    (document.activeElement as HTMLElement | null)?.blur();
+    void refreshAdminDevicesUI();
+  });
+
+  adminDevicesList.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      'button[data-action="revoke"]',
+    );
+    if (!button) return;
+    const row = button.closest<HTMLElement>('[data-device-id]');
+    const id = row?.dataset.deviceId;
+    if (!id) return;
+    const name =
+      row?.querySelector<HTMLInputElement>('input[data-field="label"]')
+        ?.value ?? 'this device';
+    if (
+      !window.confirm(
+        `Revoke "${name}"? It will stop receiving alerts and must log in with the PIN again.`,
+      )
+    ) {
+      return;
+    }
+    button.disabled = true;
+    const res = await apiFetch(`/api/admin/devices/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      button.disabled = false;
+      setMessage('Failed to revoke device.');
+      return;
+    }
+    setMessage('Device revoked.');
+    // Revoking the device we are on drops our own session: reload to the login screen.
+    if (row?.querySelector('span')?.textContent?.startsWith('This device')) {
+      window.location.reload();
+      return;
+    }
+    void refreshAdminDevicesUI();
+  });
+
+  // Typing in a device row must not mark the settings form dirty.
+  adminDevicesList.addEventListener('input', (event) =>
+    event.stopPropagation(),
+  );
+  adminDevicesList.addEventListener('change', (event) =>
+    event.stopPropagation(),
+  );
+}
+
+async function offerDeviceNaming(): Promise<void> {
+  try {
+    if (localStorage.getItem(DEVICE_NAME_PROMPTED_KEY)) return;
+  } catch {
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/admin/push/status');
+    if (!res.ok) return;
+    const device = (await res.json()).device as {
+      id: string;
+      label: string;
+    } | null;
+    if (!device) return;
+    const name = window.prompt(
+      'Name this device so you can tell it apart in the device list:',
+      device.label,
+    );
+    try {
+      localStorage.setItem(DEVICE_NAME_PROMPTED_KEY, '1');
+    } catch {
+      // ignore storage failure
+    }
+    const trimmed = name?.trim();
+    if (trimmed && trimmed !== device.label) {
+      await patchDevice(device.id, { label: trimmed });
+    }
+    void refreshAdminDevicesUI();
+  } catch {
+    // Naming is optional; ignore failures.
+  }
 }
 
 let pushEventsInitialized = false;
 function initPushSettingsEvents(): void {
   if (pushEventsInitialized) return;
   pushEventsInitialized = true;
+  initAdminDevicesEvents();
 
   enablePushBtn?.addEventListener('click', async () => {
     if (!enablePushBtn) return;
@@ -1215,6 +1435,7 @@ function initPushSettingsEvents(): void {
     if (res.ok) {
       setMessage('Push notifications enabled for this device.');
       void refreshPushSettingsUI();
+      void offerDeviceNaming();
     } else {
       setMessage(res.error || 'Failed to enable push notifications.');
     }

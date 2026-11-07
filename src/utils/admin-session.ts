@@ -3,9 +3,16 @@ import { randomUUID } from 'node:crypto';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_SESSIONS = 100;
 
+export const ADMIN_SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'strict' as const,
+  maxAge: SESSION_TTL_MS,
+};
+
 interface AdminSession {
   token: string;
   lastActivityAt: number;
+  deviceId?: string;
 }
 
 const activeSessions = new Map<string, AdminSession>();
@@ -18,7 +25,7 @@ function pruneExpiredSessions(now: number): void {
   }
 }
 
-export function createAdminSession(): string {
+export function createAdminSession(deviceId?: string): string {
   const now = Date.now();
   pruneExpiredSessions(now);
 
@@ -37,7 +44,7 @@ export function createAdminSession(): string {
   }
 
   const token = randomUUID();
-  activeSessions.set(token, { token, lastActivityAt: now });
+  activeSessions.set(token, { token, lastActivityAt: now, deviceId });
   return token;
 }
 
@@ -64,4 +71,19 @@ export function destroyAdminSession(token?: string): void {
     return;
   }
   activeSessions.clear();
+}
+
+export function getAdminSessionDeviceId(token: string): string | undefined {
+  return activeSessions.get(token)?.deviceId;
+}
+
+export function destroySessionsForDevice(deviceId: string): number {
+  let removed = 0;
+  for (const [token, session] of activeSessions.entries()) {
+    if (session.deviceId === deviceId) {
+      activeSessions.delete(token);
+      removed++;
+    }
+  }
+  return removed;
 }

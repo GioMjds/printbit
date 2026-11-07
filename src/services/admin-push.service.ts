@@ -53,6 +53,13 @@ function isTransientPushError(err: any): boolean {
   return status === 429 || status >= 500;
 }
 
+export class EndpointOwnedError extends Error {
+  readonly code = 'ENDPOINT_OWNED';
+  constructor() {
+    super('This push endpoint is registered to another device.');
+  }
+}
+
 export class AdminPushService {
   private io: Server | null = null;
   private lastAlertTimestamps = new Map<string, number>();
@@ -70,9 +77,13 @@ export class AdminPushService {
     };
   }
 
-  hasSubscription(endpoint: string): boolean {
+  hasSubscription(endpoint: string, deviceId?: string): boolean {
     const data = this.deps.getDbData();
-    return !!data?.adminPushSubscriptions?.some((s) => s.endpoint === endpoint);
+    return !!data?.adminPushSubscriptions?.some(
+      (s) =>
+        s.endpoint === endpoint &&
+        (deviceId === undefined || s.deviceId === deviceId),
+    );
   }
 
   private async sendWithRetry(
@@ -101,7 +112,9 @@ export class AdminPushService {
         if (attempt >= PUSH_SEND_ATTEMPTS || !isTransientPushError(err)) {
           throw err;
         }
-        await new Promise((r) => setTimeout(r, this.deps.retryDelayMs * attempt));
+        await new Promise((r) =>
+          setTimeout(r, this.deps.retryDelayMs * attempt),
+        );
       }
     }
   }
@@ -131,7 +144,8 @@ export class AdminPushService {
       };
       if (
         !data.settings.pushNotifications.vapidKeys ||
-        data.settings.pushNotifications.vapidKeys.publicKey !== keys.publicKey ||
+        data.settings.pushNotifications.vapidKeys.publicKey !==
+          keys.publicKey ||
         data.settings.pushNotifications.vapidKeys.privateKey !== keys.privateKey
       ) {
         data.settings.pushNotifications.vapidKeys = keys;
@@ -156,22 +170,43 @@ export class AdminPushService {
 
   async subscribe(
     sub: { endpoint: string; keys: { p256dh: string; auth: string } },
+    deviceId: string,
     userAgent = 'Unknown',
   ): Promise<AdminPushSubscriptionEntry> {
     const data = this.deps.getDbData();
     if (!data) throw new Error('Database not initialized');
     if (!data.adminPushSubscriptions) data.adminPushSubscriptions = [];
 
-    const existingIndex = data.adminPushSubscriptions.findIndex(
+    const owned = data.adminPushSubscriptions.find(
       (s) => s.endpoint === sub.endpoint,
     );
-    const nowIso = new Date().toISOString();
+    if (owned?.deviceId && owned.deviceId !== deviceId) {
+      const ownerExists = (data.adminDevices ?? []).some(
+        (d) => d.id === owned.deviceId,
+      );
+      const keysMatch =
+        owned.keys.p256dh === sub.keys.p256dh &&
+        owned.keys.auth === sub.keys.auth;
+      if (ownerExists && !keysMatch) throw new EndpointOwnedError();
+    }
 
-    if (existingIndex >= 0) {
-      data.adminPushSubscriptions[existingIndex].keys = sub.keys;
-      data.adminPushSubscriptions[existingIndex].userAgent = userAgent;
+    // One subscription per device: drop the device's previous endpoints.
+    data.adminPushSubscriptions = data.adminPushSubscriptions.filter(
+      (s) => s.endpoint === sub.endpoint || s.deviceId !== deviceId,
+    );
+
+    const existing = data.adminPushSubscriptions.find(
+      (s) => s.endpoint === sub.endpoint,
+    );
+    if (existing) {
+      // Takeover needs proof: the presented keys equal the stored ones, or the
+      // owning device no longer exists (both checked above). E.g. after a
+      // logout/login created a new device record for the same browser.
+      existing.keys = sub.keys;
+      existing.userAgent = userAgent;
+      existing.deviceId = deviceId;
       await this.deps.writeDb();
-      return data.adminPushSubscriptions[existingIndex];
+      return existing;
     }
 
     const entry: AdminPushSubscriptionEntry = {
@@ -179,31 +214,35 @@ export class AdminPushService {
       endpoint: sub.endpoint,
       keys: sub.keys,
       userAgent,
-      createdAt: nowIso,
+      createdAt: new Date().toISOString(),
       lastNotifiedAt: null,
+      deviceId,
     };
     data.adminPushSubscriptions.push(entry);
     await this.deps.writeDb();
     return entry;
   }
 
-  async unsubscribe(endpoint: string): Promise<boolean> {
+  async unsubscribe(
+    endpoint: string,
+    deviceId: string,
+  ): Promise<'removed' | 'absent' | 'forbidden'> {
     const data = this.deps.getDbData();
-    if (!data || !data.adminPushSubscriptions) return false;
-    const initialLen = data.adminPushSubscriptions.length;
+    const sub = data?.adminPushSubscriptions?.find(
+      (s) => s.endpoint === endpoint,
+    );
+    if (!data || !sub) return 'absent';
+    if (sub.deviceId && sub.deviceId !== deviceId) return 'forbidden';
     data.adminPushSubscriptions = data.adminPushSubscriptions.filter(
       (s) => s.endpoint !== endpoint,
     );
-    if (data.adminPushSubscriptions.length !== initialLen) {
-      await this.deps.writeDb();
-      return true;
-    }
-    return false;
+    await this.deps.writeDb();
+    return 'removed';
   }
 
   async broadcastCriticalAlert(
     alert: KioskCriticalAlert,
-  ): Promise<{ sent: number; pruned: number }> {
+  ): Promise<{ sent: number; pruned: number; skipped: number }> {
     const nowMs = Date.now();
     const lastAlert = this.lastAlertTimestamps.get(alert.code) ?? 0;
     const cooldownMs =
@@ -211,7 +250,7 @@ export class AdminPushService {
         30) * 1000;
 
     if (nowMs - lastAlert < cooldownMs) {
-      return { sent: 0, pruned: 0 };
+      return { sent: 0, pruned: 0, skipped: 0 };
     }
     const previousAlertTs = this.lastAlertTimestamps.get(alert.code);
     this.lastAlertTimestamps.set(alert.code, nowMs);
@@ -224,24 +263,34 @@ export class AdminPushService {
 
     // Record Anomaly Incident for audit trail
     if (this.deps.getDbData()?.anomalyIncidents) {
-      void this.deps.reportAnomaly({
-        type: `kiosk_hardware_${alert.code.toLowerCase()}`,
-        source: 'kiosk-hardware',
-        category: 'printer',
-        severity: alert.severity,
-        message: alert.message,
-        fingerprint: `kiosk-hardware-${alert.code}`,
-        context: { alertCode: alert.code },
-      }).catch(() => {});
+      void this.deps
+        .reportAnomaly({
+          type: `kiosk_hardware_${alert.code.toLowerCase()}`,
+          source: 'kiosk-hardware',
+          category: 'printer',
+          severity: alert.severity,
+          message: alert.message,
+          fingerprint: `kiosk-hardware-${alert.code}`,
+          context: { alertCode: alert.code },
+        })
+        .catch(() => {});
     }
 
     const data = this.deps.getDbData();
     if (!data || !data.settings.pushNotifications?.enabled) {
-      return { sent: 0, pruned: 0 };
+      return { sent: 0, pruned: 0, skipped: 0 };
     }
 
     this.ensureVapidKeys();
     const subscriptions = data.adminPushSubscriptions || [];
+    const devices = data.adminDevices ?? [];
+    // Fail open: a missing device record or a legacy subscription gets everything.
+    const targets = subscriptions.filter((sub) => {
+      const minSeverity =
+        devices.find((d) => d.id === sub.deviceId)?.minSeverity ?? 'warning';
+      return minSeverity === 'warning' || alert.severity === 'critical';
+    });
+    const skippedCount = subscriptions.length - targets.length;
     let sentCount = 0;
     const deadEndpoints = new Set<string>();
 
@@ -256,7 +305,7 @@ export class AdminPushService {
     });
 
     await Promise.all(
-      subscriptions.map(async (sub) => {
+      targets.map(async (sub) => {
         try {
           await this.sendWithRetry(sub, payload, {
             topic: 'kiosk-hardware-alert',
@@ -265,7 +314,14 @@ export class AdminPushService {
           sentCount++;
           sub.lastNotifiedAt = new Date().toISOString();
         } catch (err: any) {
-          console.error('[ADMIN-PUSH] Delivery failed for device (' + sub.id + ', agent: ' + sub.userAgent + '):', err?.statusCode || err?.message);
+          console.error(
+            '[ADMIN-PUSH] Delivery failed for device (' +
+              sub.id +
+              ', agent: ' +
+              sub.userAgent +
+              '):',
+            err?.statusCode || err?.message,
+          );
           if (DEAD_SUBSCRIPTION_STATUSES.has(err?.statusCode)) {
             deadEndpoints.add(sub.endpoint);
           }
@@ -274,7 +330,8 @@ export class AdminPushService {
     );
 
     // Nothing delivered: free the cooldown so the next occurrence can retry.
-    if (sentCount === 0) {
+    // (All-skipped by routing is not a failure: keep the cooldown.)
+    if (targets.length > 0 && sentCount === 0) {
       if (previousAlertTs === undefined) {
         this.lastAlertTimestamps.delete(alert.code);
       } else {
@@ -291,15 +348,19 @@ export class AdminPushService {
     }
     await this.deps.writeDb();
 
-    return { sent: sentCount, pruned: prunedCount };
+    return { sent: sentCount, pruned: prunedCount, skipped: skippedCount };
   }
 
-  async sendTestNotification(endpoint: string): Promise<boolean> {
+  async sendTestNotification(
+    endpoint: string,
+    deviceId: string,
+  ): Promise<boolean> {
     const data = this.deps.getDbData();
     const sub = data?.adminPushSubscriptions?.find(
       (s) => s.endpoint === endpoint,
     );
     if (!sub) return false;
+    if (sub.deviceId && sub.deviceId !== deviceId) return false;
 
     this.ensureVapidKeys();
     const payload = JSON.stringify({
@@ -329,7 +390,10 @@ export class AdminPushService {
       );
       return true;
     } catch (err: any) {
-      console.error('[ADMIN-PUSH] Test push failed for device (' + sub.id + '):', err?.statusCode || err?.message);
+      console.error(
+        '[ADMIN-PUSH] Test push failed for device (' + sub.id + '):',
+        err?.statusCode || err?.message,
+      );
       return false;
     }
   }

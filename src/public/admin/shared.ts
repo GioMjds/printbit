@@ -478,6 +478,10 @@ export async function apiFetch(
   }
   try {
     const res = await fetch(path, { ...init, headers, credentials: 'include' });
+    // The server re-derived our session from the device cookie (e.g. after a
+    // restart): adopt the new token instead of sending the stale one again.
+    const refreshedToken = res.headers.get('x-admin-session-token');
+    if (refreshedToken) setAdminToken(refreshedToken);
     if (
       res.status === 502 ||
       res.status === 503 ||
@@ -518,6 +522,8 @@ export async function ensureAuth(): Promise<boolean> {
       setKioskOnlineState(false, 'Kiosk machine is unreachable or powered off.');
     } else if (response.ok) {
       setKioskOnlineState(true);
+      const headerToken = response.headers.get('x-admin-session-token');
+      if (headerToken) setAdminToken(headerToken);
       try {
         const data = (await response.json()) as { sessionToken?: string };
         if (data.sessionToken) setAdminToken(data.sessionToken);
@@ -1100,6 +1106,16 @@ async function saveSubscriptionWithRetry(
           ok: false,
           error: 'Admin session expired (HTTP 401). Log in again, then enable push.',
         };
+      }
+      if (res.status === 403) {
+        const body = await res.json().catch(() => null);
+        if (body?.code === 'DEVICE_REQUIRED') {
+          return {
+            ok: false,
+            error:
+              'This browser is not registered as an admin device yet. Log out, log in again with the PIN, then enable push.',
+          };
+        }
       }
       lastError = `Kiosk rejected the subscription (HTTP ${res.status}).`;
       if (!PUSH_SAVE_RETRY_STATUSES.has(res.status)) break;
