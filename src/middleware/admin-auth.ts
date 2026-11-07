@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import { db } from '@/services/db';
-import { validateAdminSession } from '@/utils/admin-session';
+import {  ADMIN_SESSION_COOKIE_OPTIONS,  createAdminSession,  getAdminSessionDeviceId,  validateAdminSession,} from '@/utils/admin-session';import {  ADMIN_DEVICE_COOKIE,  adminDeviceService,} from '@/services/admin-device.service';
 
 function isPrivateIpv4(ip: string): boolean {
   if (ip.startsWith('10.')) return true;
@@ -44,10 +44,26 @@ export const requireAdminPin: RequestHandler = async (req, res, next) => {
   const cookieToken =
     (req.cookies?.['adminToken'] as string | undefined) || undefined;
   const token = headerToken ?? cookieToken;
-  if (!token || !validateAdminSession(token)) {
-    return res.status(401).json({
-      error: 'Admin session invalid or expired. Please log in again.',
-    });
+  if (token && validateAdminSession(token)) {
+    res.locals.adminDeviceId = getAdminSessionDeviceId(token);
+    return next();
   }
-  return next();
+
+  // Session missing or unknown (server restart, expiry): re-derive it from
+  // the persisted device cookie.
+  const device = await adminDeviceService
+    .verifyCookie(req.cookies?.[ADMIN_DEVICE_COOKIE])
+    .catch(() => null);
+  if (device) {
+    const sessionToken = createAdminSession(device.id);
+    res.cookie('adminToken', sessionToken, ADMIN_SESSION_COOKIE_OPTIONS);
+    // Lets a client holding a stale x-admin-token header switch to the new one.
+    res.setHeader('x-admin-session-token', sessionToken);
+    res.locals.adminDeviceId = device.id;
+    return next();
+  }
+
+  return res.status(401).json({
+    error: 'Admin session invalid or expired. Please log in again.',
+  });
 };
