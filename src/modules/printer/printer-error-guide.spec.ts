@@ -111,19 +111,18 @@ describe('Printer Error Guide', () => {
       );
     });
 
-    it('unlocks coin slot and emits null activeError on healthy poll when customer error cleared', () => {
+    it('never auto-clears a customer error on healthy polls', () => {
       handlePrinterStatusUpdate('Cover open', '7');
       expect(isCoinSlotLockedBy('printer-error-guide')).toBe(true);
+      mockIo.emit.mockClear();
 
-      // Debounce requires 2 healthy polls
       handlePrinterStatusUpdate('ready');
+      handlePrinterStatusUpdate('ready');
+      handlePrinterStatusUpdate('ready');
+
       expect(isCoinSlotLockedBy('printer-error-guide')).toBe(true);
-
-      handlePrinterStatusUpdate('ready');
-      expect(isCoinSlotLockedBy('printer-error-guide')).toBe(false);
-      expect(mockIo.emit).toHaveBeenLastCalledWith('printer:error-guide-update', {
-        activeError: null,
-      });
+      expect(printerErrorStateManager.getActiveError()?.code).toBe('E_COVER_OPEN');
+      expect(mockIo.emit).not.toHaveBeenCalled();
     });
 
     it('unlocks coin slot on healthy poll after staff resolves non-autoClear error', () => {
@@ -156,16 +155,8 @@ describe('Printer Error Guide', () => {
       handlePrinterStatusUpdate('ready');
       handlePrinterStatusUpdate('ready');
 
-      // Auto-clear must NOT unlock coin slot for mid-job error; emits interrupted state
+      // Healthy polls must NOT unlock the coin slot or dismiss the error
       expect(isCoinSlotLockedBy('printer-error-guide')).toBe(true);
-      expect(mockIo.emit).toHaveBeenLastCalledWith('printer:error-guide-update', {
-        activeError: expect.objectContaining({
-          code: 'E_COVER_OPEN',
-          jobId: 'PB-JOB-42',
-          jobRequiresStaff: true,
-          status: 'interrupted',
-        }),
-      });
 
       // 3rd and 4th healthy polls must NOT clear the lock or dismiss the interrupted error
       handlePrinterStatusUpdate('ready');

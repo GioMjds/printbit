@@ -3089,30 +3089,9 @@ function handleErrorGuideUpdate(
       applyConfirmGate();
       syncPaymentLeaseState();
     }
-  } else {
-    if (currentPrinterError?.code === 'PAPER_JAM_PRINT') {
-      return;
-    }
-    clearPrinterError();
-    if (isJobInterruptedState) {
-      // Auto-clear of printer error must NOT navigate back to idle home when mid-job was interrupted!
-      // Keep customer on the maintenance / staff assistance screen.
-      renderPrinterError({
-        code: 'WORKER_HARDWARE_ERROR',
-        severity: 'recoverable',
-        userMessage:
-          'Printing was interrupted due to a printer issue. Please call staff for assistance.',
-        hint: 'Please show your reference ID to staff for verification or assistance.',
-        canRetry: false,
-        canDismiss: false,
-        spoolerCorrelationKey:
-          paymentSpoolerCorrelationKey ?? activeSpoolerCorrelationKey,
-      });
-    } else {
-      applyConfirmGate();
-      syncPaymentLeaseState();
-    }
   }
+  // activeError === null never auto-clears the error UI: only the explicit
+  // simulation-cleared / paper-jam-cleared events dismiss it.
 }
 
 const ioFactory = (window as unknown as { io?: SocketIoFactory }).io;
@@ -3345,33 +3324,20 @@ if (typeof ioFactory !== 'function') {
 
   connectedSocket.on('printerRecovered', (payload: unknown) => {
     const status = payload as PrinterStatusPayload | null;
+    if (currentPrinterError || isJobInterruptedState) return;
     printerReady = true;
     latestPrinterStatusLabel = status?.status || 'Idle';
-    if (
-      !isJobInterruptedState &&
-      (!currentPrinterError ||
-      !isMaintenancePrintFailure(currentPrinterError.code))
-    ) {
-      clearPrinterError();
+    // Error UI never auto-clears; only simulation-cleared / paper-jam-cleared do.
+    if (!currentPrinterError) {
+      applyConfirmGate();
+      syncPaymentLeaseState();
     }
-    applyConfirmGate();
-    syncPaymentLeaseState();
   });
 
   connectedSocket.on('printerStatusRestored', () => {
+    if (currentPrinterError || isJobInterruptedState) return;
     printerReady = true;
     latestPrinterStatusLabel = 'Ready';
-    if (
-      !isJobInterruptedState &&
-      (!currentPrinterError ||
-      !isMaintenancePrintFailure(currentPrinterError.code))
-    ) {
-      clearPrinterError();
-      if (maintenanceDoneBtn) {
-        maintenanceDoneBtn.style.display = '';
-        maintenanceDoneBtn.removeAttribute('hidden');
-      }
-    }
     applyConfirmGate();
     syncPaymentLeaseState();
   });

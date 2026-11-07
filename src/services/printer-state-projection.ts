@@ -40,6 +40,12 @@ export function handlePrinterStatusUpdate(
       return;
     }
 
+    // Errors never auto-clear: a healthy poll must not lift an active error,
+    // its alerts, or the coin lock. Only staff/admin resolution does.
+    if (printerErrorStateManager.getActiveError() !== null) {
+      return;
+    }
+
     adminPushService.clearAlert('PAPER_JAM');
     adminPushService.clearAlert('PAPER_OUT');
     adminPushService.clearAlert('PRINTER_OFFLINE');
@@ -52,19 +58,12 @@ export function handlePrinterStatusUpdate(
     adminPushService.clearAlert('PAPER_SETUP');
     adminPushService.clearAlert('PRINTER_HARDWARE_ERROR');
 
-    const { cleared, state } = printerErrorStateManager.recordHealthyPoll();
-    const active = printerErrorStateManager.getActiveError();
-    if (cleared || (isCoinSlotLockedBy('printer-error-guide') && !active)) {
-      if (state?.jobRequiresStaff || active?.jobRequiresStaff) {
-        printerGuideSocketIo?.emit('printer:error-guide-update', {
-          activeError: { ...(state ?? active), status: 'interrupted' },
-        });
-      } else {
-        unlockCoinSlot('printer-error-guide');
-        printerGuideSocketIo?.emit('printer:error-guide-update', {
-          activeError: null,
-        });
-      }
+    printerErrorStateManager.recordHealthyPoll();
+    if (isCoinSlotLockedBy('printer-error-guide')) {
+      unlockCoinSlot('printer-error-guide');
+      printerGuideSocketIo?.emit('printer:error-guide-update', {
+        activeError: null,
+      });
     }
   } else {
     const translated = translateHardwarePrinterError({

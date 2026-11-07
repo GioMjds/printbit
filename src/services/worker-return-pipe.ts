@@ -226,6 +226,20 @@ export function handleWorkerPowerEvent(
   return state;
 }
 
+let workerEventSink: ((evt: WorkerPrintEvent) => void) | null = null;
+
+/**
+ * Single entry point for every worker event: projections first, then the
+ * server's socket/alert/lifecycle handler. The named-pipe server and the
+ * admin printer simulation both go through here, so a simulated fault takes
+ * exactly the same path as a real one.
+ */
+export function dispatchWorkerEvent(evt: WorkerPrintEvent): void {
+  printerStateProjection.applyEvent(evt);
+  void hardwareStateProjection.applyEvent(evt);
+  workerEventSink?.(evt);
+}
+
 export function startWorkerReturnPipeServer(input: {
   pipeName: string;
   maxBytes: number;
@@ -233,6 +247,7 @@ export function startWorkerReturnPipeServer(input: {
   logger?: Pick<Console, 'warn' | 'error' | 'log'>;
 }): WorkerReturnPipeServerHandle {
   const logger = input.logger ?? console;
+  workerEventSink = input.onEvent;
   const pipePath = `\\\\.\\pipe\\${input.pipeName}`;
 
   const server = net.createServer((socket) => {
@@ -246,9 +261,7 @@ export function startWorkerReturnPipeServer(input: {
         buffer = buffer.slice(index + 1);
         try {
           const evt = parseWorkerEventLine(line, input.maxBytes);
-          printerStateProjection.applyEvent(evt);
-          void hardwareStateProjection.applyEvent(evt);
-          input.onEvent(evt);
+          dispatchWorkerEvent(evt);
         } catch (err) {
           logger.warn(
             `[WORKER_RETURN_PIPE] Ignored payload: ${

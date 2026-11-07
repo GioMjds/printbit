@@ -3045,7 +3045,12 @@ export class AdminController {
       });
     }
 
-    const state = simulatePrinterError(errorType);
+    const transactionId =
+      typeof req.body?.transactionId === 'string' &&
+      req.body.transactionId.trim().length > 0
+        ? req.body.transactionId.trim()
+        : undefined;
+    const state = simulatePrinterError(errorType, transactionId);
 
     await this.adminService.appendAdminLog(
       'admin_printer_simulated_error',
@@ -4314,14 +4319,19 @@ export class AdminController {
     }
   };
 
-  private handleGetPushStatus = async (_req: Request, res: Response) => {
+  private handleGetPushStatus = async (req: Request, res: Response) => {
     try {
       const subscriptions = db.data?.adminPushSubscriptions || [];
       const enabled = db.data?.settings.pushNotifications?.enabled ?? true;
+      const endpoint =
+        typeof req.query.endpoint === 'string' ? req.query.endpoint : '';
       return res.json({
         success: true,
         enabled,
         subscriptionCount: subscriptions.length,
+        ...(endpoint
+          ? { registered: adminPushService.hasSubscription(endpoint) }
+          : {}),
       });
     } catch (err: any) {
       console.error('[ADMIN] Failed to get push status', err);

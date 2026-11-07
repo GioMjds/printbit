@@ -1,38 +1,3 @@
-/**
- * printer-guard.ts
- *
- * Client-side printer readiness gate for kiosk pages.
- *
- * USAGE — add to any kiosk page that accepts coins (same pattern as idle-timeout.ts):
- *
- *   import { initPrinterGuard } from './printer-guard';
- *
- *   const socket = io();
- *   initPrinterGuard(socket);
- *
- * REQUIRED HTML — paste the overlay block once inside <body> on each guarded page:
- *   See printer-unavailable-overlay.html
- *
- * WHAT IT DOES:
- *   1. On init    → GET /api/printer/status → applies current state before any user
- *                   interaction is possible (fail-safe: blocks on network error).
- *                 → GET /api/printer/active-error → renders customer error guide modal
- *                   if active blocking hardware fault exists.
- *   2. Runtime    → listens to `printerMalfunction` socket event → blocks UI.
- *                 → listens to `printer:error-guide-update` socket event → mounts or
- *                   clears customer error guide modal without buttons.
- *   3. Recovery   → listens to `printerRecovered` socket event   → restores UI.
- *   4. Always     → dispatches `printer:block` CustomEvent on window so the coin
- *                   acceptor controller can gate coin input without coupling to
- *                   this module.
- *
- * SOCKET EVENTS consumed (emitted by printer-monitor.ts on the server):
- *   printerMalfunction         → { status, statusFlags, printerName, timestamp }
- *   printerRecovered           → { status, printerName, timestamp }
- *   printer:error-guide-update → { activeError: ActivePrinterErrorState | null }
- */
-
-import { PrinterErrorGuideModalController } from '../public/shared/printer-error-guide-modal';
 import type { ActivePrinterErrorState } from '@/services/printer-error-state';
 
 interface SocketLike {
@@ -85,7 +50,6 @@ let _malfunctionHandler: ((p: unknown) => void) | null = null;
 let _recoveredHandler: ((p: unknown) => void) | null = null;
 let _errorGuideUpdateHandler: ((p: unknown) => void) | null = null;
 let _paperJamClearedHandler: (() => void) | null = null;
-let _errorGuideModal: PrinterErrorGuideModalController | null = null;
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
 
@@ -99,16 +63,6 @@ function getIdleScreen(): HTMLElement | null {
   return document.getElementById('kiosk-idle');
 }
 
-function getCurrentLanguage(): 'en' | 'fil' {
-  try {
-    return window.localStorage.getItem('printbit.kiosk.language') === 'fil'
-      ? 'fil'
-      : 'en';
-  } catch {
-    return 'en';
-  }
-}
-
 // ── Core state application ────────────────────────────────────────────────────
 
 function applyState(
@@ -118,8 +72,7 @@ function applyState(
 ): void {
   const overlay = getOverlay();
   const idle = getIdleScreen();
-  const modalVisible = _errorGuideModal ? _errorGuideModal.isVisible() : false;
-  const effectiveBlocked = blocked || modalVisible;
+  const effectiveBlocked = blocked;
 
   // Toggle overlay visibility
   if (overlay) {
@@ -199,10 +152,7 @@ async function checkActiveErrorOnLoad(): Promise<void> {
 
     const data = (await res.json()) as ActiveErrorResponse;
     if (data.activeError && shouldDisplayError(data.activeError.code)) {
-      _errorGuideModal?.render(data.activeError);
       applyState(true, data.activeError.code);
-    } else {
-      _errorGuideModal?.clear();
     }
   } catch (err) {
     console.error(
@@ -231,14 +181,10 @@ function onRecovered(raw: unknown): void {
 function onErrorGuideUpdate(raw: unknown): void {
   const payload = raw as { activeError: ActivePrinterErrorState | null } | null;
   const activeError = payload?.activeError;
+  // Errors never auto-clear: only an explicit staff/admin clear
+  // (printerRecovered / paper-jam-cleared) lifts the block.
   if (activeError && shouldDisplayError(activeError.code)) {
-    _errorGuideModal?.render(activeError);
     applyState(true, activeError.code);
-  } else {
-    _errorGuideModal?.clear();
-    const overlay = getOverlay();
-    const stillBlocked = overlay ? overlay.style.display === 'flex' : false;
-    applyState(stillBlocked, stillBlocked ? 'Blocked' : 'Ready');
   }
 }
 
@@ -267,26 +213,12 @@ export async function initPrinterGuard(
   const ioFactory = (window as unknown as { io?: () => SocketLike }).io;
   _socket = socket ?? (typeof ioFactory === 'function' ? ioFactory() : null);
 
-  if (typeof document !== 'undefined' && document.body) {
-    _errorGuideModal = new PrinterErrorGuideModalController({
-      container: document.body,
-      getLanguage: getCurrentLanguage,
-      onCancelJob: () => {
-        _errorGuideModal?.clear();
-        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-          window.location.href = '/';
-        }
-      },
-    });
-  }
-
   if (_socket) {
     // Store bound handlers so they can be removed later
     _malfunctionHandler = (raw: unknown) => onMalfunction(raw);
     _recoveredHandler = (raw: unknown) => onRecovered(raw);
     _errorGuideUpdateHandler = (raw: unknown) => onErrorGuideUpdate(raw);
     _paperJamClearedHandler = () => {
-      _errorGuideModal?.clear();
       if (typeof window !== 'undefined' && window.location.pathname !== '/') {
         window.location.href = '/';
       }
@@ -328,13 +260,6 @@ export function destroyPrinterGuard(): void {
   _recoveredHandler = null;
   _errorGuideUpdateHandler = null;
   _paperJamClearedHandler = null;
-
-  if (_errorGuideModal) {
-    _errorGuideModal.clear();
-    const overlay = document.querySelector('.printer-error-guide-overlay');
-    overlay?.remove();
-    _errorGuideModal = null;
-  }
 }
 
 /**
@@ -343,13 +268,5 @@ export function destroyPrinterGuard(): void {
  */
 export function isPrinterBlocked(): boolean {
   const overlay = getOverlay();
-  const modalVisible = _errorGuideModal ? _errorGuideModal.isVisible() : false;
-  return (overlay ? overlay.style.display === 'flex' : false) || modalVisible;
-}
-
-/**
- * Returns the current modal controller instance if initialized.
- */
-export function getPrinterErrorGuideModal(): PrinterErrorGuideModalController | null {
-  return _errorGuideModal;
+  return overlay ? overlay.style.display === 'flex' : false;
 }

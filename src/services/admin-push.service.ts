@@ -39,6 +39,18 @@ export interface AdminPushServiceDeps {
   writeDb?: () => Promise<void>;
   emitSocket?: (event: string, payload: unknown) => void;
   reportAnomaly?: (input: any) => Promise<any>;
+  retryDelayMs?: number;
+}
+
+const PUSH_SEND_ATTEMPTS = 3;
+const PUSH_REQUEST_TIMEOUT_MS = 10_000;
+// Push service rejected our credentials or the subscription is gone: retrying cannot help.
+const DEAD_SUBSCRIPTION_STATUSES = new Set([401, 403, 404, 410]);
+
+function isTransientPushError(err: any): boolean {
+  const status = err?.statusCode;
+  if (typeof status !== 'number') return true; // network error / timeout
+  return status === 429 || status >= 500;
 }
 
 export class AdminPushService {
@@ -54,7 +66,44 @@ export class AdminPushService {
         deps.emitSocket ?? ((event, payload) => this.io?.emit(event, payload)),
       reportAnomaly:
         deps.reportAnomaly ?? ((input) => anomalyService.report(input)),
+      retryDelayMs: deps.retryDelayMs ?? 750,
     };
+  }
+
+  hasSubscription(endpoint: string): boolean {
+    const data = this.deps.getDbData();
+    return !!data?.adminPushSubscriptions?.some((s) => s.endpoint === endpoint);
+  }
+
+  private async sendWithRetry(
+    sub: AdminPushSubscriptionEntry,
+    payload: string,
+    options: { topic: string; TTL: number },
+  ): Promise<void> {
+    const isApple = sub.endpoint.includes('push.apple.com');
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: sub.keys },
+          payload,
+          {
+            urgency: 'high',
+            topic: options.topic,
+            TTL: options.TTL,
+            timeout: PUSH_REQUEST_TIMEOUT_MS,
+            headers: isApple
+              ? { 'apns-push-type': 'alert', 'apns-priority': '10' }
+              : undefined,
+          },
+        );
+        return;
+      } catch (err: any) {
+        if (attempt >= PUSH_SEND_ATTEMPTS || !isTransientPushError(err)) {
+          throw err;
+        }
+        await new Promise((r) => setTimeout(r, this.deps.retryDelayMs * attempt));
+      }
+    }
   }
 
   setSocketIo(io: Server): void {
@@ -164,6 +213,7 @@ export class AdminPushService {
     if (nowMs - lastAlert < cooldownMs) {
       return { sent: 0, pruned: 0 };
     }
+    const previousAlertTs = this.lastAlertTimestamps.get(alert.code);
     this.lastAlertTimestamps.set(alert.code, nowMs);
 
     // Emit live in-app alert via Socket.IO
@@ -208,35 +258,29 @@ export class AdminPushService {
     await Promise.all(
       subscriptions.map(async (sub) => {
         try {
-          const isApple = sub.endpoint.includes('push.apple.com');
-          await webpush.sendNotification(
-            {
-              endpoint: sub.endpoint,
-              keys: sub.keys,
-            },
-            payload,
-            {
-              urgency: 'high',
-              topic: 'kiosk-hardware-alert',
-              TTL: 86400,
-              headers: isApple
-                ? {
-                    'apns-push-type': 'alert',
-                    'apns-priority': '10',
-                  }
-                : undefined,
-            },
-          );
+          await this.sendWithRetry(sub, payload, {
+            topic: 'kiosk-hardware-alert',
+            TTL: 86400,
+          });
           sentCount++;
           sub.lastNotifiedAt = new Date().toISOString();
         } catch (err: any) {
           console.error('[ADMIN-PUSH] Delivery failed for device (' + sub.id + ', agent: ' + sub.userAgent + '):', err?.statusCode || err?.message);
-          if (err.statusCode === 404 || err.statusCode === 410) {
+          if (DEAD_SUBSCRIPTION_STATUSES.has(err?.statusCode)) {
             deadEndpoints.add(sub.endpoint);
           }
         }
       }),
     );
+
+    // Nothing delivered: free the cooldown so the next occurrence can retry.
+    if (sentCount === 0) {
+      if (previousAlertTs === undefined) {
+        this.lastAlertTimestamps.delete(alert.code);
+      } else {
+        this.lastAlertTimestamps.set(alert.code, previousAlertTs);
+      }
+    }
 
     let prunedCount = 0;
     if (deadEndpoints.size > 0) {

@@ -99,25 +99,8 @@ export class PrinterErrorStateManager {
       return { cleared: false, state: { ...this.active } };
     }
 
-    this.consecutiveHealthyPolls += 1;
-
-    // Only Customer tier errors can auto-clear
-    if (this.active.autoClear && this.consecutiveHealthyPolls >= this.debouncePollCount) {
-      const finishedState = {
-        ...this.active,
-        status: 'cleared' as const,
-      };
-      // If error occurred mid-job, staff intervention is required: retain active state so
-      // reload safety and coin lock persist across subsequent polls until staff resolution!
-      if (this.active.jobRequiresStaff) {
-        this.active = finishedState;
-      } else {
-        this.active = null;
-      }
-      this.consecutiveHealthyPolls = 0;
-      return { cleared: true, state: { ...finishedState } };
-    }
-
+    // Errors never auto-clear: only an explicit staff/admin resolution
+    // (clearStaffResolution) lifts the active error.
     return { cleared: false, state: { ...this.active } };
   }
 

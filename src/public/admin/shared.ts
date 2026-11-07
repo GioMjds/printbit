@@ -1070,6 +1070,47 @@ function urlB64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+function subscriptionMatchesKey(
+  sub: PushSubscription,
+  serverKey: Uint8Array,
+): boolean {
+  const current = sub.options?.applicationServerKey;
+  if (!current) return true; // cannot tell; keep it
+  const bytes = new Uint8Array(current);
+  return (
+    bytes.length === serverKey.length && bytes.every((b, i) => b === serverKey[i])
+  );
+}
+
+const PUSH_SAVE_RETRY_STATUSES = new Set([502, 503, 504, 530]);
+
+async function saveSubscriptionWithRetry(
+  subscription: PushSubscription,
+): Promise<{ ok: boolean; error?: string }> {
+  let lastError = 'Failed to save subscription on kiosk server.';
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await apiFetch('/api/admin/push/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ subscription }),
+      });
+      if (res.ok) return { ok: true };
+      if (res.status === 401) {
+        return {
+          ok: false,
+          error: 'Admin session expired (HTTP 401). Log in again, then enable push.',
+        };
+      }
+      lastError = `Kiosk rejected the subscription (HTTP ${res.status}).`;
+      if (!PUSH_SAVE_RETRY_STATUSES.has(res.status)) break;
+    } catch {
+      lastError = 'Network connection to kiosk lost while saving subscription.';
+    }
+    await new Promise((r) => setTimeout(r, 600 * attempt));
+  }
+  return { ok: false, error: lastError };
+}
+
 export async function registerAdminPush(): Promise<{ ok: boolean; error?: string }> {
   const isIos = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -1113,27 +1154,21 @@ export async function registerAdminPush(): Promise<{ ok: boolean; error?: string
     }
 
     const applicationServerKey = urlB64ToUint8Array(data.publicKey);
-    try {
-      const existing = await reg.pushManager.getSubscription();
-      if (existing) {
-        await existing.unsubscribe();
-      }
-    } catch {
-      // Ignore unsubscribe error
+    const existing = await reg.pushManager.getSubscription();
+    if (existing && !subscriptionMatchesKey(existing, applicationServerKey)) {
+      // Server VAPID key changed: this subscription can never receive pushes.
+      await existing.unsubscribe().catch(() => false);
     }
-    const subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: applicationServerKey as unknown as BufferSource,
-    });
+    // Reuse a valid subscription; never drop it before the server has the replacement.
+    const subscription =
+      (await reg.pushManager.getSubscription()) ??
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: applicationServerKey as unknown as BufferSource,
+      }));
 
-    const subRes = await apiFetch('/api/admin/push/subscribe', {
-      method: 'POST',
-      body: JSON.stringify({ subscription }),
-    });
-
-    if (!subRes.ok) {
-      return { ok: false, error: 'Failed to save subscription on kiosk server.' };
-    }
+    const saved = await saveSubscriptionWithRetry(subscription);
+    if (!saved.ok) return saved;
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err?.message || 'Permission denied or registration failed.' };
@@ -1164,7 +1199,19 @@ export async function getAdminPushStatus(): Promise<'subscribed' | 'unsubscribed
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
-    return sub ? 'subscribed' : 'unsubscribed';
+    if (!sub) return 'unsubscribed';
+    // Browser has a subscription; confirm the kiosk also has it.
+    const res = await apiFetch(
+      `/api/admin/push/status?endpoint=${encodeURIComponent(sub.endpoint)}`,
+    );
+    if (!res.ok) return 'subscribed'; // server unreachable: do not claim desync
+    const status = await res.json();
+    if (status.registered === false) {
+      // Self-heal: server lost this device (DB reset, pruned, failed save).
+      const healed = await saveSubscriptionWithRetry(sub);
+      return healed.ok ? 'subscribed' : 'unsubscribed';
+    }
+    return 'subscribed';
   } catch {
     return 'unsubscribed';
   }
