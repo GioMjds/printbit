@@ -3,7 +3,7 @@
 Date: 2026-11-10
 Version audited: v1.3.4
 Scope: `/print`, `/upload`, `/copy`, `/scan`, `/config`, `/confirm`, the Node/Express server, the C# Worker Service, and the ESP32 firmware.
-Status: **The audit itself was investigation only. Afterwards, the `/upload` findings that are bugs (not policy or hardware decisions) were fixed. See [Remediation log: `/upload`](#remediation-log-upload). None of the fixes has been tested on the real kiosk.**
+Status: **The audit itself was investigation only. Afterwards, the `/upload` findings that are bugs (not policy or hardware decisions) were fixed, then the `/print` client findings, and the `/scan` timeout and worker findings. See [Remediation log: `/upload`](#remediation-log-upload), [Remediation log: `/print`](#remediation-log-print) and [Remediation log: `/scan`](#remediation-log-scan). None of the fixes has been tested on the real kiosk.**
 
 ## How to read this
 
@@ -27,14 +27,14 @@ Severity: **HIGH** (money, data loss, or a feature that fails), **MED** (degrade
 
 ## 1. `/print` (receiving customer files)
 
-| Sev  | Tag | Finding                                                                                                                                       | Location                                                          |
-| ---- | --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| HIGH | C   | A failed analysis blocks **Continue** permanently, yet the label says "Preview unverified (still printable)". There is no retry on this page. | `src/public/print/app.ts:1521`, `:1354`                           |
-| MED  | C   | "Receiving file…" shows only after the whole file has arrived, because `UploadStarted` fires after multer finishes.                           | `src/modules/wireless-session/wireless-session.controller.ts:105` |
-| MED  | C   | Every "Refresh QR / Clear & Start Over" opens a new socket and never closes the old one (socket and handler leak).                            | `src/public/print/app.ts:1221`                                    |
-| MED  | C   | The 2 s status poll has no in-flight guard and no error handling. The analysis wait loop (750 ms) has no timeout.                             | `:986`, `:993`, `:1162`                                           |
-| LOW  | C   | If the saved session has expired during the 15 s new-session cooldown, the page shows no session and no QR.                                   | `:1453`                                                           |
-| LOW  | C   | The max-pages badge can go stale after `systemSettingsChanged`. A document id is used unescaped in `querySelector`.                           | `:1330`                                                           |
+| Sev  | Tag | Finding                                                                                                                                                  | Location                                                          |
+| ---- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| HIGH | C   | **Fixed.** A failed analysis blocks **Continue** permanently, yet the label says "Preview unverified (still printable)". There is no retry on this page. | `src/public/print/app.ts:1521`, `:1354`                           |
+| MED  | C   | "Receiving file…" shows only after the whole file has arrived, because `UploadStarted` fires after multer finishes.                                      | `src/modules/wireless-session/wireless-session.controller.ts:105` |
+| MED  | C   | **Fixed.** Every "Refresh QR / Clear & Start Over" opens a new socket and never closes the old one (socket and handler leak).                            | `src/public/print/app.ts:1221`                                    |
+| MED  | C   | **Fixed.** The 2 s status poll has no in-flight guard and no error handling. The analysis wait loop (750 ms) has no timeout.                             | `:986`, `:993`, `:1162`                                           |
+| LOW  | C   | **Fixed.** If the saved session has expired during the 15 s new-session cooldown, the page shows no session and no QR.                                   | `:1453`                                                           |
+| LOW  | C   | **Fixed.** The max-pages badge can go stale after `systemSettingsChanged`. A document id is used unescaped in `querySelector`.                           | `:1330`                                                           |
 
 ## 2. `/upload` (phone upload portal)
 
@@ -69,14 +69,14 @@ Paper routing today: A4 and Short go to the glass, Long goes to the ADF (derived
 
 ## 4. `/scan` (soft copy)
 
-| Sev  | Tag | Finding                                                                                                                                                                 | Location                                                                                                                               |
-| ---- | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| HIGH | V   | The scan fee may be unpayable. The coin slot starts locked and arming is restricted to print and copy modes on both client and server.                                  | `src/public/confirm/app.ts:1405`, `src/modules/payment/payment-session.service.ts:138`, `src/services/hardware-state-projection.ts:78` |
-| HIGH | E   | One timeout covers the whole scan: 45 s in `appsettings.json`, while Node waits 100 s assuming 90 s. On 2026-10-13, 29 ADF scans at 600 DPI color ended in IPC timeout. | `appsettings.json:55`, `src/services/scanner.ts`                                                                                       |
-| HIGH | C   | The probe timeout is never applied. The token is not passed to `GetDeviceList`, so a TWAIN hang blocks all scanning.                                                    | `Naps2ScannerService.cs:75-79`                                                                                                         |
-| MED  | C   | The cached scanner device is never invalidated after a failed scan.                                                                                                     | `:141`                                                                                                                                 |
-| MED  | C   | A timeout discards every scanned page, including the PDF export. All pages are held in RAM.                                                                             | `Naps2ScannerService.cs`                                                                                                               |
-| MED  | C   | There is no scan concurrency lock in the worker.                                                                                                                        | `Naps2ScannerService.cs`                                                                                                               |
+| Sev  | Tag | Finding                                                                                                                                                                            | Location                                                                                                                               |
+| ---- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| HIGH | V   | The scan fee may be unpayable. The coin slot starts locked and arming is restricted to print and copy modes on both client and server.                                             | `src/public/confirm/app.ts:1405`, `src/modules/payment/payment-session.service.ts:138`, `src/services/hardware-state-projection.ts:78` |
+| HIGH | E   | **Fixed.** One timeout covers the whole scan: 45 s in `appsettings.json`, while Node waits 100 s assuming 90 s. On 2026-10-13, 29 ADF scans at 600 DPI color ended in IPC timeout. | `appsettings.json:55`, `src/services/scanner.ts`                                                                                       |
+| HIGH | C   | **Fixed.** The probe timeout is never applied. The token is not passed to `GetDeviceList`, so a TWAIN hang blocks all scanning.                                                    | `Naps2ScannerService.cs:75-79`                                                                                                         |
+| MED  | C   | **Fixed.** The cached scanner device is never invalidated after a failed scan.                                                                                                     | `:141`                                                                                                                                 |
+| MED  | C   | A timeout discards every scanned page, including the PDF export. All pages are held in RAM.                                                                                        | `Naps2ScannerService.cs`                                                                                                               |
+| MED  | C   | **Fixed.** There is no scan concurrency lock in the worker.                                                                                                                        | `Naps2ScannerService.cs`                                                                                                               |
 
 Scan log counts: `scan_failed` 40, `scan_completed` 4, `scan_soft_copy_charged` 1.
 
@@ -167,11 +167,11 @@ Follow the systematic-debugging rule: no fix without a confirmed root cause, one
 
 ### Step 4. Scanner reliability
 
-- Pass the probe token to `GetDeviceList`.
-- Use per-page timeouts and align the Node and worker values.
-- Return real error codes (IPC timeout vs offline vs empty glass) instead of one message.
+- ~~Pass the probe token to `GetDeviceList`.~~ Done.
+- ~~Use per-page timeouts and align the Node and worker values.~~ Done.
+- Return real error codes (IPC timeout vs offline vs empty glass) instead of one message. (`/scan` side done; the `/copy` "No document detected" message is not.)
 - Honor admin DPI settings and set a sane ADF default.
-- Invalidate the cached device on failure and add a scan lock.
+- ~~Invalidate the cached device on failure and add a scan lock.~~ Done.
 - Guard Long paper so it only uses the ADF.
 
 ### Step 5. Speed
@@ -188,7 +188,7 @@ Follow the systematic-debugging rule: no fix without a confirmed root cause, one
 - ~~Fix the upload page queue filter and retry.~~ Done.
 - ~~Release staged files and quota on early failures.~~ Done.
 - Decide the PDF JavaScript policy.
-- Close old sockets on session refresh.
+- ~~Close old sockets on session refresh.~~ Done (`/print`).
 
 ---
 
@@ -234,6 +234,67 @@ An unknown `documentId` returns "not found" (preview) or the default color resul
 | ESP32 access point (4 stations, channel 1)                               | Firmware change that cannot be verified without the device.                | Run the 5-phone test from Step 1, then raise the max connection count.                            |
 | Rate limit is keyed by IP                                                | Phones behind the Cloudflare tunnel may still share one bucket.            | Revisit after the tunnel path is tested.                                                          |
 | `buildDocxSourcePreviewUrl` in `office-preview.ts` still uses `filename` | Nothing calls it.                                                          | Update it if it is ever used.                                                                     |
+
+## Remediation log: `/print`
+
+Date: 2026-11-10. Method: systematic debugging. Root causes were confirmed in the code, tests were written first (red, then green), then the fixes were made. Pure logic lives in `src/public/print/print-session.ts` with `print-session.spec.ts` (22 tests); `app.ts` only wires it to the DOM. Nothing is committed and nothing has been tried on the kiosk.
+
+### Fixed
+
+| Finding                                                            | Root cause                                                                                                                                                                                                                                                                                                                      | Fix                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Failed analysis blocks Continue; label says "still printable"      | The server refuses to quote a document whose analysis failed (`ANALYSIS_FAILED`), so "still printable" was false. Continue only waited on a status that never changed, and nothing called the existing `POST /api/wireless/sessions/:id/analyze`. The label was set only by a socket event, and the next list render erased it. | Continue on a failed file re-queues analysis, then waits (same retry `/config` uses). The row badge is now derived from session data, so it survives re-renders, and reads "Could not prepare this file. Tap Continue to retry."                                       |
+| Socket and handler leak on every refresh                           | `io()` returns a cached socket, so each session stacked another full set of handlers. The server has no `leaveSession`.                                                                                                                                                                                                         | One socket and one handler set per page. A new session reconnects (which drops the old room) and joins the new one.                                                                                                                                                    |
+| Status poll: no guard, no error handling; wait loop has no timeout | `setInterval` fired regardless of an in-flight request, a rejected `fetch` was unhandled, and the wait loop only exited on a terminal status.                                                                                                                                                                                   | Timer ticks skip while a request is running. Event-driven refreshes (socket, delete) queue one follow-up run. Status requests have an 8 s timeout and errors are logged. The wait loop gives up after 150 s (above the 120 s conversion timeout) with a retry message. |
+| Expired saved session shows no session or QR                       | `restoreSession` called `requestNewSession`, which is blocked by the 15 s Refresh-button cooldown.                                                                                                                                                                                                                              | It now calls `createSession` directly and clears the dead session keys.                                                                                                                                                                                                |
+| Max-pages badge stale after `systemSettingsChanged`                | The re-render was skipped when the file signature was unchanged, and the signature ignored the limit.                                                                                                                                                                                                                           | The limit is part of the signature.                                                                                                                                                                                                                                    |
+| Document id unescaped in `querySelector`                           | `documentId` falls back to the filename, so a `"` in the name made the selector invalid and threw inside the socket handler.                                                                                                                                                                                                    | Rows are matched by comparing `dataset.documentId`. No selector is built.                                                                                                                                                                                              |
+
+### Not fixed
+
+| Finding                                                       | Why it is left open                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Receiving file…" shows only after the whole file has arrived | The cause is on the server: `UploadStarted` is emitted after multer finishes (`wireless-session.controller.ts:103`). The filename is not known before multer parses the body, so an early event would have no filename. Needs a decision on what the kiosk should show. |
+
+### Test notes
+
+- `tsc --noEmit` clean. Full Jest run: 16 suites, 157 tests, all passing. `scripts/build-client.js` succeeds.
+- The restore-after-expiry change and the `dataset` row lookup are DOM code and have no unit test (Jest runs in the node environment).
+- The `/upload` remediation log lists spec files (`upload-queue.spec.ts`, `upload-rate-limit.spec.ts`, `document-selection.spec.ts`, `document-query.spec.ts`, and cases in `wireless-session.service.spec.ts`). None of them exists in this working tree, so the totals quoted in the verification baseline (19 suites, 181 tests) cannot be reproduced here.
+
+## Remediation log: `/scan`
+
+Date: 2026-11-10. Committed in `8624a4a` (timeout value, "took too long" guide) and `abfca95` (deadlines, gate, probe token, client timeout). Nothing has been tried on the real kiosk or with the real EPSON L5290. The evidence below is code and automated tests only.
+
+### Fixed
+
+| Finding                                   | Root cause                                                                                                                                                            | Fix                                                                                                                                                                                                                                                                                                                               | Files                                                                                                                                                                   |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One 45 s timeout covers the whole scan    | A single `ScanTimeoutSeconds` (45) cut a whole multi-page ADF scan, while Node waited 100 s. A 600 DPI color batch cannot finish in 45 s, so Node saw an IPC timeout. | Overall cap is now 90 s. A new per-page window (`ScanPageTimeoutSeconds`, 45 s) restarts after every page, so a stalled feeder fails early and a healthy long scan is not cut. New codes `SCAN_TIMEOUT` and `SCAN_PAGE_TIMEOUT`. Node's 100 s wait is documented as worker 90 s plus 10 s for PDF export, and a spec guards that. | `ScanGuards.cs` (`ScanDeadline`), `Naps2ScannerService.cs`, both `appsettings*.json`, `ScannerSettings.cs`, `src/services/scanner.ts`, `scan-timeout-alignment.spec.ts` |
+| Probe timeout never applied               | `controller.GetDeviceList(driver)` takes no token, so the 8 s probe timeout could not stop a TWAIN hang.                                                              | The probe uses `GetDevices(driver, token)` inside `Task.Run(...).WaitAsync(token)`, so a driver that ignores the token is abandoned at the deadline.                                                                                                                                                                              | `Naps2ScannerService.cs`                                                                                                                                                |
+| Cached device kept after a failed scan    | `_selectedDevice` and the connected status were never reset on failure.                                                                                               | `ScanFailurePolicy.ShouldInvalidateDevice` clears the cache for `SCAN_TIMEOUT`, `SCAN_PAGE_TIMEOUT`, `PROCESS_FAILED` and `SCANNER_UNAVAILABLE`, so the next scan re-probes. User-fixable and busy outcomes (for example `FEEDER_EMPTY`, `SCANNER_BUSY`) keep it.                                                                 | `ScanGuards.cs`, `Naps2ScannerService.cs`                                                                                                                               |
+| No scan concurrency lock                  | Two overlapping requests could drive the scanner at once.                                                                                                             | `ScanGate` allows one scan. A second request is rejected at once with `SCANNER_BUSY`, not queued.                                                                                                                                                                                                                                 | `ScanGuards.cs`, `Naps2ScannerService.cs`                                                                                                                               |
+| `/scan` page request had no timeout (new) | `startScan` called plain `fetch`, so a dead connection left the page on the progress screen.                                                                          | The page uses a shared `fetchWithTimeout` with 110 s, above Node's 100 s so the server's more specific error normally wins.                                                                                                                                                                                                       | `src/public/scan/app.ts`, `src/public/shared/fetch-with-timeout.ts`                                                                                                     |
+| Timeout shown as a generic failure (new)  | `troubleshooting.ts` had no timeout case.                                                                                                                             | New "The scanner took too long to respond" guide. It matches `timeout`, `timed out` and `no response received`.                                                                                                                                                                                                                   | `src/public/scan/troubleshooting.ts`                                                                                                                                    |
+
+### Tests added
+
+- `worker/tests/PrintBit.Tests/ScanGuardsTests.cs`: deadline, gate and device-invalidation policy.
+- `src/services/scan-timeout-alignment.spec.ts`: Node wait stays at least worker timeout plus 10 s.
+- `src/public/shared/fetch-with-timeout.spec.ts`
+- `src/public/scan/troubleshooting.spec.ts`
+
+Re-run on 2026-11-10 against the current tree: Jest `src/public/scan`, `src/public/shared`, `src/services/scan-timeout-alignment` gives 5 suites and 29 tests, all passing. `dotnet test` with filter `Scan` gives 18 tests, all passing. The full Jest and `tsc` runs were not repeated for this log.
+
+### Not fixed
+
+| Finding                                                                | Why it is left open                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scan fee may be unpayable (HIGH, [V])                                  | Not touched. `payment-session.service.ts:138` still allows arming only for `print` and `copy`. Needs the real-kiosk coin-slot check from Step 1, then a decision on how scan mode arms the slot.                                                                       |
+| A timeout discards every scanned page, and all pages are held in RAM   | Not touched. The cancel path still deletes the output and returns no partial result. The new per-page timeout makes a total loss less likely on a healthy scan, but a stall on page N still loses pages 1 to N-1. Needs a product decision (keep partial PDF or fail). |
+| The probe fix and device invalidation have no unit test                | They depend on NAPS2 and TWAIN. Only the pure guards (`ScanDeadline`, `ScanGate`, `ScanFailurePolicy`) are tested. Confirm on the L5290 by unplugging or stalling the feeder.                                                                                          |
+| `SCANNER_BUSY` and `SCAN_PAGE_TIMEOUT` are not handled by name in Node | Nothing in `src` references them. They reach the user through the error message. `SCAN_PAGE_TIMEOUT` ("timed out") maps to the timeout guide. `SCANNER_BUSY` ("already in progress") falls to the generic guide.                                                       |
+| `Naps2ScannerService.cs` gained a UTF-8 BOM in `abfca95`               | The first line changed only by an invisible BOM. Harmless, but it shows up in blame.                                                                                                                                                                                   |
 
 ---
 

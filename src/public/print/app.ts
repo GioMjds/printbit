@@ -13,33 +13,29 @@ import {
   mountLoadingAnimation,
   type LoadingAnimationController,
 } from '../shared/loading-animation';
+import { fetchWithTimeout } from '../shared/fetch-with-timeout';
+import {
+  ANALYSIS_FAILED_TEXT,
+  ANALYSIS_PREPARING_TEXT,
+  ANALYSIS_WAIT_TIMEOUT_MS,
+  createCoalescedRunner,
+  createSessionSocket,
+  decideContinueAction,
+  fileKey,
+  filesSignature,
+  getAnalysisBadge,
+  pollDocumentAnalysis,
+  type AnalysisWaitResult,
+  type SocketLike,
+  type UploadedFile,
+} from './print-session';
 
 attachPowerSafetyOverlay();
 attachUiBlockingOverlay();
 void initPrinterGuard(null, { mode: 'kiosk_wide_only' });
 
-type UploadedFile = {
-  documentId?: string;
-  filename: string;
-  size?: number;
-  sizeBytes?: number;
-  analysisStatus?: 'pending' | 'completed' | 'failed';
-  analysisError?: string | null;
-  pageCount?: number;
-  analysis?: {
-    pageCount?: number;
-    totalPages?: number;
-    isEntirelyBlank?: boolean;
-    blankPages?: number[];
-    blankPageCount?: number;
-    pages?: {
-      index: number;
-      isBlank?: boolean;
-      classification?: string;
-      coverage?: number;
-    }[];
-  };
-};
+/** Kiosk-side deadline for a single session status request. */
+const SESSION_REQUEST_TIMEOUT_MS = 8_000;
 
 function isFileEntirelyBlank(file: UploadedFile | null | undefined): boolean {
   if (!file) return false;
@@ -240,7 +236,6 @@ let selectedDocumentId = '';
 let knownFiles = new Set<string>();
 let deletingDocumentIds = new Set<string>();
 let lastRenderedFileSignature = '';
-let attachedSessionId: string | null = null;
 let hotspotConfig: HotspotConfig | null = null;
 let sessionWarningThresholdSeconds = 60;
 const SESSION_COUNTDOWN_TICK_MS = 1000;
@@ -489,23 +484,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function fileKey(file: UploadedFile): string {
-  const bytes = file.size ?? file.sizeBytes ?? -1;
-  const pageCount =
-    typeof file.pageCount === 'number'
-      ? file.pageCount
-      : typeof file.analysis?.pageCount === 'number'
-        ? file.analysis.pageCount
-        : typeof file.analysis?.totalPages === 'number'
-          ? file.analysis.totalPages
-          : -1;
-  return `${file.documentId || file.filename}::${file.filename}::${bytes}::${pageCount}::${file.analysisStatus ?? ''}`;
-}
-
-function filesSignature(files: UploadedFile[]): string {
-  return files.map((file) => fileKey(file)).join('|');
-}
-
 // ── File list rendering ───────────────────────────────────────────────────────
 
 function clearSelectedFileState(): void {
@@ -712,6 +690,13 @@ function addFileToList(file: UploadedFile): void {
     ? `<span class="file-item__blank-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(239,68,68,0.15);color:#ef4444;font-size:11px;font-weight:600;margin-left:6px;">⚠ Blank</span>`
     : '';
 
+  const analysisBadge = getAnalysisBadge(file);
+  const analysisStatusHtml = analysisBadge
+    ? analysisBadge.state === 'analyzing'
+      ? `<span class="file-analysis-status analyzing" style="display:inline-flex"><span class="analysis-spinner-mini" aria-hidden="true"></span><span class="analysis-label">${escapeHtml(analysisBadge.text)}</span></span>`
+      : `<span class="file-analysis-status failed" style="display:inline-block">${escapeHtml(analysisBadge.text)}</span>`
+    : '<span class="file-analysis-status" style="display:none"></span>';
+
   const li = document.createElement('li');
   li.className = 'file-item';
   li.role = 'option';
@@ -728,7 +713,7 @@ function addFileToList(file: UploadedFile): void {
       <div class="file-item__meta">
         <span class="file-item__ext">${escapeHtml(ext)}</span>
         ${file.size !== undefined ? `<span>${formatBytes(file.size)}</span>` : ''}
-        <span class="file-analysis-status" style="display:none"></span>
+        ${analysisStatusHtml}
         ${pageLimitBadge}
         ${blankBadge}
       </div>
@@ -776,7 +761,7 @@ function escapeHtml(str: string): string {
 function renderFiles(files: UploadedFile[]): void {
   removeIncomingUploadSkeleton();
   const prevSelected = selectedDocumentId;
-  lastRenderedFileSignature = filesSignature(files);
+  lastRenderedFileSignature = filesSignature(files, maxPagesPerSession);
   knownFiles = new Set<string>();
 
   if (fileList) {
@@ -983,17 +968,29 @@ async function createSession(): Promise<void> {
 
     attachSocket(session.sessionId);
     void checkUploadStatus();
-    pollHandle = window.setInterval(() => void checkUploadStatus(), 2000);
+    pollHandle = window.setInterval(pollUploadStatus, 2000);
   } finally {
     createSessionInFlight = false;
     renderRefreshSessionButtonState();
   }
 }
 
-async function checkUploadStatus(): Promise<void> {
+async function checkUploadStatusOnce(): Promise<void> {
   if (!activeSessionId) return;
 
-  const response = await fetch(getSessionDetailsUrl(activeSessionId));
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      getSessionDetailsUrl(activeSessionId),
+      {},
+      SESSION_REQUEST_TIMEOUT_MS,
+      'Session status',
+    );
+  } catch (err) {
+    // Transient (AP hiccup, slow kiosk). The next tick or socket event retries.
+    console.warn('[print] Session status check failed:', err);
+    return;
+  }
   if (!response.ok) {
     if (
       response.status === 404 ||
@@ -1062,11 +1059,29 @@ async function checkUploadStatus(): Promise<void> {
     };
   });
 
-  const nextSignature = filesSignature(files);
+  const nextSignature = filesSignature(files, maxPagesPerSession);
   if (nextSignature === lastRenderedFileSignature) {
     return;
   }
   renderFiles(files);
+}
+
+// Timer ticks skip while a request is in flight; event-driven refreshes
+// (socket, delete) queue exactly one follow-up run.
+const uploadStatusRunner = createCoalescedRunner(async () => {
+  try {
+    await checkUploadStatusOnce();
+  } catch (err) {
+    console.warn('[print] Session status update failed:', err);
+  }
+});
+
+function checkUploadStatus(): Promise<void> {
+  return uploadStatusRunner.run();
+}
+
+function pollUploadStatus(): void {
+  void uploadStatusRunner.runIfIdle();
 }
 
 function getSessionDetailsUrl(sessionId: string): string {
@@ -1147,29 +1162,24 @@ function setContinueButtonDisabled(disabled: boolean): void {
   continueBtn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
 }
 
-type ConversionWaitResult =
-  | {
-      ready: true;
-      analysis?: UploadedFile['analysis'];
-      document?: UploadedFile;
-    }
-  | { ready: false; message: string };
-
 async function waitForDocumentAnalysis(
   sessionId: string,
   documentId: string,
-): Promise<ConversionWaitResult> {
-  while (!conversionWaitCancelled) {
-    try {
-      const response = await fetch(getSessionDetailsUrl(sessionId));
-      if (!response.ok) {
-        return {
-          ready: false,
-          message:
-            'Your session expired. Start a new session and upload again.',
-        };
-      }
-
+): Promise<AnalysisWaitResult> {
+  return pollDocumentAnalysis({
+    documentId,
+    isCancelled: () => conversionWaitCancelled,
+    sleep: (ms) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)),
+    now: () => Date.now(),
+    timeoutMs: ANALYSIS_WAIT_TIMEOUT_MS,
+    fetchSession: async () => {
+      const response = await fetchWithTimeout(
+        getSessionDetailsUrl(sessionId),
+        {},
+        SESSION_REQUEST_TIMEOUT_MS,
+        'Session status',
+      );
+      if (!response.ok) return { ok: false };
       const session = (await response.json()) as SessionResponse;
       const documents =
         session.documents && session.documents.length > 0
@@ -1177,50 +1187,46 @@ async function waitForDocumentAnalysis(
           : session.document
             ? [session.document]
             : [];
-      const document = documents.find(
-        (candidate) =>
-          (candidate.documentId || candidate.filename) === documentId,
-      );
-      if (!document) {
-        return {
-          ready: false,
-          message: 'The selected file is no longer available.',
-        };
-      }
-      if (document.analysisStatus === 'completed') {
-        return { ready: true, analysis: document.analysis, document };
-      }
-      if (document.analysisStatus === 'failed') {
-        return {
-          ready: false,
-          message:
-            document.analysisError ||
-            'Document could not be prepared. Choose another file or try again.',
-        };
-      }
-    } catch {
-      // A transient network failure must not abandon a conversion still running
-      // in the worker; the next poll will refresh the state.
-    }
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
-  }
+      return { ok: true, documents };
+    },
+  });
+}
 
-  return { ready: false, message: '' };
+/** Re-queues analysis for a document whose previous attempt failed. */
+async function requestAnalysisRetry(
+  sessionId: string,
+  documentId: string,
+): Promise<boolean> {
+  if (!activeSessionToken) return false;
+  try {
+    const response = await fetchWithTimeout(
+      `/api/wireless/sessions/${encodeURIComponent(sessionId)}/analyze?token=${encodeURIComponent(activeSessionToken)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId }),
+      },
+      SESSION_REQUEST_TIMEOUT_MS,
+      'Analysis retry',
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 /** Socket: get instant notification when upload lands, no need to wait for poll. */
+let sessionSocket: ReturnType<typeof createSessionSocket> | null = null;
+
 function attachSocket(sid: string): void {
-  type SocketLike = {
-    on: (e: string, cb: (...a: unknown[]) => void) => void;
-    emit: (e: string, ...a: unknown[]) => void;
-  };
   const ioFactory = (window as unknown as { io?: () => SocketLike }).io;
   if (typeof ioFactory !== 'function') return;
-  if (attachedSessionId === sid) return;
+  sessionSocket ??= createSessionSocket(ioFactory, registerSocketHandlers);
+  sessionSocket.attach(sid);
+}
 
-  const socket = ioFactory();
-  attachedSessionId = sid;
-  socket.emit('joinSession', sid);
+/** Registered once per page; the same socket is reused across sessions. */
+function registerSocketHandlers(socket: SocketLike): void {
   socket.on('PhoneConnected', () => {
     setPhoneConnected(true);
   });
@@ -1327,7 +1333,11 @@ function updateFileAnalysisState(
   documentId: string,
   state: 'analyzing' | 'ready' | 'failed',
 ): void {
-  const fileItem = document.querySelector(`[data-document-id="${documentId}"]`);
+  // documentId falls back to the filename, so it can contain quotes. Compare
+  // the dataset value instead of building a selector from it.
+  const fileItem = Array.from(
+    fileList?.querySelectorAll<HTMLElement>('[data-document-id]') ?? [],
+  ).find((el) => el.dataset.documentId === documentId);
   if (!fileItem) return;
 
   const statusEl = fileItem.querySelector(
@@ -1342,7 +1352,7 @@ function updateFileAnalysisState(
     case 'analyzing':
       statusEl.innerHTML = `
         <span class="analysis-spinner-mini" aria-hidden="true"></span>
-        <span class="analysis-label">Preparing pages…</span>
+        <span class="analysis-label">${escapeHtml(ANALYSIS_PREPARING_TEXT)}</span>
       `;
       statusEl.style.display = 'inline-flex';
       break;
@@ -1351,7 +1361,7 @@ function updateFileAnalysisState(
       statusEl.style.display = 'none';
       break;
     case 'failed':
-      statusEl.textContent = '⚠ Preview unverified (still printable)';
+      statusEl.textContent = ANALYSIS_FAILED_TEXT;
       statusEl.style.display = 'inline-block';
       break;
   }
@@ -1450,12 +1460,17 @@ async function restoreSession(sid: string): Promise<void> {
     updateUploadLink(session.uploadUrl);
     await checkUploadStatus();
   } else {
-    await requestNewSession();
+    // The saved session is gone. Create a fresh one directly: the cooldown
+    // only throttles the user's Refresh button, and honouring it here left the
+    // page with no session and no QR for up to 15 s.
+    sessionStorage.removeItem('printbit.sessionId');
+    sessionStorage.removeItem('printbit.sessionToken');
+    await createSession();
     return;
   }
 
   if (pollHandle !== null) window.clearInterval(pollHandle);
-  pollHandle = window.setInterval(() => void checkUploadStatus(), 2000);
+  pollHandle = window.setInterval(pollUploadStatus, 2000);
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
@@ -1518,10 +1533,31 @@ continueBtn?.addEventListener('click', async () => {
     setContinueButtonDisabled(true);
     return;
   }
-  if (selectedFileRecord?.analysisStatus !== 'completed') {
+  const continueAction = decideContinueAction(selectedFileRecord);
+  if (continueAction !== 'proceed') {
     conversionWaitInFlight = true;
     setContinueButtonDisabled(true);
     showConversionDialog(selectedFileRecord);
+    if (continueAction === 'retry-then-wait') {
+      // The quote endpoint refuses documents whose analysis failed, so waiting
+      // alone would never succeed. Re-queue it, like /config does.
+      const queued = await requestAnalysisRetry(
+        activeSessionId,
+        selectedDocumentId,
+      );
+      if (!queued) {
+        if (!conversionWaitCancelled) {
+          setConversionStatus(
+            'Unable to prepare document',
+            'Could not restart preparation. Check the connection, or re-upload the file.',
+          );
+          conversionCancelBtn?.focus();
+        }
+        conversionWaitInFlight = false;
+        setContinueButtonDisabled(false);
+        return;
+      }
+    }
     const result = await waitForDocumentAnalysis(
       activeSessionId,
       selectedDocumentId,
