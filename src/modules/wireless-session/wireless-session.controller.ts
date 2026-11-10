@@ -7,6 +7,7 @@ import {
   setUploadRejectionNotifier,
 } from '@/middleware/file-validation';
 import { createRateLimit } from '@/middleware/rate-limit';
+import { WIRELESS_UPLOAD_RATE_LIMIT } from './upload-rate-limit';
 import { createKioskAccessMiddleware } from '@/middleware/kiosk-access';
 import {
   powerSafetyService,
@@ -22,8 +23,7 @@ const wirelessPreviewRateLimit = createRateLimit({
 
 const wirelessUploadRateLimit = createRateLimit({
   keyPrefix: 'wireless-session-upload',
-  windowMs: 60_000,
-  max: 10,
+  ...WIRELESS_UPLOAD_RATE_LIMIT,
 });
 
 export class WirelessSessionController {

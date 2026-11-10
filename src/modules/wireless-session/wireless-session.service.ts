@@ -24,6 +24,8 @@ import {
   startPricingAnalysisWorker,
   type PricingAnalysisJobData,
 } from '@/services/pricing-analysis-queue';
+import { discardStagedUpload } from '@/services/upload-staging';
+import { selectRequestedDocument } from './document-selection';
 import { PORT } from '@/config/http.config';
 import { pricingAnalysisCacheStore } from '@/core/database/sqlite-storage';
 import {
@@ -422,6 +424,8 @@ export class WirelessSessionService {
     );
 
     const requestedFilename = req.query.filename as string;
+    const requestedDocumentId =
+      typeof req.query.documentId === 'string' ? req.query.documentId : '';
     const allDocs =
       session?.documents && session.documents.length > 0
         ? session.documents
@@ -429,12 +433,14 @@ export class WirelessSessionService {
           ? [session.document]
           : [];
 
-    const target = requestedFilename
-      ? allDocs.find((doc) => doc.filename === requestedFilename)
-      : (session?.document ?? allDocs[0]);
+    const target = selectRequestedDocument(
+      allDocs,
+      { documentId: requestedDocumentId, filename: requestedFilename },
+      session?.document,
+    );
 
     if (!target) {
-      if (requestedFilename) {
+      if (requestedDocumentId || requestedFilename) {
         res.status(404).json({ error: 'Document not found.' });
       } else {
         res.status(404).json({ error: 'No documents available for preview.' });
@@ -540,6 +546,8 @@ export class WirelessSessionService {
     }
 
     const requestedFilename = req.query.filename as string | undefined;
+    const requestedDocumentId =
+      typeof req.query.documentId === 'string' ? req.query.documentId : '';
     const allDocs =
       session.documents && session.documents.length > 0
         ? session.documents
@@ -547,9 +555,11 @@ export class WirelessSessionService {
           ? [session.document]
           : [];
 
-    const target = requestedFilename
-      ? allDocs.find((doc) => doc.filename === requestedFilename)
-      : (session.document ?? allDocs[0]);
+    const target = selectRequestedDocument(
+      allDocs,
+      { documentId: requestedDocumentId, filename: requestedFilename },
+      session.document,
+    );
 
     if (!target) {
       res.json({
@@ -728,6 +738,9 @@ export class WirelessSessionService {
       file,
     );
     if (!result.isSuccess || !result.document) {
+      // storeUpload only promotes the staged file on success; release it and
+      // its quota here so a rejected upload does not hold them until the purge.
+      if (file.path) await discardStagedUpload(file);
       this.emitToSession(sessionId, 'UploadFailed');
       await adminService.appendAdminLog(
         'upload_failed',
@@ -1192,9 +1205,17 @@ export class WirelessSessionService {
         job.documentId,
         reason,
       );
+      const failedSession = this.deps.sessionStore.tryGetSession(
+        job.sessionId,
+        this.buildInternalBaseUrl(),
+      );
+      const failedDocument = (
+        failedSession?.documents ??
+        (failedSession?.document ? [failedSession.document] : [])
+      ).find((doc) => doc.documentId === job.documentId);
       this.emitToSession(job.sessionId, 'AnalysisFailed', {
         documentId: job.documentId,
-        filename: job.documentId,
+        filename: failedDocument?.filename ?? job.documentId,
         error: reason,
       });
       throw error instanceof Error ? error : new Error(reason);

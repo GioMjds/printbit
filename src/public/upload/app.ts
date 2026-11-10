@@ -1,6 +1,16 @@
 export {};
 import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { isLargePrintDocument } from '../shared/large-print-warning';
+import {
+  UPLOAD_REQUEST_TIMEOUT_MS,
+  classifyUploadFile,
+  extOf,
+  findDuplicate,
+  isRetryableFailure,
+  isWordDocument,
+  type ItemStatus,
+  type UploadFailure,
+} from './upload-queue';
 
 void initKioskLocalization();
 
@@ -30,7 +40,6 @@ type UploadState =
   | 'session-error'
   | 'uploading'
   | 'all-done';
-type ItemStatus = 'pending' | 'uploading' | 'done' | 'error';
 
 interface SessionResponse {
   sessionId: string;
@@ -164,10 +173,17 @@ type QueuedFile = {
   file: File;
   contentHash?: string;
   status: ItemStatus;
+  /** Set when the last failure was transient, so Send can try this file again. */
+  retryable?: boolean;
   el: HTMLElement;
 };
 
 const queue: QueuedFile[] = [];
+
+/** Items the Send button will transmit: new files plus transiently failed ones. */
+function isSendable(q: QueuedFile): boolean {
+  return q.status === 'pending' || (q.status === 'error' && q.retryable === true);
+}
 let nextId = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -185,7 +201,7 @@ function updateDropZoneEnabled(): void {
 function setAppState(s: UploadState): void {
   appState = s;
   const canUpload =
-    s === 'session-ready' && queue.some((q) => q.status === 'pending');
+    s === 'session-ready' && queue.some(isSendable);
   uploadButton.disabled = !canUpload;
   if (uploadToast) {
     uploadToast.hidden = s !== 'all-done';
@@ -219,21 +235,6 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function extOf(name: string): string {
-  return name.split('.').pop()?.toLowerCase() ?? 'file';
-}
-
-function isWordDocument(fileName: string, mimeType?: string): boolean {
-  const ext = extOf(fileName);
-  if (ext === 'doc' || ext === 'docx') return true;
-  const normalized = mimeType?.trim().toLowerCase();
-  return (
-    normalized === 'application/msword' ||
-    normalized ===
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  );
 }
 
 function setDocumentConversionEnabled(enabled: boolean): void {
@@ -278,90 +279,6 @@ function setDocumentConversionEnabled(enabled: boolean): void {
       );
     }
   }
-}
-
-function normalizeMimeByExtension(
-  fileName: string,
-  mimeType: string,
-): string | null {
-  const normalizedMime = mimeType.trim().toLowerCase();
-  const ext = extOf(fileName);
-  const extensionMimeMap = {
-    pdf: 'application/pdf',
-    doc: 'application/msword',
-    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    gif: 'image/gif',
-    webp: 'image/webp',
-    bmp: 'image/bmp',
-  } as Record<string, string>;
-
-  const vendorAliases = {
-    'application/x-pdf': 'application/pdf',
-    'application/acrobat': 'application/pdf',
-    'applications/vnd.pdf': 'application/pdf',
-    'application/vnd.ms-word': 'application/msword',
-    'application/x-msword': 'application/msword',
-    'image/pjpeg': 'image/jpeg',
-    'image/x-png': 'image/png',
-  } as Record<string, string>;
-
-  if (vendorAliases[normalizedMime]) {
-    return vendorAliases[normalizedMime];
-  }
-
-  const mappedByExt = extensionMimeMap[ext];
-  if (
-    normalizedMime === '' ||
-    normalizedMime === 'application/octet-stream' ||
-    (mappedByExt && !normalizedMime.includes('/'))
-  ) {
-    return mappedByExt || null;
-  }
-
-  return mappedByExt ?? normalizedMime;
-}
-
-interface UnsupportedFilesResult {
-  unsupported: string[];
-  rejectedWordCount: number;
-}
-
-function collectUnsupportedFiles(files: File[]): UnsupportedFilesResult {
-  const allowedMimeTypes = new Set<string>([
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'image/bmp',
-  ]);
-  if (documentConversionEnabled) {
-    allowedMimeTypes.add('application/msword');
-    allowedMimeTypes.add(
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    );
-  }
-
-  const unsupported: string[] = [];
-  let rejectedWordCount = 0;
-
-  for (const file of files) {
-    const isWord = isWordDocument(file.name, file.type);
-    if (!documentConversionEnabled && isWord) {
-      rejectedWordCount++;
-      unsupported.push(file.name);
-      continue;
-    }
-    const normalized = normalizeMimeByExtension(file.name, file.type);
-    if (!normalized || !allowedMimeTypes.has(normalized)) {
-      unsupported.push(file.name);
-    }
-  }
-
-  return { unsupported, rejectedWordCount };
 }
 
 async function sha256File(file: File): Promise<string | undefined> {
@@ -705,29 +622,21 @@ function escHtml(s: string): string {
 
 async function addFilesToQueue(files: FileList | File[]): Promise<void> {
   const arr = Array.from(files);
-  const { unsupported, rejectedWordCount } = collectUnsupportedFiles(arr);
-  if (unsupported.length > 0) {
-    if (rejectedWordCount > 0) {
-      setStatus(
-        'Word document conversion is disabled on this kiosk. Please upload PDF or image files.',
-        'error',
-      );
-    } else {
-      setStatus(
-        `Unsupported file type: ${unsupported[0]}${unsupported.length > 1 ? ` (+${unsupported.length - 1} more)` : ''}.`,
-        'error',
-      );
-    }
-  }
-
+  const wordRejected: string[] = [];
+  const unsupported: string[] = [];
+  const tooLarge: string[] = [];
   const duplicateFiles: string[] = [];
+
   for (const file of arr) {
-    if (!documentConversionEnabled && isWordDocument(file.name, file.type)) {
+    // Same predicate decides the error message and queue entry, so a rejected
+    // file can never end up queued.
+    const verdict = classifyUploadFile(file, { documentConversionEnabled });
+    if (!verdict.ok) {
+      if (verdict.reason === 'word-disabled') wordRejected.push(file.name);
+      else if (verdict.reason === 'too-large') tooLarge.push(file.name);
+      else unsupported.push(file.name);
       continue;
     }
-
-    const normalizedMime = normalizeMimeByExtension(file.name, file.type);
-    if (!normalizedMime) continue;
 
     let contentHash: string | undefined;
     try {
@@ -736,7 +645,7 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
       // The server still performs the authoritative duplicate validation.
     }
 
-    if (contentHash && queue.some((q) => q.contentHash === contentHash)) {
+    if (findDuplicate(queue, contentHash)) {
       duplicateFiles.push(file.name);
       continue;
     }
@@ -753,6 +662,27 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
     queue.push(qf);
     fileQueue.appendChild(el);
   }
+
+  const rejectedCount =
+    wordRejected.length + unsupported.length + tooLarge.length;
+  const more = (n: number) => (n > 1 ? ` (+${n - 1} more)` : '');
+  if (wordRejected.length > 0) {
+    setStatus(
+      'Word document conversion is disabled on this kiosk. Please upload PDF or image files.',
+      'error',
+    );
+  } else if (unsupported.length > 0) {
+    setStatus(
+      `Unsupported file type: ${unsupported[0]}${more(unsupported.length)}.`,
+      'error',
+    );
+  } else if (tooLarge.length > 0) {
+    setStatus(
+      `${tooLarge[0]}${more(tooLarge.length)} exceeds the 25 MB limit.`,
+      'error',
+    );
+  }
+
   dropZone.classList.toggle('has-files', queue.length > 0);
   if (uploadToast) {
     uploadToast.hidden = true;
@@ -761,21 +691,21 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
     setAppState('session-ready');
   }
   refreshUploadBtn();
-  if (queue.some((q) => q.status === 'pending')) {
+  if (queue.some(isSendable)) {
     uploadButton.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   if (duplicateFiles.length > 0) {
     setStatus(
-      `${duplicateFiles[0]} is already in the upload list${duplicateFiles.length > 1 ? ` (+${duplicateFiles.length - 1} more)` : ''}.`,
+      `${duplicateFiles[0]} is already in the upload list${more(duplicateFiles.length)}.`,
       'info',
     );
-  } else if (unsupported.length === 0) {
+  } else if (rejectedCount === 0) {
     clearStatus();
   }
 }
 
 function refreshUploadBtn(): void {
-  const pendingCount = queue.filter((q) => q.status === 'pending').length;
+  const pendingCount = queue.filter(isSendable).length;
   if (appState !== 'session-ready' && appState !== 'all-done') return;
   uploadButton.disabled = pendingCount === 0;
   uploadBtnLabel.textContent =
@@ -982,9 +912,80 @@ function attachSocket(sid: string): void {
 
 // ── Upload all pending files sequentially ─────────────────────────────────────
 
+type UploadOutcome =
+  | { ok: true }
+  | {
+      ok: false;
+      label: string;
+      failure: UploadFailure;
+      errBody?: UploadErrorResponse;
+    };
+
+/** Sends one file. Always resolves, so a failure never stalls the queue. */
+function sendFile(qf: QueuedFile): Promise<UploadOutcome> {
+  return new Promise<UploadOutcome>((resolve) => {
+    const formData = new FormData();
+    formData.append('file', qf.file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open(
+      'POST',
+      `/api/wireless/sessions/${sessionId}/upload?token=${encodeURIComponent(token)}`,
+    );
+    xhr.setRequestHeader('x-upload-client-id', uploadClientId);
+    xhr.timeout = UPLOAD_REQUEST_TIMEOUT_MS;
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        setItemProgress(qf, Math.round((e.loaded / e.total) * 90));
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve({ ok: true });
+        return;
+      }
+      let errBody: UploadErrorResponse | undefined;
+      try {
+        errBody = JSON.parse(xhr.responseText) as UploadErrorResponse;
+      } catch {
+        // The rate limiter replies with plain text, not JSON.
+      }
+      const failure: UploadFailure = {
+        httpStatus: xhr.status,
+        code: errBody?.code,
+      };
+      const label = errBody
+        ? mapError(errBody)
+        : xhr.status === 429
+          ? 'Too many uploads at once. Wait a moment, then tap Send again.'
+          : 'Upload failed';
+      resolve({ ok: false, label, failure, errBody });
+    });
+
+    const networkFailure: UploadOutcome = {
+      ok: false,
+      label: 'Network error',
+      failure: { httpStatus: 0 },
+    };
+    xhr.addEventListener('error', () => resolve(networkFailure));
+    xhr.addEventListener('abort', () => resolve(networkFailure));
+    xhr.addEventListener('timeout', () =>
+      resolve({
+        ok: false,
+        label: 'Upload timed out',
+        failure: { timedOut: true },
+      }),
+    );
+
+    xhr.send(formData);
+  });
+}
+
 async function uploadPendingFiles(): Promise<void> {
   if (!sessionId || isSessionUnavailable) return;
-  const pending = queue.filter((q) => q.status === 'pending');
+  const pending = queue.filter(isSendable);
   if (pending.length === 0) return;
 
   setAppState('uploading');
@@ -993,10 +994,12 @@ async function uploadPendingFiles(): Promise<void> {
 
   let doneCount = 0;
   let errorCount = 0;
+  let retryableCount = 0;
   let securityErrorCount = 0;
 
   for (const qf of pending) {
     if (isSessionUnavailable) break;
+    qf.retryable = false;
     if (
       !documentConversionEnabled &&
       isWordDocument(qf.file.name, qf.file.type)
@@ -1008,77 +1011,42 @@ async function uploadPendingFiles(): Promise<void> {
     updateItemStatus(qf, 'uploading');
     setItemProgress(qf, 20);
 
-    const formData = new FormData();
-    formData.append('file', qf.file);
+    const outcome = await sendFile(qf);
 
-    try {
-      // Use XHR for upload progress
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open(
-          'POST',
-          `/api/wireless/sessions/${sessionId}/upload?token=${encodeURIComponent(token)}`,
-        );
-        xhr.setRequestHeader('x-upload-client-id', uploadClientId);
+    if (outcome.ok) {
+      setItemProgress(qf, 100);
+      updateItemStatus(qf, 'done');
+      doneCount++;
+      continue;
+    }
 
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            setItemProgress(qf, Math.round((e.loaded / e.total) * 90));
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            setItemProgress(qf, 100);
-            updateItemStatus(qf, 'done');
-            doneCount++;
-            resolve();
-          } else {
-            try {
-              const errBody = JSON.parse(
-                xhr.responseText,
-              ) as UploadErrorResponse;
-              const mappedErr = mapError(errBody);
-              updateItemStatus(qf, 'error', mappedErr);
-              if (
-                mappedErr === SECURITY_CHECK_FAILED_MESSAGE ||
-                isSecurityCheckFailure(errBody)
-              ) {
-                securityErrorCount++;
-              }
-              if (
-                errBody.code === 'SESSION_EXPIRED' ||
-                errBody.code === 'SESSION_OWNED'
-              ) {
-                setSessionUnavailable(mappedErr);
-              }
-            } catch {
-              updateItemStatus(qf, 'error', 'Upload failed');
-            }
-            errorCount++;
-            resolve(); // continue with next file
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          updateItemStatus(qf, 'error', 'Network error');
-          errorCount++;
-          reject();
-        });
-
-        xhr.send(formData);
-      }).catch(() => {
-        /* already handled */
-      });
-    } catch {
-      updateItemStatus(qf, 'error', 'Network error');
-      errorCount++;
+    updateItemStatus(qf, 'error', outcome.label);
+    setItemProgress(qf, 0);
+    errorCount++;
+    qf.retryable = isRetryableFailure(outcome.failure);
+    if (qf.retryable) retryableCount++;
+    const { errBody } = outcome;
+    if (
+      outcome.label === SECURITY_CHECK_FAILED_MESSAGE ||
+      (errBody && isSecurityCheckFailure(errBody))
+    ) {
+      securityErrorCount++;
+    }
+    if (
+      errBody?.code === 'SESSION_EXPIRED' ||
+      errBody?.code === 'SESSION_OWNED'
+    ) {
+      setSessionUnavailable(outcome.label);
     }
   }
 
   if (isSessionUnavailable) return;
 
   // Final summary
+  const retryHint =
+    retryableCount > 0
+      ? 'Tap Send to retry the failed items.'
+      : 'Remove the failed items or choose another file.';
   if (errorCount === 0 && doneCount > 0) {
     setStatus(
       `✓ ${doneCount} file${doneCount > 1 ? 's' : ''} sent successfully. Look up at the kiosk screen to continue.`,
@@ -1089,7 +1057,7 @@ async function uploadPendingFiles(): Promise<void> {
     setStatus(
       securityErrorCount > 0
         ? `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} rejected: unverified or damaged file. Please use standard PDF or image.`
-        : `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} failed. You can retry failed items.`,
+        : `${doneCount} file${doneCount > 1 ? 's' : ''} sent, ${errorCount} failed. ${retryHint}`,
       'info',
     );
     setAppState('session-ready');

@@ -11,6 +11,7 @@ type ScanFailureCause =
   | 'empty_feeder'
   | 'multi_feed'
   | 'busy'
+  | 'timeout'
   | 'connection'
   | 'unknown';
 
@@ -68,6 +69,16 @@ const GUIDES = {
       'Wait a few seconds for the scanner to finish.',
       'Keep the paper in place in the ADF.',
       'Try again once the scanner is quiet.',
+    ],
+  },
+  timeout: {
+    title: 'The scanner took too long to respond',
+    summary:
+      'The scan did not finish in time. Nothing is wrong with your document. Try again.',
+    checks: [
+      'Keep your document in place and tap Try again.',
+      'For a long document, scan fewer pages at a time.',
+      'If it keeps happening, ask a staff member for help.',
     ],
   },
   connection: {
@@ -184,6 +195,13 @@ function classifyScanFailure(rawMessage: string): ScanFailureCause {
     message.includes('already scanning')
   ) {
     return 'busy';
+  }
+  if (
+    message.includes('timeout') ||
+    message.includes('timed out') ||
+    message.includes('no response received')
+  ) {
+    return 'timeout';
   }
   if (
     message.includes('no scanner') ||

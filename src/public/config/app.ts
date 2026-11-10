@@ -36,6 +36,7 @@ import {
 import { createConfigPreparationLoadingController } from './loading-state';
 import { shouldPreparePreviewInBackground } from './office-preview';
 import { getPreviewRequestTimeoutMs } from './preview-timeout';
+import { buildDocumentQuery } from './document-query';
 import { PagePickerModal } from './page-picker-modal';
 import { BlankPageWarningModal } from './blank-page-modal';
 
@@ -528,7 +529,11 @@ class PrintPreview {
     }
   }
 
-  async load(sessionId: string, filename?: string): Promise<void> {
+  async load(
+    sessionId: string,
+    filename?: string,
+    documentId?: string,
+  ): Promise<void> {
     this.iframe.onload = null; // clear any stale iframe load handler
     this.controls.style.display = 'none';
     this.showLoading(true);
@@ -538,13 +543,20 @@ class PrintPreview {
     this.setHint('Loading preview…');
     this.latestImageInfo = null;
 
-    const previewParams = new URLSearchParams();
-    if (filename) previewParams.set('filename', filename);
-    if (sessionToken) previewParams.set('token', sessionToken);
+    const previewParams = buildDocumentQuery({
+      filename,
+      documentId,
+      token: sessionToken,
+    });
     const previewQuery = previewParams.toString();
     let url = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/preview`;
     if (previewQuery) url += `?${previewQuery}`;
-    previewLog('load() start', { sessionId, filename: filename ?? null, url });
+    previewLog('load() start', {
+      sessionId,
+      filename: filename ?? null,
+      documentId: documentId ?? null,
+      url,
+    });
 
     let response: Response;
     try {
@@ -2424,7 +2436,11 @@ async function loadPreview(): Promise<void> {
   }
 
   const filename = selectedFile ?? undefined;
-  const previewPromise = preview.load(sessionId, filename);
+  const previewPromise = preview.load(
+    sessionId,
+    filename,
+    selectedDocumentId ?? undefined,
+  );
 
   if (shouldPreparePreviewInBackground(filename)) {
     void previewPromise.then(async () => {
@@ -2433,7 +2449,7 @@ async function loadPreview(): Promise<void> {
       clampSinglePage();
       updateSummary();
     });
-    void applyColorAnalysis(sessionId, selectedFile);
+    void applyColorAnalysis(sessionId, selectedFile, selectedDocumentId);
     syncPageRangeAvailability();
     clampSinglePage();
     updateSummary();
@@ -2443,7 +2459,9 @@ async function loadPreview(): Promise<void> {
 
   await previewPromise;
   await applyDocumentAutoDetection();
-  if (sessionId) await applyColorAnalysis(sessionId, selectedFile);
+  if (sessionId) {
+    await applyColorAnalysis(sessionId, selectedFile, selectedDocumentId);
+  }
   syncPageRangeAvailability();
   clampSinglePage();
   updateSummary();
@@ -2481,13 +2499,16 @@ function resetColorLock(): void {
 async function applyColorAnalysis(
   sessionId: string,
   filename?: string | null,
+  documentId?: string | null,
 ): Promise<void> {
   resetColorLock();
   detectedColorMode = null;
 
-  const analysisParams = new URLSearchParams();
-  if (filename) analysisParams.set('filename', filename);
-  if (sessionToken) analysisParams.set('token', sessionToken);
+  const analysisParams = buildDocumentQuery({
+    filename,
+    documentId,
+    token: sessionToken,
+  });
   const analysisQuery = analysisParams.toString();
   let url = `/api/wireless/sessions/${encodeURIComponent(sessionId)}/color-analysis`;
   if (analysisQuery) url += `?${analysisQuery}`;

@@ -87,7 +87,7 @@ interface WorkerCancelScanResponse {
 
 const PREFERRED_SCANNER_NAME =
   process.env.PRINTBIT_SCANNER_NAME ?? 'EPSON L5290 Series';
-const SCAN_COMMAND_TIMEOUT_MS = 100_000; // 100s (giving 90s worker scan headroom)
+const SCAN_COMMAND_TIMEOUT_MS = 100_000;
 
 let cachedRuntimeStatus: ScannerRuntimeStatus = {
   connected: false,
