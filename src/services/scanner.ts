@@ -85,6 +85,21 @@ interface WorkerCancelScanResponse {
   message?: string;
 }
 
+/**
+ * A failed scan. `code` is the worker's error code (for example FEEDER_EMPTY,
+ * SCAN_TIMEOUT, SCANNER_BUSY), or WORKER_NO_RESPONSE when the worker never
+ * answered. The message is unchanged from the plain Error thrown before.
+ */
+export class ScannerError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'ScannerError';
+  }
+}
+
 const PREFERRED_SCANNER_NAME =
   process.env.PRINTBIT_SCANNER_NAME ?? 'EPSON L5290 Series';
 // Must stay >= worker ScanTimeoutSeconds (90s) + 10s for PDF export, which runs after the
@@ -180,14 +195,15 @@ export class WorkerScannerAdapter implements ScannerAdapter {
     const elapsed = Date.now() - startMs;
 
     if (!resp) {
-      throw new Error(
+      throw new ScannerError(
         'Scan failed: No response received from C# Worker (IPC timeout or disconnected).',
+        'WORKER_NO_RESPONSE',
       );
     }
 
     if (!resp.success || !resp.outputPath) {
       const detail = resp.message || resp.errorCode || 'Unknown scanning error';
-      throw new Error(`Scan failed: ${detail}`);
+      throw new ScannerError(`Scan failed: ${detail}`, resp.errorCode);
     }
 
     console.log(

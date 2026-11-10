@@ -236,14 +236,14 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
             }
         };
 
-        var normPaper = request.PaperSize?.Trim().ToLowerInvariant();
-        options.PageSize = normPaper switch
+        var pageSize = ScanPageSizeResolver.Resolve(request.PaperSize, isFeeder);
+        options.PageSize = pageSize.PageSize;
+        if (pageSize.ClampedToGlass)
         {
-            "a4" => PageSize.A4,
-            "letter" or "short" => isFeeder ? PageSize.Letter : new PageSize(216m, 279m, PageSizeUnit.Millimetre),
-            "legal" or "folio" or "long" => new PageSize(216m, 330m, PageSizeUnit.Millimetre),
-            _ => isFeeder ? null : new PageSize(216m, 297m, PageSizeUnit.Millimetre)
-        };
+            _logger.LogWarning(
+                "[SCANNER] Request {requestId} asked for {paperSize} on the glass; scan area clamped to {width}x{length} mm (glass maximum). Use the feeder for the full sheet.",
+                request.RequestId, request.PaperSize, ScanPageSizeResolver.GlassWidthMm, ScanPageSizeResolver.GlassMaxLengthMm);
+        }
 
         using var deadline = new ScanDeadline(
             TimeSpan.FromSeconds(_settings.ScanTimeoutSeconds),

@@ -228,6 +228,49 @@ export const FLATBED_FAILURE_GUIDE = {
   ],
 } satisfies CopyTroubleshootingGuide;
 
+export const SCANNER_TIMEOUT_GUIDE = {
+  title: 'The scanner took too long to respond',
+  summary:
+    'The scanner did not respond in time. Nothing is wrong with your document.',
+  causes: [
+    'The scanner is still warming up or finishing a previous job.',
+    'The scanner service on the kiosk is restarting.',
+  ],
+  steps: [
+    'Keep your document in place.',
+    'Wait a few seconds, then tap Retry.',
+    'If it keeps happening, ask staff for assistance.',
+  ],
+} satisfies CopyTroubleshootingGuide;
+
+/**
+ * Guide for a failure code sent by POST /api/scan/preview. Returns null for a
+ * missing or unknown code, so the caller can fall back to message matching.
+ */
+export function getCopyTroubleshootingGuideForCode(
+  code: string | null | undefined,
+  usesAdf: boolean,
+): CopyTroubleshootingGuide | null {
+  switch (code) {
+    case 'NO_DOCUMENT':
+      return usesAdf ? ADF_NO_DOCUMENT_GUIDE : FLATBED_NO_DOCUMENT_GUIDE;
+    case 'SCANNER_TIMEOUT':
+      return SCANNER_TIMEOUT_GUIDE;
+    case 'SCANNER_OFFLINE':
+      return ADF_CONNECTION_GUIDE;
+    case 'SCANNER_BUSY':
+      return ADF_BUSY_GUIDE;
+    case 'PAPER_JAM':
+      return usesAdf ? ADF_PAPER_JAM_GUIDE : FLATBED_FAILURE_GUIDE;
+    case 'ADF_ERROR':
+      return ADF_ERROR_GUIDE;
+    case 'SCAN_FAILED':
+      return usesAdf ? ADF_UNKNOWN_GUIDE : FLATBED_FAILURE_GUIDE;
+    default:
+      return null;
+  }
+}
+
 export function isAdfPaperJam(rawMessage: string, usesAdf: boolean): boolean {
   if (!usesAdf) return false;
   const message = rawMessage.toLowerCase();
@@ -263,6 +306,14 @@ export function getCopyTroubleshootingGuide(
 
   if (message.includes('feeder jam')) {
     return ADF_PAPER_JAM_GUIDE;
+  }
+
+  if (
+    message.includes('timed out') ||
+    message.includes('timeout') ||
+    message.includes('no response received')
+  ) {
+    return SCANNER_TIMEOUT_GUIDE;
   }
 
   if (usesAdf) {

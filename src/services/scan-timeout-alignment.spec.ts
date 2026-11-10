@@ -61,4 +61,12 @@ describe('scan timeout alignment (worker, Node, scan page)', () => {
       tsConstant('src/services/scanner.ts', 'SCAN_COMMAND_TIMEOUT_MS'),
     );
   });
+
+  it('copy page pre-scan client timeout stays above the Node IPC timeout', () => {
+    expect(
+      tsConstant('src/public/copy/app.ts', 'COPY_PREVIEW_REQUEST_TIMEOUT_MS'),
+    ).toBeGreaterThan(
+      tsConstant('src/services/scanner.ts', 'SCAN_COMMAND_TIMEOUT_MS'),
+    );
+  });
 });

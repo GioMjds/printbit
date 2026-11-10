@@ -8,6 +8,10 @@ import {
   type PaperSize,
   type PrintScaling,
 } from '../../shared/print-configuration';
+import {
+  computeSheetRender,
+  paintPageOnSheet,
+} from '../shared/print-preview-sheet';
 import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import {
@@ -694,15 +698,16 @@ class PrintPreview {
         const baseVP = page.getViewport({ scale: 1 });
 
         // Fit the rotated source once inside the same target inset used by C#.
-        const layout = calculatePrintLayout(
+        // Shared with the /copy preview (print-preview-sheet.ts).
+        const sheetRender = computeSheetRender(
           baseVP.width,
           baseVP.height,
           config,
+          sheetW,
+          sheetH,
+          window.devicePixelRatio || 1,
         );
-        const dpr = window.devicePixelRatio || 1;
-        const pixelsPerPoint = (sheetW / layout.width) * dpr;
-        const scale = layout.scale * pixelsPerPoint;
-        const viewport = page.getViewport({ scale });
+        const viewport = page.getViewport({ scale: sheetRender.renderScale });
         const sourceCanvas = document.createElement('canvas');
         sourceCanvas.width = Math.max(1, Math.ceil(viewport.width));
         sourceCanvas.height = Math.max(1, Math.ceil(viewport.height));
@@ -710,22 +715,16 @@ class PrintPreview {
           canvasContext: sourceCanvas.getContext('2d')!,
           viewport,
         }).promise;
-        this.canvas.width = Math.max(1, Math.ceil(sheetW * dpr));
-        this.canvas.height = Math.max(1, Math.ceil(sheetH * dpr));
-        const ctx = this.canvas.getContext('2d')!;
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        ctx.save();
-        ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
-        ctx.rotate((config.rotationDeg * Math.PI) / 180);
-        ctx.drawImage(
+        this.canvas.width = sheetRender.canvasWidth;
+        this.canvas.height = sheetRender.canvasHeight;
+        paintPageOnSheet(
+          this.canvas.getContext('2d')!,
+          this.canvas,
           sourceCanvas,
-          -viewport.width / 2,
-          -viewport.height / 2,
           viewport.width,
           viewport.height,
+          sheetRender.rotationRad,
         );
-        ctx.restore();
 
         this.showCanvas(true);
         this.showImg(false);

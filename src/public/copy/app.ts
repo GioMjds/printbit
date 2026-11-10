@@ -9,7 +9,19 @@ import {
   destroyPdfLoadingTask,
   type PdfLoadingTask,
 } from '../shared/pdfjs-loading-task-cleanup';
-import { getCopyTroubleshootingGuide } from './troubleshooting';
+import {
+  getCopyTroubleshootingGuide,
+  getCopyTroubleshootingGuideForCode,
+} from './troubleshooting';
+import { PAPER_POINTS } from '../../shared/print-configuration';
+import { detectPaperSizeFromDimensions } from '../config/geometry-detection';
+import { fetchWithTimeout } from '../shared/fetch-with-timeout';
+import {
+  computeSheetRender,
+  defaultCopyLayout,
+  fitSheetInBox,
+  paintPageOnSheet,
+} from '../shared/print-preview-sheet';
 import { attachUiBlockingOverlay } from '../shared/ui-blocking-overlay';
 import { initPrinterGuard } from '@/guards/printer-guard';
 
@@ -316,6 +328,9 @@ let previewPath: string | null = null;
 let previewReleaseToken: string | null = null;
 let previewObjectUrl: string | null = null;
 const RELEASE_TIMEOUT_MS = 1_500;
+// Must stay above Node's SCAN_COMMAND_TIMEOUT_MS (100 s) so the server's more
+// specific error normally wins. Guarded by scan-timeout-alignment.spec.ts.
+const COPY_PREVIEW_REQUEST_TIMEOUT_MS = 110_000;
 
 
 function sanitizeUserFacingError(rawMessage: string): string {
@@ -359,12 +374,20 @@ function hideCopyTroubleshooting(): void {
   currentVisualGuideKind = null;
 }
 
-function showCopyTroubleshooting(rawMessage: string, usesAdf: boolean): string {
+function showCopyTroubleshooting(
+  rawMessage: string,
+  usesAdf: boolean,
+  code?: string,
+): string {
   const isAdfRelated =
     usesAdf ||
     rawMessage.toLowerCase().includes("adf") ||
     rawMessage.toLowerCase().includes("feeder");
-  const guide = getCopyTroubleshootingGuide(rawMessage, isAdfRelated);
+  // The server's failure code is exact. Message matching is the fallback for
+  // socket events and older responses.
+  const guide =
+    getCopyTroubleshootingGuideForCode(code, usesAdf) ??
+    getCopyTroubleshootingGuide(rawMessage, isAdfRelated);
   const safeMessage = sanitizeUserFacingError(rawMessage);
   const userFacingMessage = guide.summary || safeMessage;
 
@@ -494,8 +517,8 @@ function setPreviewBlockedByError(blocked: boolean): void {
   errorBanner?.closest('.preview-col')?.classList.toggle('has-error', blocked);
 }
 
-function showError(msg: string, usesAdf = false): void {
-  const safeMessage = showCopyTroubleshooting(msg, usesAdf);
+function showError(msg: string, usesAdf = false, code?: string): void {
+  const safeMessage = showCopyTroubleshooting(msg, usesAdf, code);
   setPreviewBlockedByError(true);
   if (errorBanner) errorBanner.style.display = '';
   if (errorText) errorText.textContent = safeMessage;
@@ -614,27 +637,50 @@ async function renderPdfPreview(buf: ArrayBuffer): Promise<void> {
     const firstPage = await pdfDoc.getPage(1);
     const baseViewport = firstPage.getViewport({ scale: 1 });
 
-    const paperWidth = Math.max((previewPaper?.clientWidth ?? 840) - 24, 240);
-    const paperHeight = Math.max(
-      (previewPaper?.clientHeight ?? 1188) - 24,
-      320,
+    const boxWidth = Math.max((previewPaper?.clientWidth ?? 840) - 24, 240);
+    const boxHeight = Math.max((previewPaper?.clientHeight ?? 1188) - 24, 320);
+
+    // Same sheet layout as the /config preview and the printed page: the scan
+    // is placed on the paper with the print margins, not stretched edge to edge.
+    const layoutConfig = defaultCopyLayout(
+      detectPaperSizeFromDimensions(baseViewport.width, baseViewport.height) ??
+        getSelectedCopyPaperSize(),
+      baseViewport.width,
+      baseViewport.height,
     );
-    const dpr = window.devicePixelRatio || 1;
-    const scale =
-      Math.min(
-        paperWidth / baseViewport.width,
-        paperHeight / baseViewport.height,
-      ) * dpr;
-    const viewport = firstPage.getViewport({ scale });
+    const [paperW, paperH] = PAPER_POINTS[layoutConfig.paperSize];
+    const sheet =
+      layoutConfig.orientation === 'landscape'
+        ? fitSheetInBox(paperH, paperW, boxWidth, boxHeight)
+        : fitSheetInBox(paperW, paperH, boxWidth, boxHeight);
+    const sheetRender = computeSheetRender(
+      baseViewport.width,
+      baseViewport.height,
+      layoutConfig,
+      sheet.width,
+      sheet.height,
+      window.devicePixelRatio || 1,
+    );
+    const viewport = firstPage.getViewport({ scale: sheetRender.renderScale });
 
-    previewCanvas.width = Math.floor(viewport.width);
-    previewCanvas.height = Math.floor(viewport.height);
-
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = Math.max(1, Math.ceil(viewport.width));
+    sourceCanvas.height = Math.max(1, Math.ceil(viewport.height));
+    const sourceCtx = sourceCanvas.getContext('2d');
     const ctx = previewCanvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas context unavailable');
+    if (!sourceCtx || !ctx) throw new Error('Canvas context unavailable');
+    await firstPage.render({ canvasContext: sourceCtx, viewport }).promise;
 
-    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-    await firstPage.render({ canvasContext: ctx, viewport }).promise;
+    previewCanvas.width = sheetRender.canvasWidth;
+    previewCanvas.height = sheetRender.canvasHeight;
+    paintPageOnSheet(
+      ctx,
+      previewCanvas,
+      sourceCanvas,
+      viewport.width,
+      viewport.height,
+      sheetRender.rotationRad,
+    );
 
     if (previewImageStage) previewImageStage.style.display = 'none';
     previewCanvas.style.display = 'block';
@@ -769,15 +815,21 @@ async function checkForDocument(): Promise<void> {
   if (clearRescanBtn) clearRescanBtn.disabled = true;
 
   try {
-    const res = await fetch('/api/scan/preview', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paperSize }),
-    });
+    const res = await fetchWithTimeout(
+      '/api/scan/preview',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paperSize }),
+      },
+      COPY_PREVIEW_REQUEST_TIMEOUT_MS,
+      'Document check',
+    );
     const data = (await res.json()) as {
-      detected: boolean;
+      detected?: boolean;
       previewPath?: string;
       releaseToken?: string;
+      code?: string;
       error?: string;
     };
 
@@ -806,13 +858,27 @@ async function checkForDocument(): Promise<void> {
         getSelectedCopySource() === "feeder" ||
         (data.error ?? "").toLowerCase().includes("adf") ||
         (data.error ?? "").toLowerCase().includes("feeder");
-      showError(data.error ?? "No document detected.", isUsingAdf);
+      // No "No document detected" default: a response without an error text
+      // is a server-side failure, not an empty scanner.
+      showError(
+        data.error ?? 'Could not complete scanner check. Please try again.',
+        isUsingAdf,
+        data.code ?? (data.error ? undefined : 'SCAN_FAILED'),
+      );
     }
-  } catch {
+  } catch (error) {
     showOverlay(false);
     setCopySourceRadiosDisabled(false);
     const isUsingAdf = getSelectedCopySource() === 'feeder';
-    showError('Could not reach the scanner. Please try again.', isUsingAdf);
+    const timedOut =
+      error instanceof Error && error.message.includes('timed out');
+    showError(
+      timedOut
+        ? error.message
+        : 'Could not reach the scanner. Please try again.',
+      isUsingAdf,
+      timedOut ? 'SCANNER_TIMEOUT' : 'SCANNER_OFFLINE',
+    );
   } finally {
     setBackNavigationLocked(false);
     if (checkDocBtn) checkDocBtn.disabled = false;

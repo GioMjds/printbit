@@ -40,6 +40,14 @@ import {
   prepareScanRotationArtifact,
 } from '@/services/document-rotation';
 import type { Server as SocketIOServer } from 'socket.io';
+import {
+  buildCopyPreviewScanSettings,
+  resolveScannerDpi,
+} from './copy-preview-settings';
+import {
+  describeScanPreviewFailure,
+  type ScanPreviewFailureCode,
+} from './scan-preview-failure';
 
 const VALID_SOURCES = new Set(['adf', 'flatbed']);
 const VALID_DPI = new Set([150, 300, 600]);
@@ -66,9 +74,6 @@ function normalizeScannerPaperSize(paperSize: string): ScannerPaperSize {
   if (paperSize === 'Legal' || paperSize === 'Long') return 'Long';
   return 'A4';
 }
-
-const toCopyPreviewSource = (paperSize: ScannerPaperSize): 'adf' | 'flatbed' =>
-  paperSize === 'Long' ? 'adf' : 'flatbed';
 
 // The worker's stub scanner names its output `stub-scan-*` and writes plain
 // text, so flag it instead of letting it pass as a real scan.
@@ -194,12 +199,7 @@ export class ScannerService {
     service: 'copy' | 'scan',
     source: 'flatbed' | 'adf' | 'glass' | 'feeder',
   ): SupportedDpi {
-    const isAdf = source === 'adf' || source === 'feeder';
-    const cfg = db.data?.settings?.scannerDpi;
-    if (service === 'copy') {
-      return isAdf ? (cfg?.copyAdf ?? 300) : (cfg?.copyGlass ?? 300);
-    }
-    return isAdf ? (cfg?.scanAdf ?? 300) : (cfg?.scanGlass ?? 300);
+    return resolveScannerDpi(db.data?.settings?.scannerDpi, service, source);
   }
 
   private toScanSource(source: ScannerPageSource): 'flatbed' | 'adf' {
@@ -870,30 +870,24 @@ export class ScannerService {
     previewPath?: string;
     releaseToken?: string;
     pageCount?: number;
+    code?: ScanPreviewFailureCode;
     error?: string;
   }> {
     if (!VALID_PAPER_SIZES.has(paperSize)) {
       throw new Error('Invalid paperSize. Accepted: "A4", "Short", "Long"');
     }
 
-    const normalizedPaperSize = normalizeScannerPaperSize(paperSize);
-    const source = toCopyPreviewSource(normalizedPaperSize);
-    // Preview scan only needs 300 DPI layout verification to minimize ADF feed and transfer time
-    const dpi = 300;
+    // The pre-scan file is the one that gets printed, so it honors the admin
+    // copy DPI (Admin > scanner DPI) instead of a fixed value.
+    const previewSettings = buildCopyPreviewScanSettings(
+      normalizeScannerPaperSize(paperSize),
+      db.data?.settings?.scannerDpi,
+    );
+    const { source, dpi } = previewSettings;
 
     console.log(
       `[SCAN-PREVIEW] Starting copy pre-scan (${source}, ${dpi} DPI color, maxPages: 1)...`,
     );
-
-    const previewSettings = {
-      source,
-      dpi,
-      colorMode: 'colored' as const,
-      duplex: false,
-      format: 'pdf' as const,
-      paperSize: normalizedPaperSize,
-      maxPages: 1,
-    };
 
     try {
       const simulation = getPrinterSimulationState();
@@ -923,20 +917,26 @@ export class ScannerService {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error(`[SCAN-PREVIEW] ✗ Preview scan failed: ${message}`);
+      const failure = describeScanPreviewFailure(err, source);
+      console.error(
+        `[SCAN-PREVIEW] ✗ Preview scan failed (${failure.code}): ${message}`,
+      );
 
       void adminService.appendAdminLog(
         'scan_preview_failed',
         'Preview scan failed.',
         {
           error: message,
+          code: failure.code,
+          source,
+          dpi,
         },
       );
 
       return {
         detected: false,
-        error:
-          'No document detected. Place your document face-down on the scanner glass and try again.',
+        code: failure.code,
+        error: failure.error,
       };
     }
   }
