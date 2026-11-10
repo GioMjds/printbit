@@ -1,5 +1,6 @@
 import { initializePageIdleTimeout } from '@/services/idle-timeout';
 import { initKioskLocalization } from '../shared/kiosk-i18n';
+import { fetchWithTimeout } from '../shared/fetch-with-timeout';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import { mountLoadingAnimation } from '../shared/loading-animation';
 import {
@@ -243,6 +244,10 @@ interface ScannerDpiSettings {
 }
 
 let configuredScannerDpi: ScannerDpiSettings | null = null;
+
+// Server waits up to 100s for the worker (SCAN_COMMAND_TIMEOUT_MS in src/services/scanner.ts).
+// Stay above it so the server's more specific error normally wins.
+const SCAN_REQUEST_TIMEOUT_MS = 110_000;
 
 const SCAN_SOURCE: ScanSource = 'feeder';
 const SCAN_COLOR: ScanColor = 'color';
@@ -845,17 +850,22 @@ async function startScan(): Promise<void> {
   try {
     const selectedSource = getSelectedScanSource();
     SCAN_DPI = resolveScanDpi(selectedSource);
-    const res = await fetch('/api/scanner/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source: selectedSource,
-        color: SCAN_COLOR,
-        dpi: SCAN_DPI,
-        paperSize,
-        format: scanFormat,
-      }),
-    });
+    const res = await fetchWithTimeout(
+      '/api/scanner/scan',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: selectedSource,
+          color: SCAN_COLOR,
+          dpi: SCAN_DPI,
+          paperSize,
+          format: scanFormat,
+        }),
+      },
+      SCAN_REQUEST_TIMEOUT_MS,
+      'Scan',
+    );
 
     clearInterval(progTimer);
 

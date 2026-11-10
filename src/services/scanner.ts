@@ -87,6 +87,8 @@ interface WorkerCancelScanResponse {
 
 const PREFERRED_SCANNER_NAME =
   process.env.PRINTBIT_SCANNER_NAME ?? 'EPSON L5290 Series';
+// Must stay >= worker ScanTimeoutSeconds (90s) + 10s for PDF export, which runs after the
+// scan deadline. Guarded by scan-timeout-alignment.spec.ts.
 const SCAN_COMMAND_TIMEOUT_MS = 100_000;
 
 let cachedRuntimeStatus: ScannerRuntimeStatus = {

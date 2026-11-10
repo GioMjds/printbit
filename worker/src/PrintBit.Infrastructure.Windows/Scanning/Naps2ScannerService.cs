@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NAPS2.Images;
@@ -16,6 +16,7 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
     private readonly StubScannerService _stubService;
     private readonly ScanningContext _scanningContext;
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeScans = new();
+    private readonly ScanGate _scanGate = new();
 
     private ScannerRuntimeStatus _lastKnownStatus;
     private ScanDevice? _selectedDevice;
@@ -76,7 +77,17 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
                 var controller = new ScanController(_scanningContext);
-                var devices = await controller.GetDeviceList(driver);
+                var devices = new List<ScanDevice>();
+
+                // GetDeviceList(driver) takes no token, so a TWAIN hang would block forever.
+                // GetDevices honors the token, and WaitAsync abandons a driver that ignores it.
+                await Task.Run(async () =>
+                {
+                    await foreach (var device in controller.GetDevices(driver, linkedCts.Token))
+                    {
+                        devices.Add(device);
+                    }
+                }, linkedCts.Token).WaitAsync(linkedCts.Token);
 
                 if (devices.Count > 0)
                 {
@@ -136,6 +147,40 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
     }
 
     public async Task<ScanResult> ExecuteScanAsync(ScanRequest request, CancellationToken cancellationToken = default)
+    {
+        using var gate = _scanGate.TryEnter();
+        if (gate == null)
+        {
+            _logger.LogWarning("[SCANNER] Rejected scan request {requestId}: another scan is already in progress", request.RequestId);
+            return new ScanResult
+            {
+                Success = false,
+                ErrorCode = "SCANNER_BUSY",
+                ErrorMessage = "Another scan is already in progress"
+            };
+        }
+
+        var result = await ExecuteScanCoreAsync(request, cancellationToken);
+        if (!result.Success && ScanFailurePolicy.ShouldInvalidateDevice(result.ErrorCode))
+        {
+            InvalidateCachedDevice(result.ErrorCode!);
+        }
+
+        return result;
+    }
+
+    private void InvalidateCachedDevice(string reason)
+    {
+        _logger.LogWarning("[SCANNER] Clearing cached scanner device after {reason}; next scan will re-probe", reason);
+        _selectedDevice = null;
+        _lastKnownStatus = _lastKnownStatus with
+        {
+            Connected = false,
+            LastError = $"Cached device cleared after {reason}"
+        };
+    }
+
+    private async Task<ScanResult> ExecuteScanCoreAsync(ScanRequest request, CancellationToken cancellationToken)
     {
         // Reuse known connected status if fresh to avoid probing overhead
         var status = (_lastKnownStatus.Connected && !string.IsNullOrWhiteSpace(_lastKnownStatus.DeviceName) && _selectedDevice != null)
@@ -200,9 +245,12 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
             _ => isFeeder ? null : new PageSize(216m, 297m, PageSizeUnit.Millimetre)
         };
 
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.ScanTimeoutSeconds));
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-        _activeScans[request.RequestId] = linkedCts;
+        using var deadline = new ScanDeadline(
+            TimeSpan.FromSeconds(_settings.ScanTimeoutSeconds),
+            TimeSpan.FromSeconds(_settings.ScanPageTimeoutSeconds),
+            cancellationToken);
+        using var cancelCts = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
+        _activeScans[request.RequestId] = cancelCts;
 
         var controller = new ScanController(_scanningContext);
         var images = new List<ProcessedImage>();
@@ -215,11 +263,12 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
                 "[SCANNER] Starting NAPS2.Sdk scan for request {requestId} ({source}, {dpi} DPI, {color}, maxPages: {maxPages}, device: {device})",
                 request.RequestId, request.Source, options.Dpi, request.ColorMode, request.MaxPages, _selectedDevice.Name);
 
-            await foreach (var image in controller.Scan(options, linkedCts.Token))
+            await foreach (var image in controller.Scan(options, cancelCts.Token))
             {
                 var pageElapsed = sw.ElapsedMilliseconds - lastPageMs;
                 lastPageMs = sw.ElapsedMilliseconds;
                 images.Add(image);
+                deadline.PageCompleted();
                 _logger.LogInformation(
                     "[SCANNER] Page {page} scanned in {pageMs}ms (total: {totalMs}ms) for request {requestId}",
                     images.Count, pageElapsed, sw.ElapsedMilliseconds, request.RequestId);
@@ -273,14 +322,16 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
             _logger.LogWarning("[SCANNER] Scan execution cancelled or timed out after {duration}ms for request {requestId}", sw.ElapsedMilliseconds, request.RequestId);
             if (File.Exists(outputPath)) File.Delete(outputPath);
 
-            var code = timeoutCts.IsCancellationRequested ? "SCAN_TIMEOUT" : "CANCELLED";
+            var (code, message) = deadline.OverallExpired
+                ? ("SCAN_TIMEOUT", $"Scan timed out after {_settings.ScanTimeoutSeconds} seconds")
+                : deadline.PageExpired
+                    ? ("SCAN_PAGE_TIMEOUT", $"Scan timed out: no page received for {_settings.ScanPageTimeoutSeconds} seconds (page {images.Count + 1})")
+                    : ("CANCELLED", "Scan cancelled");
             return new ScanResult
             {
                 Success = false,
                 ErrorCode = code,
-                ErrorMessage = timeoutCts.IsCancellationRequested
-                    ? $"Scan timed out after {_settings.ScanTimeoutSeconds} seconds"
-                    : "Scan cancelled",
+                ErrorMessage = message,
                 DurationMs = sw.ElapsedMilliseconds
             };
         }

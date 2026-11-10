@@ -7,6 +7,7 @@ public sealed class ScannerSettings
     public string PreferredDriver { get; set; } = "twain";
     public string ScanOutputDir { get; set; } = @"uploads\scans";
     public int ScanTimeoutSeconds { get; set; } = 90;
+    public int ScanPageTimeoutSeconds { get; set; } = 45;
     public int ProbeTimeoutSeconds { get; set; } = 8;
     public bool EnableStubFallback { get; set; } = true;
 }

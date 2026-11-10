@@ -3,7 +3,7 @@
 Date: 2026-11-10
 Version audited: v1.3.4
 Scope: `/print`, `/upload`, `/copy`, `/scan`, `/config`, `/confirm`, the Node/Express server, the C# Worker Service, and the ESP32 firmware.
-Status: **Investigation only. No project files were modified during the audit.**
+Status: **The audit itself was investigation only. Afterwards, the `/upload` findings that are bugs (not policy or hardware decisions) were fixed. See [Remediation log: `/upload`](#remediation-log-upload). None of the fixes has been tested on the real kiosk.**
 
 ## How to read this
 
@@ -21,6 +21,7 @@ Severity: **HIGH** (money, data loss, or a feature that fails), **MED** (degrade
 - Jest: 12 suites, 122 tests, all passing.
 - Dev database snapshot: `runtime_state` is 44,100 bytes; 26 upload sessions; 39 documents; 1,575 admin log rows.
 - Every `coin_accepted` log entry (37) is a simulated coin. There is no evidence of a real coin being tested.
+- After the `/upload` remediation: `tsc --noEmit` clean, Jest 19 suites and 181 tests all passing, and `scripts/build-client.js` succeeds.
 
 ---
 
@@ -37,19 +38,19 @@ Severity: **HIGH** (money, data loss, or a feature that fails), **MED** (degrade
 
 ## 2. `/upload` (phone upload portal)
 
-| Sev  | Tag | Finding                                                                                                                                                            | Location                                                               |
-| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| HIGH | C   | The ESP32 access point uses the default 4 stations on fixed channel 1. If the kiosk PC is one client, only about 3 phones fit.                                     | `esp32-softAP.ino:2419`                                                |
-| HIGH | E   | Uploads are rejected (503) whenever Defender reports unavailable. The log shows 7 rejected `.docx`/`.pdf` uploads on 2026-10-18. The gate is fail-closed.          | `src/middleware/file-validation.ts:955`                                |
-| MED  | C   | Any PDF whose first 4 MB contains `/JavaScript`, `/Launch`, or an `/OpenAction` with Launch is rejected and quarantined. This hits many legitimate fillable forms. | `src/middleware/file-validation.ts:686-714`                            |
-| MED  | C   | Unsupported files (for example `.xlsx`, `.pptx`, `.txt`) show an error but are still queued as "Ready to send", then rejected by the server.                       | `src/public/upload/app.ts:730`                                         |
-| MED  | C   | The summary says "You can retry failed items", but failed items never return to pending, and re-adding the same file hits the duplicate-hash check.                | `:739`, `:1092`                                                        |
-| MED  | C   | The upload rate limit is 10 per minute per IP, the same as the 10-file session cap, so any retry returns 429. All phones may share an IP behind the tunnel.        | `wireless-session.controller.ts:23`, `src/middleware/rate-limit.ts:21` |
-| MED  | C   | Each upload spawns `MpCmdRun.exe`, plus PowerShell when the 60 s health cache is cold. Progress stays at 90% meanwhile.                                            | `src/services/defender-scanner.ts:253`, `:387`                         |
-| MED  | C   | The whole file is hashed in the browser before queueing (`sha256File`). Large files freeze the phone briefly. The XHR has no timeout.                              | `src/public/upload/app.ts`                                             |
-| LOW  | C   | Several rejection paths (too large, max files, size limit, unsupported type, bad token) keep the staged file and quota for up to 1 hour.                           | `src/services/session.ts:359-398`                                      |
-| LOW  | C   | The preview endpoint looks up a document by `filename`, not `documentId`. Two files with the same name show the first one.                                         | `wireless-session.service.ts:432`                                      |
-| LOW  | C   | `AnalysisFailed` carries the document UUID as the filename, so the kiosk shows a UUID.                                                                             | `wireless-session.service.ts:1195-1199`                                |
+| Sev  | Tag | Finding                                                                                                                                                                                                               | Location                                                               |
+| ---- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| HIGH | C   | The ESP32 access point uses the default 4 stations on fixed channel 1. If the kiosk PC is one client, only about 3 phones fit.                                                                                        | `esp32-softAP.ino:2419`                                                |
+| HIGH | E   | Uploads are rejected (503) whenever Defender reports unavailable. The log shows 7 rejected `.docx`/`.pdf` uploads on 2026-10-18. The gate is fail-closed.                                                             | `src/middleware/file-validation.ts:955`                                |
+| MED  | C   | Any PDF whose first 4 MB contains `/JavaScript`, `/Launch`, or an `/OpenAction` with Launch is rejected and quarantined. This hits many legitimate fillable forms.                                                    | `src/middleware/file-validation.ts:686-714`                            |
+| MED  | C   | **Fixed.** Unsupported files (for example `.xlsx`, `.pptx`, `.txt`) show an error but are still queued as "Ready to send", then rejected by the server.                                                               | `src/public/upload/app.ts:730`                                         |
+| MED  | C   | **Fixed.** The summary says "You can retry failed items", but failed items never return to pending, and re-adding the same file hits the duplicate-hash check.                                                        | `:739`, `:1092`                                                        |
+| MED  | C   | **Partly fixed** (limit raised to 30; still keyed by IP). The upload rate limit is 10 per minute per IP, the same as the 10-file session cap, so any retry returns 429. All phones may share an IP behind the tunnel. | `wireless-session.controller.ts:23`, `src/middleware/rate-limit.ts:21` |
+| MED  | C   | Each upload spawns `MpCmdRun.exe`, plus PowerShell when the 60 s health cache is cold. Progress stays at 90% meanwhile.                                                                                               | `src/services/defender-scanner.ts:253`, `:387`                         |
+| MED  | C   | **Fixed** (XHR timeout; unsupported and oversize files are no longer hashed). The whole file is hashed in the browser before queueing (`sha256File`). Large files freeze the phone briefly. The XHR has no timeout.   | `src/public/upload/app.ts`                                             |
+| LOW  | C   | **Fixed.** Several rejection paths (too large, max files, size limit, unsupported type, bad token) keep the staged file and quota for up to 1 hour.                                                                   | `src/services/session.ts:359-398`                                      |
+| LOW  | C   | **Fixed.** The preview endpoint looks up a document by `filename`, not `documentId`. Two files with the same name show the first one.                                                                                 | `wireless-session.service.ts:432`                                      |
+| LOW  | C   | **Fixed.** `AnalysisFailed` carries the document UUID as the filename, so the kiosk shows a UUID.                                                                                                                     | `wireless-session.service.ts:1195-1199`                                |
 
 Supported types are PDF, DOC, DOCX, JPG, JPEG, PNG, GIF, WebP and BMP. The type validation itself (magic bytes, OOXML structure, macro and zip-bomb checks) is sound.
 
@@ -184,10 +185,55 @@ Follow the systematic-debugging rule: no fix without a confirmed root cause, one
 
 - Re-enable session expiry and add cleanup.
 - Cap the ledger or move it to its own table.
-- Fix the upload page queue filter and retry.
-- Release staged files and quota on early failures.
+- ~~Fix the upload page queue filter and retry.~~ Done.
+- ~~Release staged files and quota on early failures.~~ Done.
 - Decide the PDF JavaScript policy.
 - Close old sockets on session refresh.
+
+---
+
+## Remediation log: `/upload`
+
+Date: 2026-11-10. Method: systematic debugging. Each root cause was confirmed in the code, a failing test was written first, then one fix was made. Nothing is committed yet, and nothing has been tried on the real kiosk or on a phone.
+
+### Fixed
+
+| Finding                                             | Root cause                                                                                                                                                                                               | Fix                                                                                                                                                                                                                     | Files                                                                                                   |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Unsupported files queued after an error             | The error message and the queue loop used different checks. The loop only skipped a file when its normalized MIME type was null, so `text/plain`, the `.xlsx` and `.pptx` MIME types and similar passed. | One `classifyUploadFile` check now decides both the message and queue entry. It also rejects files over 25 MB before they are read or hashed.                                                                           | `src/public/upload/upload-queue.ts`, `app.ts`                                                           |
+| Retry does not work                                 | Only `pending` items were ever sent, and the duplicate check counted failed items.                                                                                                                       | Transient failures (network error, timeout, 429, 5xx, `SCAN_UNAVAILABLE`, `SCAN_FAILED`) stay sendable, so Send retries them. Failed items no longer count as duplicates. The summary says whether a retry is possible. | `upload-queue.ts`, `app.ts`                                                                             |
+| Hashing freeze, XHR without timeout                 | Unsupported or huge files were read fully into memory before any check. The XHR had no `timeout`, `abort` or `timeout` handler, so a stalled request never finished and blocked the queue.               | Size and type checks run before hashing. The XHR has a 180 s timeout (above the 60 s Defender scan timeout) and `abort` and `timeout` handlers. `sendFile` always resolves. A plain-text 429 now shows a clear message. | `upload-queue.ts`, `app.ts`                                                                             |
+| Rate limit blocks retries                           | 10 per minute per IP, equal to the 10-file session cap.                                                                                                                                                  | Raised to 30 per minute as a named constant.                                                                                                                                                                            | `src/modules/wireless-session/upload-rate-limit.ts`, `wireless-session.controller.ts`                   |
+| Rejected uploads hold staged file and quota         | `storeUpload` only discarded the staged file on the duplicate path.                                                                                                                                      | `uploadToSession` now discards the staged file on every failure.                                                                                                                                                        | `wireless-session.service.ts`                                                                           |
+| `AnalysisFailed` shows a UUID                       | The event was sent with `filename: job.documentId`.                                                                                                                                                      | The event now carries the real filename and falls back to the id only if the document is gone.                                                                                                                          | `wireless-session.service.ts`                                                                           |
+| Preview shows the wrong file for same-named uploads | Lookup by `filename` always returned the first match.                                                                                                                                                    | The preview endpoint accepts `?documentId=`, and the config page now sends it. `?filename=` still works for older clients.                                                                                              | `document-selection.ts`, `wireless-session.service.ts`, `src/public/config/app.ts`, `document-query.ts` |
+
+### New finding, found and fixed during the work
+
+| Sev | Tag | Finding                                                                                                                                                                                                    | Fix                                                                                                          |
+| --- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| MED | C   | `/api/wireless/sessions/:id/color-analysis` had the same filename lookup as the preview. With two same-named uploads, the wrong file fed color detection, which sets the default color mode and the price. | Same shared `selectRequestedDocument` helper, and the config page sends `documentId` for color analysis too. |
+
+An unknown `documentId` returns "not found" (preview) or the default color result (color analysis). It never falls back to a different document.
+
+### Tests added
+
+- `src/public/upload/upload-queue.spec.ts` (28 tests)
+- `src/modules/wireless-session/wireless-session.service.spec.ts` (staged-file release, `AnalysisFailed` filename, preview by `documentId`, color-analysis by `documentId`)
+- `src/modules/wireless-session/upload-rate-limit.spec.ts`
+- `src/modules/wireless-session/document-selection.spec.ts`
+- `src/public/config/document-query.spec.ts`
+
+### Not fixed (needs a decision or a real-device test)
+
+| Finding                                                                  | Why it is left open                                                        | Recommendation                                                                                    |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Defender unavailable gives a 503                                         | Fail policy is a security decision. The cause of "unavailable" is unknown. | Keep fail-closed. Find why Defender reports unavailable (`npm run defender:verify` on the kiosk). |
+| PDFs with `/JavaScript` or `/Launch` are rejected                        | Security trade-off.                                                        | Stop rejecting `/JavaScript` alone, because it hits fillable forms. Keep `/Launch`.               |
+| Defender cost per upload (`MpCmdRun.exe`, cold PowerShell)               | Needs measurement on the real kiosk.                                       | Measure first, then decide.                                                                       |
+| ESP32 access point (4 stations, channel 1)                               | Firmware change that cannot be verified without the device.                | Run the 5-phone test from Step 1, then raise the max connection count.                            |
+| Rate limit is keyed by IP                                                | Phones behind the Cloudflare tunnel may still share one bucket.            | Revisit after the tunnel path is tested.                                                          |
+| `buildDocxSourcePreviewUrl` in `office-preview.ts` still uses `filename` | Nothing calls it.                                                          | Update it if it is ever used.                                                                     |
 
 ---
 
