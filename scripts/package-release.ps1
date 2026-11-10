@@ -65,6 +65,9 @@ if (-not $SkipBuild) {
 if (-not (Test-Path (Join-Path $ProjectDir "dist\server.js"))) {
     throw "dist\server.js does not exist. Run build before packaging."
 }
+if (-not (Test-Path (Join-Path $ProjectDir "dist\document-analysis-worker.js"))) {
+    throw "dist\document-analysis-worker.js does not exist. Run build before packaging."
+}
 
 # 3. Build & Publish C# Hardware Worker Service
 if (-not $SkipWorker) {
@@ -101,6 +104,8 @@ Write-Host "[4/6] Copying application assets and scripts to staging directory...
 
 # 4.1 Server bundle
 Copy-Item (Join-Path $ProjectDir "dist\server.js") -Destination (Join-Path $StagingDir "dist\server.js") -Force
+# Analysis worker thread bundle. Without it the server analyzes PDFs on the main thread.
+Copy-Item (Join-Path $ProjectDir "dist\document-analysis-worker.js") -Destination (Join-Path $StagingDir "dist\document-analysis-worker.js") -Force
 
 # 4.2 Public assets, HTML, bundled JS, styles
 Copy-Item -Path (Join-Path $ProjectDir "src\public") -Destination (Join-Path $StagingDir "src\public") -Recurse -Force

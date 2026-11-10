@@ -20,6 +20,7 @@ import {
 } from '@/core/database/sqlite-storage';
 import { discardStagedUpload, promoteStagedUpload } from '@/services/upload-staging';
 import type { CoverageTier } from '@/core/database/models/admin.model';
+import { MIN_CONTENT_COVERAGE_THRESHOLD } from '@/config/document-analysis.config';
 export { CoverageTier };
 
 export interface PageAnalysis {
@@ -969,7 +970,7 @@ export class SessionStore {
       const isBlank =
         typeof pageCandidate.isBlank === 'boolean'
           ? pageCandidate.isBlank
-          : (contentCoverage ?? coverage) < 0.001;
+          : (contentCoverage ?? coverage) < MIN_CONTENT_COVERAGE_THRESHOLD;
       const isColor = pageCandidate.isColor === true;
       const coverageTier: CoverageTier =
         pageCandidate.coverageTier === 'low' ||

@@ -10,15 +10,19 @@ const nativePackages = [
   'argon2',
 ];
 
+// The analysis worker is a separate bundle: the server starts it in a worker
+// thread, so it must not contain (and re-run) the server itself.
 const args = [
   'src/server.ts',
+  'src/services/document-analysis-worker.ts',
   '--bundle',
   '--platform=node',
   '--format=cjs',
   ...(nativePackages.map((pkg) => `--external:${pkg}`)),
   '--packages=external',
   '--target=node22',
-  '--outfile=dist/server.js',
+  '--outdir=dist',
+  '--entry-names=[name]',
 ];
 
 const fullCommand = `"${esbuildPath}" ${args.join(' ')}`;

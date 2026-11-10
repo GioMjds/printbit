@@ -3,7 +3,7 @@
 Date: 2026-11-10
 Version audited: v1.3.4
 Scope: `/print`, `/upload`, `/copy`, `/scan`, `/config`, `/confirm`, the Node/Express server, the C# Worker Service, and the ESP32 firmware.
-Status: **The audit itself was investigation only. Afterwards, the `/upload` findings that are bugs (not policy or hardware decisions) were fixed, then the `/print` client findings, and the `/scan` timeout and worker findings. See [Remediation log: `/upload`](#remediation-log-upload), [Remediation log: `/print`](#remediation-log-print) and [Remediation log: `/scan`](#remediation-log-scan). None of the fixes has been tested on the real kiosk.**
+Status: **The audit itself was investigation only. Afterwards, the `/upload` findings that are bugs (not policy or hardware decisions) were fixed, then the `/print` client findings, the `/scan` timeout and worker findings, and all nine `/config` findings. See [Remediation log: `/upload`](#remediation-log-upload), [Remediation log: `/print`](#remediation-log-print), [Remediation log: `/scan`](#remediation-log-scan) and [Remediation log: `/config`](#remediation-log-config). None of the fixes has been tested on the real kiosk.**
 
 ## How to read this
 
@@ -22,6 +22,7 @@ Severity: **HIGH** (money, data loss, or a feature that fails), **MED** (degrade
 - Dev database snapshot: `runtime_state` is 44,100 bytes; 26 upload sessions; 39 documents; 1,575 admin log rows.
 - Every `coin_accepted` log entry (37) is a simulated coin. There is no evidence of a real coin being tested.
 - After the `/upload` remediation: `tsc --noEmit` clean, Jest 19 suites and 181 tests all passing, and `scripts/build-client.js` succeeds.
+- After the `/config` remediation: `tsc --noEmit` clean, Jest 21 suites and 176 tests all passing, `dotnet test` 75 tests all passing, and both `scripts/build-client.js` and `scripts/build-server.js` succeed.
 
 ---
 
@@ -82,19 +83,19 @@ Scan log counts: `scan_failed` 40, `scan_completed` 4, `scan_soft_copy_charged` 
 
 ## 5. `/config` (preview accuracy, pricing, detection)
 
-| Sev  | Tag | Finding                                                                                                                                                            | Location                                                                         |
-| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| HIGH | C   | Phone photos with EXIF rotation print sideways compared with the preview. The browser honors EXIF; `ImageToPdfConverter` does not.                                 | `worker/.../DocumentConversion/ImageToPdfConverter.cs:61-67`                     |
-| HIGH | C   | Two color detectors can disagree. An operator-list detector sets the default color mode in the UI. A pixel-based detector sets the price.                          | `src/services/color-detection.ts:305` vs `src/services/document-analysis.ts:357` |
-| HIGH | C   | PDF analysis renders every page on the Node main thread. The worker-thread entry point is dead code. Coins, sockets and HTTP stall during large documents.         | `document-analysis.ts:950`, `:1007`                                              |
-| MED  | V   | The first detector waits 200 ms per unresolved image and only searches page-level objects. Shared logos may cost seconds and be skipped, giving a false grayscale. | `color-detection.ts:161-215`                                                     |
-| MED  | C   | `/color-analysis` is uncached and reads the PDF synchronously.                                                                                                     | `color-detection.ts`                                                             |
-| MED  | C   | Blank threshold is 0.1% content coverage at half scale. A page with only a page number can be flagged blank, and an all-sparse document can be blocked.            | `document-analysis.ts:456`                                                       |
-| MED  | V   | WebP is converted by LibreOffice, so its page geometry likely differs from the browser preview.                                                                    | `LibreOfficeDocumentConversionService.cs`                                        |
-| MED  | V   | `convertToPdfArtifact` checks `existsSync` before its in-flight map, so a partly written artifact may be returned.                                                 | `src/services/preview.ts:22-25`                                                  |
-| LOW  | C   | `PDF_RENDER_SCALE` in the config is unused. Analysis hardcodes scale 0.5.                                                                                          | `src/config/document-analysis.config.ts`                                         |
+| Sev  | Tag | Finding                                                                                                                                                                       | Location                                                                         |
+| ---- | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| HIGH | C   | **Fixed.** Phone photos with EXIF rotation print sideways compared with the preview. The browser honors EXIF; `ImageToPdfConverter` does not.                                 | `worker/.../DocumentConversion/ImageToPdfConverter.cs:61-67`                     |
+| HIGH | C   | **Fixed.** Two color detectors can disagree. An operator-list detector sets the default color mode in the UI. A pixel-based detector sets the price.                          | `src/services/color-detection.ts:305` vs `src/services/document-analysis.ts:357` |
+| HIGH | C   | **Fixed.** PDF analysis renders every page on the Node main thread. The worker-thread entry point is dead code. Coins, sockets and HTTP stall during large documents.         | `document-analysis.ts:950`, `:1007`                                              |
+| MED  | V   | **Fixed.** The first detector waits 200 ms per unresolved image and only searches page-level objects. Shared logos may cost seconds and be skipped, giving a false grayscale. | `color-detection.ts:161-215`                                                     |
+| MED  | C   | **Fixed.** `/color-analysis` is uncached and reads the PDF synchronously.                                                                                                     | `color-detection.ts`                                                             |
+| MED  | C   | **Fixed.** Blank threshold is 0.1% content coverage at half scale. A page with only a page number can be flagged blank, and an all-sparse document can be blocked.            | `document-analysis.ts:456`                                                       |
+| MED  | V   | **Fixed** (routed around; the LibreOffice output was not measured). WebP is converted by LibreOffice, so its page geometry likely differs from the browser preview.           | `LibreOfficeDocumentConversionService.cs`                                        |
+| MED  | V   | **Fixed.** `convertToPdfArtifact` checks `existsSync` before its in-flight map, so a partly written artifact may be returned.                                                 | `src/services/preview.ts:22-25`                                                  |
+| LOW  | C   | **Fixed.** `PDF_RENDER_SCALE` in the config is unused. Analysis hardcodes scale 0.5.                                                                                          | `src/config/document-analysis.config.ts`                                         |
 
-What is good: the layout contract matches between TypeScript (`PRINT_MARGIN_POINTS = 14.4`, A4 595.28×841.89, Short 612×792, Long 612×936) and C# `PrintLayout`. The analysis cache is keyed by file hash, pricing fingerprint and algorithm version (12).
+What is good: the layout contract matches between TypeScript (`PRINT_MARGIN_POINTS = 14.4`, A4 595.28×841.89, Short 612×792, Long 612×936) and C# `PrintLayout`. The analysis cache is keyed by file hash, pricing fingerprint and algorithm version (12 at audit time, 13 after the `/config` remediation).
 
 ## 6. `/confirm` (coins, change, reverify)
 
@@ -159,11 +160,11 @@ Follow the systematic-debugging rule: no fix without a confirmed root cause, one
 
 ### Step 3. Print accuracy
 
-- Apply EXIF auto-orientation in `ImageToPdfConverter`.
-- Use one color detector as the source of truth for both default mode and price.
-- Revisit the blank-page threshold.
+- ~~Apply EXIF auto-orientation in `ImageToPdfConverter`.~~ Done.
+- ~~Use one color detector as the source of truth for both default mode and price.~~ Done.
+- ~~Revisit the blank-page threshold.~~ Done (0.1% lowered to 0.001%).
 - Share one preview renderer between copy and config.
-- Confirm the WebP path geometry.
+- ~~Confirm the WebP path geometry.~~ WebP now takes the same image path as JPG and PNG. Still confirm on the kiosk.
 
 ### Step 4. Scanner reliability
 
@@ -176,7 +177,7 @@ Follow the systematic-debugging rule: no fix without a confirmed root cause, one
 
 ### Step 5. Speed
 
-- Move PDF analysis off the main thread.
+- ~~Move PDF analysis off the main thread.~~ Done.
 - Reduce Defender cost and decide the fail policy when it is unavailable.
 - Add in-flight guards to the polling loops and cut persist frequency.
 - Plan access point capacity (station count, channel).
@@ -295,6 +296,53 @@ Re-run on 2026-11-10 against the current tree: Jest `src/public/scan`, `src/publ
 | The probe fix and device invalidation have no unit test                | They depend on NAPS2 and TWAIN. Only the pure guards (`ScanDeadline`, `ScanGate`, `ScanFailurePolicy`) are tested. Confirm on the L5290 by unplugging or stalling the feeder.                                                                                          |
 | `SCANNER_BUSY` and `SCAN_PAGE_TIMEOUT` are not handled by name in Node | Nothing in `src` references them. They reach the user through the error message. `SCAN_PAGE_TIMEOUT` ("timed out") maps to the timeout guide. `SCANNER_BUSY` ("already in progress") falls to the generic guide.                                                       |
 | `Naps2ScannerService.cs` gained a UTF-8 BOM in `abfca95`               | The first line changed only by an invisible BOM. Harmless, but it shows up in blame.                                                                                                                                                                                   |
+
+## Remediation log: `/config`
+
+Date: 2026-11-10. Method: systematic debugging. Each root cause was confirmed in the code (and measured where possible), a failing test was written first, then one fix was made. Nothing is committed, and nothing has been tried on the real kiosk, the real printer or with LibreOffice.
+
+### Fixed
+
+| Finding                                      | Root cause                                                                                                                                                                                                                      | Fix                                                                                                                                                                                                                                               | Files                                                                                                                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phone photos print sideways                  | GDI+ `Image.FromStream` plus `DrawImage` ignores EXIF tag 0x0112. The browser preview honors it.                                                                                                                                | New `ExifOrientation.Apply` rotates or flips the image for all 8 orientation values and removes the tag before the JPEG is embedded.                                                                                                              | `ExifOrientation.cs`, `ImageToPdfConverter.cs`                                                                                                                              |
+| Two color detectors can disagree             | `/color-analysis` ran an operator-list detector (`detectPdfColorContent`). The price came from the pixel-based `analyzeDocument`.                                                                                               | `/color-analysis` now answers from the stored pricing analysis (`colorPages > 0`), and runs the pricing analysis if none is stored. The operator-list detector is deleted, so there is one detector.                                              | `color-analysis.ts`, `wireless-session.service.ts`, `color-detection.ts`                                                                                                    |
+| PDF analysis on the main thread              | `analyzeDocument` called `analyzeDocumentDirect` in-process. The worker entry at the bottom of the file was never started, and the server is one bundle, so nothing could start it.                                             | The worker entry is its own bundle (`dist/document-analysis-worker.js`). PDFs and images are analyzed in a worker thread per request. If the worker file is missing or the thread crashes, analysis falls back to the main thread with a warning. | `document-analysis-thread.ts`, `document-analysis-worker.ts`, `document-analysis.ts`, `scripts/build-server.js`, `scripts/dev-server.js`, `scripts/package-release.ps1`     |
+| 200 ms wait per image, shared logos skipped  | pdf.js stores an image reused across pages in `commonObjs` under a `g_` id. `resolveImageObject` only asked the page store, which never answers for those ids, so it waited 200 ms and skipped the image.                       | Ids that start with `g_` are read from `commonObjs`. This helper now only serves the operator-list fallback inside `analyzeDocument`.                                                                                                             | `color-detection.ts`                                                                                                                                                        |
+| `/color-analysis` uncached, synchronous read | It re-parsed the PDF with `readFileSync` on every request.                                                                                                                                                                      | Removed with the detector above. The answer comes from the stored analysis or the hash-keyed pricing cache.                                                                                                                                       | `wireless-session.service.ts`                                                                                                                                               |
+| Sparse pages flagged blank                   | Blank was `contentCoverage < 0.001`. Measured on A4 at half scale: a 12 pt "Hello world" is 0.065%, a page number "12" is 0.011%, a "1" is 0.0024%. All were blank, and a document of such pages was blocked as entirely blank. | `MIN_CONTENT_COVERAGE_THRESHOLD` is now 0.00001 (0.001%) and is the only threshold: the nine hardcoded `0.001` checks in server and browser code use it. `ANALYSIS_ALGORITHM_VERSION` is 13, so cached analyses are redone.                       | `document-analysis.config.ts`, `document-analysis.ts`, `print-quote.ts`, `session.ts`, `wireless-session.service.ts`, `src/public/config/app.ts`, `src/public/print/app.ts` |
+| WebP converted by LibreOffice                | GDI+ cannot decode WebP, so the worker sent it to LibreOffice, which places the picture on an office page. Other images become a full-bleed page with the image's aspect ratio.                                                 | Node decodes WebP to a temporary PNG with `sharp` (EXIF orientation applied) and sends that, so WebP takes the same path as JPG and PNG.                                                                                                          | `src/services/preview.ts`                                                                                                                                                   |
+| Partly written artifact returned             | `existsSync` ran before the in-flight map. The worker names its output after the source, so it can write straight to the artifact path, and a second caller saw the file mid-write.                                             | The in-flight map is checked first, in `convertToPdfArtifact` and in `convertToPdfPreview`.                                                                                                                                                       | `src/services/preview.ts`                                                                                                                                                   |
+| `PDF_RENDER_SCALE` unused                    | The analyzer hardcoded `scale: 0.5` and the config said 0.35.                                                                                                                                                                   | The analyzer uses the constant, and the constant is 0.5 so results do not change.                                                                                                                                                                 | `document-analysis.config.ts`, `document-analysis.ts`                                                                                                                       |
+
+### Evidence
+
+- Worker thread, measured on a generated 61-page PDF with a harness bundled next to the worker file: maximum event-loop lag 16 ms in the worker against 221 ms on the main thread. Both runs gave the same result (confidence high, 1 color page, 1 blank page). The worker run took 3.8 s against 3.1 s, the cost of starting a thread per analysis.
+- EXIF: `ConvertAsync_PortraitPhoneJpeg_ProducesPortraitPage` fails with the fix disabled (MediaBox 40x20) and passes with it (20x40).
+- The preview, blank-threshold and shared-image specs were run before their fixes and failed for the expected reason. The worker-runner and color-mapping specs test new modules, so their "red" was only a missing module.
+
+### Tests added
+
+- `worker/tests/PrintBit.Tests/ExifOrientationTests.cs` (15 tests)
+- `src/services/preview.spec.ts`
+- `src/services/document-analysis.spec.ts`
+- `src/services/document-analysis-thread.spec.ts`
+- `src/services/color-detection.spec.ts`
+- `src/modules/wireless-session/color-analysis.spec.ts`
+
+### Not verified, and limits
+
+| Item                      | Detail                                                                                                                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Real devices              | No photo was printed, no WebP went through the C# worker, and the server was not started with the new worker bundle. Print a portrait phone photo and a WebP, and upload a large PDF while inserting coins.                   |
+| WebP geometry             | The LibreOffice output was never measured, so the size of the old mismatch is unknown. The fix removes LibreOffice from the WebP path. `.webp` is still listed in the worker's office extensions and is now unused from Node. |
+| Blank threshold value     | 0.001% is a judgment. It treats only an empty page or one stray pixel as blank. A scanned sheet with a few specks is no longer blank.                                                                                         |
+| Operator-list fallback    | When a page cannot be rendered, blank and color still come from the operator scan, not from pixels. That path is unchanged apart from the shared-image lookup.                                                                |
+| `/color-analysis` handler | Only the mapping from analysis to answer has a unit test. The handler wiring is covered by `tsc` only. If the analysis is not ready within the page's 10 s timeout, the page keeps its default color mode.                    |
+| PDF analysis in Jest      | pdf.js does not load under Jest (`import.meta`), so the PDF render path has no unit test. The blank tests use the image path.                                                                                                 |
+| Deployment                | `dist/document-analysis-worker.js` must ship next to `dist/server.js`. `package-release.ps1` now copies it and fails if it is missing. Older release folders fall back to the main thread.                                    |
+| `sharp` file handles      | `analyzeImage` still opens images by path. On Windows `sharp` can keep that handle open and block deleting the file. Not changed here.                                                                                        |
+| `graphify update .`       | Not run. The CLI is not on PATH.                                                                                                                                                                                              |
 
 ---
 

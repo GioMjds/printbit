@@ -8,13 +8,15 @@ async function dev() {
   console.log('[DEV-SERVER] Initializing fast esbuild watcher for PrintBit...');
 
   const ctx = await esbuild.context({
-    entryPoints: ['src/server.ts'],
+    // The analysis worker is its own bundle; the server runs it in a thread.
+    entryPoints: ['src/server.ts', 'src/services/document-analysis-worker.ts'],
     bundle: true,
     platform: 'node',
     format: 'cjs',
     packages: 'external',
     target: 'node22',
-    outfile: 'dist/server.js',
+    outdir: 'dist',
+    entryNames: '[name]',
     sourcemap: 'inline',
     plugins: [
       {

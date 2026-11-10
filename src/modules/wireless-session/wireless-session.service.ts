@@ -11,7 +11,6 @@ import type {
   SessionStore,
   UploadedDocument,
 } from '@/services/session';
-import { detectPdfColorContent } from '@/services/color-detection';
 import {
   ANALYSIS_ALGORITHM_VERSION,
   analyzeDocument,
@@ -26,7 +25,12 @@ import {
 } from '@/services/pricing-analysis-queue';
 import { discardStagedUpload } from '@/services/upload-staging';
 import { selectRequestedDocument } from './document-selection';
+import {
+  COLOR_ANALYSIS_FALLBACK,
+  colorAnalysisFromDocumentAnalysis,
+} from './color-analysis';
 import { PORT } from '@/config/http.config';
+import { MIN_CONTENT_COVERAGE_THRESHOLD } from '@/config/document-analysis.config';
 import { pricingAnalysisCacheStore } from '@/core/database/sqlite-storage';
 import {
   powerSafetyService,
@@ -562,11 +566,7 @@ export class WirelessSessionService {
     );
 
     if (!target) {
-      res.json({
-        hasColor: true,
-        isGrayscale: false,
-        sampledPages: 0,
-      });
+      res.json({ ...COLOR_ANALYSIS_FALLBACK });
       return;
     }
 
@@ -589,24 +589,38 @@ export class WirelessSessionService {
     }
 
     try {
-      const pdfPath = await this.resolveCanonicalPdfPath(sessionId, target);
-
-      const result = await detectPdfColorContent(pdfPath);
-      res.json({
-        hasColor: result.hasColor,
-        isGrayscale: result.isGrayscale,
-        sampledPages: result.sampledPages,
-      });
+      // Answer from the same analysis that prices the document, so the
+      // default color mode on /config cannot disagree with the price. The
+      // analysis is normally already stored by the time /config opens, and is
+      // otherwise served from the hash-keyed pricing cache.
+      let analysis =
+        target.analysis &&
+        target.analysisVersion === ANALYSIS_ALGORITHM_VERSION
+          ? target.analysis
+          : null;
+      if (!analysis) {
+        const analyzed = await this.analyzeAndStoreDocument(
+          sessionId,
+          target.documentId,
+          publicBaseUrl,
+        );
+        if (analyzed.status !== 200) {
+          console.warn(
+            '[color-analysis] Analysis unavailable, defaulting to color:',
+            analyzed.error,
+          );
+          res.json({ ...COLOR_ANALYSIS_FALLBACK });
+          return;
+        }
+        analysis = analyzed.analysis;
+      }
+      res.json(colorAnalysisFromDocumentAnalysis(analysis));
     } catch (err) {
       console.warn(
         '[color-analysis] Detection failed, defaulting to color:',
         err,
       );
-      res.json({
-        hasColor: true,
-        isGrayscale: false,
-        sampledPages: 0,
-      });
+      res.json({ ...COLOR_ANALYSIS_FALLBACK });
     }
   };
 
@@ -1377,7 +1391,8 @@ export class WirelessSessionService {
         (p) =>
           p.isBlank ||
           p.classification === 'blank' ||
-          (typeof p.coverage === 'number' && p.coverage < 0.001),
+          (typeof p.coverage === 'number' &&
+            p.coverage < MIN_CONTENT_COVERAGE_THRESHOLD),
       )
       .map((p) => p.index);
     const blankPageCount = blankPages.length;

@@ -3,43 +3,28 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import sharp from 'sharp';
 import { createCanvas } from 'canvas';
-import { isMainThread, workerData, parentPort } from 'node:worker_threads';
+import { isMainThread } from 'node:worker_threads';
 import type { CoverageTier } from '@/core/database/models/admin.model';
 export { CoverageTier };
 import {
   COLOR_SATURATION_THRESHOLD,
   MAX_PIXELS_TO_SAMPLE,
+  MIN_CONTENT_COVERAGE_THRESHOLD,
+  PDF_RENDER_SCALE,
 } from '@/config/document-analysis.config';
 import {
   resolveImageObject,
   getImageColorStats,
   type PdfPageProxy,
 } from './color-detection';
+import {
+  ANALYSIS_WORKER_SCRIPT_NAME,
+  AnalysisWorkerUnavailableError,
+  canAnalyzeInWorker,
+  runAnalysisInWorker,
+} from './document-analysis-thread';
 
-/**
- * Monotonically-increasing version for the document analysis algorithm.
- * Bump this whenever the analysis logic changes in a way that could produce
- * different results for the same file (e.g. blank-page detection fixes,
- * RGB-spread threshold changes, white-paint guard additions, etc.).
- *
- * Consumers (wireless service, pricing cache) compare stored analysisVersion
- * against this constant and treat stale results as pending re-analysis.
- *
- * History:
- *   1 — initial operator-list analysis
- *   2 — colour-op / content-op separation; white-paint guard (blank page fix)
- *   3 — persist content coverage separately from color coverage
- *   4 — forward original file type to preserve image classification across PDF conversion
- *   5 — isolate Form XObjects from raster images, maintain graphics-state color stack, and auto-fallback converter
- *   6 — ignore whitespace-only text operations and handle setFillGray/setStrokeGray in color detection
- *   7 — sample embedded images for color, exclude grayscale/monochrome icons from color, and restrict image tier to converted image uploads
- *   8 — include constructPath and rawFillPath in pathDrawingOps to recognize vector shapes and colored boxes
- *   9 — uniform low-DPI canvas coverage metering for PDF pages and images; coverage tiers (low, medium, high, very_high)
- *   10 — lower color coverage threshold to 0.0005 and add RGB spread guard to recognize small logos, stamps, and seals
- *   11 — fix missing min variable in isColorPixel
- *   12 — near-black noise guard in isColorPixel and cache bump
- */
-export const ANALYSIS_ALGORITHM_VERSION = 12;
+export const ANALYSIS_ALGORITHM_VERSION = 13;
 
 export function resolveCoverageTier(contentCoverage: number): CoverageTier {
   const coverage =
@@ -89,13 +74,13 @@ export interface DocumentAnalysisResult {
    * Version of the analysis algorithm that produced this result.
    * Compare against ANALYSIS_ALGORITHM_VERSION to detect stale cache entries.
    */
-  analysisVersion: number;
+  analysisVersion?: number;
   isEntirelyBlank?: boolean;
   blankPages?: number[];
   blankPageCount?: number;
 }
 
-interface AnalyzeDocumentInput {
+export interface AnalyzeDocumentInput {
   filePath: string;
   contentType?: string;
   filename?: string;
@@ -263,7 +248,7 @@ async function analyzeImage(
     width: info.width,
     height: info.height,
   });
-  const isBlank = metrics.contentCoverage < 0.001;
+  const isBlank = metrics.contentCoverage < MIN_CONTENT_COVERAGE_THRESHOLD;
   const isColor =
     colorDetectionEnabled && !isBlank && metrics.colorCoverage > 0.0005;
   const coverageTier = resolveCoverageTier(metrics.contentCoverage);
@@ -432,7 +417,7 @@ async function analyzePdfFile(
       const fallbackFlags: string[] = [];
 
       try {
-        const viewport = page.getViewport({ scale: 0.5 });
+        const viewport = page.getViewport({ scale: PDF_RENDER_SCALE });
         const canvas = canvasFactory(
           Math.ceil(viewport.width),
           Math.ceil(viewport.height),
@@ -453,7 +438,7 @@ async function analyzePdfFile(
           height: canvas.height,
         });
 
-        isBlank = metrics.contentCoverage < 0.001;
+        isBlank = metrics.contentCoverage < MIN_CONTENT_COVERAGE_THRESHOLD;
         isColor =
           colorDetectionEnabled && !isBlank && metrics.colorCoverage > 0.0005;
         coverageTier = resolveCoverageTier(metrics.contentCoverage);
@@ -529,7 +514,8 @@ async function analyzePdfFile(
       (page) =>
         page.isBlank ||
         page.classification === 'blank' ||
-        (typeof page.coverage === 'number' && page.coverage < 0.001),
+        (typeof page.coverage === 'number' &&
+          page.coverage < MIN_CONTENT_COVERAGE_THRESHOLD),
     )
     .map((page) => page.index);
   const blankPageCount = blankPages.length;
@@ -877,7 +863,8 @@ async function analyzePageOperatorList(
 }
 
 /**
- * Direct implementation of document analysis, used within worker threads or as fallback.
+ * Direct implementation of document analysis. Runs on the calling thread:
+ * inside the analysis worker, or on the main thread as a fallback.
  */
 async function analyzeDocumentDirect(
   input: AnalyzeDocumentInput,
@@ -918,6 +905,50 @@ async function analyzeDocumentDirect(
   }
 
   throw new Error('Unsupported file type for analysis.');
+}
+
+let analysisWorkerScript: string | null | undefined;
+
+/**
+ * Path of the bundled worker entry, or null when it is not available (tsx,
+ * Jest, or a build that did not ship it). Resolved once.
+ */
+function resolveAnalysisWorkerScript(): string | null {
+  if (analysisWorkerScript !== undefined) return analysisWorkerScript;
+  const candidate =
+    typeof __dirname !== 'undefined'
+      ? path.join(__dirname, ANALYSIS_WORKER_SCRIPT_NAME)
+      : null;
+  analysisWorkerScript = candidate && fs.existsSync(candidate) ? candidate : null;
+  if (!analysisWorkerScript) {
+    console.warn(
+      `[document-analysis] ${ANALYSIS_WORKER_SCRIPT_NAME} not found; documents will be analyzed on the main thread.`,
+    );
+  }
+  return analysisWorkerScript;
+}
+
+/**
+ * Runs the analysis in a worker thread so that rendering a large PDF does not
+ * stall coin events, sockets and HTTP. Falls back to the calling thread when
+ * the request cannot be sent to a worker or the worker itself is unavailable.
+ */
+async function analyzeOffMainThread(
+  input: AnalyzeDocumentInput,
+): Promise<DocumentAnalysisResult> {
+  const script = canAnalyzeInWorker(input) ? resolveAnalysisWorkerScript() : null;
+  if (!script) return analyzeDocumentDirect(input);
+
+  try {
+    return await runAnalysisInWorker<DocumentAnalysisResult>(script, input);
+  } catch (error) {
+    if (!(error instanceof AnalysisWorkerUnavailableError)) throw error;
+    console.warn(
+      '[document-analysis] Worker unavailable; analyzing on the main thread.',
+      error.message,
+    );
+    return analyzeDocumentDirect(input);
+  }
 }
 
 interface AnalysisCacheEntry {
@@ -980,7 +1011,7 @@ export async function analyzeDocument(
 
   const analysisPromise = (async () => {
     try {
-      const result = await analyzeDocumentDirect(input);
+      const result = await analyzeOffMainThread(input);
       if (stat) {
         if (analysisCache.size >= MAX_CACHE_ENTRIES) {
           const firstKey = analysisCache.keys().next().value;
@@ -1001,19 +1032,4 @@ export async function analyzeDocument(
 
   inFlightAnalysis.set(cacheKey, analysisPromise);
   return analysisPromise;
-}
-
-// Worker thread entry point
-if (!isMainThread && parentPort) {
-  (async () => {
-    try {
-      const result = await analyzeDocumentDirect(workerData);
-      parentPort!.postMessage({ type: 'success', result });
-    } catch (error) {
-      parentPort!.postMessage({
-        type: 'error',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  })();
 }

@@ -1,4 +1,5 @@
 import { initializePageIdleTimeout } from '@/services/idle-timeout';
+import { MIN_CONTENT_COVERAGE_THRESHOLD } from '../../config/document-analysis.config';
 import {
   calculatePrintLayout,
   DEFAULT_PRINT_SCALING,
@@ -2631,7 +2632,11 @@ continueBtn?.addEventListener('click', () => {
   if (mode === 'print' && currentPrintQuote?.pageBreakdown && blankPageModal) {
     const selectedPages = currentPrintQuote.pageBreakdown.map((p) => p.pageNumber);
     const blankPages = currentPrintQuote.pageBreakdown
-      .filter((p) => p.isBlank === true || (p.coverage ?? 0) < 0.001)
+      .filter(
+        (p) =>
+          p.isBlank === true ||
+          (p.coverage ?? 0) < MIN_CONTENT_COVERAGE_THRESHOLD,
+      )
       .map((p) => p.pageNumber);
 
     if (blankPages.length > 0 && selectedPages.length > blankPages.length) {

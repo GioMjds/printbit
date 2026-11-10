@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import sharp from 'sharp';
 import { PREVIEW_CACHE_DIR } from '@/config/http.config';
 import { convertDocumentViaWorker } from '@/services/document-conversion-pipe';
 
@@ -19,10 +20,12 @@ export class PreviewService {
     if (path.resolve(sourcePath) === resolvedArtifactPath) {
       throw new Error('Document conversion artifact must not replace its source file.');
     }
-    if (fs.existsSync(resolvedArtifactPath)) return resolvedArtifactPath;
-
+    // Check the in-flight map first. The worker can write straight to the
+    // artifact path, so the file may exist while it is still being written.
     const existing = this.inFlightConversions.get(resolvedArtifactPath);
     if (existing) return existing;
+
+    if (fs.existsSync(resolvedArtifactPath)) return resolvedArtifactPath;
 
     const conversion = this.convertToPdfArtifactUncached(
       sourcePath,
@@ -50,10 +53,10 @@ export class PreviewService {
       .digest('hex');
     const cachePdf = path.join(PREVIEW_CACHE_DIR, `${key}.pdf`);
 
-    if (fs.existsSync(cachePdf)) return cachePdf;
-
     const existing = this.inFlightConversions.get(cachePdf);
     if (existing) return existing;
+
+    if (fs.existsSync(cachePdf)) return cachePdf;
 
     const conversion = this.convertToPdfPreviewUncached(sourcePath, cachePdf);
     this.inFlightConversions.set(cachePdf, conversion);
@@ -69,9 +72,11 @@ export class PreviewService {
     sourcePath: string,
     cachePdf: string,
   ): Promise<string> {
-    const result = await convertDocumentViaWorker(sourcePath, {
-      outputDirectory: PREVIEW_CACHE_DIR,
-    });
+    const result = await this.convertViaWorker(
+      sourcePath,
+      PREVIEW_CACHE_DIR,
+      path.basename(cachePdf, '.pdf'),
+    );
 
     if (!result.success || !result.outputPath) {
       throw new Error(
@@ -98,7 +103,11 @@ export class PreviewService {
   ): Promise<string> {
     const outputDirectory = path.dirname(artifactPath);
     await fs.promises.mkdir(outputDirectory, { recursive: true });
-    const result = await convertDocumentViaWorker(sourcePath, { outputDirectory });
+    const result = await this.convertViaWorker(
+      sourcePath,
+      outputDirectory,
+      path.basename(artifactPath, '.pdf'),
+    );
     if (!result.success || !result.outputPath) {
       throw new Error(result.errorMessage ?? 'Document conversion failed.');
     }
@@ -126,6 +135,44 @@ export class PreviewService {
       }
     }
     return artifactPath;
+  }
+
+  /**
+   * Sends a source file to the worker for PDF conversion.
+   *
+   * The worker's image converter (GDI+) cannot decode WebP, so WebP used to
+   * go through LibreOffice, which places the picture on a default office page.
+   * Every other image becomes a full-bleed page with the image's own aspect
+   * ratio, which is what the print layout and the browser preview expect.
+   * WebP is therefore decoded to PNG here and takes the normal image path.
+   */
+  private async convertViaWorker(
+    sourcePath: string,
+    outputDirectory: string,
+    outputBaseName: string,
+  ): ReturnType<typeof convertDocumentViaWorker> {
+    if (path.extname(sourcePath).toLowerCase() !== '.webp') {
+      return convertDocumentViaWorker(sourcePath, { outputDirectory });
+    }
+
+    await fs.promises.mkdir(outputDirectory, { recursive: true });
+    const rasterPath = path.join(
+      outputDirectory,
+      `${outputBaseName}.webp-raster.png`,
+    );
+    try {
+      // rotate() with no angle applies the EXIF orientation, like a browser.
+      // Buffers in and out: sharp keeps a handle open on files it reads by
+      // path, which would block deleting the upload later on Windows.
+      const png = await sharp(await fs.promises.readFile(sourcePath))
+        .rotate()
+        .png()
+        .toBuffer();
+      await fs.promises.writeFile(rasterPath, png);
+      return await convertDocumentViaWorker(rasterPath, { outputDirectory });
+    } finally {
+      await fs.promises.unlink(rasterPath).catch(() => {});
+    }
   }
 
   private static readonly HTML_PREVIEW_EXTENSIONS = new Set(['.xls', '.xlsx']);

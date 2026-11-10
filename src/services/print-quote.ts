@@ -8,6 +8,7 @@ import {
 } from './db';
 import type { CoverageTier } from '@/core/database/models/admin.model';
 import { resolveCoverageTier } from './document-analysis';
+import { MIN_CONTENT_COVERAGE_THRESHOLD } from '@/config/document-analysis.config';
 import type { DocumentAnalysis, DocumentPageAnalysis } from './session';
 import {
   normalizePageSelection,
@@ -460,9 +461,11 @@ export function buildPrintQuote(input: {
 
     const isBlank = page
       ? Boolean(
-          page.isBlank || page.classification === 'blank' || coverage < 0.001,
+          page.isBlank ||
+            page.classification === 'blank' ||
+            coverage < MIN_CONTENT_COVERAGE_THRESHOLD,
         )
-      : coverage < 0.001;
+      : coverage < MIN_CONTENT_COVERAGE_THRESHOLD;
     singleCopyPrintCost += pageRate;
     pageBreakdown.push({
       pageNumber: pageNum,

@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { MIN_CONTENT_COVERAGE_THRESHOLD } from '../../config/document-analysis.config';
 import {
   initializePageIdleTimeout,
   setupPageIdleWarningButton,
@@ -46,7 +47,8 @@ function isFileEntirelyBlank(file: UploadedFile | null | undefined): boolean {
       (p) =>
         p.isBlank === true ||
         p.classification === 'blank' ||
-        (typeof p.coverage === 'number' && p.coverage < 0.001),
+        (typeof p.coverage === 'number' &&
+          p.coverage < MIN_CONTENT_COVERAGE_THRESHOLD),
     );
   }
   return false;

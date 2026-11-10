@@ -62,6 +62,8 @@ public static class ImageToPdfConverter
     {
         using var stream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var srcImage = Image.FromStream(stream, useEmbeddedColorManagement: true, validateImageData: true);
+        // Match the browser preview, which honors the EXIF orientation of phone photos.
+        ExifOrientation.Apply(srcImage);
         return ConvertToJpeg(srcImage);
     }
 
