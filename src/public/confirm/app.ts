@@ -34,9 +34,9 @@ import {
   type HotspotConfig,
 } from '../shared/wifi-troubleshooting';
 import { buildPhysicalPrintSettings } from './print-settings';
+import { canArmLease, deriveConfirmGate } from './confirm-gate';
 import {
   createPrinterReadinessState,
-  hasBlockingPrinterError as hasBlockingPrinterErrorState,
   reducePrinterReadiness,
   type PrinterReadinessState,
 } from './printer-readiness-state';
@@ -1404,21 +1404,15 @@ function stopPaymentHeartbeat(): void {
   }
 }
 
-function hasBlockingPrinterError(): boolean {
-  return hasBlockingPrinterErrorState(printer);
-}
-
 function canArmPaymentLease(): boolean {
-  return (
-    (config.mode === 'print' || config.mode === 'copy') &&
-    isPricingReady(pricing) &&
-    getTotalPrice(pricing) > 0 &&
-    printer.ready &&
-    !hasBlockingPrinterError() &&
-    currentBalance < getTotalPrice(pricing) &&
-    !isProcessingPayment &&
-    !hasActiveJob()
-  );
+  return canArmLease({
+    mode: config.mode,
+    pricing,
+    printer,
+    jobProcessing: isProcessingPayment,
+    jobActive: hasActiveJob(),
+    balance: currentBalance,
+  });
 }
 
 async function armPaymentLease(): Promise<void> {
@@ -1548,87 +1542,27 @@ function updateChangeDisplay(balance: number): void {
   }
 }
 
-function sanitizeStatusBadgeMessage(msg: string): string {
-  if (!msg) return msg;
-  if (
-    msg.length > 50 ||
-    msg.includes('|') ||
-    msg.toLowerCase().includes('post-clear') ||
-    msg.toLowerCase().includes('hardware error') ||
-    msg.toLowerCase().includes('epson popup')
-  ) {
-    return 'Printer attention needed. See instructions.';
-  }
-  return msg;
-}
-
 function applyConfirmGate(statusOverride?: string): void {
   if (!confirmBtn || !statusMessage) return;
-  if (isProcessingPayment) {
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    if (statusBadge) statusBadge.dataset.state = 'waiting';
-    return;
-  }
+  const gate = deriveConfirmGate({
+    pricing,
+    printer,
+    jobProcessing: isProcessingPayment,
+    balance: currentBalance,
+    statusOverride,
+  });
 
-  if (
-    printer.error &&
-    (printer.error.severity === 'fatal' ||
-      printer.error.severity === 'recoverable')
-  ) {
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    statusMessage.textContent = sanitizeStatusBadgeMessage(
-      statusOverride ?? printer.error.userMessage,
-    );
-    if (statusBadge) statusBadge.dataset.state = 'error';
-    return;
-  }
-
-  if (!isPricingReady(pricing)) {
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    statusMessage.textContent =
-      statusOverride ?? getPricingMessage(pricing) ?? 'Loading pricing...';
-    if (statusBadge) statusBadge.dataset.state = 'waiting';
-    return;
-  }
-
-  if (!printer.ready) {
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    statusMessage.textContent =
-      statusOverride ??
-      `Printer not ready (${printer.statusLabel}). Please wait before inserting coins.`;
-    if (statusBadge) {
-      statusBadge.dataset.state = printer.statusLabel.startsWith(
-        'Checking',
-      )
-        ? 'waiting'
-        : 'error';
-    }
-    return;
-  }
-
-  if (currentBalance >= getTotalPrice(pricing)) {
-    confirmBtn.disabled = false;
-    confirmBtn.setAttribute('aria-disabled', 'false');
+  confirmBtn.disabled = !gate.confirmEnabled;
+  confirmBtn.setAttribute('aria-disabled', String(!gate.confirmEnabled));
+  if (gate.highlightReady === true) {
     confirmBtn.classList.add('is-ready');
     actionCol?.classList.add('is-ready');
-    statusMessage.textContent =
-      statusOverride ?? 'Sufficient balance detected. You can confirm now.';
-    if (statusBadge) statusBadge.dataset.state = 'ready';
-  } else {
+  } else if (gate.highlightReady === false) {
     confirmBtn.classList.remove('is-ready');
     actionCol?.classList.remove('is-ready');
-    const needed = getTotalPrice(pricing) - currentBalance;
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    statusMessage.textContent = sanitizeStatusBadgeMessage(
-      statusOverride ?? `Insert more coins: ₱ ${needed} remaining.`,
-    );
-    if (statusBadge) statusBadge.dataset.state = statusOverride ? 'error' : 'waiting';
   }
+  if (gate.message !== null) statusMessage.textContent = gate.message;
+  if (statusBadge) statusBadge.dataset.state = gate.badge;
 }
 
 let displayedBalance = 0;
