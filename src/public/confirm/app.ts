@@ -36,6 +36,13 @@ import {
 import { buildPhysicalPrintSettings } from './print-settings';
 import { canArmLease, deriveConfirmGate } from './confirm-gate';
 import {
+  canStartArm,
+  createPaymentLeaseState,
+  getFinalLeaseId,
+  reducePaymentLease,
+  type PaymentLeaseState,
+} from './payment-lease-state';
+import {
   createPrinterReadinessState,
   reducePrinterReadiness,
   type PrinterReadinessState,
@@ -884,11 +891,8 @@ const PENDING_PAYMENT_FINGERPRINT_STORAGE_KEY =
   'printbit.confirmPaymentFingerprint';
 let pricing: PricingState<PrintQuote> = createPricingState<PrintQuote>();
 let currentBalance = 0;
-let paymentLeaseId: string | null = null;
-let paymentLeaseIdForFinalization: string | null = null;
-let paymentArmInFlight = false;
+let lease: PaymentLeaseState = createPaymentLeaseState();
 let paymentHeartbeatTimer: number | null = null;
-let paymentLeaseGeneration = 0;
 
 if (!rawConfig) {
   const storedSessionId = sessionStorage.getItem('printbit.sessionId');
@@ -1415,10 +1419,9 @@ function canArmPaymentLease(): boolean {
 }
 
 async function armPaymentLease(): Promise<void> {
-  if (paymentArmInFlight || paymentLeaseId || !canArmPaymentLease()) return;
+  if (!canStartArm(lease) || !canArmPaymentLease()) return;
 
-  paymentArmInFlight = true;
-  const armGeneration = paymentLeaseGeneration;
+  lease = reducePaymentLease(lease, { type: 'arm-started' });
   try {
     const response = await fetch('/api/payment-session/arm', {
       method: 'POST',
@@ -1429,42 +1432,43 @@ async function armPaymentLease(): Promise<void> {
         sessionId: config.sessionId,
       }),
     });
-    const lease = (await response.json()) as Partial<PaymentLease>;
+    const granted = (await response.json()) as Partial<PaymentLease>;
     if (
       !response.ok ||
-      typeof lease.leaseId !== 'string' ||
-      typeof lease.expiresAt !== 'number'
+      typeof granted.leaseId !== 'string' ||
+      typeof granted.expiresAt !== 'number'
     ) {
       throw new Error('Payment hardware is unavailable.');
     }
 
-    if (armGeneration !== paymentLeaseGeneration || !canArmPaymentLease()) {
+    lease = reducePaymentLease(lease, {
+      type: 'arm-succeeded',
+      leaseId: granted.leaseId,
+      stillEligible: canArmPaymentLease(),
+    });
+    if (lease.phase !== 'armed') {
       void fetch('/api/payment-session/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leaseId: lease.leaseId }),
+        body: JSON.stringify({ leaseId: granted.leaseId }),
         keepalive: true,
       });
       return;
     }
 
-    paymentLeaseIdForFinalization = null;
-    paymentLeaseId = lease.leaseId;
     paymentHeartbeatTimer = window.setInterval(() => {
       void sendPaymentHeartbeat();
     }, 3_000);
     applyLockState(false);
   } catch {
     stopPaymentHeartbeat();
-    paymentLeaseId = null;
+    lease = reducePaymentLease(lease, { type: 'arm-failed' });
     applyLockState(true);
-  } finally {
-    paymentArmInFlight = false;
   }
 }
 
 async function sendPaymentHeartbeat(): Promise<void> {
-  const leaseId = paymentLeaseId;
+  const leaseId = lease.leaseId;
   if (!leaseId) return;
 
   try {
@@ -1478,9 +1482,13 @@ async function sendPaymentHeartbeat(): Promise<void> {
       throw new Error('Payment lease heartbeat failed.');
     }
   } catch {
-    if (paymentLeaseId !== leaseId) return;
+    const next = reducePaymentLease(lease, {
+      type: 'heartbeat-failed',
+      leaseId,
+    });
+    if (next === lease) return;
+    lease = next;
     stopPaymentHeartbeat();
-    paymentLeaseId = null;
     applyLockState(true);
   }
 }
@@ -1489,15 +1497,9 @@ async function releasePaymentLease(
   reason: string,
   keepalive = false,
 ): Promise<void> {
-  const leaseId = paymentLeaseId;
-  if (reason === 'target_reached' && leaseId) {
-    paymentLeaseIdForFinalization = leaseId;
-  } else if (reason !== 'confirm_payment') {
-    paymentLeaseIdForFinalization = null;
-  }
-  paymentLeaseGeneration += 1;
+  const leaseId = lease.leaseId;
+  lease = reducePaymentLease(lease, { type: 'released', reason });
   stopPaymentHeartbeat();
-  paymentLeaseId = null;
   applyLockState(true);
   if (!leaseId) return;
 
@@ -1515,7 +1517,7 @@ async function releasePaymentLease(
 
 function syncPaymentLeaseState(): void {
   if (!canArmPaymentLease()) {
-    if (paymentLeaseId) {
+    if (lease.leaseId) {
       void releasePaymentLease('payment_ineligible', true);
     } else {
       applyLockState(true);
@@ -2656,7 +2658,7 @@ function hideOverlay(el: HTMLElement | null): void {
 
 function clearConfirmSessionStorage(): void {
   confirmationOutcome = createConfirmationOutcomeState();
-  paymentLeaseIdForFinalization = null;
+  lease = reducePaymentLease(lease, { type: 'session-cleared' });
   setTransactionReference(null);
   pendingOwedChange = null;
   if (owedChangeAlert) {
@@ -2729,8 +2731,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
   showInitialPrintProgress();
 
   try {
-    const finalPaymentLeaseId =
-      paymentLeaseIdForFinalization ?? paymentLeaseId;
+    const finalPaymentLeaseId = getFinalLeaseId(lease);
     if (config.mode === 'print' || config.mode === 'copy') {
       await releasePaymentLease('confirm_payment');
     }
