@@ -7,11 +7,13 @@ import {
 import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import { mountLoadingAnimation } from '../shared/loading-animation';
+import type { ConfirmationOutcomeIdentity } from './confirmation-outcome';
 import {
-  applyConfirmationEvidence,
-  createConfirmationOutcomeState,
-  type ConfirmationOutcomeIdentity,
-} from './confirmation-outcome';
+  createJobState,
+  hasActiveJob as hasActiveJobState,
+  reduceJob,
+  type JobState,
+} from './job-state';
 import {
   buildMaintenanceReceiptView,
   isMaintenancePrintFailure,
@@ -34,6 +36,27 @@ import {
   type HotspotConfig,
 } from '../shared/wifi-troubleshooting';
 import { buildPhysicalPrintSettings } from './print-settings';
+import { canArmLease, deriveConfirmGate } from './confirm-gate';
+import {
+  canStartArm,
+  createPaymentLeaseState,
+  getFinalLeaseId,
+  reducePaymentLease,
+  type PaymentLeaseState,
+} from './payment-lease-state';
+import {
+  createPrinterReadinessState,
+  reducePrinterReadiness,
+  type PrinterReadinessState,
+} from './printer-readiness-state';
+import {
+  createPricingState,
+  getQuote,
+  getTotalPrice,
+  isPricingReady,
+  reducePricing,
+  type PricingState,
+} from './pricing-state';
 import type { ActivePrinterErrorState } from '@/services/printer-error-state';
 
 export {};
@@ -477,7 +500,6 @@ interface OwedChangeNotice {
   message?: string;
 }
 
-let pendingOwedChange: OwedChangeNotice | null = null;
 
 // Scan Download CTA Elements
 const scanDownloadCtaContainer = document.getElementById(
@@ -579,51 +601,47 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-let currentPrinterError: PrintError | null = null;
+let printer: PrinterReadinessState<PrintError> =
+  createPrinterReadinessState<PrintError>();
 let lastKnownPagesPrinted = 0;
 let lastKnownTotalPages = 0;
 let displayedPrintPages = 0;
-let confirmationOutcome = createConfirmationOutcomeState();
+let jobState: JobState<OwedChangeNotice> = createJobState<OwedChangeNotice>();
 
-let isJobInterruptedState = false;
 function isJobInterrupted(): boolean {
-  return isJobInterruptedState;
+  return printer.interrupted;
 }
 
 function hasActiveJob(): boolean {
-  return (
-    isProcessingPayment ||
-    activeSpoolerCorrelationKey !== null ||
-    paymentSpoolerCorrelationKey !== null
-  );
+  return hasActiveJobState(jobState, paymentSpoolerCorrelationKey);
 }
 
 function restoreConfirmationPending(
   identity: Partial<ConfirmationOutcomeIdentity>,
 ): void {
-  confirmationOutcome = applyConfirmationEvidence(confirmationOutcome, {
-    type: 'restore-pending',
-    identity,
+  jobState = reduceJob(jobState, {
+    type: 'outcome-evidence',
+    evidence: { type: 'restore-pending', identity },
   });
 }
 
 function recordConfirmationTerminalFailure(
   identity: Partial<ConfirmationOutcomeIdentity>,
 ): void {
-  confirmationOutcome = applyConfirmationEvidence(confirmationOutcome, {
-    type: 'terminal-failure',
-    identity,
+  jobState = reduceJob(jobState, {
+    type: 'outcome-evidence',
+    evidence: { type: 'terminal-failure', identity },
   });
 }
 
 function recordConfirmationTerminalSuccess(
   identity: Partial<ConfirmationOutcomeIdentity>,
 ): boolean {
-  confirmationOutcome = applyConfirmationEvidence(confirmationOutcome, {
-    type: 'terminal-success',
-    identity,
+  jobState = reduceJob(jobState, {
+    type: 'outcome-evidence',
+    evidence: { type: 'terminal-success', identity },
   });
-  return confirmationOutcome.outcome === 'success';
+  return jobState.outcome.outcome === 'success';
 }
 
 // NOTE: powerSafetyOverlay is initialized AFTER socket is created (below, inside the
@@ -640,7 +658,7 @@ const COIN_INSERT_GUIDANCE_MESSAGE =
   DEFAULT_COIN_INSERT_GUIDANCE_MESSAGE;
 
 function renderPrinterError(err: PrintError): void {
-  currentPrinterError = err;
+  printer = reducePrinterReadiness(printer, { type: 'error-raised', error: err });
   if (err.severity === 'fatal' || err.severity === 'recoverable') {
     void releasePaymentLease('printer_failure', true);
   }
@@ -656,7 +674,7 @@ function renderPrinterError(err: PrintError): void {
   );
   if (requiresMaintenance) {
     recordConfirmationTerminalFailure({
-      transactionId: currentTransactionId,
+      transactionId: jobState.transactionId,
       spoolerCorrelationKey:
         err.spoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
     });
@@ -807,7 +825,7 @@ function renderAmbiguousWorkerFailure(input: {
 }): void {
   hideOverlay(printingOverlay);
   hidePrintProgress();
-  isProcessingPayment = false;
+  jobState = reduceJob(jobState, { type: 'processing-stopped' });
   powerSafetyOverlay.notifyPrintCompleted();
   renderPrinterError({
     code: 'WORKER_PRINT_FAILED',
@@ -825,7 +843,7 @@ function renderAmbiguousWorkerFailure(input: {
 }
 
 function clearPrinterError(): void {
-  currentPrinterError = null;
+  printer = reducePrinterReadiness(printer, { type: 'error-dismissed' });
   if (printerErrorBlock) {
     printerErrorBlock.classList.remove('printer-error-modal--wide');
     printerErrorBlock.classList.remove('printer-error-modal-overlay--wide');
@@ -868,17 +886,10 @@ const PENDING_PAYMENT_SPOOLER_STORAGE_KEY =
   'printbit.confirmPaymentSpoolerCorrelationKey';
 const PENDING_PAYMENT_FINGERPRINT_STORAGE_KEY =
   'printbit.confirmPaymentFingerprint';
-let totalPrice = 0;
-let pricingLoaded = false;
-let pricingError: string | null = null;
+let pricing: PricingState<PrintQuote> = createPricingState<PrintQuote>();
 let currentBalance = 0;
-let currentPrintQuote: PrintQuote | null = null;
-let printerReady = false;
-let paymentLeaseId: string | null = null;
-let paymentLeaseIdForFinalization: string | null = null;
-let paymentArmInFlight = false;
+let lease: PaymentLeaseState = createPaymentLeaseState();
 let paymentHeartbeatTimer: number | null = null;
-let paymentLeaseGeneration = 0;
 
 if (!rawConfig) {
   const storedSessionId = sessionStorage.getItem('printbit.sessionId');
@@ -919,10 +930,12 @@ if (
 ) {
   config.detectedColorMode = null;
 }
-currentPrintQuote =
-  config.mode === 'scan'
-    ? null
-    : ((config.quote as PrintQuote | undefined) ?? null);
+pricing = createPricingState<PrintQuote>({
+  quote:
+    config.mode === 'scan'
+      ? null
+      : ((config.quote as PrintQuote | undefined) ?? null),
+});
 
 const currentPaymentFingerprint = JSON.stringify({
   mode: config.mode,
@@ -934,7 +947,7 @@ const currentPaymentFingerprint = JSON.stringify({
   rotationDeg: config.rotationDeg,
   paperSize: config.paperSize,
   pageRange: pageRangeFingerprint(config.pageRange),
-  quotedAmount: currentPrintQuote?.requiredAmount ?? null,
+  quotedAmount: getQuote(pricing)?.requiredAmount ?? null,
 });
 
 if (config.mode === 'print' && config.sessionId) {
@@ -1026,11 +1039,9 @@ async function releaseTransientFilesForCurrentMode(
 }
 
 function getDisplayColorMode(): 'colored' | 'grayscale' {
-  if (
-    (config.mode === 'print' || config.mode === 'copy') &&
-    currentPrintQuote
-  ) {
-    return currentPrintQuote.effectiveColorMode;
+  const quote = getQuote(pricing);
+  if ((config.mode === 'print' || config.mode === 'copy') && quote) {
+    return quote.effectiveColorMode;
   }
   return config.colorMode;
 }
@@ -1243,7 +1254,7 @@ export function populateJobSummary(cfg: PrintConfig): void {
     pagesRangeValue.textContent = pageRangeLabel(cfg.pageRange);
   }
 
-  const quote = currentPrintQuote;
+  const quote = getQuote(pricing);
   const totalSheets = quote
     ? quote.selectedPages
     : (cfg.totalPages ?? 1);
@@ -1393,77 +1404,68 @@ function stopPaymentHeartbeat(): void {
   }
 }
 
-function hasBlockingPrinterError(): boolean {
-  return (
-    currentPrinterError?.severity === 'fatal' ||
-    currentPrinterError?.severity === 'recoverable'
-  );
-}
-
 function canArmPaymentLease(): boolean {
-  return (
-    (config.mode === 'print' || config.mode === 'copy') &&
-    pricingLoaded &&
-    totalPrice > 0 &&
-    printerReady &&
-    !hasBlockingPrinterError() &&
-    currentBalance < totalPrice &&
-    !isProcessingPayment &&
-    !hasActiveJob()
-  );
+  return canArmLease({
+    mode: config.mode,
+    pricing,
+    printer,
+    jobProcessing: jobState.processing,
+    jobActive: hasActiveJob(),
+    balance: currentBalance,
+  });
 }
 
 async function armPaymentLease(): Promise<void> {
-  if (paymentArmInFlight || paymentLeaseId || !canArmPaymentLease()) return;
+  if (!canStartArm(lease) || !canArmPaymentLease()) return;
 
-  paymentArmInFlight = true;
-  const armGeneration = paymentLeaseGeneration;
+  lease = reducePaymentLease(lease, { type: 'arm-started' });
   try {
     const response = await fetch('/api/payment-session/arm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mode: config.mode,
-        amount: totalPrice,
+        amount: getTotalPrice(pricing),
         sessionId: config.sessionId,
       }),
     });
-    const lease = (await response.json()) as Partial<PaymentLease>;
+    const granted = (await response.json()) as Partial<PaymentLease>;
     if (
       !response.ok ||
-      typeof lease.leaseId !== 'string' ||
-      typeof lease.expiresAt !== 'number'
+      typeof granted.leaseId !== 'string' ||
+      typeof granted.expiresAt !== 'number'
     ) {
       throw new Error('Payment hardware is unavailable.');
     }
 
-    if (armGeneration !== paymentLeaseGeneration || !canArmPaymentLease()) {
+    lease = reducePaymentLease(lease, {
+      type: 'arm-succeeded',
+      leaseId: granted.leaseId,
+      stillEligible: canArmPaymentLease(),
+    });
+    if (lease.phase !== 'armed') {
       void fetch('/api/payment-session/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leaseId: lease.leaseId }),
+        body: JSON.stringify({ leaseId: granted.leaseId }),
         keepalive: true,
       });
       return;
     }
 
-    paymentLeaseIdForFinalization = null;
-    paymentLeaseId = lease.leaseId;
     paymentHeartbeatTimer = window.setInterval(() => {
       void sendPaymentHeartbeat();
     }, 3_000);
     applyLockState(false);
   } catch {
     stopPaymentHeartbeat();
-    paymentLeaseId = null;
+    lease = reducePaymentLease(lease, { type: 'arm-failed' });
     applyLockState(true);
-  } finally {
-    paymentArmInFlight = false;
   }
 }
 
 async function sendPaymentHeartbeat(): Promise<void> {
-  const leaseId = paymentLeaseId;
+  const leaseId = lease.leaseId;
   if (!leaseId) return;
 
   try {
@@ -1477,9 +1479,13 @@ async function sendPaymentHeartbeat(): Promise<void> {
       throw new Error('Payment lease heartbeat failed.');
     }
   } catch {
-    if (paymentLeaseId !== leaseId) return;
+    const next = reducePaymentLease(lease, {
+      type: 'heartbeat-failed',
+      leaseId,
+    });
+    if (next === lease) return;
+    lease = next;
     stopPaymentHeartbeat();
-    paymentLeaseId = null;
     applyLockState(true);
   }
 }
@@ -1488,15 +1494,9 @@ async function releasePaymentLease(
   reason: string,
   keepalive = false,
 ): Promise<void> {
-  const leaseId = paymentLeaseId;
-  if (reason === 'target_reached' && leaseId) {
-    paymentLeaseIdForFinalization = leaseId;
-  } else if (reason !== 'confirm_payment') {
-    paymentLeaseIdForFinalization = null;
-  }
-  paymentLeaseGeneration += 1;
+  const leaseId = lease.leaseId;
+  lease = reducePaymentLease(lease, { type: 'released', reason });
   stopPaymentHeartbeat();
-  paymentLeaseId = null;
   applyLockState(true);
   if (!leaseId) return;
 
@@ -1514,7 +1514,7 @@ async function releasePaymentLease(
 
 function syncPaymentLeaseState(): void {
   if (!canArmPaymentLease()) {
-    if (paymentLeaseId) {
+    if (lease.leaseId) {
       void releasePaymentLease('payment_ineligible', true);
     } else {
       applyLockState(true);
@@ -1526,8 +1526,8 @@ function syncPaymentLeaseState(): void {
 }
 
 function updateChangeDisplay(balance: number): void {
-  const change = balance - totalPrice;
-  const hasChange = pricingLoaded && change > 0;
+  const change = balance - getTotalPrice(pricing);
+  const hasChange = isPricingReady(pricing) && change > 0;
   if (changeRow) {
     if (hasChange) {
       changeRow.removeAttribute('hidden');
@@ -1540,87 +1540,27 @@ function updateChangeDisplay(balance: number): void {
   }
 }
 
-function sanitizeStatusBadgeMessage(msg: string): string {
-  if (!msg) return msg;
-  if (
-    msg.length > 50 ||
-    msg.includes('|') ||
-    msg.toLowerCase().includes('post-clear') ||
-    msg.toLowerCase().includes('hardware error') ||
-    msg.toLowerCase().includes('epson popup')
-  ) {
-    return 'Printer attention needed. See instructions.';
-  }
-  return msg;
-}
-
 function applyConfirmGate(statusOverride?: string): void {
   if (!confirmBtn || !statusMessage) return;
-  if (isProcessingPayment) {
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    if (statusBadge) statusBadge.dataset.state = 'waiting';
-    return;
-  }
+  const gate = deriveConfirmGate({
+    pricing,
+    printer,
+    jobProcessing: jobState.processing,
+    balance: currentBalance,
+    statusOverride,
+  });
 
-  if (
-    currentPrinterError &&
-    (currentPrinterError.severity === 'fatal' ||
-      currentPrinterError.severity === 'recoverable')
-  ) {
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    statusMessage.textContent = sanitizeStatusBadgeMessage(
-      statusOverride ?? currentPrinterError.userMessage,
-    );
-    if (statusBadge) statusBadge.dataset.state = 'error';
-    return;
-  }
-
-  if (!pricingLoaded) {
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    statusMessage.textContent =
-      statusOverride ?? pricingError ?? 'Loading pricing...';
-    if (statusBadge) statusBadge.dataset.state = 'waiting';
-    return;
-  }
-
-  if (!printerReady) {
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    statusMessage.textContent =
-      statusOverride ??
-      `Printer not ready (${latestPrinterStatusLabel}). Please wait before inserting coins.`;
-    if (statusBadge) {
-      statusBadge.dataset.state = latestPrinterStatusLabel.startsWith(
-        'Checking',
-      )
-        ? 'waiting'
-        : 'error';
-    }
-    return;
-  }
-
-  if (currentBalance >= totalPrice) {
-    confirmBtn.disabled = false;
-    confirmBtn.setAttribute('aria-disabled', 'false');
+  confirmBtn.disabled = !gate.confirmEnabled;
+  confirmBtn.setAttribute('aria-disabled', String(!gate.confirmEnabled));
+  if (gate.highlightReady === true) {
     confirmBtn.classList.add('is-ready');
     actionCol?.classList.add('is-ready');
-    statusMessage.textContent =
-      statusOverride ?? 'Sufficient balance detected. You can confirm now.';
-    if (statusBadge) statusBadge.dataset.state = 'ready';
-  } else {
+  } else if (gate.highlightReady === false) {
     confirmBtn.classList.remove('is-ready');
     actionCol?.classList.remove('is-ready');
-    const needed = totalPrice - currentBalance;
-    confirmBtn.disabled = true;
-    confirmBtn.setAttribute('aria-disabled', 'true');
-    statusMessage.textContent = sanitizeStatusBadgeMessage(
-      statusOverride ?? `Insert more coins: ₱ ${needed} remaining.`,
-    );
-    if (statusBadge) statusBadge.dataset.state = statusOverride ? 'error' : 'waiting';
   }
+  if (gate.message !== null) statusMessage.textContent = gate.message;
+  if (statusBadge) statusBadge.dataset.state = gate.badge;
 }
 
 let displayedBalance = 0;
@@ -1681,17 +1621,17 @@ function animateBalanceCounter(targetBalance: number): void {
 function updateBalanceRingArc(balance: number): void {
   if (balanceRing) {
     balanceRing.setAttribute('aria-valuenow', String(balance));
-    balanceRing.setAttribute('aria-valuemax', String(totalPrice));
+    balanceRing.setAttribute('aria-valuemax', String(getTotalPrice(pricing)));
   }
   if (!balanceArc) return;
   const circumference = 326.7;
   const ratio =
-    totalPrice > 0 ? Math.min(1, Math.max(0, balance / totalPrice)) : 0;
+    getTotalPrice(pricing) > 0 ? Math.min(1, Math.max(0, balance / getTotalPrice(pricing))) : 0;
   const offset = circumference * (1 - ratio);
   balanceArc.style.strokeDashoffset = String(offset);
 
   if (balanceRing) {
-    if (pricingLoaded && totalPrice > 0 && balance >= totalPrice) {
+    if (isPricingReady(pricing) && getTotalPrice(pricing) > 0 && balance >= getTotalPrice(pricing)) {
       balanceRing.classList.add('is-ready');
     } else {
       balanceRing.classList.remove('is-ready');
@@ -1704,7 +1644,7 @@ function updateBalanceUI(balance: number): void {
   animateBalanceCounter(balance);
   updateBalanceRingArc(balance);
   updateChangeDisplay(balance);
-  if (pricingLoaded && totalPrice > 0 && currentBalance >= totalPrice) {
+  if (isPricingReady(pricing) && getTotalPrice(pricing) > 0 && currentBalance >= getTotalPrice(pricing)) {
     void releasePaymentLease('target_reached');
   } else {
     syncPaymentLeaseState();
@@ -1892,7 +1832,7 @@ function showInitialPrintProgress(): void {
   if (config.mode !== 'print') return;
 
   const selectedPages =
-    currentPrintQuote?.selectedPages ?? config.totalPages ?? 1;
+    getQuote(pricing)?.selectedPages ?? config.totalPages ?? 1;
   renderPrintProgress({
     pagesPrinted: 0,
     totalPages: getExpectedPrintPages({
@@ -1954,12 +1894,13 @@ async function loadPricing(): Promise<void> {
         );
       }
 
-      currentPrintQuote = payload.quote;
-      totalPrice = payload.quote.requiredAmount;
-      pricingLoaded = true;
-      pricingError = null;
-      if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
-      if (actionPriceValue) actionPriceValue.textContent = `₱ ${totalPrice}`;
+      pricing = reducePricing(pricing, {
+        type: 'quote-loaded',
+        totalPrice: payload.quote.requiredAmount,
+        quote: payload.quote,
+      });
+      if (priceValue) priceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
+      if (actionPriceValue) actionPriceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
       populateJobSummary(config);
       updateBalanceRingArc(currentBalance);
       updateChangeDisplay(currentBalance);
@@ -1970,10 +1911,7 @@ async function loadPricing(): Promise<void> {
         error instanceof Error
           ? error.message
           : `Failed to load ${config.mode === 'print' ? 'print' : 'copy'} quote.`;
-      currentPrintQuote = null;
-      totalPrice = 0;
-      pricingLoaded = false;
-      pricingError = message;
+      pricing = reducePricing(pricing, { type: 'quote-failed', message });
       if (priceValue) priceValue.textContent = 'Unavailable';
       if (actionPriceValue) actionPriceValue.textContent = '₱ 0';
       updateChangeDisplay(currentBalance);
@@ -1991,11 +1929,13 @@ async function loadPricing(): Promise<void> {
     scanDocument: payload.scanDocument ?? DEFAULT_PRICING.scanDocument,
   };
 
-  totalPrice = safePricing.scanDocument;
-  pricingLoaded = true;
-  pricingError = null;
-  if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
-  if (actionPriceValue) actionPriceValue.textContent = `₱ ${totalPrice}`;
+  pricing = reducePricing(pricing, {
+    type: 'quote-loaded',
+    totalPrice: safePricing.scanDocument,
+    quote: null,
+  });
+  if (priceValue) priceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
+  if (actionPriceValue) actionPriceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
   updateChangeDisplay(currentBalance);
   syncPaymentLeaseState();
   applyConfirmGate();
@@ -2003,8 +1943,6 @@ async function loadPricing(): Promise<void> {
 
 // Modal declarations removed (moved to top of file)
 
-let isProcessingPayment = false;
-let activeSpoolerCorrelationKey: string | null = null;
 const persistedSpoolerCorrelationKeyRaw = sessionStorage.getItem(
   PENDING_PAYMENT_SPOOLER_STORAGE_KEY,
 );
@@ -2035,20 +1973,18 @@ if (!persistedFingerprintMatchesCurrent) {
   sessionStorage.removeItem(PENDING_PAYMENT_IDEMPOTENCY_STORAGE_KEY);
   sessionStorage.removeItem(PENDING_PAYMENT_FINGERPRINT_STORAGE_KEY);
 }
-let latestPrinterStatusLabel = 'Checking...';
 
 const NETWORK_REQUEST_TIMEOUT_MS = 90_000;
 
-let currentTransactionId: string | null = null;
 let currentScanDownloadUrl: string | null = null;
 let currentScanDownloadExpiry: string | null = null;
 
 function setTransactionReference(id: string | null): void {
-  currentTransactionId = id?.trim().length ? id.trim() : null;
-  powerSafetyOverlay.setTransactionReference(currentTransactionId);
+  jobState = reduceJob(jobState, { type: 'transaction-referenced', id });
+  powerSafetyOverlay.setTransactionReference(jobState.transactionId);
   if (!transactionReference) return;
-  if (currentTransactionId) {
-    transactionReference.textContent = `Reference ID: ${currentTransactionId}`;
+  if (jobState.transactionId) {
+    transactionReference.textContent = `Reference ID: ${jobState.transactionId}`;
     transactionReference.removeAttribute('hidden');
   } else {
     transactionReference.textContent = 'Reference ID: —';
@@ -2094,7 +2030,7 @@ async function pollCopyJobReceipt(jobId: string): Promise<void> {
           {
             transactionId: txId,
             spoolerCorrelationKey:
-              activeSpoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
+              jobState.activeSpoolerKey ?? paymentSpoolerCorrelationKey,
           },
         );
         return;
@@ -2109,7 +2045,7 @@ async function pollCopyJobReceipt(jobId: string): Promise<void> {
 }
 
 function renderReceiptCta(): void {
-  const receipt = confirmationOutcome.receipt;
+  const receipt = jobState.outcome.receipt;
   if (!receiptCtaContainer || !receiptQrCanvas || !receipt) return;
   receiptCtaContainer.removeAttribute('hidden');
   if (receiptQrExpiry) {
@@ -2138,9 +2074,9 @@ function renderReceiptCta(): void {
 
 function renderMaintenanceResolution(): void {
   const view = buildMaintenanceReceiptView({
-    transactionId: currentTransactionId,
-    receiptUrl: confirmationOutcome.receipt?.url ?? null,
-    receiptExpiresAt: confirmationOutcome.receipt?.expiresAt ?? null,
+    transactionId: jobState.transactionId,
+    receiptUrl: jobState.outcome.receipt?.url ?? null,
+    receiptExpiresAt: jobState.outcome.receipt?.expiresAt ?? null,
   });
 
   if (!view.receipt || !maintenanceReceiptQrCanvas) {
@@ -2173,20 +2109,19 @@ function renderMaintenanceResolution(): void {
 function captureReceiptCta(
   payload: ReceiptLinkPayload,
   identity: Partial<ConfirmationOutcomeIdentity> = {
-    transactionId: currentTransactionId,
+    transactionId: jobState.transactionId,
     spoolerCorrelationKey:
-      activeSpoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
+      jobState.activeSpoolerKey ?? paymentSpoolerCorrelationKey,
   },
 ): void {
   const receipt = extractReceiptUrl(payload);
   if (!receipt) return;
-  confirmationOutcome = applyConfirmationEvidence(confirmationOutcome, {
-    type: 'receipt-available',
-    identity,
-    receipt,
+  jobState = reduceJob(jobState, {
+    type: 'outcome-evidence',
+    evidence: { type: 'receipt-available', identity, receipt },
   });
   renderReceiptCta();
-  if (confirmationOutcome.outcome === 'maintenance') {
+  if (jobState.outcome.outcome === 'maintenance') {
     renderMaintenanceResolution();
   }
 }
@@ -2272,10 +2207,10 @@ function captureScanDownloadCta(
 function finalizePrintSuccess(
   transactionId: string | null,
   spoolerCorrelationKey: string | null =
-    activeSpoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
+    jobState.activeSpoolerKey ?? paymentSpoolerCorrelationKey,
 ): void {
   void releasePaymentLease('terminal_completion', true);
-  const effectiveTxId = transactionId ?? currentTransactionId;
+  const effectiveTxId = transactionId ?? jobState.transactionId;
   if (!recordConfirmationTerminalSuccess({ transactionId: effectiveTxId, spoolerCorrelationKey })) {
     console.warn(
       '[PRINT] Ignoring success event because this job already failed',
@@ -2288,14 +2223,14 @@ function finalizePrintSuccess(
   hideOverlay(printingOverlay);
   hidePrintProgress();
 
-  if (pendingOwedChange && pendingOwedChange.amountOwed > 0) {
+  if (jobState.owedChange && jobState.owedChange.amountOwed > 0) {
     const owedRef =
-      effectiveTxId || pendingOwedChange.transactionId || 'Contact Staff';
+      effectiveTxId || jobState.owedChange.transactionId || 'Contact Staff';
     if (owedChangeAmountBadge) {
-      owedChangeAmountBadge.textContent = `₱${pendingOwedChange.amountOwed} Owed`;
+      owedChangeAmountBadge.textContent = `₱${jobState.owedChange.amountOwed} Owed`;
     }
     if (owedChangeAmountText) {
-      owedChangeAmountText.textContent = String(pendingOwedChange.amountOwed);
+      owedChangeAmountText.textContent = String(jobState.owedChange.amountOwed);
     }
     if (owedChangeRefId) {
       owedChangeRefId.textContent = owedRef;
@@ -2352,7 +2287,7 @@ function finalizePrintSuccess(
 
   showOverlay(thankYouOverlay);
   clearPendingPaymentSessionState();
-  activeSpoolerCorrelationKey = null;
+  jobState = reduceJob(jobState, { type: 'spooler-cleared' });
   if (statusMessage) {
     statusMessage.textContent =
       config.mode === 'scan'
@@ -2361,7 +2296,7 @@ function finalizePrintSuccess(
           ? 'Copy complete. Thank you!'
           : 'Printing complete. Thank you!';
   }
-  isProcessingPayment = false;
+  jobState = reduceJob(jobState, { type: 'processing-stopped' });
   powerSafetyOverlay.notifyPrintCompleted();
 
   if (printAnotherBtn) {
@@ -2384,10 +2319,13 @@ function finalizePrintSuccess(
 
 function enterWorkerPendingState(transactionId: string | null): void {
   setTransactionReference(transactionId);
-  activeSpoolerCorrelationKey = paymentSpoolerCorrelationKey;
+  jobState = reduceJob(jobState, {
+    type: 'spooler-activated',
+    key: paymentSpoolerCorrelationKey,
+  });
 
   // If print completed before the confirm-payment response resolved, do not revert to pending
-  if (confirmationOutcome.outcome === 'success') {
+  if (jobState.outcome.outcome === 'success') {
     hideOverlay(printingOverlay);
     showOverlay(thankYouOverlay);
     return;
@@ -2395,9 +2333,9 @@ function enterWorkerPendingState(transactionId: string | null): void {
 
   restoreConfirmationPending({
     transactionId,
-    spoolerCorrelationKey: activeSpoolerCorrelationKey,
+    spoolerCorrelationKey: jobState.activeSpoolerKey,
   });
-  if (confirmationOutcome.outcome === 'maintenance') {
+  if (jobState.outcome.outcome === 'maintenance') {
     hideOverlay(printingOverlay);
     renderMaintenanceResolution();
     return;
@@ -2425,7 +2363,7 @@ function matchesPendingWorkerEvent(payload: {
       ? payload.spoolerCorrelationKey
       : null;
 
-  if (currentTransactionId && payloadTransactionId === currentTransactionId) {
+  if (jobState.transactionId && payloadTransactionId === jobState.transactionId) {
     return true;
   }
 
@@ -2557,7 +2495,7 @@ function showModal(): void {
     modalQualityRow?.removeAttribute('hidden');
 
     // 1. Pages & Range
-    const quote = currentPrintQuote;
+    const quote = getQuote(pricing);
     const totalSheets = quote ? quote.selectedPages : (config.totalPages ?? 1);
     const totalDisplay = quote
       ? `${quote.selectedPages} of ${quote.totalPages} ${quote.totalPages === 1 ? 'page' : 'pages'}`
@@ -2673,11 +2611,11 @@ function showModal(): void {
     }
   }
 
-  if (modalPrice) modalPrice.textContent = `₱ ${totalPrice}`;
+  if (modalPrice) modalPrice.textContent = `₱ ${getTotalPrice(pricing)}`;
   if (modalPaid) modalPaid.textContent = `₱ ${currentBalance}`;
 
   // Show coin change in modal
-  const modalChangeAmount = Math.max(0, currentBalance - totalPrice);
+  const modalChangeAmount = Math.max(0, currentBalance - getTotalPrice(pricing));
   if (modalChange) {
     modalChange.textContent = `₱ ${modalChangeAmount}`;
   }
@@ -2715,10 +2653,9 @@ function hideOverlay(el: HTMLElement | null): void {
 }
 
 function clearConfirmSessionStorage(): void {
-  confirmationOutcome = createConfirmationOutcomeState();
-  paymentLeaseIdForFinalization = null;
+  jobState = reduceJob(jobState, { type: 'session-cleared' });
+  lease = reducePaymentLease(lease, { type: 'session-cleared' });
   setTransactionReference(null);
-  pendingOwedChange = null;
   if (owedChangeAlert) {
     owedChangeAlert.setAttribute('hidden', '');
   }
@@ -2783,14 +2720,13 @@ modalConfirmBtn?.addEventListener('click', async () => {
   modalConfirmBtn.disabled = true;
   hideModal();
   confirmBtn.disabled = true;
-  isProcessingPayment = true;
+  jobState = reduceJob(jobState, { type: 'submit-started' });
   showOverlay(printingOverlay);
   setPrintingPhase('printing');
   showInitialPrintProgress();
 
   try {
-    const finalPaymentLeaseId =
-      paymentLeaseIdForFinalization ?? paymentLeaseId;
+    const finalPaymentLeaseId = getFinalLeaseId(lease);
     if (config.mode === 'print' || config.mode === 'copy') {
       await releasePaymentLease('confirm_payment');
     }
@@ -2862,11 +2798,11 @@ modalConfirmBtn?.addEventListener('click', async () => {
           'Idempotency-Key': paymentIdempotencyKey,
         },
         body: JSON.stringify({
-          amount: totalPrice,
+          amount: getTotalPrice(pricing),
           ...buildPhysicalPrintSettings(config, getDisplayColorMode()),
           previewPath: config.copyPreviewPath,
           spoolerCorrelationKey,
-          quoteHash: currentPrintQuote?.quoteHash ?? config.quote?.quoteHash,
+          quoteHash: getQuote(pricing)?.quoteHash ?? config.quote?.quoteHash,
         }),
       });
 
@@ -2931,14 +2867,14 @@ modalConfirmBtn?.addEventListener('click', async () => {
           'Idempotency-Key': paymentIdempotencyKey,
         },
         body: JSON.stringify({
-          amount: totalPrice,
+          amount: getTotalPrice(pricing),
           paymentLeaseId: finalPaymentLeaseId,
           mode: config.mode,
           sessionId: config.sessionId,
           documentId: config.documentId,
           ...buildPhysicalPrintSettings(config, getDisplayColorMode()),
           spoolerCorrelationKey,
-          quoteHash: currentPrintQuote?.quoteHash ?? config.quote?.quoteHash,
+          quoteHash: getQuote(pricing)?.quoteHash ?? config.quote?.quoteHash,
         }),
       });
 
@@ -2983,7 +2919,7 @@ modalConfirmBtn?.addEventListener('click', async () => {
     }
   } catch (error) {
     hideOverlay(printingOverlay);
-    isProcessingPayment = false;
+    jobState = reduceJob(jobState, { type: 'processing-stopped' });
     powerSafetyOverlay.notifyPrintCompleted();
     const message =
       error instanceof Error ? error.message : 'Error processing payment.';
@@ -2998,14 +2934,14 @@ thankYouDoneBtn?.addEventListener('click', () => {
 });
 
 maintenanceDoneBtn?.addEventListener('click', () => {
-  isJobInterruptedState = false;
+  printer = reducePrinterReadiness(printer, { type: 'maintenance-acknowledged' });
   clearConfirmSessionStorage();
   navigateWithKioskMotion('/');
 });
 
 printAnotherBtn?.addEventListener('click', () => {
   setTransactionReference(null);
-  pendingOwedChange = null;
+  jobState = reduceJob(jobState, { type: 'owed-change-cleared' });
   if (owedChangeAlert) {
     owedChangeAlert.setAttribute('hidden', '');
   }
@@ -3039,20 +2975,20 @@ function handleErrorGuideUpdate(
 ): void {
   if (activeError) {
     const isMidJob =
-      isJobInterruptedState ||
+      printer.interrupted ||
       hasActiveJob() ||
       Boolean(activeError.jobRequiresStaff) ||
       Boolean(activeError.jobId);
 
     if (isMidJob) {
-      isJobInterruptedState = true;
+      printer = reducePrinterReadiness(printer, { type: 'job-interrupted' });
       hideOverlay(printingOverlay);
-      isProcessingPayment = false;
+      jobState = reduceJob(jobState, { type: 'processing-stopped' });
       powerSafetyOverlay?.notifyPrintCompleted();
 
       const rawRef =
         activeError.jobId ||
-        currentTransactionId ||
+        jobState.transactionId ||
         (paymentSpoolerCorrelationKey
           ? `PB-${paymentSpoolerCorrelationKey}`
           : null);
@@ -3139,16 +3075,19 @@ if (typeof ioFactory !== 'function') {
           ? data.dispensed
           : 0;
       const owed = Math.max(0, requested - dispensed);
-      pendingOwedChange = {
-        amountOwed: owed > 0 ? owed : requested,
-        transactionId: data.transactionId ?? currentTransactionId,
-        message: data.message,
-      };
+      jobState = reduceJob(jobState, {
+        type: 'owed-change-recorded',
+        notice: {
+          amountOwed: owed > 0 ? owed : requested,
+          transactionId: data.transactionId ?? jobState.transactionId,
+          message: data.message,
+        },
+      });
       if (data.owedChangeId) {
         setPrintingPhase('failed');
       }
     } else if (data.state === 'dispensed') {
-      pendingOwedChange = null;
+      jobState = reduceJob(jobState, { type: 'owed-change-cleared' });
     }
   });
 
@@ -3190,10 +3129,10 @@ if (typeof ioFactory !== 'function') {
           lifecycle.printError.code,
           lifecycle.printError.userMessage,
         )) ||
-        (currentPrinterError &&
+        (printer.error &&
           isMaintenancePrintFailure(
-            currentPrinterError.code,
-            currentPrinterError.userMessage,
+            printer.error.code,
+            printer.error.userMessage,
           )) ||
         isMaintenancePrintFailure(undefined, lifecycle.reason) ||
         lifecycle.failureStage === 'HardwareError' ||
@@ -3227,20 +3166,20 @@ if (typeof ioFactory !== 'function') {
         setTransactionReference(lifecycle.transactionId);
       }
       recordConfirmationTerminalFailure({
-        transactionId: lifecycle.transactionId ?? currentTransactionId,
+        transactionId: lifecycle.transactionId ?? jobState.transactionId,
         spoolerCorrelationKey:
           lifecycle.spoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
       });
 
       if (isHardwareError) {
         hideOverlay(printingOverlay);
-        isProcessingPayment = false;
+        jobState = reduceJob(jobState, { type: 'processing-stopped' });
         powerSafetyOverlay.notifyPrintCompleted();
-        // Keep activeSpoolerCorrelationKey and session state intact!
+        // Keep jobState.activeSpoolerKey and session state intact!
         if (lifecycle.printError) {
           renderPrinterError(lifecycle.printError);
-        } else if (currentPrinterError) {
-          renderPrinterError(currentPrinterError);
+        } else if (printer.error) {
+          renderPrinterError(printer.error);
         } else {
           renderPrinterError({
             code: 'WORKER_HARDWARE_ERROR',
@@ -3307,11 +3246,13 @@ if (typeof ioFactory !== 'function') {
           ? BLOCKED_PRINTER_STATUSES.has(status.status)
           : false;
       const isBlocked = !status.connected || blockedByStatus;
-      printerReady = !isBlocked;
-      latestPrinterStatusLabel =
-        status.status || (status.connected ? 'Ready' : 'Not Found');
+      printer = reducePrinterReadiness(printer, {
+        type: 'status-reported',
+        ready: !isBlocked,
+        label: status.status || (status.connected ? 'Ready' : 'Not Found'),
+      });
       applyConfirmGate();
-      if (!printerReady) {
+      if (!printer.ready) {
         void releasePaymentLease('printer_failure', true);
         void loadPrinterStatus();
       } else {
@@ -3324,30 +3265,31 @@ if (typeof ioFactory !== 'function') {
 
   connectedSocket.on('printerRecovered', (payload: unknown) => {
     const status = payload as PrinterStatusPayload | null;
-    if (currentPrinterError || isJobInterruptedState) return;
-    printerReady = true;
-    latestPrinterStatusLabel = status?.status || 'Idle';
+    if (printer.error || printer.interrupted) return;
+    printer = reducePrinterReadiness(printer, {
+      type: 'recovered',
+      label: status?.status || 'Idle',
+    });
     // Error UI never auto-clears; only simulation-cleared / paper-jam-cleared do.
-    if (!currentPrinterError) {
+    if (!printer.error) {
       applyConfirmGate();
       syncPaymentLeaseState();
     }
   });
 
   connectedSocket.on('printerStatusRestored', () => {
-    if (currentPrinterError || isJobInterruptedState) return;
-    printerReady = true;
-    latestPrinterStatusLabel = 'Ready';
+    if (printer.error || printer.interrupted) return;
+    printer = reducePrinterReadiness(printer, {
+      type: 'recovered',
+      label: 'Ready',
+    });
     applyConfirmGate();
     syncPaymentLeaseState();
   });
 
   connectedSocket.on('printer:simulation-cleared', (payload: unknown) => {
     const data = payload as { redirectHome?: boolean } | null;
-    isJobInterruptedState = false;
-    currentPrinterError = null;
-    printerReady = true;
-    latestPrinterStatusLabel = 'Ready';
+    printer = reducePrinterReadiness(printer, { type: 'admin-cleared' });
     clearPrinterError();
     if (maintenanceDoneBtn) {
       maintenanceDoneBtn.style.display = '';
@@ -3362,10 +3304,7 @@ if (typeof ioFactory !== 'function') {
   });
 
   connectedSocket.on('printer:paper-jam-cleared', () => {
-    isJobInterruptedState = false;
-    currentPrinterError = null;
-    printerReady = true;
-    latestPrinterStatusLabel = 'Ready';
+    printer = reducePrinterReadiness(printer, { type: 'admin-cleared' });
     clearPrinterError();
     clearConfirmSessionStorage();
     navigateWithKioskMotion('/', 'replace');
@@ -3396,12 +3335,14 @@ if (typeof ioFactory !== 'function') {
   // Re-sync on printer malfunction or spooler failure
   connectedSocket.on('printerMalfunction', (payload: unknown) => {
     const status = payload as PrinterStatusPayload | null;
-    printerReady = false;
-    latestPrinterStatusLabel = status?.status || 'Error';
+    printer = reducePrinterReadiness(printer, {
+      type: 'malfunction',
+      label: status?.status || 'Error',
+    });
     if (status?.printError) {
       if (hasActiveJob()) {
         hideOverlay(printingOverlay);
-        isProcessingPayment = false;
+        jobState = reduceJob(jobState, { type: 'processing-stopped' });
         powerSafetyOverlay?.notifyPrintCompleted();
       }
       renderPrinterError(status.printError);
@@ -3418,7 +3359,7 @@ if (typeof ioFactory !== 'function') {
   connectedSocket.on('workerPrintStarted', (payload: unknown) => {
     const job = payload as WorkerJobPayload | null;
     if (!matchesPendingWorkerEvent(job ?? {})) return;
-    if (confirmationOutcome.outcome === 'maintenance') return;
+    if (jobState.outcome.outcome === 'maintenance') return;
     setPrintingPhase('printing');
     if (statusMessage) {
       statusMessage.textContent =
@@ -3433,7 +3374,7 @@ if (typeof ioFactory !== 'function') {
   connectedSocket.on('workerPrintProgress', (payload: unknown) => {
     const job = payload as WorkerJobPayload | null;
     if (!matchesPendingWorkerEvent(job ?? {})) return;
-    if (confirmationOutcome.outcome === 'maintenance') return;
+    if (jobState.outcome.outcome === 'maintenance') return;
     if (typeof job?.pagesPrinted !== 'number') return;
 
     lastKnownPagesPrinted = Math.max(
@@ -3455,12 +3396,12 @@ if (typeof ioFactory !== 'function') {
     if (!matchesPendingWorkerEvent(job ?? {})) return;
     if (job?.transactionId) setTransactionReference(job.transactionId);
     recordConfirmationTerminalFailure({
-      transactionId: job?.transactionId ?? currentTransactionId,
+      transactionId: job?.transactionId ?? jobState.transactionId,
       spoolerCorrelationKey:
         job?.spoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
     });
     hideOverlay(printingOverlay);
-    isProcessingPayment = false;
+    jobState = reduceJob(jobState, { type: 'processing-stopped' });
     renderPrinterError({
       code: 'WORKER_HARDWARE_ERROR',
       severity: 'recoverable',
@@ -3509,7 +3450,7 @@ if (typeof ioFactory !== 'function') {
 
     if (job?.transactionId) setTransactionReference(job.transactionId);
     recordConfirmationTerminalFailure({
-      transactionId: job?.transactionId ?? currentTransactionId,
+      transactionId: job?.transactionId ?? jobState.transactionId,
       spoolerCorrelationKey:
         job?.spoolerCorrelationKey ?? paymentSpoolerCorrelationKey,
     });
@@ -3532,7 +3473,7 @@ if (typeof ioFactory !== 'function') {
 
     if (isHardwareError) {
       hideOverlay(printingOverlay);
-      isProcessingPayment = false;
+      jobState = reduceJob(jobState, { type: 'processing-stopped' });
       powerSafetyOverlay.notifyPrintCompleted();
       const hardwareError: PrintError = {
         ...(job?.printError ?? {
@@ -3597,11 +3538,14 @@ async function loadPrinterStatus(): Promise<void> {
   try {
     const res = await fetch('/api/printer/status');
     const data = await res.json();
-    printerReady = Boolean(data.ready);
-    latestPrinterStatusLabel =
-      data.status || (printerReady ? 'Ready' : 'Not Found');
+    const reportedReady = Boolean(data.ready);
+    printer = reducePrinterReadiness(printer, {
+      type: 'status-reported',
+      ready: reportedReady,
+      label: data.status || (reportedReady ? 'Ready' : 'Not Found'),
+    });
     applyConfirmGate();
-    if (!printerReady) {
+    if (!printer.ready) {
       void releasePaymentLease('printer_failure', true);
     } else {
       syncPaymentLeaseState();
@@ -3609,16 +3553,16 @@ async function loadPrinterStatus(): Promise<void> {
 
     // If printer is not ready or still in checking phase, schedule a retry
     if (
-      !printerReady ||
-      latestPrinterStatusLabel === 'Checking…' ||
-      latestPrinterStatusLabel === 'Checking...'
+      !printer.ready ||
+      printer.statusLabel === 'Checking…' ||
+      printer.statusLabel === 'Checking...'
     ) {
       printerStatusRetryTimer = window.setTimeout(() => {
         void loadPrinterStatus();
       }, 2500);
     }
   } catch {
-    printerReady = false;
+    printer = reducePrinterReadiness(printer, { type: 'status-request-failed' });
     void releasePaymentLease('printer_failure', true);
     applyConfirmGate();
     printerStatusRetryTimer = window.setTimeout(() => {
