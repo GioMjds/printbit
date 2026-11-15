@@ -34,6 +34,15 @@ import {
   type HotspotConfig,
 } from '../shared/wifi-troubleshooting';
 import { buildPhysicalPrintSettings } from './print-settings';
+import {
+  createPricingState,
+  getPricingMessage,
+  getQuote,
+  getTotalPrice,
+  isPricingReady,
+  reducePricing,
+  type PricingState,
+} from './pricing-state';
 import type { ActivePrinterErrorState } from '@/services/printer-error-state';
 
 export {};
@@ -868,11 +877,8 @@ const PENDING_PAYMENT_SPOOLER_STORAGE_KEY =
   'printbit.confirmPaymentSpoolerCorrelationKey';
 const PENDING_PAYMENT_FINGERPRINT_STORAGE_KEY =
   'printbit.confirmPaymentFingerprint';
-let totalPrice = 0;
-let pricingLoaded = false;
-let pricingError: string | null = null;
+let pricing: PricingState<PrintQuote> = createPricingState<PrintQuote>();
 let currentBalance = 0;
-let currentPrintQuote: PrintQuote | null = null;
 let printerReady = false;
 let paymentLeaseId: string | null = null;
 let paymentLeaseIdForFinalization: string | null = null;
@@ -919,10 +925,12 @@ if (
 ) {
   config.detectedColorMode = null;
 }
-currentPrintQuote =
-  config.mode === 'scan'
-    ? null
-    : ((config.quote as PrintQuote | undefined) ?? null);
+pricing = createPricingState<PrintQuote>({
+  quote:
+    config.mode === 'scan'
+      ? null
+      : ((config.quote as PrintQuote | undefined) ?? null),
+});
 
 const currentPaymentFingerprint = JSON.stringify({
   mode: config.mode,
@@ -934,7 +942,7 @@ const currentPaymentFingerprint = JSON.stringify({
   rotationDeg: config.rotationDeg,
   paperSize: config.paperSize,
   pageRange: pageRangeFingerprint(config.pageRange),
-  quotedAmount: currentPrintQuote?.requiredAmount ?? null,
+  quotedAmount: getQuote(pricing)?.requiredAmount ?? null,
 });
 
 if (config.mode === 'print' && config.sessionId) {
@@ -1026,11 +1034,9 @@ async function releaseTransientFilesForCurrentMode(
 }
 
 function getDisplayColorMode(): 'colored' | 'grayscale' {
-  if (
-    (config.mode === 'print' || config.mode === 'copy') &&
-    currentPrintQuote
-  ) {
-    return currentPrintQuote.effectiveColorMode;
+  const quote = getQuote(pricing);
+  if ((config.mode === 'print' || config.mode === 'copy') && quote) {
+    return quote.effectiveColorMode;
   }
   return config.colorMode;
 }
@@ -1243,7 +1249,7 @@ export function populateJobSummary(cfg: PrintConfig): void {
     pagesRangeValue.textContent = pageRangeLabel(cfg.pageRange);
   }
 
-  const quote = currentPrintQuote;
+  const quote = getQuote(pricing);
   const totalSheets = quote
     ? quote.selectedPages
     : (cfg.totalPages ?? 1);
@@ -1403,11 +1409,11 @@ function hasBlockingPrinterError(): boolean {
 function canArmPaymentLease(): boolean {
   return (
     (config.mode === 'print' || config.mode === 'copy') &&
-    pricingLoaded &&
-    totalPrice > 0 &&
+    isPricingReady(pricing) &&
+    getTotalPrice(pricing) > 0 &&
     printerReady &&
     !hasBlockingPrinterError() &&
-    currentBalance < totalPrice &&
+    currentBalance < getTotalPrice(pricing) &&
     !isProcessingPayment &&
     !hasActiveJob()
   );
@@ -1424,7 +1430,7 @@ async function armPaymentLease(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mode: config.mode,
-        amount: totalPrice,
+        amount: getTotalPrice(pricing),
         sessionId: config.sessionId,
       }),
     });
@@ -1526,8 +1532,8 @@ function syncPaymentLeaseState(): void {
 }
 
 function updateChangeDisplay(balance: number): void {
-  const change = balance - totalPrice;
-  const hasChange = pricingLoaded && change > 0;
+  const change = balance - getTotalPrice(pricing);
+  const hasChange = isPricingReady(pricing) && change > 0;
   if (changeRow) {
     if (hasChange) {
       changeRow.removeAttribute('hidden');
@@ -1577,11 +1583,11 @@ function applyConfirmGate(statusOverride?: string): void {
     return;
   }
 
-  if (!pricingLoaded) {
+  if (!isPricingReady(pricing)) {
     confirmBtn.disabled = true;
     confirmBtn.setAttribute('aria-disabled', 'true');
     statusMessage.textContent =
-      statusOverride ?? pricingError ?? 'Loading pricing...';
+      statusOverride ?? getPricingMessage(pricing) ?? 'Loading pricing...';
     if (statusBadge) statusBadge.dataset.state = 'waiting';
     return;
   }
@@ -1602,7 +1608,7 @@ function applyConfirmGate(statusOverride?: string): void {
     return;
   }
 
-  if (currentBalance >= totalPrice) {
+  if (currentBalance >= getTotalPrice(pricing)) {
     confirmBtn.disabled = false;
     confirmBtn.setAttribute('aria-disabled', 'false');
     confirmBtn.classList.add('is-ready');
@@ -1613,7 +1619,7 @@ function applyConfirmGate(statusOverride?: string): void {
   } else {
     confirmBtn.classList.remove('is-ready');
     actionCol?.classList.remove('is-ready');
-    const needed = totalPrice - currentBalance;
+    const needed = getTotalPrice(pricing) - currentBalance;
     confirmBtn.disabled = true;
     confirmBtn.setAttribute('aria-disabled', 'true');
     statusMessage.textContent = sanitizeStatusBadgeMessage(
@@ -1681,17 +1687,17 @@ function animateBalanceCounter(targetBalance: number): void {
 function updateBalanceRingArc(balance: number): void {
   if (balanceRing) {
     balanceRing.setAttribute('aria-valuenow', String(balance));
-    balanceRing.setAttribute('aria-valuemax', String(totalPrice));
+    balanceRing.setAttribute('aria-valuemax', String(getTotalPrice(pricing)));
   }
   if (!balanceArc) return;
   const circumference = 326.7;
   const ratio =
-    totalPrice > 0 ? Math.min(1, Math.max(0, balance / totalPrice)) : 0;
+    getTotalPrice(pricing) > 0 ? Math.min(1, Math.max(0, balance / getTotalPrice(pricing))) : 0;
   const offset = circumference * (1 - ratio);
   balanceArc.style.strokeDashoffset = String(offset);
 
   if (balanceRing) {
-    if (pricingLoaded && totalPrice > 0 && balance >= totalPrice) {
+    if (isPricingReady(pricing) && getTotalPrice(pricing) > 0 && balance >= getTotalPrice(pricing)) {
       balanceRing.classList.add('is-ready');
     } else {
       balanceRing.classList.remove('is-ready');
@@ -1704,7 +1710,7 @@ function updateBalanceUI(balance: number): void {
   animateBalanceCounter(balance);
   updateBalanceRingArc(balance);
   updateChangeDisplay(balance);
-  if (pricingLoaded && totalPrice > 0 && currentBalance >= totalPrice) {
+  if (isPricingReady(pricing) && getTotalPrice(pricing) > 0 && currentBalance >= getTotalPrice(pricing)) {
     void releasePaymentLease('target_reached');
   } else {
     syncPaymentLeaseState();
@@ -1892,7 +1898,7 @@ function showInitialPrintProgress(): void {
   if (config.mode !== 'print') return;
 
   const selectedPages =
-    currentPrintQuote?.selectedPages ?? config.totalPages ?? 1;
+    getQuote(pricing)?.selectedPages ?? config.totalPages ?? 1;
   renderPrintProgress({
     pagesPrinted: 0,
     totalPages: getExpectedPrintPages({
@@ -1954,12 +1960,13 @@ async function loadPricing(): Promise<void> {
         );
       }
 
-      currentPrintQuote = payload.quote;
-      totalPrice = payload.quote.requiredAmount;
-      pricingLoaded = true;
-      pricingError = null;
-      if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
-      if (actionPriceValue) actionPriceValue.textContent = `₱ ${totalPrice}`;
+      pricing = reducePricing(pricing, {
+        type: 'quote-loaded',
+        totalPrice: payload.quote.requiredAmount,
+        quote: payload.quote,
+      });
+      if (priceValue) priceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
+      if (actionPriceValue) actionPriceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
       populateJobSummary(config);
       updateBalanceRingArc(currentBalance);
       updateChangeDisplay(currentBalance);
@@ -1970,10 +1977,7 @@ async function loadPricing(): Promise<void> {
         error instanceof Error
           ? error.message
           : `Failed to load ${config.mode === 'print' ? 'print' : 'copy'} quote.`;
-      currentPrintQuote = null;
-      totalPrice = 0;
-      pricingLoaded = false;
-      pricingError = message;
+      pricing = reducePricing(pricing, { type: 'quote-failed', message });
       if (priceValue) priceValue.textContent = 'Unavailable';
       if (actionPriceValue) actionPriceValue.textContent = '₱ 0';
       updateChangeDisplay(currentBalance);
@@ -1991,11 +1995,13 @@ async function loadPricing(): Promise<void> {
     scanDocument: payload.scanDocument ?? DEFAULT_PRICING.scanDocument,
   };
 
-  totalPrice = safePricing.scanDocument;
-  pricingLoaded = true;
-  pricingError = null;
-  if (priceValue) priceValue.textContent = `₱ ${totalPrice}`;
-  if (actionPriceValue) actionPriceValue.textContent = `₱ ${totalPrice}`;
+  pricing = reducePricing(pricing, {
+    type: 'quote-loaded',
+    totalPrice: safePricing.scanDocument,
+    quote: null,
+  });
+  if (priceValue) priceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
+  if (actionPriceValue) actionPriceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
   updateChangeDisplay(currentBalance);
   syncPaymentLeaseState();
   applyConfirmGate();
@@ -2557,7 +2563,7 @@ function showModal(): void {
     modalQualityRow?.removeAttribute('hidden');
 
     // 1. Pages & Range
-    const quote = currentPrintQuote;
+    const quote = getQuote(pricing);
     const totalSheets = quote ? quote.selectedPages : (config.totalPages ?? 1);
     const totalDisplay = quote
       ? `${quote.selectedPages} of ${quote.totalPages} ${quote.totalPages === 1 ? 'page' : 'pages'}`
@@ -2673,11 +2679,11 @@ function showModal(): void {
     }
   }
 
-  if (modalPrice) modalPrice.textContent = `₱ ${totalPrice}`;
+  if (modalPrice) modalPrice.textContent = `₱ ${getTotalPrice(pricing)}`;
   if (modalPaid) modalPaid.textContent = `₱ ${currentBalance}`;
 
   // Show coin change in modal
-  const modalChangeAmount = Math.max(0, currentBalance - totalPrice);
+  const modalChangeAmount = Math.max(0, currentBalance - getTotalPrice(pricing));
   if (modalChange) {
     modalChange.textContent = `₱ ${modalChangeAmount}`;
   }
@@ -2862,11 +2868,11 @@ modalConfirmBtn?.addEventListener('click', async () => {
           'Idempotency-Key': paymentIdempotencyKey,
         },
         body: JSON.stringify({
-          amount: totalPrice,
+          amount: getTotalPrice(pricing),
           ...buildPhysicalPrintSettings(config, getDisplayColorMode()),
           previewPath: config.copyPreviewPath,
           spoolerCorrelationKey,
-          quoteHash: currentPrintQuote?.quoteHash ?? config.quote?.quoteHash,
+          quoteHash: getQuote(pricing)?.quoteHash ?? config.quote?.quoteHash,
         }),
       });
 
@@ -2931,14 +2937,14 @@ modalConfirmBtn?.addEventListener('click', async () => {
           'Idempotency-Key': paymentIdempotencyKey,
         },
         body: JSON.stringify({
-          amount: totalPrice,
+          amount: getTotalPrice(pricing),
           paymentLeaseId: finalPaymentLeaseId,
           mode: config.mode,
           sessionId: config.sessionId,
           documentId: config.documentId,
           ...buildPhysicalPrintSettings(config, getDisplayColorMode()),
           spoolerCorrelationKey,
-          quoteHash: currentPrintQuote?.quoteHash ?? config.quote?.quoteHash,
+          quoteHash: getQuote(pricing)?.quoteHash ?? config.quote?.quoteHash,
         }),
       });
 
