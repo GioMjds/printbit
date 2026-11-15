@@ -35,6 +35,12 @@ import {
 } from '../shared/wifi-troubleshooting';
 import { buildPhysicalPrintSettings } from './print-settings';
 import {
+  createPrinterReadinessState,
+  hasBlockingPrinterError as hasBlockingPrinterErrorState,
+  reducePrinterReadiness,
+  type PrinterReadinessState,
+} from './printer-readiness-state';
+import {
   createPricingState,
   getPricingMessage,
   getQuote,
@@ -588,15 +594,15 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-let currentPrinterError: PrintError | null = null;
+let printer: PrinterReadinessState<PrintError> =
+  createPrinterReadinessState<PrintError>();
 let lastKnownPagesPrinted = 0;
 let lastKnownTotalPages = 0;
 let displayedPrintPages = 0;
 let confirmationOutcome = createConfirmationOutcomeState();
 
-let isJobInterruptedState = false;
 function isJobInterrupted(): boolean {
-  return isJobInterruptedState;
+  return printer.interrupted;
 }
 
 function hasActiveJob(): boolean {
@@ -649,7 +655,7 @@ const COIN_INSERT_GUIDANCE_MESSAGE =
   DEFAULT_COIN_INSERT_GUIDANCE_MESSAGE;
 
 function renderPrinterError(err: PrintError): void {
-  currentPrinterError = err;
+  printer = reducePrinterReadiness(printer, { type: 'error-raised', error: err });
   if (err.severity === 'fatal' || err.severity === 'recoverable') {
     void releasePaymentLease('printer_failure', true);
   }
@@ -834,7 +840,7 @@ function renderAmbiguousWorkerFailure(input: {
 }
 
 function clearPrinterError(): void {
-  currentPrinterError = null;
+  printer = reducePrinterReadiness(printer, { type: 'error-dismissed' });
   if (printerErrorBlock) {
     printerErrorBlock.classList.remove('printer-error-modal--wide');
     printerErrorBlock.classList.remove('printer-error-modal-overlay--wide');
@@ -879,7 +885,6 @@ const PENDING_PAYMENT_FINGERPRINT_STORAGE_KEY =
   'printbit.confirmPaymentFingerprint';
 let pricing: PricingState<PrintQuote> = createPricingState<PrintQuote>();
 let currentBalance = 0;
-let printerReady = false;
 let paymentLeaseId: string | null = null;
 let paymentLeaseIdForFinalization: string | null = null;
 let paymentArmInFlight = false;
@@ -1400,10 +1405,7 @@ function stopPaymentHeartbeat(): void {
 }
 
 function hasBlockingPrinterError(): boolean {
-  return (
-    currentPrinterError?.severity === 'fatal' ||
-    currentPrinterError?.severity === 'recoverable'
-  );
+  return hasBlockingPrinterErrorState(printer);
 }
 
 function canArmPaymentLease(): boolean {
@@ -1411,7 +1413,7 @@ function canArmPaymentLease(): boolean {
     (config.mode === 'print' || config.mode === 'copy') &&
     isPricingReady(pricing) &&
     getTotalPrice(pricing) > 0 &&
-    printerReady &&
+    printer.ready &&
     !hasBlockingPrinterError() &&
     currentBalance < getTotalPrice(pricing) &&
     !isProcessingPayment &&
@@ -1570,14 +1572,14 @@ function applyConfirmGate(statusOverride?: string): void {
   }
 
   if (
-    currentPrinterError &&
-    (currentPrinterError.severity === 'fatal' ||
-      currentPrinterError.severity === 'recoverable')
+    printer.error &&
+    (printer.error.severity === 'fatal' ||
+      printer.error.severity === 'recoverable')
   ) {
     confirmBtn.disabled = true;
     confirmBtn.setAttribute('aria-disabled', 'true');
     statusMessage.textContent = sanitizeStatusBadgeMessage(
-      statusOverride ?? currentPrinterError.userMessage,
+      statusOverride ?? printer.error.userMessage,
     );
     if (statusBadge) statusBadge.dataset.state = 'error';
     return;
@@ -1592,14 +1594,14 @@ function applyConfirmGate(statusOverride?: string): void {
     return;
   }
 
-  if (!printerReady) {
+  if (!printer.ready) {
     confirmBtn.disabled = true;
     confirmBtn.setAttribute('aria-disabled', 'true');
     statusMessage.textContent =
       statusOverride ??
-      `Printer not ready (${latestPrinterStatusLabel}). Please wait before inserting coins.`;
+      `Printer not ready (${printer.statusLabel}). Please wait before inserting coins.`;
     if (statusBadge) {
-      statusBadge.dataset.state = latestPrinterStatusLabel.startsWith(
+      statusBadge.dataset.state = printer.statusLabel.startsWith(
         'Checking',
       )
         ? 'waiting'
@@ -2041,7 +2043,6 @@ if (!persistedFingerprintMatchesCurrent) {
   sessionStorage.removeItem(PENDING_PAYMENT_IDEMPOTENCY_STORAGE_KEY);
   sessionStorage.removeItem(PENDING_PAYMENT_FINGERPRINT_STORAGE_KEY);
 }
-let latestPrinterStatusLabel = 'Checking...';
 
 const NETWORK_REQUEST_TIMEOUT_MS = 90_000;
 
@@ -3004,7 +3005,7 @@ thankYouDoneBtn?.addEventListener('click', () => {
 });
 
 maintenanceDoneBtn?.addEventListener('click', () => {
-  isJobInterruptedState = false;
+  printer = reducePrinterReadiness(printer, { type: 'maintenance-acknowledged' });
   clearConfirmSessionStorage();
   navigateWithKioskMotion('/');
 });
@@ -3045,13 +3046,13 @@ function handleErrorGuideUpdate(
 ): void {
   if (activeError) {
     const isMidJob =
-      isJobInterruptedState ||
+      printer.interrupted ||
       hasActiveJob() ||
       Boolean(activeError.jobRequiresStaff) ||
       Boolean(activeError.jobId);
 
     if (isMidJob) {
-      isJobInterruptedState = true;
+      printer = reducePrinterReadiness(printer, { type: 'job-interrupted' });
       hideOverlay(printingOverlay);
       isProcessingPayment = false;
       powerSafetyOverlay?.notifyPrintCompleted();
@@ -3196,10 +3197,10 @@ if (typeof ioFactory !== 'function') {
           lifecycle.printError.code,
           lifecycle.printError.userMessage,
         )) ||
-        (currentPrinterError &&
+        (printer.error &&
           isMaintenancePrintFailure(
-            currentPrinterError.code,
-            currentPrinterError.userMessage,
+            printer.error.code,
+            printer.error.userMessage,
           )) ||
         isMaintenancePrintFailure(undefined, lifecycle.reason) ||
         lifecycle.failureStage === 'HardwareError' ||
@@ -3245,8 +3246,8 @@ if (typeof ioFactory !== 'function') {
         // Keep activeSpoolerCorrelationKey and session state intact!
         if (lifecycle.printError) {
           renderPrinterError(lifecycle.printError);
-        } else if (currentPrinterError) {
-          renderPrinterError(currentPrinterError);
+        } else if (printer.error) {
+          renderPrinterError(printer.error);
         } else {
           renderPrinterError({
             code: 'WORKER_HARDWARE_ERROR',
@@ -3313,11 +3314,13 @@ if (typeof ioFactory !== 'function') {
           ? BLOCKED_PRINTER_STATUSES.has(status.status)
           : false;
       const isBlocked = !status.connected || blockedByStatus;
-      printerReady = !isBlocked;
-      latestPrinterStatusLabel =
-        status.status || (status.connected ? 'Ready' : 'Not Found');
+      printer = reducePrinterReadiness(printer, {
+        type: 'status-reported',
+        ready: !isBlocked,
+        label: status.status || (status.connected ? 'Ready' : 'Not Found'),
+      });
       applyConfirmGate();
-      if (!printerReady) {
+      if (!printer.ready) {
         void releasePaymentLease('printer_failure', true);
         void loadPrinterStatus();
       } else {
@@ -3330,30 +3333,31 @@ if (typeof ioFactory !== 'function') {
 
   connectedSocket.on('printerRecovered', (payload: unknown) => {
     const status = payload as PrinterStatusPayload | null;
-    if (currentPrinterError || isJobInterruptedState) return;
-    printerReady = true;
-    latestPrinterStatusLabel = status?.status || 'Idle';
+    if (printer.error || printer.interrupted) return;
+    printer = reducePrinterReadiness(printer, {
+      type: 'recovered',
+      label: status?.status || 'Idle',
+    });
     // Error UI never auto-clears; only simulation-cleared / paper-jam-cleared do.
-    if (!currentPrinterError) {
+    if (!printer.error) {
       applyConfirmGate();
       syncPaymentLeaseState();
     }
   });
 
   connectedSocket.on('printerStatusRestored', () => {
-    if (currentPrinterError || isJobInterruptedState) return;
-    printerReady = true;
-    latestPrinterStatusLabel = 'Ready';
+    if (printer.error || printer.interrupted) return;
+    printer = reducePrinterReadiness(printer, {
+      type: 'recovered',
+      label: 'Ready',
+    });
     applyConfirmGate();
     syncPaymentLeaseState();
   });
 
   connectedSocket.on('printer:simulation-cleared', (payload: unknown) => {
     const data = payload as { redirectHome?: boolean } | null;
-    isJobInterruptedState = false;
-    currentPrinterError = null;
-    printerReady = true;
-    latestPrinterStatusLabel = 'Ready';
+    printer = reducePrinterReadiness(printer, { type: 'admin-cleared' });
     clearPrinterError();
     if (maintenanceDoneBtn) {
       maintenanceDoneBtn.style.display = '';
@@ -3368,10 +3372,7 @@ if (typeof ioFactory !== 'function') {
   });
 
   connectedSocket.on('printer:paper-jam-cleared', () => {
-    isJobInterruptedState = false;
-    currentPrinterError = null;
-    printerReady = true;
-    latestPrinterStatusLabel = 'Ready';
+    printer = reducePrinterReadiness(printer, { type: 'admin-cleared' });
     clearPrinterError();
     clearConfirmSessionStorage();
     navigateWithKioskMotion('/', 'replace');
@@ -3402,8 +3403,10 @@ if (typeof ioFactory !== 'function') {
   // Re-sync on printer malfunction or spooler failure
   connectedSocket.on('printerMalfunction', (payload: unknown) => {
     const status = payload as PrinterStatusPayload | null;
-    printerReady = false;
-    latestPrinterStatusLabel = status?.status || 'Error';
+    printer = reducePrinterReadiness(printer, {
+      type: 'malfunction',
+      label: status?.status || 'Error',
+    });
     if (status?.printError) {
       if (hasActiveJob()) {
         hideOverlay(printingOverlay);
@@ -3603,11 +3606,14 @@ async function loadPrinterStatus(): Promise<void> {
   try {
     const res = await fetch('/api/printer/status');
     const data = await res.json();
-    printerReady = Boolean(data.ready);
-    latestPrinterStatusLabel =
-      data.status || (printerReady ? 'Ready' : 'Not Found');
+    const reportedReady = Boolean(data.ready);
+    printer = reducePrinterReadiness(printer, {
+      type: 'status-reported',
+      ready: reportedReady,
+      label: data.status || (reportedReady ? 'Ready' : 'Not Found'),
+    });
     applyConfirmGate();
-    if (!printerReady) {
+    if (!printer.ready) {
       void releasePaymentLease('printer_failure', true);
     } else {
       syncPaymentLeaseState();
@@ -3615,16 +3621,16 @@ async function loadPrinterStatus(): Promise<void> {
 
     // If printer is not ready or still in checking phase, schedule a retry
     if (
-      !printerReady ||
-      latestPrinterStatusLabel === 'Checking…' ||
-      latestPrinterStatusLabel === 'Checking...'
+      !printer.ready ||
+      printer.statusLabel === 'Checking…' ||
+      printer.statusLabel === 'Checking...'
     ) {
       printerStatusRetryTimer = window.setTimeout(() => {
         void loadPrinterStatus();
       }, 2500);
     }
   } catch {
-    printerReady = false;
+    printer = reducePrinterReadiness(printer, { type: 'status-request-failed' });
     void releasePaymentLease('printer_failure', true);
     applyConfirmGate();
     printerStatusRetryTimer = window.setTimeout(() => {
