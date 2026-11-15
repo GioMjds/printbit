@@ -42,7 +42,6 @@ import {
 } from './printer-readiness-state';
 import {
   createPricingState,
-  getPricingMessage,
   getQuote,
   getTotalPrice,
   isPricingReady,
