@@ -339,11 +339,11 @@ type CanvasInstance = {
 
 type CanvasFactory = (w: number, h: number) => CanvasInstance;
 
-async function analyzePdfFile(
-  pdfPath: string,
-  fileType: AnalyzedFileType,
-  colorDetectionEnabled: boolean = true,
-): Promise<DocumentAnalysisResult> {
+/** pdf.js for Node plus a canvas factory it can render into. */
+async function loadPdfjsForNode(): Promise<{
+  pdfjs: PdfjsLib;
+  canvasFactory: CanvasFactory;
+}> {
   let pdfjs: PdfjsLib;
   let canvasFactory: CanvasFactory = (w: number, h: number) =>
     createCanvas(w, h);
@@ -373,6 +373,79 @@ async function analyzePdfFile(
     pdfjs =
       (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as PdfjsLib;
   }
+  return { pdfjs, canvasFactory };
+}
+
+export const PDF_THUMBNAIL_SIZE = 32;
+const THUMBNAIL_OVERSAMPLE = 8;
+
+/**
+ * First page of a PDF as `size * size` gray levels (0 black, 255 white),
+ * row-major. Rendered larger and box-averaged so small shifts of the content
+ * change the result only a little.
+ */
+export async function renderPdfGrayThumbnail(
+  pdfPath: string,
+  size: number = PDF_THUMBNAIL_SIZE,
+): Promise<Uint8Array> {
+  const { pdfjs, canvasFactory } = await loadPdfjsForNode();
+  const data = new Uint8Array(await fs.promises.readFile(pdfPath));
+  const loadingTask = pdfjs.getDocument({ data, verbosity: 0 });
+  try {
+    const doc = await loadingTask.promise;
+    const page = await doc.getPage(1);
+    const base = page.getViewport({ scale: 1 });
+    const renderSide = size * THUMBNAIL_OVERSAMPLE;
+    const viewport = page.getViewport({
+      scale: renderSide / Math.max(base.width, base.height),
+    });
+    const width = Math.max(1, Math.min(renderSide, Math.round(viewport.width)));
+    const height = Math.max(
+      1,
+      Math.min(renderSide, Math.round(viewport.height)),
+    );
+    const canvas = canvasFactory(width, height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context is not available');
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    const rgba = ctx.getImageData(0, 0, width, height).data;
+    page.cleanup();
+
+    const sums = new Float64Array(size * size);
+    const counts = new Uint32Array(size * size);
+    for (let y = 0; y < height; y += 1) {
+      const cellY = Math.min(size - 1, Math.floor(y / THUMBNAIL_OVERSAMPLE));
+      for (let x = 0; x < width; x += 1) {
+        const cellX = Math.min(size - 1, Math.floor(x / THUMBNAIL_OVERSAMPLE));
+        const offset = (y * width + x) * 4;
+        const alpha = rgba[offset + 3] / 255;
+        const gray =
+          0.299 * rgba[offset] +
+          0.587 * rgba[offset + 1] +
+          0.114 * rgba[offset + 2];
+        const cell = cellY * size + cellX;
+        sums[cell] += gray * alpha + 255 * (1 - alpha);
+        counts[cell] += 1;
+      }
+    }
+
+    const thumbnail = new Uint8Array(size * size);
+    for (let cell = 0; cell < thumbnail.length; cell += 1) {
+      thumbnail[cell] =
+        counts[cell] === 0 ? 255 : Math.round(sums[cell] / counts[cell]);
+    }
+    return thumbnail;
+  } finally {
+    await loadingTask.destroy();
+  }
+}
+
+async function analyzePdfFile(
+  pdfPath: string,
+  fileType: AnalyzedFileType,
+  colorDetectionEnabled: boolean = true,
+): Promise<DocumentAnalysisResult> {
+  const { pdfjs, canvasFactory } = await loadPdfjsForNode();
   const data = new Uint8Array(await fs.promises.readFile(pdfPath));
   const loadingTask = pdfjs.getDocument({ data, verbosity: 0 });
   const doc = await loadingTask.promise;
