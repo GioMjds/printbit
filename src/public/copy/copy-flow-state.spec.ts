@@ -110,6 +110,25 @@ describe('ID card copy', () => {
     expect(retake.stage).toBe('capture');
   });
 
+  it('reaches settings when a rescan fails after Retake on a complete sheet', () => {
+    const state = run([
+      ...scanFront,
+      { type: 'scan-started', target: 'back' },
+      {
+        type: 'side-scanned',
+        side: 'back',
+        warnings: [{ code: 'side_blank', side: 'back' }],
+      },
+      { type: 'warning-retake' },
+      { type: 'scan-started', target: 'back' },
+      { type: 'scan-failed' },
+    ]);
+    expect(state.stage).toBe('settings');
+    expect(state.front).toBe(true);
+    expect(state.back).toBe(true);
+    expect(canContinue(state)).toBe(true);
+  });
+
   it('stays in settings during a retake and blocks Continue while it runs', () => {
     const retaking = run([
       ...scanBoth,
@@ -254,6 +273,25 @@ describe('snapshot', () => {
       snapshot,
     });
     expect(after.stage).toBe('capture');
+  });
+
+  it('restores a complete ID sheet into settings whatever stage was stored', () => {
+    const snapshot = parseSnapshot(
+      JSON.stringify({
+        copyType: 'id',
+        stage: 'capture',
+        documentScanned: false,
+        front: true,
+        back: true,
+        rotations: { front: 0, back: 0 },
+      }),
+    )!;
+    const after = reduceCopyFlow(createCopyFlowState(), {
+      type: 'restored',
+      snapshot,
+    });
+    expect(after.stage).toBe('settings');
+    expect(canContinue(after)).toBe(true);
   });
 
   it.each([

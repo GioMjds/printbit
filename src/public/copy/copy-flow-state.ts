@@ -144,7 +144,11 @@ export function reduceCopyFlow(
     }
 
     case 'warning-retake':
-      return { ...state, pendingWarnings: [] };
+      return {
+        ...state,
+        pendingWarnings: [],
+        stage: isSheetComplete(state) ? 'settings' : state.stage,
+      };
 
     case 'side-rotated':
       if (state.scanning !== null || !state[event.side]) return state;
@@ -169,10 +173,7 @@ export function reduceCopyFlow(
       };
       return {
         ...restored,
-        stage:
-          event.snapshot.stage === 'settings' && isSheetComplete(restored)
-            ? 'settings'
-            : 'capture',
+        stage: isSheetComplete(restored) ? 'settings' : 'capture',
       };
     }
 
