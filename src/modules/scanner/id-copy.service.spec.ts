@@ -14,6 +14,7 @@ let service: IdCopyService;
 let scanShouldFail: boolean;
 let scanCount: number;
 let thumbnailFor: (filePath: string) => Uint8Array;
+let onRegisterToken: (() => void) | null;
 const tokens = new Map<string, string>();
 const invalidated: string[] = [];
 
@@ -32,6 +33,7 @@ beforeEach(async () => {
   sessions = new IdCopySessionStore({ scansDir: dir });
   scanShouldFail = false;
   scanCount = 0;
+  onRegisterToken = null;
   tokens.clear();
   invalidated.length = 0;
   const seeds = new Map<string, number>();
@@ -57,6 +59,7 @@ beforeEach(async () => {
       error: 'The scanner is busy.',
     }),
     registerReleaseToken: (fileName) => {
+      onRegisterToken?.();
       const token = `token-${tokens.size + 1}`;
       tokens.set(token, fileName);
       return token;
@@ -162,6 +165,30 @@ describe('IdCopyService.scanSide', () => {
     const result = await service.scanSide({ side: 'front', paperSize: 'A4' });
     if (!result.detected) throw new Error('expected a sheet');
     expect(result.warnings).toEqual([{ code: 'side_blank', side: 'front' }]);
+  });
+});
+
+describe('IdCopyService when the session is destroyed mid-rebuild', () => {
+  it('deletes the new sheet and its token instead of orphaning them', async () => {
+    const first = await service.scanSide({ side: 'front', paperSize: 'A4' });
+    if (!first.detected) throw new Error('expected a sheet');
+    let destroyed: Promise<void> = Promise.resolve();
+    onRegisterToken = () => {
+      destroyed = sessions.destroy(first.sessionId);
+    };
+    invalidated.length = 0;
+
+    await expect(
+      service.compose({
+        sessionId: first.sessionId,
+        paperSize: 'A4',
+        rotations: {},
+      }),
+    ).rejects.toBeInstanceOf(IdCopySessionNotFoundError);
+    await destroyed;
+
+    expect(fs.readdirSync(dir)).toEqual([]);
+    expect(invalidated).toContain([...tokens.values()].pop());
   });
 });
 

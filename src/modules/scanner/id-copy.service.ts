@@ -142,11 +142,29 @@ export class IdCopyService {
     const fileName = `id-copy-${randomUUID()}.pdf`;
     await fs.promises.writeFile(path.join(this.deps.scansDir, fileName), bytes);
     const releaseToken = this.deps.registerReleaseToken(fileName);
-    const previous = await this.deps.sessions.setMerged(
-      session.id,
-      fileName,
-      releaseToken,
-    );
+    let previous: string | null;
+    try {
+      previous = await this.deps.sessions.setMerged(
+        session.id,
+        fileName,
+        releaseToken,
+      );
+    } catch (error) {
+      // The session was destroyed while the sheet was being built: nothing
+      // owns the new file, so it must not outlive the customer's release.
+      await fs.promises
+        .unlink(path.join(this.deps.scansDir, fileName))
+        .catch((unlinkError: NodeJS.ErrnoException) => {
+          if (unlinkError.code !== 'ENOENT') {
+            // Left for the startup purge; the original error still surfaces.
+            console.warn(
+              `[ID-COPY] Could not delete a sheet file (${unlinkError.code}).`,
+            );
+          }
+        });
+      this.deps.invalidateReleaseTokens(fileName);
+      throw error;
+    }
     if (previous) this.deps.invalidateReleaseTokens(previous);
     return {
       detected: true,
