@@ -238,6 +238,12 @@ public sealed class Naps2ScannerService : IScannerService, IDisposable
 
         var pageSize = ScanPageSizeResolver.Resolve(request.PaperSize, isFeeder);
         options.PageSize = pageSize.PageSize;
+        if (ScanPageSizeResolver.IsIdCard(request.PaperSize))
+        {
+            // A region smaller than the glass must start at the origin corner,
+            // where the customer places the card (the marked corner).
+            options.PageAlign = HorizontalAlign.Left;
+        }
         if (pageSize.ClampedToGlass)
         {
             _logger.LogWarning(

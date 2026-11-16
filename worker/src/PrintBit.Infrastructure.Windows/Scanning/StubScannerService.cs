@@ -11,6 +11,7 @@ public sealed class StubScannerService : IScannerService
     private readonly ILogger<StubScannerService> _logger;
     private readonly ScannerSettings _settings;
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeScans = new();
+    private static int _idStubCounter;
 
     public StubScannerService(ILogger<StubScannerService> logger, IOptions<ScannerSettings> settings)
     {
@@ -138,15 +139,33 @@ public sealed class StubScannerService : IScannerService
             "You can preview this file in PDF.js and print it to virtual printers."
         };
 
+        var isIdCard = ScanPageSizeResolver.IsIdCard(request.PaperSize);
+        var titleFont = isIdCard ? 9 : 18;
+        var bodyFont = isIdCard ? 6 : 11;
+        var startX = isIdCard ? 10 : 50;
+        var startY = isIdCard ? 255 : 780;
+        var lineStep = isIdCard ? 10 : 20;
+
         var sb = new StringBuilder();
+        if (isIdCard)
+        {
+            // A card-sized block at the origin corner, alternating colour so the
+            // two sides of a stub ID differ and the scan checks stay quiet.
+            var shade = Interlocked.Increment(ref _idStubCounter) % 2 == 0
+                ? "0.20 0.30 0.60"
+                : "0.75 0.35 0.20";
+            sb.AppendLine($"{shade} rg");
+            sb.AppendLine("0 130 243 153 re f");
+            sb.AppendLine("1 1 1 rg");
+        }
         sb.AppendLine("BT");
-        sb.AppendLine("/F1 18 Tf");
-        sb.AppendLine("50 780 Td");
+        sb.AppendLine($"/F1 {titleFont} Tf");
+        sb.AppendLine($"{startX} {startY} Td");
         sb.AppendLine($"({EscapePdf(textLines[0])}) Tj");
-        sb.AppendLine("/F1 11 Tf");
+        sb.AppendLine($"/F1 {bodyFont} Tf");
         for (int i = 1; i < textLines.Length; i++)
         {
-            sb.AppendLine("0 -20 Td");
+            sb.AppendLine($"0 -{lineStep} Td");
             sb.AppendLine($"({EscapePdf(textLines[i])}) Tj");
         }
         sb.AppendLine("ET");
@@ -172,7 +191,8 @@ public sealed class StubScannerService : IScannerService
 
         // 3 0 obj: Page
         offsets.Add(fs.Position);
-        writer.Write("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n");
+        var mediaBox = isIdCard ? "0 0 283 283" : "0 0 595 842";
+        writer.Write($"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [{mediaBox}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n");
         writer.Flush();
 
         // 4 0 obj: Font
