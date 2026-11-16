@@ -79,12 +79,22 @@ export class IdCopySessionStore {
     side: IdSide,
     scannedFileName: string,
   ): Promise<IdCopySession> {
-    const session = this.require(id);
+    const session = this.sessions.get(id);
+    if (!session) {
+      // The raw scan is an ID image the startup purge would not match.
+      await removeFile(this.scansDir, path.basename(scannedFileName));
+      throw new IdCopySessionNotFoundError();
+    }
     const fileName = `id-side-${randomUUID()}.pdf`;
     await fs.promises.rename(
       path.join(this.scansDir, path.basename(scannedFileName)),
       path.join(this.scansDir, fileName),
     );
+    if (this.sessions.get(id) !== session) {
+      // Destroyed while the rename was in flight: nothing else owns this file.
+      await removeFile(this.scansDir, fileName);
+      throw new IdCopySessionNotFoundError();
+    }
     const previous = session[side];
     session[side] = { fileName, rotationDeg: 0 };
     session.touchedAt = this.now();

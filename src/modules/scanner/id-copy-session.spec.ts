@@ -143,6 +143,26 @@ describe('IdCopySessionStore', () => {
     ).rejects.toBeInstanceOf(IdCopySessionNotFoundError);
   });
 
+  it('deletes the scanned file when the session id is unknown', async () => {
+    await expect(
+      store.setSide('nope', 'front', await writeScan('scan-1.pdf')),
+    ).rejects.toBeInstanceOf(IdCopySessionNotFoundError);
+    expect(exists('scan-1.pdf')).toBe(false);
+  });
+
+  it('leaves no id-side file when the session is destroyed during setSide', async () => {
+    const session = store.create();
+    const pending = store.setSide(
+      session.id,
+      'front',
+      await writeScan('scan-1.pdf'),
+    );
+    await store.destroy(session.id);
+
+    await expect(pending).rejects.toBeInstanceOf(IdCopySessionNotFoundError);
+    expect(await fs.promises.readdir(dir)).toEqual([]);
+  });
+
   it('survives a file that is already gone', async () => {
     const session = store.create();
     const withFront = await store.setSide(
