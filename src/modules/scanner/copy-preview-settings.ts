@@ -48,3 +48,21 @@ export function buildCopyPreviewScanSettings(
     maxPages: 1,
   };
 }
+
+/**
+ * Settings for one side of an ID card: the small region at the glass origin
+ * corner. Always the flatbed and always colour; grayscale is applied at print.
+ */
+export function buildIdCopyScanSettings(
+  cfg: ScannerDpiConfig | null | undefined,
+) {
+  return {
+    source: 'flatbed' as const,
+    dpi: resolveScannerDpi(cfg, 'copy', 'flatbed'),
+    colorMode: 'colored' as const,
+    duplex: false,
+    format: 'pdf' as const,
+    paperSize: 'IdCard' as const,
+    maxPages: 1,
+  };
+}

@@ -9,7 +9,10 @@ import {
   powerSafetyService,
   type PowerSafetyService,
 } from '@/services/power-safety';
+import { ID_SESSION_EXPIRED_CODE } from '@/shared/id-copy-contract';
 import { ScannerService } from './scanner.service';
+import { parseIdRotations } from './id-copy.service';
+import { IdCopySessionNotFoundError } from './id-copy-session';
 import { db } from '@/core/database/db';
 import { formatCustomerScanFilename } from '@/services/scan-filename';
 
@@ -93,6 +96,8 @@ export class ScannerController {
     this.router.get('/api/scan/jobs/:id/result', scanJobResultRateLimit, this.getScanJobResult);
     this.router.post('/api/scan/preview', this.previewScan);
     this.router.get('/api/scan/preview/:filename', scanPreviewFileRateLimit, this.getPreviewFile);
+    this.router.post('/api/scan/id-copy/side', this.scanIdCopySide);
+    this.router.post('/api/scan/id-copy/compose', this.composeIdCopy);
     this.router.get('/api/scan/color-analysis/:filename', this.getColorAnalysis);
     this.router.post('/api/scan/jobs/:id/cancel', this.cancelScanJob);
   }
@@ -512,6 +517,106 @@ export class ScannerController {
         return;
       }
       throw error;
+    }
+  };
+
+  private respondIdCopyError(res: Response, error: unknown): void {
+    if (error instanceof IdCopySessionNotFoundError) {
+      res.status(409).json({
+        code: ID_SESSION_EXPIRED_CODE,
+        error: 'Your ID scan session expired. Please scan your ID again.',
+      });
+      return;
+    }
+    const message = this.getErrorMessage(error, 'ID copy failed.');
+    if (message.startsWith('Invalid paperSize')) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    console.error('[ID-COPY] Request failed:', message);
+    res
+      .status(500)
+      .json({ error: 'Could not prepare the ID copy. Please try again.' });
+  }
+
+  private scanIdCopySide = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    if (!this.powerSafety.canAcceptCustomerWork()) {
+      res.status(503).json({
+        code: 'POWER_EMERGENCY',
+        message: 'Power emergency active; customer work suspended',
+      });
+      return;
+    }
+
+    const body = (req.body ?? {}) as {
+      sessionId?: unknown;
+      side?: unknown;
+      paperSize?: unknown;
+    };
+    if (body.side !== 'front' && body.side !== 'back') {
+      res
+        .status(400)
+        .json({ error: 'Invalid side. Accepted: "front", "back"' });
+      return;
+    }
+    const sessionId =
+      typeof body.sessionId === 'string' && body.sessionId.trim()
+        ? body.sessionId.trim()
+        : null;
+
+    try {
+      const result = await this.scannerService.scanIdCopySide({
+        sessionId,
+        side: body.side,
+        paperSize: typeof body.paperSize === 'string' ? body.paperSize : 'A4',
+      });
+      res.json(result);
+    } catch (error) {
+      this.respondIdCopyError(res, error);
+    }
+  };
+
+  private composeIdCopy = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    if (!this.powerSafety.canAcceptCustomerWork()) {
+      res.status(503).json({
+        code: 'POWER_EMERGENCY',
+        message: 'Power emergency active; customer work suspended',
+      });
+      return;
+    }
+
+    const body = (req.body ?? {}) as {
+      sessionId?: unknown;
+      paperSize?: unknown;
+      rotations?: unknown;
+    };
+    if (typeof body.sessionId !== 'string' || !body.sessionId.trim()) {
+      res.status(400).json({ error: 'Missing sessionId.' });
+      return;
+    }
+    const rotations = parseIdRotations(body.rotations);
+    if (!rotations) {
+      res.status(400).json({
+        error: 'Invalid rotation. Accepted values: 0, 90, 180, 270.',
+      });
+      return;
+    }
+
+    try {
+      const result = await this.scannerService.composeIdCopy({
+        sessionId: body.sessionId.trim(),
+        paperSize: typeof body.paperSize === 'string' ? body.paperSize : 'A4',
+        rotations,
+      });
+      res.json(result);
+    } catch (error) {
+      this.respondIdCopyError(res, error);
     }
   };
 
