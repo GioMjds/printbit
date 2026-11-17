@@ -1,7 +1,7 @@
 # Homepage idle screen: informative carousel on Lottie
 
 Date: 2026-11-17
-Branch: new branch from `main` (not `feat/id-card-copy`)
+Branch: `feat/id-card-copy` (owner's choice; no branch switch)
 Scope: `src/public/index.html`, `src/public/idle-screen.css`,
 `src/public/shared/idle-screen.ts`, new `src/public/shared/idle/`,
 `src/public/assets/lottie/idle/`, `src/modules/page/`,
@@ -30,16 +30,16 @@ Success:
 
 ## Decisions
 
-| Topic               | Decision                                                                                                   |
-| ------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Content             | A rotating carousel that mixes how-to slides with live status and price slides.                             |
-| Animation runtime   | `@lottiefiles/dotlottie-web` (already a dependency). One shared player for the whole screen.               |
-| Lottie assets       | Mixed. First version reuses `src/public/assets/lottie/` files and free LottieFiles assets recolored to the palette. Each slide has a fixed slot path, so a custom file replaces it with no code change. |
-| Content control     | Admin toggles per slide and one slide duration. Slide text lives in code and locale files.                 |
-| Degraded hardware   | Honest. A status slide says each service is Ready, Limited, or Unavailable, in plain words. How-to slides for an Unavailable service are skipped. |
-| Ambient background  | Static gradient. No animation.                                                                             |
-| Slide transitions   | CSS `opacity` transitions only (compositor). No CSS `@keyframes` anywhere in the idle screen.               |
-| Language            | Each full cycle alternates English and Filipino. The idle screen does not change the kiosk's selected language. |
+| Topic              | Decision                                                                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Content            | A rotating carousel that mixes how-to slides with live status and price slides.                                                                                                                         |
+| Animation runtime  | `@lottiefiles/dotlottie-web` (already a dependency). One shared player for the whole screen.                                                                                                            |
+| Lottie assets      | Mixed. First version reuses `src/public/assets/lottie/` files and free LottieFiles assets recolored to the palette. Each slide has a fixed slot path, so a custom file replaces it with no code change. |
+| Content control    | Admin toggles per slide and one slide duration. Slide text lives in code and locale files.                                                                                                              |
+| Degraded hardware  | Honest. A status slide says each service is Ready, Limited, or Unavailable, in plain words. How-to slides for an Unavailable service are skipped.                                                       |
+| Ambient background | Static gradient. No animation.                                                                                                                                                                          |
+| Slide transitions  | CSS `opacity` transitions only (compositor). No CSS `@keyframes` anywhere in the idle screen.                                                                                                           |
+| Language           | Each full cycle alternates English and Filipino. The idle screen does not change the kiosk's selected language.                                                                                         |
 
 ## Non-goals
 
@@ -66,18 +66,18 @@ The background is the current deep-space gradient, static.
 
 ### Slide catalog
 
-| Slide id         | Content                                                                                       | Depends on service | Can disable | Slot file                     | First-version source      |
-| ---------------- | --------------------------------------------------------------------------------------------- | ------------------ | ----------- | ----------------------------- | ------------------------- |
-| `welcome`        | "Print, Copy, Scan — coins and your phone."                                                  | none               | no          | `idle/welcome.lottie`         | free LottieFiles asset    |
-| `status`         | Each service with state and reason. Paper level. "Exact coins only" when change is unavailable. | none               | no          | `idle/status.lottie`          | `paper-tray.lottie`       |
-| `howToPrint`     | 4 steps: scan the QR, upload from phone, choose settings, insert coins.                      | print              | yes         | `idle/how-to-print.lottie`    | `upload.lottie`           |
-| `howToCopy`      | Place on the glass or in the feeder, set copies, pay.                                        | copy               | yes         | `idle/how-to-copy.lottie`     | `copy-glass.lottie`       |
-| `idCardCopy`     | Front and back of an ID on one sheet.                                                        | copy               | yes         | `idle/id-card-copy.lottie`    | `copy-adf.lottie`         |
-| `scanToPhone`    | Scan, scan the QR, the file goes to your phone.                                              | scan               | yes         | `idle/scan-to-phone.lottie`   | `scan-transfer.lottie`    |
-| `prices`         | Live prices: B/W per page, color surcharge, copy per page, scan per document.                | none               | yes         | `idle/prices.lottie`          | `coin-insertion.lottie`   |
-| `paying`         | Accepted coins ₱1, ₱5, ₱10, ₱20. Whole pesos. Change is returned.                            | none               | yes         | `idle/paying.lottie`          | `coin-insertion.lottie`   |
-| `supportedFiles` | PDF, Word, PowerPoint, Excel, images, and the upload size limit.                             | print              | yes         | `idle/supported-files.lottie` | `upload.lottie`           |
-| `privacyReceipt` | Files are deleted after the job. You get an e-receipt on your phone.                         | none               | yes         | `idle/privacy-receipt.lottie` | free LottieFiles asset    |
+| Slide id         | Content                                                                                         | Depends on service | Can disable | Slot file                     | First-version source    |
+| ---------------- | ----------------------------------------------------------------------------------------------- | ------------------ | ----------- | ----------------------------- | ----------------------- |
+| `welcome`        | "Print, Copy, Scan — coins and your phone."                                                     | none               | no          | `idle/welcome.lottie`         | free LottieFiles asset  |
+| `status`         | Each service with state and reason. Paper level. "Exact coins only" when change is unavailable. | none               | no          | `idle/status.lottie`          | `paper-tray.lottie`     |
+| `howToPrint`     | 4 steps: scan the QR, upload from phone, choose settings, insert coins.                         | print              | yes         | `idle/how-to-print.lottie`    | `upload.lottie`         |
+| `howToCopy`      | Place on the glass or in the feeder, set copies, pay.                                           | copy               | yes         | `idle/how-to-copy.lottie`     | `copy-glass.lottie`     |
+| `idCardCopy`     | Front and back of an ID on one sheet.                                                           | copy               | yes         | `idle/id-card-copy.lottie`    | `copy-adf.lottie`       |
+| `scanToPhone`    | Scan, scan the QR, the file goes to your phone.                                                 | scan               | yes         | `idle/scan-to-phone.lottie`   | `scan-transfer.lottie`  |
+| `prices`         | Live prices: B/W per page, color surcharge, copy per page, scan per document.                   | none               | yes         | `idle/prices.lottie`          | `coin-insertion.lottie` |
+| `paying`         | Accepted coins ₱1, ₱5, ₱10, ₱20. Whole pesos. Change is returned.                               | none               | yes         | `idle/paying.lottie`          | `coin-insertion.lottie` |
+| `supportedFiles` | PDF, Word, PowerPoint, Excel, images, and the upload size limit.                                | print              | yes         | `idle/supported-files.lottie` | `upload.lottie`         |
+| `privacyReceipt` | Files are deleted after the job. You get an e-receipt on your phone.                            | none               | yes         | `idle/privacy-receipt.lottie` | free LottieFiles asset  |
 
 Slot files live in `src/public/assets/lottie/idle/`. The first version copies
 the listed source file into each slot. Each slide also has a static poster in
@@ -173,15 +173,15 @@ Sources: the printer state projection snapshot
 the hopper's last error code (`src/services/hopper.ts`), settings
 `consumablesForecasting`, and settings pricing.
 
-| Condition                                                              | Effect                                  |
-| ---------------------------------------------------------------------- | --------------------------------------- |
-| Printer offline                                                        | print, copy: `unavailable`, `printer_offline` |
-| Printer has an active error other than paper                           | print, copy: `unavailable`, `printer_error`   |
-| Printer reports paper out, or `paperCurrentSheets` is 0                | print, copy: `unavailable`, `paper_out`; paper `out` |
-| `paperCurrentSheets` ≤ max(10, 10% of `paperTrayCapacitySheets`)       | print, copy: `limited`, `paper_low`; paper `low` |
-| Forecasting disabled and printer reports no paper state               | paper `unknown`                         |
-| Scanner not ready                                                      | scan, copy: `unavailable`, `scanner_unavailable` |
-| Hopper last error is `EMPTY`                                           | `exactCoinsOnly: true`                  |
+| Condition                                                        | Effect                                               |
+| ---------------------------------------------------------------- | ---------------------------------------------------- |
+| Printer offline                                                  | print, copy: `unavailable`, `printer_offline`        |
+| Printer has an active error other than paper                     | print, copy: `unavailable`, `printer_error`          |
+| Printer reports paper out, or `paperCurrentSheets` is 0          | print, copy: `unavailable`, `paper_out`; paper `out` |
+| `paperCurrentSheets` ≤ max(10, 10% of `paperTrayCapacitySheets`) | print, copy: `limited`, `paper_low`; paper `low`     |
+| Forecasting disabled and printer reports no paper state          | paper `unknown`                                      |
+| Scanner not ready                                                | scan, copy: `unavailable`, `scanner_unavailable`     |
+| Hopper last error is `EMPTY`                                     | `exactCoinsOnly: true`                               |
 
 When several rules hit one service, the worst state wins
 (`unavailable` > `limited` > `unknown` > `ready`). For equal states, the first
@@ -244,16 +244,16 @@ field: one switch per disableable slide and a number input for duration.
 
 ## Failure handling
 
-| Failure                                       | Behavior                                                                                       |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| WASM fails to load                            | Every slide shows its poster. The carousel keeps running.                                       |
-| One slot file is missing or invalid           | That slide shows its poster.                                                                    |
-| 3 Lottie load failures in a row               | The player is destroyed for this page load. Posters only.                                       |
-| Poster also missing                           | The animation area stays empty. Slide text still shows.                                          |
-| `/api/idle/info` fails after an earlier success | Keep the last good response.                                                                 |
-| `/api/idle/info` has never succeeded          | Chips read "Checking…". `prices` is skipped. The how-to slides still show.                      |
-| A server source throws                        | That source's services are `unknown`. The route still returns 200.                              |
-| Tap during a crossfade                        | Existing dismiss wins. Carousel stops, player pauses, polling stops.                            |
+| Failure                                         | Behavior                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------- |
+| WASM fails to load                              | Every slide shows its poster. The carousel keeps running.                  |
+| One slot file is missing or invalid             | That slide shows its poster.                                               |
+| 3 Lottie load failures in a row                 | The player is destroyed for this page load. Posters only.                  |
+| Poster also missing                             | The animation area stays empty. Slide text still shows.                    |
+| `/api/idle/info` fails after an earlier success | Keep the last good response.                                               |
+| `/api/idle/info` has never succeeded            | Chips read "Checking…". `prices` is skipped. The how-to slides still show. |
+| A server source throws                          | That source's services are `unknown`. The route still returns 200.         |
+| Tap during a crossfade                          | Existing dismiss wins. Carousel stops, player pauses, polling stops.       |
 
 ## Performance budget
 
