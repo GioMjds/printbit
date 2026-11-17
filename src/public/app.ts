@@ -7,6 +7,10 @@ import {
 import { navigateWithKioskMotion } from './shared/kiosk-navigation';
 import { mountLoadingAnimation } from './shared/loading-animation';
 import { initIdleScreen } from './shared/idle-screen';
+import {
+  createIdleAttract,
+  type IdleAttract,
+} from './shared/idle/idle-controller';
 import { isMobileViewport } from './shared/device-mode';
 import { attachPowerSafetyOverlay } from './shared/power-safety-overlay';
 import { attachUiBlockingOverlay } from './shared/ui-blocking-overlay';
@@ -106,11 +110,25 @@ function syncFabVisibility(): void {
   }
 }
 
+// The attract controller is created on first show, after DOMContentLoaded,
+// so the overlay markup is guaranteed to exist.
+let idleAttract: IdleAttract | null = null;
+
 initIdleScreen({
   overlayId: 'idleOverlay',
   activateImmediately: idleBootFlag,
-  onShow: () => syncFabVisibility(),
-  onHide: () => syncFabVisibility(),
+  onShow: () => {
+    syncFabVisibility();
+    if (!idleAttract) {
+      const overlay = document.getElementById('idleOverlay');
+      idleAttract = overlay ? createIdleAttract(overlay) : null;
+    }
+    idleAttract?.start();
+  },
+  onHide: () => {
+    idleAttract?.stop();
+    syncFabVisibility();
+  },
 });
 
 const ioFactory = (

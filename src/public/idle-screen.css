@@ -1,44 +1,69 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   IDLE / ATTRACTOR SCREEN — "Cinematic Full-Bleed" layout
+   IDLE / ATTRACT SCREEN
    ───────────────────────────────────────────────────────────────────────────
-   The PrintBit machine bleeds across the top ~65% of the viewport as the
-   background hero. A frosted-glass copy card sits below it, containing the
-   rotating headline, sub-line, a full-width progress bar, and the method
-   label row. The CTA pill and hint sit at the very bottom.
+   No keyframe animations. Motion comes from one Lottie canvas (stepped at 30 Hz by
+   shared/idle/idle-lottie.ts) and opacity/transform transitions only.
 
-   Layering (z-index inside .idle-live):
-     0  .idle-stage       machine SVG bleeding
-     3  .idle-header      brand (top-left)
-     3  .idle-copy-block  frosted glass card
-     4  .idle-footer      CTA + hint
+   globals.css turns every transition off under html[data-kiosk-static='true']
+   with `transition: none !important` (specificity 0,1,1). The idle rules that
+   must animate repeat their transition with !important at specificity 0,2,1
+   or higher in the "Kiosk static mode" section below.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Tokens (mirror globals.css) ───────────────────────────────────────────── */
 .idle-overlay {
-  --idle-bg: #0c0b1e;
   --idle-primary: #696fc7;
-  --idle-primary-soft: #a7aae1;
-  --idle-accent: #f2aebb;
+  --idle-lavender: #a7aae1;
+  --idle-pink: #f2aebb;
   --idle-peach: #f5d3c4;
   --idle-mint: #8de5bc;
   --idle-text: #ffffff;
-  --idle-text-muted: #c9c9dc;
-  --idle-text-soft: #a6a5b9;
-  --idle-cycle: 18s;
+  --idle-muted: #c9c9dc;
+  --idle-soft: #a6a5b9;
+  --idle-fade-ms: 220ms;
+
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background:
+    radial-gradient(ellipse at 20% 5%, rgba(105, 111, 199, 0.3), transparent 58%),
+    radial-gradient(ellipse at 82% 92%, rgba(242, 174, 187, 0.16), transparent 52%),
+    linear-gradient(165deg, #0e0d1f 0%, #100f22 45%, #0a0918 100%);
+  color: var(--idle-text);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-synthesis: none;
-  font-family:
-    'Plus Jakarta Sans',
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 600ms;
 }
 
-/* ── Immediate boot coverage (blocks homepage before first render) ────────── */
+.idle-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s;
+}
+
+.idle-overlay.is-leaving {
+  opacity: 0;
+  visibility: visible;
+  pointer-events: none;
+  transition: opacity 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Boot flow (/?idle=boot): cover the homepage before the first paint. */
 html.kiosk-boot-idle .idle-overlay {
   opacity: 1 !important;
+  visibility: visible !important;
   pointer-events: auto !important;
-  animation: none !important;
   transition: none !important;
 }
 
@@ -46,1898 +71,348 @@ html.kiosk-boot-idle .kiosk-shell {
   pointer-events: none !important;
 }
 
-/* ── Overlay shell ─────────────────────────────────────────────────────────── */
-.idle-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9000;
-  /* Deeper, richer backdrop for the cinematic feel */
-  background:
-    radial-gradient(
-      ellipse at 20% 5%,
-      rgba(105, 111, 199, 0.3),
-      transparent 58%
-    ),
-    radial-gradient(
-      ellipse at 82% 92%,
-      rgba(242, 174, 187, 0.16),
-      transparent 52%
-    ),
-    linear-gradient(165deg, #0e0d1f 0%, #100f22 45%, #0a0918 100%);
-  color: var(--idle-text);
-  opacity: 0;
-  pointer-events: none;
-  overflow: hidden;
-  user-select: none;
-  -webkit-user-select: none;
-  will-change: opacity;
-}
-
-.idle-overlay.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-  animation: idle-overlay-fade-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.idle-overlay.is-leaving {
-  pointer-events: none !important;
-  animation: idle-overlay-fade-out 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
-}
-
-/* Subtle vignette so the edges recede and the machine floats in the centre */
-.idle-overlay::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 58%,
-    rgba(0, 0, 0, 0.42) 100%
-  );
-}
-
-/* Everything animated is hidden (and therefore stopped) until the overlay is live */
-.idle-overlay .idle-live {
-  display: none;
-}
-
-.idle-overlay.is-visible .idle-live,
-.idle-overlay.is-leaving .idle-live,
-html.kiosk-boot-idle .idle-overlay .idle-live {
-  display: flex;
-}
-
-/* ── Soft glow backdrop (gradients, no blur filters: light on tablet GPU) ─── */
-.idle-backdrop {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.idle-blob {
-  position: absolute;
-  border-radius: 50%;
-}
-
-.idle-blob--1 {
-  width: 62vw;
-  height: 62vw;
-  top: -22%;
-  right: -16%;
-  background: radial-gradient(
-    circle,
-    rgba(105, 111, 199, 0.34),
-    transparent 66%
-  );
-  animation: idle-blob-drift-1 22s ease-in-out infinite alternate;
-}
-
-.idle-blob--2 {
-  width: 54vw;
-  height: 54vw;
-  bottom: -26%;
-  left: -14%;
-  background: radial-gradient(
-    circle,
-    rgba(242, 174, 187, 0.22),
-    transparent 66%
-  );
-  animation: idle-blob-drift-2 28s ease-in-out infinite alternate;
-}
-
-.idle-blob--3 {
-  width: 36vw;
-  height: 36vw;
-  top: 34%;
-  left: 40%;
-  background: radial-gradient(
-    circle,
-    rgba(141, 229, 188, 0.1),
-    transparent 66%
-  );
-  animation: idle-blob-drift-3 20s ease-in-out infinite alternate;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   LAYOUT
-   ───────────────────────────────────────────────────────────────────────────
-   .idle-live = full-viewport flex column.
-     - .idle-header sits at top
-     - .idle-copy-block uses margin-top:auto to sink to the bottom
-     - .idle-footer sits below
-     - .idle-stage is absolutely positioned and bleeds full viewport
-
-   Top of the screen:  brand → empty space → machine (behind the card)
-   Bottom third:       frosted card (headline, sub, progress, labels) → CTA
-   ═══════════════════════════════════════════════════════════════════════════ */
-.idle-live {
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  width: 100%;
+/* ── Frame ─────────────────────────────────────────────────────────────── */
+.idle-frame {
   box-sizing: border-box;
-  flex-direction: column;
-  align-items: stretch;
-  padding: 0;
-  animation: idle-live-arrive 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(16px, 3vh, 36px);
+  padding: clamp(24px, 4vh, 48px) clamp(24px, 5vw, 72px);
 }
 
-.idle-overlay.is-leaving .idle-live {
-  animation: idle-live-depart 260ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
-}
-
-/* ── Header ────────────────────────────────────────────────────────────────── */
 .idle-header {
-  position: relative;
-  z-index: 3;
-  flex-shrink: 0;
-  padding: clamp(20px, 2.4vw, 40px) clamp(24px, 3vw, 56px) 0;
+  display: flex;
+  align-items: center;
+  gap: 24px;
 }
 
 .idle-brand {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: clamp(12px, 1.2vw, 18px);
+  gap: 12px;
+  font-weight: 800;
+  font-size: clamp(22px, 2.2vw, 32px);
 }
 
 .idle-brand__mark {
-  width: clamp(40px, 3.6vw, 60px);
-  height: clamp(40px, 3.6vw, 60px);
-  background: url('/assets/logo.png') center / contain no-repeat;
-  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, var(--idle-primary), var(--idle-pink));
 }
 
-.idle-brand__name {
-  font-size: clamp(22px, 2.2vw, 38px);
+/* ── Service chips ─────────────────────────────────────────────────────── */
+.idle-chips {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.idle-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border: 1px solid rgba(167, 170, 225, 0.3);
+  border-radius: 999px;
+  background: rgba(105, 111, 199, 0.12);
+  font-size: clamp(14px, 1.2vw, 18px);
+}
+
+.idle-chip__name {
   font-weight: 700;
-  letter-spacing: -0.035em;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   STAGE — machine SVG bleeds behind the copy card
-   ───────────────────────────────────────────────────────────────────────────
-   inset:0 on a fixed-position overlay means it covers the whole viewport.
-   padding-top reserves a tiny header strip; padding-bottom reserves the card
-   + CTA zone. The SVG letterboxes to fit the remaining space with its own
-   aspect ratio (840×540), so it lands centred in the top ~65% of the screen.
-   ═══════════════════════════════════════════════════════════════════════════ */
-.idle-stage {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  display: grid;
-  place-items: center;
-  padding-top: 6vh;
-  padding-bottom: 48vh;
+.idle-chip__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--idle-muted);
 }
 
-.idle-stage__inner {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  max-width: 800px;
-  max-height: 50vh;
-  animation: idle-stage-bob 6s ease-in-out infinite;
-}
-
-/* Soft bottom scrim so the machine blends into the copy card area */
-.idle-stage::after {
+.idle-chip__state::before {
   content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 45%;
-  pointer-events: none;
-  z-index: 1;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(10, 9, 24, 0.55) 70%,
-    rgba(10, 9, 24, 0.85) 100%
-  );
-}
-
-/* Soft glow behind the machine — reads as ambient light on the stage */
-.idle-stage::before {
-  content: '';
-  position: absolute;
-  inset: 12% 6% 42% 6%;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  pointer-events: none;
-  z-index: -1;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(105, 111, 199, 0.32),
-    transparent 70%
-  );
-  animation: idle-stage-glow 4.5s ease-in-out infinite;
+  background: var(--idle-chip-dot, var(--idle-soft));
 }
 
-.idle-rings {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
+.idle-chip[data-state='ready'] {
+  --idle-chip-dot: var(--idle-mint);
 }
 
-.idle-ring {
-  position: absolute;
-  border-radius: 50%;
-  border: 1px solid rgba(167, 170, 225, 0.2);
-  animation: idle-ring-pulse 5s ease-in-out infinite;
+.idle-chip[data-state='limited'] {
+  --idle-chip-dot: var(--idle-peach);
+  border-color: rgba(245, 211, 196, 0.6);
 }
 
-.idle-ring--1 {
-  width: 56%;
-  aspect-ratio: 1;
+.idle-chip[data-state='unavailable'] {
+  --idle-chip-dot: var(--idle-pink);
+  border-color: rgba(242, 174, 187, 0.7);
+  background: rgba(242, 174, 187, 0.14);
 }
 
-.idle-ring--2 {
-  width: 76%;
-  aspect-ratio: 1;
-  border-color: rgba(167, 170, 225, 0.12);
-  animation-delay: 0.8s;
-}
-
-.idle-ring--3 {
-  width: 96%;
-  aspect-ratio: 1;
-  border-color: rgba(167, 170, 225, 0.07);
-  animation-delay: 1.6s;
-}
-
-.idle-machine,
-.idle-scene {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-/* Scenes cross-fade in their own 6s slot */
-.idle-scene {
-  opacity: 0;
-  animation: idle-slot var(--idle-cycle) var(--d, 0s) linear infinite both;
-}
-
-/* Every moving part in the scenes scales/rotates around its own centre */
-.idle-scene g,
-.idle-scene circle,
-.idle-scene rect,
-.idle-scene path,
-.idle-machine g,
-.idle-machine rect {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-/* Machine: pixel sparkles echo the logo's pixel trail */
-.idle-spark {
-  animation: idle-spark 7s ease-in-out infinite;
-}
-
-.idle-spark--2 {
-  animation-duration: 9s;
-  animation-delay: -3s;
-}
-
-.idle-spark--3 {
-  animation-duration: 8s;
-  animation-delay: -5s;
-}
-
-.idle-spark--4 {
-  animation-duration: 10s;
-  animation-delay: -1s;
-}
-
-/* Phone: dims during Copy because that service doesn't use it */
-.idle-phone {
-  animation: idle-phone-dim var(--idle-cycle) linear infinite both;
-}
-
-/* Eyes: glance toward the action of each scene, blink every few seconds */
-.idle-eyes {
-  animation: idle-eyes-look var(--idle-cycle) linear infinite both;
-}
-
-.idle-eye {
-  animation: idle-eye-blink 5.5s ease-in-out infinite;
-}
-
-.idle-eye--r {
-  animation-delay: 0.02s;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   FROSTED COPY CARD
-   ───────────────────────────────────────────────────────────────────────────
-   A glass panel containing: rotating headline + sub-line, then the progress
-   bar + method label row. Sits at the bottom of the flex column.
-   ═══════════════════════════════════════════════════════════════════════════ */
-.idle-copy-block {
-  position: relative;
-  z-index: 3;
-  margin-top: auto;
-  margin-left: auto;
-  margin-right: auto;
-  margin-bottom: 0;
-  width: calc(100% - 2 * clamp(20px, 2.6vw, 48px));
-  max-width: 760px;
-  /* Slightly reduced padding */
-  padding: clamp(20px, 2.5vw, 32px) clamp(24px, 3vw, 40px);
+/* ── Clock ─────────────────────────────────────────────────────────────── */
+.idle-clock {
   display: flex;
   flex-direction: column;
-  gap: clamp(16px, 2vw, 24px); /* Reduced gap */
-  border-radius: 32px;
-  /* Made background darker/more opaque to clearly separate from the SVG */
-  background: linear-gradient(
-    180deg,
-    rgba(14, 13, 31, 0.85) 0%,
-    rgba(14, 13, 31, 0.98) 100%
-  );
-  border: 1px solid rgba(167, 170, 225, 0.18);
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  align-items: flex-end;
+  margin-left: 12px;
 }
 
-/* Optional: enable backdrop blur for the real glass look.
-   Disabled by default because globals.css turns off backdrop-filter under
-   data-kiosk-static="true" for GPU conservation. Uncomment only if your
-   kiosk hardware has headroom. */
-/*
-
-html[data-kiosk-static='true'] .idle-overlay .idle-copy-block {
-  backdrop-filter: blur(20px) saturate(1.3) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.3) !important;
+.idle-clock__time {
+  font-size: clamp(22px, 2vw, 30px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
-*/
 
-/* ── Rotating copy (3 blocks stacked in one grid cell) ─────────────────────── */
-.idle-copy-stack {
+.idle-clock__date {
+  font-size: clamp(13px, 1vw, 16px);
+  color: var(--idle-soft);
+}
+
+/* ── Slide ─────────────────────────────────────────────────────────────── */
+.idle-slide {
   display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 72px);
+  min-height: 0;
 }
 
-.idle-copy {
-  grid-area: 1 / 1;
+.idle-slide__art {
+  position: relative;
+  justify-self: center;
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  aspect-ratio: 1;
+}
+
+.idle-slide__canvas,
+.idle-slide__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.idle-slide__art,
+.idle-slide__text {
+  transition: opacity var(--idle-fade-ms) ease;
+}
+
+.idle-slide.is-fading .idle-slide__art,
+.idle-slide.is-fading .idle-slide__text {
   opacity: 0;
-  animation: idle-slot-text var(--idle-cycle) var(--d, 0s) linear infinite both;
 }
 
-/* Headline: dominant, tightly tracked, cinematically large */
-.idle-copy__title {
-  margin: 0 0 clamp(8px, 1vw, 12px);
-  font-size: clamp(32px, 3.8vw, 54px);
+.idle-slide__text {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.idle-slide__eyebrow {
+  margin: 0;
+  color: var(--idle-lavender);
+  font-size: clamp(14px, 1.2vw, 18px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.idle-slide__title {
+  margin: 0;
+  font-size: clamp(36px, 4.6vw, 72px);
   font-weight: 800;
   line-height: 1.05;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
+}
+
+.idle-slide__body {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--idle-muted);
+  font-size: clamp(18px, 1.7vw, 26px);
+  line-height: 1.45;
+}
+
+.idle-slide__body:empty,
+.idle-slide__steps:empty {
+  display: none;
+}
+
+.idle-slide__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: idle-step;
+}
+
+.idle-step {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  color: var(--idle-muted);
+  font-size: clamp(18px, 1.7vw, 26px);
+  line-height: 1.35;
+}
+
+.idle-slide__steps[data-stepped='true'] .idle-step {
+  opacity: 0.55;
+  transition:
+    color 300ms ease,
+    opacity 300ms ease;
+}
+
+.idle-slide__steps[data-stepped='true'] .idle-step::before {
+  counter-increment: idle-step;
+  content: counter(idle-step);
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  background: rgba(105, 111, 199, 0.25);
+  color: var(--idle-text);
+  font-size: 0.85em;
+  font-weight: 800;
+}
+
+.idle-slide__steps[data-stepped='true'] .idle-step.is-current {
+  opacity: 1;
   color: var(--idle-text);
 }
 
-/* Sub-line: comfortable, still readable from a distance */
-.idle-copy__sub {
-  margin: 0;
-  max-width: 50ch;
-  color: var(--idle-text-muted);
-  font-size: clamp(15px, 1.2vw, 19px);
-  font-weight: 500;
-  line-height: 1.45;
-  text-wrap: pretty;
+.idle-slide__steps[data-stepped='true'] .idle-step.is-current::before {
+  background: var(--idle-primary);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   PROGRESS BAR + METHOD LABELS
-   ───────────────────────────────────────────────────────────────────────────
-   Single bar fills over the whole 18s cycle. Below it, three labels sit
-   evenly spaced. Whichever method is currently playing gets a bright white
-   colour + a glowing accent dot.
-   ═══════════════════════════════════════════════════════════════════════════ */
-.idle-tabs {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(12px, 1.4vw, 18px);
-  width: 100%;
-}
-
-.idle-tab-track {
-  position: relative;
-  width: 100%;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(167, 170, 225, 0.18);
-  overflow: hidden;
-}
-
-.idle-tab-track i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    var(--idle-primary-soft) 0%,
-    var(--idle-accent) 100%
-  );
-  transform-origin: left center;
-  animation: idle-tab-progress-full var(--idle-cycle) linear infinite both;
-}
-
-.idle-tab-labels {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: clamp(12px, 2vw, 32px);
-}
-
-.idle-tab-label {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: clamp(17px, 1.35vw, 24px);
-  font-weight: 700;
-  letter-spacing: 0.005em;
-  color: var(--idle-text-soft);
-  white-space: nowrap;
-  animation: idle-tab-label-color var(--idle-cycle) var(--d, 0s) linear infinite
-    both;
-}
-
-.idle-tab-label::before {
-  content: '';
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--idle-text-soft);
-  flex-shrink: 0;
-  animation: idle-tab-dot-active var(--idle-cycle) var(--d, 0s) linear infinite
-    both;
-}
-
-/* ── Footer: CTA + hint ────────────────────────────────────────────────────── */
+/* ── Footer ────────────────────────────────────────────────────────────── */
 .idle-footer {
-  position: relative;
-  z-index: 4;
-  flex-shrink: 0;
-  padding: clamp(16px, 2vw, 24px) clamp(24px, 3vw, 56px)
-    clamp(20px, 2.5vw, 36px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(12px, 1.4vw, 18px);
+  gap: 16px;
+}
+
+.idle-progress {
+  width: min(560px, 60vw);
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(167, 170, 225, 0.2);
+}
+
+.idle-progress__bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--idle-primary), var(--idle-pink));
+  transform: scaleX(0);
+  transform-origin: left center;
 }
 
 .idle-cta {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: clamp(14px, 1.4vw, 20px);
-  min-height: 64px;
-  padding: clamp(14px, 1.5vw, 20px) clamp(28px, 2.8vw, 50px)
-    clamp(14px, 1.5vw, 20px) clamp(22px, 2.2vw, 38px);
-  border-radius: 999px;
-  background: linear-gradient(135deg, #696fc7 0%, #8489df 100%);
-  box-shadow:
-    0 14px 48px rgba(105, 111, 199, 0.48),
-    0 0 80px rgba(105, 111, 199, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  animation: idle-cta-breathe 3.2s ease-in-out infinite;
-}
-
-.idle-cta__pulse {
-  position: relative;
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #ffffff;
-}
-
-.idle-cta__pulse::before,
-.idle-cta__pulse::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  animation: idle-cta-ripple 2.4s ease-out infinite;
-}
-
-.idle-cta__pulse::after {
-  animation-delay: 1.2s;
-}
-
-.idle-cta__label {
-  font-size: clamp(20px, 1.6vw, 28px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-}
-
-.idle-hint {
   margin: 0;
-  color: var(--idle-text-soft);
-  font-size: clamp(15px, 1.05vw, 19px);
-  font-weight: 500;
-  text-align: center;
+  padding: 14px 32px;
+  border: 1px solid rgba(167, 170, 225, 0.45);
+  border-radius: 999px;
+  background: rgba(105, 111, 199, 0.18);
+  font-size: clamp(18px, 1.6vw, 24px);
+  font-weight: 700;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   SCENE EVENTS
-   ───────────────────────────────────────────────────────────────────────────
-   Each event's start offset inside the scene's 6s slot is baked into its
-   generated keyframes (@keyframes idle-<event>-<offset in 0.1s>), and every
-   event shares the scene's --d delay. That way the whole scene snaps back to
-   its starting state exactly when the 18s cycle restarts, while the scene
-   itself is invisible.
-   ═══════════════════════════════════════════════════════════════════════════ */
-.ev {
-  animation-duration: var(--idle-cycle);
-  animation-delay: var(--d, 0s);
-  animation-iteration-count: infinite;
-  animation-fill-mode: both;
-  animation-timing-function: ease-in-out;
+.idle-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.idle-scene .ev-wifi {
-  animation-delay:
-    calc(var(--d, 0s) + var(--a, 0s)), calc(var(--d, 0s) + var(--a, 0s));
+/* ── Kiosk static mode: re-enable only the idle transitions ───────────── */
+html[data-kiosk-static='true'] .idle-overlay {
+  transition:
+    opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 600ms !important;
 }
 
-.idle-scene--print .ev-select {
-  animation-name: idle-select-5;
+html[data-kiosk-static='true'] .idle-overlay.is-visible {
+  transition:
+    opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s !important;
 }
-.idle-scene--print .ev-tap {
-  animation-name: idle-tap-10;
-}
-.idle-scene--print .ev-fly-out {
-  animation-name: idle-flyout-12;
-}
-.idle-scene--print .ev-coin {
-  animation-name: idle-coin-25;
-}
-.idle-scene--print .ev-ding {
-  animation-name: idle-ding-32;
-}
-.idle-scene--print .ev-paper {
-  animation-name: idle-paper-35;
-  animation-timing-function: linear;
-}
-.idle-scene--print .ev-wifi {
-  animation-name: idle-wifi-12, idle-wifi-17;
-}
-.idle-scene--copy .ev-coin {
-  animation-name: idle-coin-2;
-}
-.idle-scene--copy .ev-ding {
-  animation-name: idle-ding-9;
-}
-.idle-scene--copy .ev-drop {
-  animation-name: idle-drop-10;
-  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1);
-}
-.idle-scene--copy .ev-sweep {
-  animation-name: idle-sweep-20;
-  animation-timing-function: linear;
-}
-.idle-scene--copy .ev-paper {
-  animation-name: idle-paper-33;
-  animation-timing-function: linear;
-}
-.idle-scene--copy .ev-paper2 {
-  animation-name: idle-paper2-41;
-  animation-timing-function: linear;
-}
-.idle-scene--scan .ev-coin {
-  animation-name: idle-coin-2;
-}
-.idle-scene--scan .ev-ding {
-  animation-name: idle-ding-9;
-}
-.idle-scene--scan .ev-drop {
-  animation-name: idle-drop-10;
-  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1);
-}
-.idle-scene--scan .ev-sweep {
-  animation-name: idle-sweep-20;
-  animation-timing-function: linear;
-}
-.idle-scene--scan .ev-fly-in {
-  animation-name: idle-flyin-33;
-}
-.idle-scene--scan .ev-waiting {
-  animation-name: idle-waiting-44;
-}
-.idle-scene--scan .ev-received {
-  animation-name: idle-pop-44;
-  animation-timing-function: cubic-bezier(0.3, 1.4, 0.4, 1);
-}
-.idle-scene--scan .ev-wifi {
-  animation-name: idle-wifi-33, idle-wifi-38;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   KEYFRAMES
-   ═══════════════════════════════════════════════════════════════════════════ */
-@keyframes idle-overlay-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@keyframes idle-overlay-fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes idle-live-arrive {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 24px, 0) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes idle-live-depart {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translate3d(0, -12px, 0) scale(0.985);
-  }
-}
-
-@keyframes idle-blob-drift-1 {
-  from {
-    transform: translate(0, 0) scale(1);
-  }
-  to {
-    transform: translate(-6%, 8%) scale(1.1);
-  }
-}
-
-@keyframes idle-blob-drift-2 {
-  from {
-    transform: translate(0, 0) scale(1);
-  }
-  to {
-    transform: translate(7%, -6%) scale(1.08);
-  }
-}
-
-@keyframes idle-blob-drift-3 {
-  from {
-    transform: translate(0, 0) scale(0.95);
-  }
-  to {
-    transform: translate(5%, -6%) scale(1.12);
-  }
-}
-
-@keyframes idle-ring-pulse {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.04);
-  }
-}
-
-@keyframes idle-stage-bob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-@keyframes idle-stage-glow {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.06);
-  }
-}
-
-@keyframes idle-cta-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.025);
-  }
-}
-
-@keyframes idle-cta-ripple {
-  0% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-  100% {
-    transform: scale(3.2);
-    opacity: 0;
-  }
-}
-
-/* A scene's visible slot is the first third of the cycle */
-@keyframes idle-slot {
-  0% {
-    opacity: 0;
-  }
-  2% {
-    opacity: 1;
-  }
-  31% {
-    opacity: 1;
-  }
-  33.3% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes idle-slot-text {
-  0% {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  2.4% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  31% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  33.3% {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-}
-
-/* NEW: single bar fills over the entire 18s cycle */
-@keyframes idle-tab-progress-full {
-  0% {
-    transform: scaleX(0);
-  }
-  100% {
-    transform: scaleX(1);
-  }
-}
-
-/* NEW: label text colour highlights during its own 6s slot */
-@keyframes idle-tab-label-color {
-  0% {
-    color: var(--idle-text-soft);
-  }
-  1% {
-    color: #ffffff;
-  }
-  33% {
-    color: #ffffff;
-  }
-  34% {
-    color: var(--idle-text-soft);
-  }
-  100% {
-    color: var(--idle-text-soft);
-  }
-}
-
-/* NEW: dot indicator glows during its own 6s slot */
-@keyframes idle-tab-dot-active {
-  0% {
-    background: var(--idle-text-soft);
-    box-shadow: none;
-    transform: scale(1);
-  }
-  1% {
-    background: var(--idle-accent);
-    box-shadow: 0 0 12px var(--idle-accent);
-    transform: scale(1.15);
-  }
-  33% {
-    background: var(--idle-accent);
-    box-shadow: 0 0 12px var(--idle-accent);
-    transform: scale(1.15);
-  }
-  34% {
-    background: var(--idle-text-soft);
-    box-shadow: none;
-    transform: scale(1);
-  }
-  100% {
-    background: var(--idle-text-soft);
-    box-shadow: none;
-    transform: scale(1);
-  }
-}
-
-@keyframes idle-spark {
-  0%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.35;
-  }
-  50% {
-    transform: translateY(-14px);
-    opacity: 1;
-  }
-}
-
-/* Slot 1 (print/scan): look left at the phone. Slot 2 (copy): look up at the glass. */
-@keyframes idle-eyes-look {
-  0% {
-    transform: translate(-9px, 0);
-  }
-  31% {
-    transform: translate(-9px, 0);
-  }
-  35% {
-    transform: translate(0, -7px);
-  }
-  64% {
-    transform: translate(0, -7px);
-  }
-  68% {
-    transform: translate(-9px, 0);
-  }
-  100% {
-    transform: translate(-9px, 0);
-  }
-}
-
-@keyframes idle-phone-dim {
-  0%,
-  31% {
-    opacity: 1;
-  }
-  35%,
-  64% {
-    opacity: 0.2;
-  }
-  68%,
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes idle-eye-blink {
-  0%,
-  90%,
-  100% {
-    transform: scaleY(1);
-  }
-  94% {
-    transform: scaleY(0.1);
-  }
-}
-
-/* Generated per-event keyframes (percentages are of the 18s cycle) */
-@keyframes idle-select-5 {
-  0% {
-    opacity: 0;
-  }
-  2.778% {
-    opacity: 0;
-  }
-  4.778% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes idle-tap-10 {
-  0% {
-    opacity: 0.9;
-    transform: scale(0.2);
-  }
-  5.556% {
-    opacity: 0.9;
-    transform: scale(0.2);
-  }
-  8.556% {
-    opacity: 0;
-    transform: scale(2.6);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2.6);
-  }
-}
-
-@keyframes idle-flyout-12 {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.7);
-  }
-  6.667% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.7);
-  }
-  7.667% {
-    opacity: 1;
-    transform: translate(0, 0) scale(0.9);
-  }
-  10.167% {
-    opacity: 1;
-    transform: translate(110px, -66px) scale(1);
-  }
-  13.056% {
-    opacity: 1;
-    transform: translate(222px, -30px) scale(0.7);
-  }
-  13.667% {
-    opacity: 0;
-    transform: translate(240px, -16px) scale(0.3);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(240px, -16px) scale(0.3);
-  }
-}
-
-@keyframes idle-coin-25 {
-  0% {
-    opacity: 0;
-    transform: translateY(0) scaleX(1);
-  }
-  13.889% {
-    opacity: 0;
-    transform: translateY(0) scaleX(1);
-  }
-  14.5% {
-    opacity: 1;
-    transform: translateY(8px) scaleX(1);
-  }
-  15.667% {
-    opacity: 1;
-    transform: translateY(80px) scaleX(0.15);
-  }
-  16.889% {
-    opacity: 1;
-    transform: translateY(170px) scaleX(1);
-  }
-  17.889% {
-    opacity: 1;
-    transform: translateY(236px) scaleX(0.15);
-  }
-  18.389% {
-    opacity: 0;
-    transform: translateY(258px) scaleX(0.15);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(258px) scaleX(0.15);
-  }
-}
-
-@keyframes idle-ding-32 {
-  0% {
-    opacity: 0.9;
-    transform: scale(0.4);
-  }
-  17.778% {
-    opacity: 0.9;
-    transform: scale(0.4);
-  }
-  20.778% {
-    opacity: 0;
-    transform: scale(3);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(3);
-  }
-}
-
-@keyframes idle-paper-35 {
-  0% {
-    transform: translateY(-150px);
-  }
-  19.444% {
-    transform: translateY(-150px);
-  }
-  20.944% {
-    transform: translateY(-122px);
-  }
-  21.444% {
-    transform: translateY(-120px);
-  }
-  22.944% {
-    transform: translateY(-62px);
-  }
-  23.444% {
-    transform: translateY(-60px);
-  }
-  25.0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
-
-@keyframes idle-wifi-12 {
-  0% {
-    opacity: 0;
-  }
-  6.667% {
-    opacity: 0;
-  }
-  7.556% {
-    opacity: 1;
-  }
-  8.889% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes idle-wifi-17 {
-  0% {
-    opacity: 0;
-  }
-  9.444% {
-    opacity: 0;
-  }
-  10.333% {
-    opacity: 1;
-  }
-  11.667% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes idle-coin-2 {
-  0% {
-    opacity: 0;
-    transform: translateY(0) scaleX(1);
-  }
-  1.111% {
-    opacity: 0;
-    transform: translateY(0) scaleX(1);
-  }
-  1.722% {
-    opacity: 1;
-    transform: translateY(8px) scaleX(1);
-  }
-  2.889% {
-    opacity: 1;
-    transform: translateY(80px) scaleX(0.15);
-  }
-  4.111% {
-    opacity: 1;
-    transform: translateY(170px) scaleX(1);
-  }
-  5.111% {
-    opacity: 1;
-    transform: translateY(236px) scaleX(0.15);
-  }
-  5.611% {
-    opacity: 0;
-    transform: translateY(258px) scaleX(0.15);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(258px) scaleX(0.15);
-  }
-}
-
-@keyframes idle-ding-9 {
-  0% {
-    opacity: 0.9;
-    transform: scale(0.4);
-  }
-  5.0% {
-    opacity: 0.9;
-    transform: scale(0.4);
-  }
-  8.0% {
-    opacity: 0;
-    transform: scale(3);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(3);
-  }
-}
-
-@keyframes idle-drop-10 {
-  0% {
-    opacity: 0;
-    transform: translateY(-120px) rotate(-4deg);
-  }
-  5.556% {
-    opacity: 0;
-    transform: translateY(-120px) rotate(-4deg);
-  }
-  8.556% {
-    opacity: 1;
-    transform: translateY(-60px) rotate(-4deg);
-  }
-  9.944% {
-    opacity: 1;
-    transform: translateY(6px) rotate(-4deg);
-  }
-  11.111% {
-    opacity: 1;
-    transform: translateY(0) rotate(-4deg);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) rotate(-4deg);
-  }
-}
-
-@keyframes idle-sweep-20 {
-  0% {
-    opacity: 0;
-    transform: translateY(0);
-  }
-  11.111% {
-    opacity: 0;
-    transform: translateY(0);
-  }
-  12.111% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  17.611% {
-    opacity: 1;
-    transform: translateY(128px);
-  }
-  18.333% {
-    opacity: 0;
-    transform: translateY(128px);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(128px);
-  }
-}
-
-@keyframes idle-paper-33 {
-  0% {
-    transform: translateY(-150px);
-  }
-  18.333% {
-    transform: translateY(-150px);
-  }
-  19.833% {
-    transform: translateY(-122px);
-  }
-  20.333% {
-    transform: translateY(-120px);
-  }
-  21.833% {
-    transform: translateY(-62px);
-  }
-  22.333% {
-    transform: translateY(-60px);
-  }
-  23.889% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
-
-@keyframes idle-paper2-41 {
-  0% {
-    transform: translate(16px, -150px) rotate(3deg);
-  }
-  22.778% {
-    transform: translate(16px, -150px) rotate(3deg);
-  }
-  24.278% {
-    transform: translate(16px, -122px) rotate(3deg);
-  }
-  24.778% {
-    transform: translate(16px, -120px) rotate(3deg);
-  }
-  26.278% {
-    transform: translate(16px, -62px) rotate(3deg);
-  }
-  26.778% {
-    transform: translate(16px, -60px) rotate(3deg);
-  }
-  28.333% {
-    transform: translate(16px, 0) rotate(3deg);
-  }
-  100% {
-    transform: translate(16px, 0) rotate(3deg);
-  }
-}
-
-@keyframes idle-flyin-33 {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.6);
-  }
-  18.333% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.6);
-  }
-  19.333% {
-    opacity: 1;
-    transform: translate(0, -6px) scale(0.9);
-  }
-  21.833% {
-    opacity: 1;
-    transform: translate(-190px, -48px) scale(1);
-  }
-  24.722% {
-    opacity: 1;
-    transform: translate(-360px, 80px) scale(0.8);
-  }
-  25.333% {
-    opacity: 0;
-    transform: translate(-382px, 105px) scale(0.4);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-382px, 105px) scale(0.4);
-  }
-}
-
-@keyframes idle-waiting-44 {
-  0% {
-    opacity: 1;
-  }
-  24.444% {
-    opacity: 1;
-  }
-  26.444% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes idle-pop-44 {
-  0% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  24.444% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  27.444% {
-    opacity: 1;
-    transform: scale(1.06);
-  }
-  29.444% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes idle-wifi-33 {
-  0% {
-    opacity: 0;
-  }
-  18.333% {
-    opacity: 0;
-  }
-  19.222% {
-    opacity: 1;
-  }
-  20.556% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes idle-wifi-38 {
-  0% {
-    opacity: 0;
-  }
-  21.111% {
-    opacity: 0;
-  }
-  22.0% {
-    opacity: 1;
-  }
-  23.333% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0;
-  }
-}
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   RESPONSIVE
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Portrait / narrow screens: give the card more room, shrink the machine */
-@media (max-aspect-ratio: 1 / 1), (max-width: 900px) {
-  .idle-stage {
-    padding-bottom: 42vh;
-  }
-
-  .idle-copy__title {
-    font-size: clamp(34px, 6.8vw, 58px);
-  }
-
-  .idle-copy__sub {
-    font-size: clamp(15px, 2vw, 20px);
-    max-width: 52ch;
-  }
-
-  .idle-tab-label {
-    font-size: clamp(15px, 2vw, 20px);
-    gap: 8px;
-  }
-
-  .idle-tab-label::before {
-    width: 8px;
-    height: 8px;
-  }
-
-  .idle-cta__label {
-    font-size: clamp(19px, 2.4vw, 28px);
-  }
-}
-
-/* Short viewports: hide the hint, tighten everything */
-@media (max-height: 640px) {
-  .idle-hint {
-    display: none;
-  }
-
-  .idle-stage {
-    padding-bottom: 45vh;
-  }
-
-  .idle-copy-block {
-    padding: 20px 24px;
-    gap: 16px;
-  }
-
-  .idle-copy__title {
-    font-size: clamp(28px, 4vw, 44px);
-  }
-
-  .idle-footer {
-    padding-top: 16px;
-    padding-bottom: 20px;
-  }
-
-  .idle-cta {
-    min-height: 60px;
-    padding: 14px 28px 14px 22px;
-  }
+html[data-kiosk-static='true'] .idle-overlay.is-leaving {
+  transition: opacity 260ms cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
-
-/* Mobile phones */
-@media (max-width: 520px) {
-  .idle-header {
-    padding: 16px 20px 0;
-  }
-
-  .idle-brand__mark {
-    width: 34px;
-    height: 34px;
-  }
-
-  .idle-brand__name {
-    font-size: 20px;
-  }
 
-  .idle-stage {
-    padding-bottom: 46vh;
-  }
-
-  .idle-copy-block {
-    width: calc(100% - 24px);
-    border-radius: 24px;
-    padding: 22px 22px 24px;
-    gap: 18px;
-  }
-
-  .idle-copy__title {
-    font-size: clamp(28px, 8.6vw, 40px);
-    line-height: 1.08;
-  }
-
-  .idle-copy__sub {
-    font-size: 15px;
-    line-height: 1.5;
-  }
-
-  .idle-tab-labels {
-    gap: 10px;
-  }
-
-  .idle-tab-label {
-    font-size: 15px;
-    gap: 6px;
-    letter-spacing: 0;
-  }
-
-  .idle-tab-label::before {
-    width: 7px;
-    height: 7px;
-  }
-
-  .idle-footer {
-    padding: 16px 20px 24px;
-    gap: 10px;
-  }
-
-  .idle-cta {
-    width: 100%;
-    justify-content: center;
-    min-height: 60px;
-    padding: 14px 22px;
-    gap: 12px;
-  }
-
-  .idle-cta__label {
-    font-size: 17px;
-    white-space: normal;
-    text-align: center;
-  }
-
-  .idle-cta__pulse {
-    width: 12px;
-    height: 12px;
-  }
-
-  .idle-hint {
-    font-size: 13px;
-  }
+html[data-kiosk-static='true'] .idle-overlay .idle-slide__art,
+html[data-kiosk-static='true'] .idle-overlay .idle-slide__text {
+  transition: opacity var(--idle-fade-ms) ease !important;
 }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   REDUCED MOTION
-   ═══════════════════════════════════════════════════════════════════════════ */
-@media (prefers-reduced-motion: reduce) {
-  .idle-live *,
-  .idle-live *::before,
-  .idle-live *::after {
-    animation: none !important;
-  }
-
-  .idle-copy--print,
-  .idle-scene--print {
-    opacity: 1;
-  }
-
-  .idle-scene--print .ev-select,
-  .idle-scene--print .ev-paper {
-    opacity: 1;
-    transform: none;
-  }
-
-  .idle-tab-track i {
-    transform: scaleX(0.33);
-  }
-
-  .idle-tab-label:first-child {
-    color: #ffffff;
-  }
-
-  .idle-tab-label:first-child::before {
-    background: var(--idle-accent);
-    box-shadow: 0 0 12px var(--idle-accent);
-  }
 
-  .idle-scene--print .ev-fly-out,
-  .idle-scene--print .ev-coin,
-  .idle-scene--print .ev-ding,
-  .idle-scene--print .ev-tap,
-  .idle-scene--print .ev-wifi {
-    opacity: 0;
-  }
+html[data-kiosk-static='true']
+  .idle-overlay
+  .idle-slide__steps[data-stepped='true']
+  .idle-step {
+  transition:
+    color 300ms ease,
+    opacity 300ms ease !important;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   HIGH CONTRAST
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* ── High contrast ─────────────────────────────────────────────────────── */
 html[data-high-contrast='true'] .idle-overlay {
   background: #000000;
 }
 
-html[data-high-contrast='true'] .idle-blob,
-html[data-high-contrast='true'] .idle-ring,
-html[data-high-contrast='true'] .idle-stage::before,
-html[data-high-contrast='true'] .idle-stage::after {
-  display: none;
-}
-
-html[data-high-contrast='true'] .idle-copy-block {
-  background: #000 !important;
-  border-color: #fff !important;
-  box-shadow: none !important;
-}
-
-html[data-high-contrast='true'] .idle-copy__sub,
-html[data-high-contrast='true'] .idle-hint,
-html[data-high-contrast='true'] .idle-tab-label {
+html[data-high-contrast='true'] .idle-slide__body,
+html[data-high-contrast='true'] .idle-step,
+html[data-high-contrast='true'] .idle-chip__state {
   color: #ffffff;
+  opacity: 1;
 }
 
-html[data-high-contrast='true'] .idle-tab-track {
-  background: #333;
-}
-
-html[data-high-contrast='true'] .idle-tab-track i {
-  background: #ffffff;
-}
-
-html[data-high-contrast='true'] .idle-tab-label::before {
-  background: #ffffff;
-}
-
+html[data-high-contrast='true'] .idle-chip,
 html[data-high-contrast='true'] .idle-cta {
-  background: #0057ff;
-  border: 2px solid #ffffff;
-  box-shadow: none;
+  border-color: #ffffff;
+  background: transparent;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   KIOSK-STATIC ANIMATION RE-ENABLE — THE ACTUAL BUG FIX
-   ───────────────────────────────────────────────────────────────────────────
-   globals.css applies a blanket `animation: none !important` to every
-   element when <html data-kiosk-static="true"> is set (kiosk GPU conservation).
-   The idle screen's whole point is animation, so we re-enable every animation
-   it uses here. Because globals.css uses !important, every value we want
-   back must also be !important, and our selectors must be more specific than
-   the blanket rule — they are (we scope to .idle-overlay .idle-live).
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* ── Reduced motion (after the static-mode rules so it wins on ties) ───── */
+@media (prefers-reduced-motion: reduce) {
+  html .idle-overlay,
+  html .idle-overlay.is-visible,
+  html .idle-overlay.is-leaving,
+  html .idle-overlay .idle-slide__art,
+  html .idle-overlay .idle-slide__text,
+  html[data-kiosk-static='true'] .idle-overlay,
+  html[data-kiosk-static='true'] .idle-overlay.is-visible,
+  html[data-kiosk-static='true'] .idle-overlay.is-leaving,
+  html[data-kiosk-static='true'] .idle-overlay .idle-slide__art,
+  html[data-kiosk-static='true'] .idle-overlay .idle-slide__text,
+  html[data-kiosk-static='true']
+    .idle-overlay
+    .idle-slide__steps[data-stepped='true']
+    .idle-step {
+    transition: none !important;
+  }
 
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-copy {
-  animation: idle-slot-text var(--idle-cycle) var(--d, 0s) linear infinite both !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-scene {
-  animation: idle-slot var(--idle-cycle) var(--d, 0s) linear infinite both !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-spark {
-  animation: idle-spark 7s ease-in-out infinite !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-spark--2 {
-  animation-duration: 9s !important;
-  animation-delay: -3s !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-spark--3 {
-  animation-duration: 8s !important;
-  animation-delay: -5s !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-spark--4 {
-  animation-duration: 10s !important;
-  animation-delay: -1s !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-eyes {
-  animation: idle-eyes-look var(--idle-cycle) linear infinite both !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-eye {
-  animation: idle-eye-blink 5.5s ease-in-out infinite !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-eye--r {
-  animation-delay: 0.02s !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-phone {
-  animation: idle-phone-dim var(--idle-cycle) linear infinite both !important;
-}
-
-/* Base event rule */
-html[data-kiosk-static='true'] .idle-overlay .idle-live .ev {
-  animation-duration: var(--idle-cycle) !important;
-  animation-delay: var(--d, 0s) !important;
-  animation-iteration-count: infinite !important;
-  animation-fill-mode: both !important;
-  animation-timing-function: ease-in-out !important;
-}
-
-/* WiFi event two-value delay */
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-scene .ev-wifi {
-  animation-delay:
-    calc(var(--d, 0s) + var(--a, 0s)), calc(var(--d, 0s) + var(--a, 0s)) !important;
-}
-
-/* Print scene animation-names */
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--print
-  .ev-select {
-  animation-name: idle-select-5 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--print
-  .ev-tap {
-  animation-name: idle-tap-10 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--print
-  .ev-fly-out {
-  animation-name: idle-flyout-12 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--print
-  .ev-coin {
-  animation-name: idle-coin-25 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--print
-  .ev-ding {
-  animation-name: idle-ding-32 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--print
-  .ev-paper {
-  animation-name: idle-paper-35 !important;
-  animation-timing-function: linear !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--print
-  .ev-wifi {
-  animation-name: idle-wifi-12, idle-wifi-17 !important;
-}
-
-/* Copy scene */
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--copy
-  .ev-coin {
-  animation-name: idle-coin-2 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--copy
-  .ev-ding {
-  animation-name: idle-ding-9 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--copy
-  .ev-drop {
-  animation-name: idle-drop-10 !important;
-  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1) !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--copy
-  .ev-sweep {
-  animation-name: idle-sweep-20 !important;
-  animation-timing-function: linear !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--copy
-  .ev-paper {
-  animation-name: idle-paper-33 !important;
-  animation-timing-function: linear !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--copy
-  .ev-paper2 {
-  animation-name: idle-paper2-41 !important;
-  animation-timing-function: linear !important;
-}
-
-/* Scan scene */
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--scan
-  .ev-coin {
-  animation-name: idle-coin-2 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--scan
-  .ev-ding {
-  animation-name: idle-ding-9 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--scan
-  .ev-drop {
-  animation-name: idle-drop-10 !important;
-  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1) !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--scan
-  .ev-sweep {
-  animation-name: idle-sweep-20 !important;
-  animation-timing-function: linear !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--scan
-  .ev-fly-in {
-  animation-name: idle-flyin-33 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--scan
-  .ev-waiting {
-  animation-name: idle-waiting-44 !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--scan
-  .ev-received {
-  animation-name: idle-pop-44 !important;
-  animation-timing-function: cubic-bezier(0.3, 1.4, 0.4, 1) !important;
-}
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-scene--scan
-  .ev-wifi {
-  animation-name: idle-wifi-33, idle-wifi-38 !important;
-}
-
-/* Progress bar + method label animations */
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-tab-track i {
-  animation: idle-tab-progress-full var(--idle-cycle) linear infinite both !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-live .idle-tab-label {
-  animation: idle-tab-label-color var(--idle-cycle) var(--d, 0s) linear infinite
-    both !important;
-}
-
-html[data-kiosk-static='true']
-  .idle-overlay
-  .idle-live
-  .idle-tab-label::before {
-  animation: idle-tab-dot-active var(--idle-cycle) var(--d, 0s) linear infinite
-    both !important;
-}
-
-/* Overlay fade in/out — keep the existing overlay-level entrance intact */
-html[data-kiosk-static='true'] .idle-overlay.is-visible {
-  animation: idle-overlay-fade-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay.is-leaving {
-  animation: idle-overlay-fade-out 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
-}
-
-/* Stage bob, CTA breathe, and blobs */
-html[data-kiosk-static='true'] .idle-overlay .idle-stage__inner {
-  animation: idle-stage-bob 6s ease-in-out infinite !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-cta {
-  animation: idle-cta-breathe 3.2s ease-in-out infinite !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-cta__pulse::before,
-html[data-kiosk-static='true'] .idle-overlay .idle-cta__pulse::after {
-  animation: idle-cta-ripple 2.4s ease-out infinite !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-cta__pulse::after {
-  animation-delay: 1.2s !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-blob--1 {
-  animation: idle-blob-drift-1 22s ease-in-out infinite alternate !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-blob--2 {
-  animation: idle-blob-drift-2 28s ease-in-out infinite alternate !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-blob--3 {
-  animation: idle-blob-drift-3 20s ease-in-out infinite alternate !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-ring {
-  animation: idle-ring-pulse 5s ease-in-out infinite !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-ring--2 {
-  animation-delay: 0.8s !important;
-}
-html[data-kiosk-static='true'] .idle-overlay .idle-ring--3 {
-  animation-delay: 1.6s !important;
-}
-
-html[data-kiosk-static='true'] .idle-overlay .idle-stage::before {
-  animation: idle-stage-glow 4.5s ease-in-out infinite !important;
+  .idle-progress {
+    visibility: hidden;
+  }
 }
