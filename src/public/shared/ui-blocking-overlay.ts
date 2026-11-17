@@ -505,7 +505,7 @@ function cancelActiveCustomerSessions(state: UiBlockingSettings): void {
   try {
     const copyToken = sessionStorage.getItem('printbit.copyPreviewReleaseToken');
     if (copyToken) {
-      void fetch('/api/copy/preview/release', {
+      void fetch('/api/scanner/release', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -516,7 +516,7 @@ function cancelActiveCustomerSessions(state: UiBlockingSettings): void {
     }
     const scanToken = sessionStorage.getItem('printbit.scanReleaseToken');
     if (scanToken) {
-      void fetch('/api/scan/release', {
+      void fetch('/api/scanner/release', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
