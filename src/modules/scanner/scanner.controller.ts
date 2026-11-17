@@ -622,7 +622,11 @@ export class ScannerController {
 
   private getPreviewFile = (req: Request, res: Response): void => {
     const filename = path.basename(String(req.params.filename ?? ''));
-    const absPath = this.scannerService.getPreviewPath(filename);
+    // A raw ID side is never served; only the merged id-copy sheet is.
+    // Same reply as a missing file so the route does not reveal the pattern.
+    const absPath = /^id-side-/i.test(filename)
+      ? null
+      : this.scannerService.getPreviewPath(filename);
     if (!absPath) {
       res.status(404).json({ error: 'Preview file not found' });
       return;
