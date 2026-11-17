@@ -76,7 +76,7 @@ The background is the current deep-space gradient, static.
 | `scanToPhone`    | Scan, scan the QR, the file goes to your phone.                                                 | scan               | yes         | `idle/scan-to-phone.lottie`   | `scan-transfer.lottie`                                              |
 | `prices`         | Live "from" prices: B/W print, color print, B/W copy, color copy, scan per document.            | none               | yes         | `idle/prices.lottie`          | `coin-insertion.json`, packed to `.lottie`                          |
 | `paying`         | Accepted coins ₱1, ₱5, ₱10, ₱20. Whole pesos. Change is returned.                               | none               | yes         | `idle/paying.lottie`          | `coin-insertion.json`, packed to `.lottie`                          |
-| `supportedFiles` | PDF, Word, PowerPoint, Excel, images, and the upload size limit.                                | print              | yes         | `idle/supported-files.lottie` | `upload.lottie`                                                     |
+| `supportedFiles` | PDF, images, Word (only when document conversion is on), and the upload size limit.             | print              | yes         | `idle/supported-files.lottie` | `upload.lottie`                                                     |
 | `privacyReceipt` | Files are deleted after the job. You get an e-receipt on your phone.                            | none               | yes         | `idle/privacy-receipt.lottie` | `scan-transfer.lottie` until a free LottieFiles asset is dropped in |
 
 Slot files live in `src/public/assets/lottie/idle/`. The first version copies
@@ -93,7 +93,9 @@ and `opacity` with a CSS transition.
 
 The `paying` slide reads the accepted coin values (`ACCEPTED_COIN_VALUES` in
 `src/modules/financial/financial.service.ts`, exported for this) and the
-`supportedFiles` slide reads the size limit (`MAX_FILE_SIZE_BYTES` in
+`supportedFiles` slide reads `wordUploads`
+(`pipelineSettings.documentConversionEnabled`; uploads accept PDF, images, and
+Word only, never PowerPoint or Excel) and the size limit (`MAX_FILE_SIZE_BYTES` in
 `src/utils/file-types.ts`). Both come through `/api/idle/info`.
 
 ### Playlist rules
@@ -164,7 +166,8 @@ Response shape:
   "paper": { "level": "low" },
   "change": { "exactCoinsOnly": false },
   "coins": [1, 5, 10, 20],
-  "maxUploadMb": 25
+  "maxUploadMb": 25,
+  "wordUploads": true
 }
 ```
 
