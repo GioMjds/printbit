@@ -1,3 +1,9 @@
+import {
+  applyIdleScreenSettingsPatch,
+  normalizeIdleScreenSettings,
+  validateIdleScreenSettingsPatch,
+  type IdleScreenSettingsPatch,
+} from '@/shared/idle-screen-contract';
 import { WORKER_QUEUE_DIR } from '@/config';
 import {
   ADMIN_TEST_PAGE_USAGE_SOURCE,
@@ -1770,6 +1776,7 @@ export class AdminController {
       };
       idleTimeoutSeconds?: number;
       idleScreenTimeoutSeconds?: number;
+      idleScreen?: unknown;
       adminPin?: string;
       adminLocalOnly?: boolean;
       pipelineSettings?: {
@@ -1954,6 +1961,15 @@ export class AdminController {
       });
     }
 
+    let idleScreenPatch: IdleScreenSettingsPatch | null = null;
+    if (body.idleScreen !== undefined) {
+      const idleScreenResult = validateIdleScreenSettingsPatch(body.idleScreen);
+      if (!idleScreenResult.ok) {
+        return res.status(400).json({ error: idleScreenResult.error });
+      }
+      idleScreenPatch = idleScreenResult.patch;
+    }
+
     if (
       body.adminPin !== undefined &&
       (typeof body.adminPin !== 'string' || body.adminPin.trim().length < 4)
@@ -2067,6 +2083,13 @@ export class AdminController {
     if (body.idleScreenTimeoutSeconds !== undefined) {
       nextSettings.idleScreenTimeoutSeconds = Math.floor(
         body.idleScreenTimeoutSeconds,
+      );
+    }
+
+    if (idleScreenPatch) {
+      nextSettings.idleScreen = applyIdleScreenSettingsPatch(
+        normalizeIdleScreenSettings(originalSettings.idleScreen),
+        idleScreenPatch,
       );
     }
 

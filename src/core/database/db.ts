@@ -1,6 +1,10 @@
 import { ANALYSIS_ALGORITHM_VERSION } from '@/services/document-analysis';
 import { finiteOr } from '@/utils';
 import {
+  createDefaultIdleScreenSettings,
+  normalizeIdleScreenSettings,
+} from '@/shared/idle-screen-contract';
+import {
   ConsumableInkSnapshotEntry,
   ConsumableInkSnapshotSupply,
   ConsumableUsageEventEntry,
@@ -251,6 +255,7 @@ const DEFAULT_DATA: Schema = {
     pricingEngine: defaultPricingEngine,
     idleTimeoutSeconds: 120,
     idleScreenTimeoutSeconds: 30,
+    idleScreen: createDefaultIdleScreenSettings(),
     adminPin:
       '$argon2id$v=19$m=65536,t=3,p=4$gqSpsbLttLcalBC6SYKG0A$T34vxa4BxPcJ++fLZ+19qp9FGaQufJCCCqWu1fb35TQ',
     adminLocalOnly: true,
@@ -1268,6 +1273,9 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
         (data?.settings as { idleScreenTimeoutSeconds?: number })
           ?.idleScreenTimeoutSeconds,
         DEFAULT_DATA.settings.idleScreenTimeoutSeconds,
+      ),
+      idleScreen: normalizeIdleScreenSettings(
+        (data?.settings as { idleScreen?: unknown })?.idleScreen,
       ),
       adminPin:
         typeof data?.settings?.adminPin === 'string' &&
