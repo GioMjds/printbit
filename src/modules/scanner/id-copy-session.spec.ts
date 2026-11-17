@@ -131,6 +131,55 @@ describe('IdCopySessionStore', () => {
     expect(exists('id-copy-a.pdf')).toBe(false);
   });
 
+  it('destroys a complete session whose merged sheet was deleted, well inside the TTL', async () => {
+    const session = store.create();
+    await store.setSide(session.id, 'front', await writeScan('scan-1.pdf'));
+    await store.setSide(session.id, 'back', await writeScan('scan-2.pdf'));
+    await writeScan('id-copy-a.pdf');
+    await store.setMerged(session.id, 'id-copy-a.pdf', 'token-a');
+    const complete = store.findByReleaseToken('token-a')!;
+    const front = complete.front!.fileName;
+    const back = complete.back!.fileName;
+
+    // The paid copy job deletes the merged sheet itself after printing.
+    await fs.promises.unlink(path.join(dir, 'id-copy-a.pdf'));
+    clock += 1;
+
+    expect(await store.purgeExpired()).toBe(1);
+    expect(exists(front)).toBe(false);
+    expect(exists(back)).toBe(false);
+    expect(store.findByReleaseToken('token-a')).toBeNull();
+  });
+
+  it('keeps a complete session whose merged sheet still exists inside the TTL', async () => {
+    const session = store.create();
+    await store.setSide(session.id, 'front', await writeScan('scan-1.pdf'));
+    await store.setSide(session.id, 'back', await writeScan('scan-2.pdf'));
+    await writeScan('id-copy-a.pdf');
+    await store.setMerged(session.id, 'id-copy-a.pdf', 'token-a');
+
+    clock += 1;
+
+    expect(await store.purgeExpired()).toBe(0);
+    expect(store.findByReleaseToken('token-a')!.id).toBe(session.id);
+    expect(exists('id-copy-a.pdf')).toBe(true);
+  });
+
+  it('leaves a session with no merged sheet yet to the normal TTL', async () => {
+    const session = store.create();
+    const withFront = await store.setSide(
+      session.id,
+      'front',
+      await writeScan('scan-1.pdf'),
+    );
+
+    clock += 1;
+
+    expect(await store.purgeExpired()).toBe(0);
+    expect(exists(withFront.front!.fileName)).toBe(true);
+    expect(await store.get(session.id)).not.toBeNull();
+  });
+
   it('rejects writes to an unknown session', async () => {
     await expect(
       store.setSide('nope', 'front', 'scan-1.pdf'),

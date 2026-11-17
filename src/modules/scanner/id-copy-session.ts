@@ -160,7 +160,31 @@ export class IdCopySessionStore {
       return now - session.touchedAt >= ttl;
     });
     for (const session of expired) await this.destroy(session.id);
-    return expired.length;
+    return expired.length + (await this.destroySessionsWithMissingSheet());
+  }
+
+  /**
+   * Frees sessions whose merged sheet is gone from disk (the paid copy job
+   * deletes it after printing). A rebuild writes the new sheet before
+   * `setMerged` records its name, so a live session's sheet always exists.
+   */
+  private async destroySessionsWithMissingSheet(): Promise<number> {
+    let destroyed = 0;
+    for (const session of [...this.sessions.values()]) {
+      const merged = session.mergedFileName;
+      if (!merged) continue;
+      try {
+        await fs.promises.access(path.join(this.scansDir, merged));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') continue;
+        // Skip a session rebuilt or destroyed while the check was in flight.
+        if (this.sessions.get(session.id) !== session) continue;
+        if (session.mergedFileName !== merged) continue;
+        await this.destroy(session.id);
+        destroyed += 1;
+      }
+    }
+    return destroyed;
   }
 
   /** Deletes expired sessions on a timer. Returns a stop function. */
