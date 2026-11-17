@@ -17,17 +17,17 @@ const POSTER_DIR = path.join(SLOT_DIR, 'posters');
 const force = process.argv.includes('--force');
 
 // [slot name, source file in assets/lottie, display name]
+// idle-src/*.json come from scripts/generate-idle-lottie-assets.js.
 const SLOTS = [
-  ['welcome', 'printing.lottie', 'PrintBit — Welcome'],
-  ['status', 'paper-tray.lottie', 'PrintBit — Kiosk status'],
+  ['welcome', 'idle-src/welcome.json', 'PrintBit — Welcome'],
   ['how-to-print', 'upload.lottie', 'PrintBit — How to print'],
   ['how-to-copy', 'copy-glass.lottie', 'PrintBit — How to copy'],
   ['id-card-copy', 'copy-adf.lottie', 'PrintBit — ID card copy'],
   ['scan-to-phone', 'scan-transfer.lottie', 'PrintBit — Scan to phone'],
   ['prices', 'coin-insertion.json', 'PrintBit — Prices'],
-  ['paying', 'coin-insertion.json', 'PrintBit — Paying'],
-  ['supported-files', 'upload.lottie', 'PrintBit — Supported files'],
-  ['privacy-receipt', 'scan-transfer.lottie', 'PrintBit — Privacy'],
+  ['paying', 'idle-src/paying.json', 'PrintBit — Accepted coins'],
+  ['supported-files', 'idle-src/supported-files.json', 'PrintBit — Supported files'],
+  ['privacy-receipt', 'idle-src/privacy-receipt.json', 'PrintBit — Privacy'],
 ];
 
 const icon = (inner) =>
@@ -41,7 +41,6 @@ const POSTERS = {
   welcome: icon(
     '<path d="M80 95V55h80v40"/><rect x="55" y="95" width="130" height="65" rx="12"/><rect x="80" y="140" width="80" height="50" rx="4"/>',
   ),
-  status: icon('<circle cx="120" cy="120" r="64"/><path d="M90 122l22 22 40-46"/>'),
   'how-to-print': icon(
     '<rect x="85" y="45" width="70" height="150" rx="14"/><path d="M110 170h20"/>',
   ),
@@ -56,7 +55,7 @@ const POSTERS = {
   ),
   prices: icon('<path d="M95 60v120M95 60h35a30 30 0 0 1 0 60H95M80 90h80M80 105h80"/>'),
   paying: icon(
-    '<circle cx="120" cy="120" r="64"/><path d="M105 85v70M105 85h20a20 20 0 0 1 0 40h-20M95 100h50M95 112h50"/>',
+    '<circle cx="52" cy="128" r="21"/><circle cx="102" cy="128" r="23"/><circle cx="156" cy="128" r="25"/><circle cx="198" cy="128" r="14"/><path d="M90 70h60"/>',
   ),
   'supported-files': icon(
     '<path d="M75 45h65l35 35v115H75z"/><path d="M140 45v35h35M95 120h60M95 145h60"/>',
