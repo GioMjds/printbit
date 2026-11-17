@@ -1,9 +1,10 @@
 import { DotLottie } from '@lottiefiles/dotlottie-web';
+import { adaptDotLottie, type DotLottieLike } from './idle-dotlottie-adapter';
 import { IDLE_LOTTIE_RENDER_CONFIG, type IdleLottiePlayer } from './idle-lottie';
 
 const DOTLOTTIE_WASM_URL = '/vendor/dotlottie/dotlottie-player.wasm';
 
-/** Wraps DotLottie in the small interface the idle stage needs. */
+/** Creates the real DotLottie player behind the idle stage's interface. */
 export function createDotLottiePlayer(
   canvas: HTMLCanvasElement,
 ): IdleLottiePlayer {
@@ -14,7 +15,7 @@ export function createDotLottiePlayer(
     loop: false,
     renderConfig: IDLE_LOTTIE_RENDER_CONFIG,
   });
-  return {
+  const like: DotLottieLike = {
     load: (config) => player.load(config),
     setFrame: (frame) => player.setFrame(frame),
     addEventListener: (type, listener) =>
@@ -27,6 +28,7 @@ export function createDotLottiePlayer(
     },
     destroy: () => player.destroy(),
   };
+  return adaptDotLottie(like);
 }
 
 export async function fetchLottieAsset(src: string): Promise<ArrayBuffer> {

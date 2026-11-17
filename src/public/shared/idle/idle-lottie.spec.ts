@@ -6,6 +6,7 @@ import {
   IdleLottieStage,
   type IdleLottiePlayer,
 } from './idle-lottie';
+import { adaptDotLottie } from './idle-dotlottie-adapter';
 
 type EventName = 'load' | 'loadError' | 'renderError';
 
@@ -192,6 +193,41 @@ describe('IdleLottieStage', () => {
     players[0].emit('load');
     expect(players[0].setFrame).toHaveBeenLastCalledWith(30);
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('shows each slide its own poster when WASM init fails asynchronously', async () => {
+    // Real DotLottie never throws from its constructor: init failure arrives
+    // later as one loadError, after which load() is ignored.
+    const listeners = new Map<string, Array<() => void>>();
+    const inert = {
+      load: jest.fn(),
+      setFrame: jest.fn(),
+      destroy: jest.fn(),
+      totalFrames: 0,
+      duration: 0,
+      addEventListener: (type: string, listener: () => void) =>
+        listeners.set(type, [...(listeners.get(type) ?? []), listener]),
+    };
+    const canvas = document.createElement('canvas');
+    const poster = document.createElement('img');
+    const stage = new IdleLottieStage({
+      canvas,
+      poster,
+      createPlayer: () => adaptDotLottie(inert),
+      fetchAsset: async () => new ArrayBuffer(8),
+      reducedMotion: false,
+    });
+    await stage.prefetch([SLIDE_A.src, SLIDE_B.src]);
+    stage.resume();
+    stage.show(SLIDE_A);
+    for (const listener of listeners.get('loadError') ?? []) listener();
+    expect(poster.getAttribute('src')).toBe('/a.svg');
+    stage.show(SLIDE_B);
+    expect(poster.getAttribute('src')).toBe('/b.svg');
+    expect(poster.hidden).toBe(false);
+    stage.show(SLIDE_A);
+    expect(poster.getAttribute('src')).toBe('/a.svg');
+    expect(inert.destroy).toHaveBeenCalledTimes(1);
   });
 
   it('hides a poster image that fails to load', () => {
