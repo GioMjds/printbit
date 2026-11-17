@@ -212,6 +212,25 @@ describe('IdCopySessionStore', () => {
     expect(await fs.promises.readdir(dir)).toEqual([]);
   });
 
+  it('deletes the raw scan and rethrows when the rename fails', async () => {
+    const session = store.create();
+    const failure = Object.assign(new Error('resource busy'), {
+      code: 'EBUSY',
+    });
+    const rename = jest
+      .spyOn(fs.promises, 'rename')
+      .mockRejectedValueOnce(failure);
+    try {
+      await expect(
+        store.setSide(session.id, 'front', await writeScan('scan-1.pdf')),
+      ).rejects.toBe(failure);
+    } finally {
+      rename.mockRestore();
+    }
+    expect(exists('scan-1.pdf')).toBe(false);
+    expect(await fs.promises.readdir(dir)).toEqual([]);
+  });
+
   it('survives a file that is already gone', async () => {
     const session = store.create();
     const withFront = await store.setSide(
