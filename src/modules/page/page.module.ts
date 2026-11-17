@@ -3,6 +3,7 @@ import type { ModuleContext } from '../module.types';
 import type { SessionStore } from '@/services/session';
 import type { PaymentAcceptorGate } from '@/services/payment-acceptor-gate';
 import { PageController, type PageRoute } from './page.controller';
+import { createIdleInfoProvider } from './idle-info.sources';
 
 export interface PageModuleDeps extends ModuleContext {
   sessionStore: SessionStore;
@@ -21,6 +22,7 @@ export function registerPageModule(
     publicPageRoutes: deps.publicPageRoutes,
     resolvePublicBaseUrl: deps.resolvePublicBaseUrl,
     paymentAcceptorGate: deps.paymentAcceptorGate,
+    idleInfoProvider: createIdleInfoProvider(),
   });
 
   // Page routes serve static HTML files - mount at root (no /api prefix)

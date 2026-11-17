@@ -1,3 +1,4 @@
+import type { IdleInfo } from '@/shared/idle-screen-contract';
 import type { Server } from 'socket.io';
 import { Router, Request, Response, NextFunction } from 'express';
 import path from 'node:path';
@@ -25,6 +26,8 @@ export interface PageControllerDeps {
   resolvePublicBaseUrl: (req: Request) => URL;
   paymentAcceptorGate: PaymentAcceptorGate;
   kioskAccessService?: KioskAccessService;
+  /** Builds the GET /api/idle/info snapshot. */
+  idleInfoProvider: () => IdleInfo;
 }
 
 const PORTAL_WAITING_HTML = `<!DOCTYPE html>
@@ -107,6 +110,9 @@ export class PageController {
       ['/api/settings/idle-timeout', '/api/page/settings'],
       this.handleIdleTimeout.bind(this),
     );
+
+    // Public, read-only snapshot for the homepage idle (attract) screen.
+    this.router.get('/api/idle/info', this.handleIdleInfo.bind(this));
 
     this.router.get('/', (req: Request, res: Response, next: NextFunction) => {
       const host = (req.headers['x-forwarded-host'] ||
@@ -276,6 +282,16 @@ export class PageController {
         scanAdf: 300,
       },
     });
+  }
+
+  private handleIdleInfo(_req: Request, res: Response): void {
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      res.json(this.deps.idleInfoProvider());
+    } catch (error) {
+      console.error('[IdleInfo] Failed to build idle info:', error);
+      res.status(503).json({ error: 'Idle info unavailable.' });
+    }
   }
 
   private handleAdminRedirect(_req: Request, res: Response): void {
