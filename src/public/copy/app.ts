@@ -315,14 +315,39 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-const copyLoadingController =
-  copyLoadingAnimation && copyLoadingCanvas
-    ? mountLoadingAnimation({
-        root: copyLoadingAnimation,
-        canvas: copyLoadingCanvas,
-        mode: 'scan',
-      })
-    : null;
+// The overlay animation follows the copy source: Long originals go through the
+// ADF, everything else (A4/Letter documents and ID cards) sits on the glass.
+type CopyLoadingMode = 'copy-glass' | 'copy-adf';
+let copyLoadingMode: CopyLoadingMode | null = null;
+let copyLoadingController: ReturnType<typeof mountLoadingAnimation> | null =
+  null;
+
+function copyLoadingModeFor(target: ScanTarget): CopyLoadingMode {
+  return target === 'document' && documentSize === 'Long'
+    ? 'copy-adf'
+    : 'copy-glass';
+}
+
+function mountCopyLoadingAnimation(mode: CopyLoadingMode): void {
+  if (!copyLoadingAnimation || !copyLoadingCanvas) return;
+  if (mode === copyLoadingMode) return;
+  copyLoadingController?.destroy();
+  copyLoadingController = mountLoadingAnimation({
+    root: copyLoadingAnimation,
+    canvas: copyLoadingCanvas,
+    mode,
+  });
+  copyLoadingMode = mode;
+}
+
+function setCopyLoadingAnimation(target: ScanTarget | null): void {
+  if (target) mountCopyLoadingAnimation(copyLoadingModeFor(target));
+  copyLoadingController?.setActive(target !== null);
+}
+
+// Preload the glass animation (the common case) so the overlay never opens on
+// the CSS fallback; the ADF one is mounted on demand.
+mountCopyLoadingAnimation('copy-glass');
 
 window.addEventListener('pagehide', (event) => {
   if (!event.persisted) copyLoadingController?.destroy();
@@ -538,7 +563,7 @@ function overlaySubtitle(target: ScanTarget): string {
 
 function showOverlay(target: ScanTarget | null): void {
   if (!scanOverlay) return;
-  copyLoadingController?.setActive(target !== null);
+  setCopyLoadingAnimation(target);
   if (target) {
     if (copyOverlayTitle) copyOverlayTitle.textContent = OVERLAY_TITLES[target];
     if (copyOverlaySub) copyOverlaySub.textContent = overlaySubtitle(target);

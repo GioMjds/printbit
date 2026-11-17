@@ -1,6 +1,12 @@
 import { DotLottie } from '@lottiefiles/dotlottie-web';
 
-export type LoadingAnimationMode = 'print' | 'copy' | 'scan' | 'upload';
+export type LoadingAnimationMode =
+  | 'print'
+  | 'copy'
+  | 'copy-glass'
+  | 'copy-adf'
+  | 'scan'
+  | 'upload';
 
 const DOTLOTTIE_WASM_URL = '/vendor/dotlottie/dotlottie-player.wasm';
 const REDUCED_MOTION_FRAME = 28;
@@ -8,6 +14,8 @@ const REDUCED_MOTION_FRAME = 28;
 const LOADING_ANIMATION_ASSETS = {
   print: '/assets/lottie/printing.lottie',
   copy: '/assets/lottie/copying.lottie',
+  'copy-glass': '/assets/lottie/copy-glass.lottie',
+  'copy-adf': '/assets/lottie/copy-adf.lottie',
   scan: '/assets/lottie/scan-transfer.lottie',
   upload: '/assets/lottie/upload.lottie',
 } satisfies Record<LoadingAnimationMode, string>;
@@ -68,7 +76,13 @@ export interface LoadingAnimationController {
 }
 
 export function resolveLoadingAnimationAsset(mode: unknown): string {
-  if (mode === 'copy' || mode === 'scan' || mode === 'upload') {
+  if (
+    mode === 'copy' ||
+    mode === 'copy-glass' ||
+    mode === 'copy-adf' ||
+    mode === 'scan' ||
+    mode === 'upload'
+  ) {
     return LOADING_ANIMATION_ASSETS[mode];
   }
 
