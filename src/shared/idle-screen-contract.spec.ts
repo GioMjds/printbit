@@ -1,0 +1,164 @@
+import {
+  DISABLEABLE_IDLE_SLIDE_IDS,
+  applyIdleScreenSettingsPatch,
+  createDefaultIdleScreenSettings,
+  isDisableableIdleSlideId,
+  isIdleDegraded,
+  normalizeIdleScreenSettings,
+  validateIdleScreenSettingsPatch,
+  type IdleInfo,
+} from './idle-screen-contract';
+
+const healthyInfo = (overrides: Partial<IdleInfo> = {}): IdleInfo => ({
+  settings: createDefaultIdleScreenSettings(),
+  pricing: null,
+  services: {
+    print: { state: 'ready', reason: null },
+    copy: { state: 'ready', reason: null },
+    scan: { state: 'ready', reason: null },
+  },
+  paper: { level: 'ok' },
+  change: { exactCoinsOnly: false },
+  coins: [1, 5, 10, 20],
+  maxUploadMb: 25,
+  wordUploads: true,
+  ...overrides,
+});
+
+describe('idle screen contract', () => {
+  it('defaults to 8 seconds with every slide on', () => {
+    const settings = createDefaultIdleScreenSettings();
+    expect(settings.slideDurationSeconds).toBe(8);
+    for (const id of DISABLEABLE_IDLE_SLIDE_IDS) {
+      expect(settings.slides[id]).toBe(true);
+    }
+  });
+
+  it('returns a fresh defaults object each call', () => {
+    const first = createDefaultIdleScreenSettings();
+    first.slides.prices = false;
+    expect(createDefaultIdleScreenSettings().slides.prices).toBe(true);
+  });
+
+  it('knows which slides can be turned off', () => {
+    expect(isDisableableIdleSlideId('prices')).toBe(true);
+    expect(isDisableableIdleSlideId('welcome')).toBe(false);
+    expect(isDisableableIdleSlideId('status')).toBe(false);
+    expect(isDisableableIdleSlideId('bogus')).toBe(false);
+  });
+
+  describe('normalizeIdleScreenSettings', () => {
+    it('uses defaults when nothing is stored', () => {
+      expect(normalizeIdleScreenSettings(undefined)).toEqual(
+        createDefaultIdleScreenSettings(),
+      );
+    });
+
+    it('keeps valid stored values and fills the rest', () => {
+      const result = normalizeIdleScreenSettings({
+        slideDurationSeconds: 12,
+        slides: { prices: false },
+      });
+      expect(result.slideDurationSeconds).toBe(12);
+      expect(result.slides.prices).toBe(false);
+      expect(result.slides.howToPrint).toBe(true);
+    });
+
+    it('drops an out-of-range duration and invalid slide entries', () => {
+      const result = normalizeIdleScreenSettings({
+        slideDurationSeconds: 99,
+        slides: { welcome: false, prices: 'no' },
+      });
+      expect(result).toEqual(createDefaultIdleScreenSettings());
+    });
+  });
+
+  describe('validateIdleScreenSettingsPatch', () => {
+    it.each([4, 21, 7.5, '8'])('rejects duration %p', (value) => {
+      expect(
+        validateIdleScreenSettingsPatch({ slideDurationSeconds: value }).ok,
+      ).toBe(false);
+    });
+
+    it.each([5, 20])('accepts duration %p', (value) => {
+      expect(
+        validateIdleScreenSettingsPatch({ slideDurationSeconds: value }),
+      ).toEqual({ ok: true, patch: { slideDurationSeconds: value } });
+    });
+
+    it('rejects a slide that cannot be turned off', () => {
+      const result = validateIdleScreenSettingsPatch({
+        slides: { status: false },
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toContain('idleScreen.slides.status');
+    });
+
+    it('rejects an unknown slide id', () => {
+      expect(
+        validateIdleScreenSettingsPatch({ slides: { bogus: true } }).ok,
+      ).toBe(false);
+    });
+
+    it('rejects a non-boolean slide value', () => {
+      expect(
+        validateIdleScreenSettingsPatch({ slides: { prices: 1 } }).ok,
+      ).toBe(false);
+    });
+
+    it('rejects an unknown top-level field', () => {
+      expect(validateIdleScreenSettingsPatch({ theme: 'dark' }).ok).toBe(false);
+    });
+
+    it.each([null, [], 'x', 3])('rejects non-object input %p', (value) => {
+      expect(validateIdleScreenSettingsPatch(value).ok).toBe(false);
+    });
+
+    it('accepts a partial slides patch', () => {
+      expect(
+        validateIdleScreenSettingsPatch({ slides: { prices: false } }),
+      ).toEqual({ ok: true, patch: { slides: { prices: false } } });
+    });
+  });
+
+  it('applies a patch without dropping other slides', () => {
+    const next = applyIdleScreenSettingsPatch(
+      createDefaultIdleScreenSettings(),
+      { slides: { prices: false } },
+    );
+    expect(next.slides.prices).toBe(false);
+    expect(next.slides.paying).toBe(true);
+    expect(next.slideDurationSeconds).toBe(8);
+  });
+
+  describe('isIdleDegraded', () => {
+    it('is false for null info and a healthy kiosk', () => {
+      expect(isIdleDegraded(null)).toBe(false);
+      expect(isIdleDegraded(healthyInfo())).toBe(false);
+    });
+
+    it('is false when a service is only unknown', () => {
+      const info = healthyInfo();
+      info.services.scan = { state: 'unknown', reason: null };
+      expect(isIdleDegraded(info)).toBe(false);
+    });
+
+    it('is true for a limited or unavailable service', () => {
+      const limited = healthyInfo();
+      limited.services.print = { state: 'limited', reason: 'paper_low' };
+      expect(isIdleDegraded(limited)).toBe(true);
+      const down = healthyInfo();
+      down.services.scan = {
+        state: 'unavailable',
+        reason: 'scanner_unavailable',
+      };
+      expect(isIdleDegraded(down)).toBe(true);
+    });
+
+    it('is true when only exact coins are accepted', () => {
+      expect(
+        isIdleDegraded(healthyInfo({ change: { exactCoinsOnly: true } })),
+      ).toBe(true);
+    });
+  });
+});
