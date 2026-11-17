@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { IdRotation, IdSide } from '@/shared/id-card-layout';
+import type { IdRect, IdRotation, IdSide } from '@/shared/id-card-layout';
 import type {
   IdCopyFailureResponse,
   IdCopySheetResponse,
@@ -25,6 +25,8 @@ export interface IdCopyServiceDeps {
   registerReleaseToken(fileName: string): string;
   invalidateReleaseTokens(fileName: string): void;
   thumbnail(filePath: string): Promise<Uint8Array>;
+  /** The card's box on a full-glass scan, in points. Null: no card found. */
+  locateCard?(filePath: string): Promise<IdRect | null>;
 }
 
 const QUARTER_TURNS = new Set<unknown>([0, 90, 180, 270]);
@@ -71,10 +73,12 @@ export class IdCopyService {
       };
     }
 
+    const cardBox = await this.findCard(scanned.outputPath);
     await this.deps.sessions.setSide(
       session.id,
       input.side,
       path.basename(scanned.outputPath),
+      cardBox,
     );
     const sheet = await this.rebuild(session, input.paperSize);
     const warnings = await checkIdScan(
@@ -119,6 +123,20 @@ export class IdCopyService {
     return session;
   }
 
+  /** Never fails the scan: without a box the whole scan is merged. */
+  private async findCard(filePath: string): Promise<IdRect | null> {
+    if (!this.deps.locateCard) return null;
+    try {
+      return await this.deps.locateCard(filePath);
+    } catch (error) {
+      console.warn(
+        '[ID-COPY] Card locate skipped:',
+        error instanceof Error ? error.message : 'unknown error',
+      );
+      return null;
+    }
+  }
+
   private sidePath(record: IdCopySideRecord | null): string | null {
     return record ? path.join(this.deps.scansDir, record.fileName) : null;
   }
@@ -132,6 +150,7 @@ export class IdCopyService {
         ? {
             filePath: path.join(this.deps.scansDir, record.fileName),
             rotationDeg: record.rotationDeg,
+            cardBox: record.cardBox,
           }
         : null;
     const bytes = await composeIdSheet({

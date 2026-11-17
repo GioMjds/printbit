@@ -11,6 +11,7 @@ import {
 } from 'pdf-lib';
 import {
   idCardSheetLayout,
+  type IdRect,
   type IdRotation,
   type IdSide,
   type IdSidePlacement,
@@ -20,6 +21,8 @@ import { PAPER_POINTS, type PaperSize } from '@/shared/print-configuration';
 export interface IdSheetSideInput {
   filePath: string;
   rotationDeg: IdRotation;
+  /** Part of the scan holding the card, in points. Omitted: the whole scan. */
+  cardBox?: IdRect | null;
 }
 
 export interface ComposeIdSheetInput {
@@ -61,12 +64,24 @@ export function regionDrawOptions(
 
 async function embedFirstPage(
   out: PDFDocument,
-  filePath: string,
+  side: IdSheetSideInput,
 ): Promise<PDFEmbeddedPage> {
-  const bytes = await fs.promises.readFile(filePath);
+  const bytes = await fs.promises.readFile(side.filePath);
   const source = await PDFDocument.load(bytes, { ignoreEncryption: true });
-  const [embedded] = await out.embedPdf(source, [0]);
-  return embedded;
+  const box = side.cardBox;
+  if (!box) {
+    const [embedded] = await out.embedPdf(source, [0]);
+    return embedded;
+  }
+  // Only the card: the rest of the glass never reaches the sheet.
+  const page = source.getPage(0);
+  const { x: originX, y: originY } = page.getMediaBox();
+  return out.embedPage(page, {
+    left: originX + box.x,
+    bottom: originY + box.y,
+    right: originX + box.x + box.width,
+    top: originY + box.y + box.height,
+  });
 }
 
 /** Builds the one-page ID copy sheet. A side that is null is left empty. */
@@ -82,8 +97,8 @@ export async function composeIdSheet(
   const page = out.addPage([pageWidth, pageHeight]);
 
   const embedded: Record<IdSide, PDFEmbeddedPage | null> = {
-    front: input.front ? await embedFirstPage(out, input.front.filePath) : null,
-    back: input.back ? await embedFirstPage(out, input.back.filePath) : null,
+    front: input.front ? await embedFirstPage(out, input.front) : null,
+    back: input.back ? await embedFirstPage(out, input.back) : null,
   };
 
   const sideInput = (side: IdSide) => {

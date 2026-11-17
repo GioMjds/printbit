@@ -440,6 +440,57 @@ export async function renderPdfGrayThumbnail(
   }
 }
 
+/**
+ * First page of a PDF as gray levels (0 black, 255 white) at `pxPerMm`, plus
+ * the page size in points. Used to find an ID card on a full-glass scan.
+ */
+export async function renderPdfGrayImage(
+  pdfPath: string,
+  pxPerMm: number,
+): Promise<{
+  data: Uint8Array;
+  width: number;
+  height: number;
+  pageWidthPt: number;
+  pageHeightPt: number;
+}> {
+  const { pdfjs, canvasFactory } = await loadPdfjsForNode();
+  const data = new Uint8Array(await fs.promises.readFile(pdfPath));
+  const loadingTask = pdfjs.getDocument({ data, verbosity: 0 });
+  try {
+    const doc = await loadingTask.promise;
+    const page = await doc.getPage(1);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: (pxPerMm * 25.4) / 72 });
+    const width = Math.max(1, Math.round(viewport.width));
+    const height = Math.max(1, Math.round(viewport.height));
+    const canvas = canvasFactory(width, height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context is not available');
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    const rgba = ctx.getImageData(0, 0, width, height).data;
+    page.cleanup();
+
+    const gray = new Uint8Array(width * height);
+    for (let i = 0; i < gray.length; i += 1) {
+      const offset = i * 4;
+      const alpha = rgba[offset + 3] / 255;
+      const value =
+        0.299 * rgba[offset] + 0.587 * rgba[offset + 1] + 0.114 * rgba[offset + 2];
+      gray[i] = Math.round(value * alpha + 255 * (1 - alpha));
+    }
+    return {
+      data: gray,
+      width,
+      height,
+      pageWidthPt: base.width,
+      pageHeightPt: base.height,
+    };
+  } finally {
+    await loadingTask.destroy();
+  }
+}
+
 async function analyzePdfFile(
   pdfPath: string,
   fileType: AnalyzedFileType,

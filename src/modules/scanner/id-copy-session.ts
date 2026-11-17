@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { IdRotation, IdSide } from '@/shared/id-card-layout';
+import type { IdRect, IdRotation, IdSide } from '@/shared/id-card-layout';
 
 /** An abandoned capture is removed quickly: the files are ID images. */
 export const ID_COPY_INCOMPLETE_TTL_MS = 10 * 60 * 1000;
@@ -20,6 +20,8 @@ export class IdCopySessionNotFoundError extends Error {
 export interface IdCopySideRecord {
   fileName: string;
   rotationDeg: IdRotation;
+  /** Where the card sits on the scan, in points. Null: use the whole scan. */
+  cardBox: IdRect | null;
 }
 
 export interface IdCopySession {
@@ -78,6 +80,7 @@ export class IdCopySessionStore {
     id: string,
     side: IdSide,
     scannedFileName: string,
+    cardBox: IdRect | null = null,
   ): Promise<IdCopySession> {
     const session = this.sessions.get(id);
     if (!session) {
@@ -103,7 +106,7 @@ export class IdCopySessionStore {
       throw new IdCopySessionNotFoundError();
     }
     const previous = session[side];
-    session[side] = { fileName, rotationDeg: 0 };
+    session[side] = { fileName, rotationDeg: 0, cardBox };
     session.touchedAt = this.now();
     if (previous) await removeFile(this.scansDir, previous.fileName);
     return session;

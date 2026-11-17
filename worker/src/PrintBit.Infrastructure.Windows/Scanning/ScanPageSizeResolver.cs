@@ -14,11 +14,6 @@ public static class ScanPageSizeResolver
     public const decimal GlassMaxLengthMm = 297m;
     private const decimal LongLengthMm = 330m;
 
-    /// <summary>
-    /// Side of the square scanned for an ID card. The card (85.6 x 54 mm) sits
-    /// at the glass origin corner; the square fits it in either orientation.
-    /// </summary>
-    public const decimal IdCardRegionMm = 100m;
 
     public static bool IsIdCard(string? paperSize) =>
         string.Equals(paperSize?.Trim(), "idcard", StringComparison.OrdinalIgnoreCase);
@@ -30,8 +25,10 @@ public static class ScanPageSizeResolver
         switch (paperSize?.Trim().ToLowerInvariant())
         {
             case "idcard":
+                // The whole glass: the card may lie anywhere on it. Node finds
+                // the card on the scan and crops to it before merging.
                 return new Resolution(
-                    new PageSize(IdCardRegionMm, IdCardRegionMm, PageSizeUnit.Millimetre),
+                    new PageSize(GlassWidthMm, GlassMaxLengthMm, PageSizeUnit.Millimetre),
                     false);
             case "a4":
                 return new Resolution(PageSize.A4, false);

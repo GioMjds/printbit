@@ -1,6 +1,4 @@
 import {
-  ID_CARD_HEIGHT_MM,
-  ID_CARD_WIDTH_MM,
   MM_TO_PT,
   idCardSheetLayout,
   slotFractions,
@@ -8,7 +6,7 @@ import {
   type IdRect,
   type IdRotation,
 } from './id-card-layout';
-import { PAPER_POINTS, type PaperSize } from './print-configuration';
+import type { PaperSize } from './print-configuration';
 
 const PAPERS: PaperSize[] = ['A4', 'Short', 'Long'];
 const SQUARE = { width: 100 * MM_TO_PT, height: 100 * MM_TO_PT };
@@ -43,11 +41,16 @@ describe('idCardSheetLayout', () => {
     expect(front.height).toBeCloseTo(100, 3);
   });
 
-  it.each(PAPERS)('centres the card horizontally on %s', (paper) => {
+  it.each(PAPERS)('fills the slot with a slot-sized scan on %s', (paper) => {
     const layout = idCardSheetLayout(paper, both());
-    const paperWidthMm = PAPER_POINTS[paper][0] / MM_TO_PT;
-    const front = printedMm(layout, layout.front!.region);
-    expect(front.x).toBeCloseTo((paperWidthMm - ID_CARD_WIDTH_MM) / 2, 3);
+    for (const side of ['front', 'back'] as const) {
+      const region = layout[side]!.region;
+      const slot = layout[side]!.slot;
+      expect(region.x).toBeCloseTo(slot.x, 3);
+      expect(region.y).toBeCloseTo(slot.y, 3);
+      expect(region.width).toBeCloseTo(slot.width, 3);
+      expect(region.height).toBeCloseTo(slot.height, 3);
+    }
   });
 
   it.each(PAPERS)('keeps both slots on the page and apart on %s', (paper) => {
@@ -64,22 +67,25 @@ describe('idCardSheetLayout', () => {
     expect(front.y).toBeGreaterThanOrEqual(back.y + back.height);
   });
 
-  it('puts the card at the same printed place for every rotation', () => {
-    const base = idCardSheetLayout('A4', both(0));
-    const baseRegion = printedMm(base, base.front!.region);
-    const slack = { x: 100 - ID_CARD_WIDTH_MM, y: 100 - ID_CARD_HEIGHT_MM };
-    const expected: Record<IdRotation, { dx: number; dy: number }> = {
-      0: { dx: 0, dy: 0 },
-      90: { dx: -slack.x, dy: 0 },
-      180: { dx: -slack.x, dy: -slack.y },
-      270: { dx: 0, dy: -slack.y },
-    };
+  it('keeps the scan centred in its slot for every rotation', () => {
+    const wide = { width: 90 * MM_TO_PT, height: 60 * MM_TO_PT };
     for (const rotation of [0, 90, 180, 270] as IdRotation[]) {
-      const layout = idCardSheetLayout('A4', both(rotation));
-      const region = printedMm(layout, layout.front!.region);
-      expect(region.x - baseRegion.x).toBeCloseTo(expected[rotation].dx, 3);
-      expect(region.y - baseRegion.y).toBeCloseTo(expected[rotation].dy, 3);
-      expect(layout.front!.rotationDeg).toBe(rotation);
+      const layout = idCardSheetLayout('A4', {
+        front: { region: wide, rotationDeg: rotation },
+        back: { region: wide, rotationDeg: rotation },
+      });
+      for (const side of ['front', 'back'] as const) {
+        const { region, slot } = layout[side]!;
+        expect(region.x + region.width / 2).toBeCloseTo(
+          slot.x + slot.width / 2,
+          3,
+        );
+        expect(region.y + region.height / 2).toBeCloseTo(
+          slot.y + slot.height / 2,
+          3,
+        );
+        expect(layout[side]!.rotationDeg).toBe(rotation);
+      }
     }
   });
 
@@ -90,30 +96,41 @@ describe('idCardSheetLayout', () => {
     expect(b.back!.slot).toEqual(a.back!.slot);
   });
 
-  it('anchors a full-glass scan at the card corner and keeps the slot', () => {
+  it('shrinks a full-glass scan into the slot and keeps the slot', () => {
     const fullGlass = { width: 216 * MM_TO_PT, height: 297 * MM_TO_PT };
     const normal = idCardSheetLayout('A4', both());
     const layout = idCardSheetLayout('A4', {
       front: { region: fullGlass, rotationDeg: 0 },
       back: null,
     });
-    const region = printedMm(layout, layout.front!.region);
-    const normalRegion = printedMm(normal, normal.front!.region);
-    expect(region.x).toBeCloseTo(normalRegion.x, 3);
-    expect(region.y).toBeCloseTo(normalRegion.y, 3);
-    expect(region.width).toBeCloseTo(216, 3);
-    expect(layout.front!.slot).toEqual(normal.front!.slot);
+    const { region, slot } = layout.front!;
+    expect(region.height).toBeCloseTo(slot.height, 3);
+    expect(region.width / region.height).toBeCloseTo(216 / 297, 3);
+    expect(region.x + region.width / 2).toBeCloseTo(slot.x + slot.width / 2, 3);
+    expect(region.y).toBeCloseTo(slot.y, 3);
+    expect(slot).toEqual(normal.front!.slot);
+  });
+
+  it('keeps a cropped card at real size', () => {
+    const card = { width: 92 * MM_TO_PT, height: 60 * MM_TO_PT };
+    const layout = idCardSheetLayout('A4', {
+      front: { region: card, rotationDeg: 90 },
+      back: null,
+    });
+    const printed = printedMm(layout, layout.front!.region);
+    expect(printed.width).toBeCloseTo(60, 3);
+    expect(printed.height).toBeCloseTo(92, 3);
   });
 
   it('swaps the footprint of a non-square region on a quarter turn', () => {
-    const wide = { width: 120 * MM_TO_PT, height: 80 * MM_TO_PT };
+    const wide = { width: 90 * MM_TO_PT, height: 60 * MM_TO_PT };
     const layout = idCardSheetLayout('A4', {
       front: { region: wide, rotationDeg: 90 },
       back: null,
     });
     const region = printedMm(layout, layout.front!.region);
-    expect(region.width).toBeCloseTo(80, 3);
-    expect(region.height).toBeCloseTo(120, 3);
+    expect(region.width).toBeCloseTo(60, 3);
+    expect(region.height).toBeCloseTo(90, 3);
   });
 
   it('returns null for a side that is not scanned', () => {

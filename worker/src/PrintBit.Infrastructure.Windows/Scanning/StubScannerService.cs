@@ -142,20 +142,24 @@ public sealed class StubScannerService : IScannerService
         var isIdCard = ScanPageSizeResolver.IsIdCard(request.PaperSize);
         var titleFont = isIdCard ? 9 : 18;
         var bodyFont = isIdCard ? 6 : 11;
-        var startX = isIdCard ? 10 : 50;
-        var startY = isIdCard ? 255 : 780;
+        var startX = 50;
+        var startY = 780;
         var lineStep = isIdCard ? 10 : 20;
 
         var sb = new StringBuilder();
         if (isIdCard)
         {
-            // A card-sized block at the origin corner, alternating colour so the
-            // two sides of a stub ID differ and the scan checks stay quiet.
-            var shade = Interlocked.Increment(ref _idStubCounter) % 2 == 0
-                ? "0.20 0.30 0.60"
-                : "0.75 0.35 0.20";
+            // A card-sized block (85.6 x 54 mm) somewhere on the full glass,
+            // moving and alternating colour per scan so the two sides of a stub
+            // ID differ and the card finder has something to find.
+            var count = Interlocked.Increment(ref _idStubCounter);
+            var shade = count % 2 == 0 ? "0.20 0.30 0.60" : "0.75 0.35 0.20";
+            int[][] spots = [[40, 600], [300, 420], [120, 90], [330, 640]];
+            var spot = spots[count % spots.Length];
+            startX = spot[0] + 10;
+            startY = spot[1] + 135;
             sb.AppendLine($"{shade} rg");
-            sb.AppendLine("0 130 243 153 re f");
+            sb.AppendLine($"{spot[0]} {spot[1]} 243 153 re f");
             sb.AppendLine("1 1 1 rg");
         }
         sb.AppendLine("BT");
@@ -191,7 +195,7 @@ public sealed class StubScannerService : IScannerService
 
         // 3 0 obj: Page
         offsets.Add(fs.Position);
-        var mediaBox = isIdCard ? "0 0 283 283" : "0 0 595 842";
+        var mediaBox = isIdCard ? "0 0 612 842" : "0 0 595 842";
         writer.Write($"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [{mediaBox}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n");
         writer.Flush();
 

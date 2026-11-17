@@ -82,14 +82,14 @@ public class ScanPageSizeResolverTests
     [InlineData("IdCard", false)]
     [InlineData(" IDCARD ", false)]
     [InlineData("idcard", true)]
-    public void IdCard_IsASquareRegionAtTheGlassOrigin(string paperSize, bool isFeeder)
+    public void IdCard_IsTheWholeGlass(string paperSize, bool isFeeder)
     {
         var resolved = ScanPageSizeResolver.Resolve(paperSize, isFeeder);
 
         Assert.False(resolved.ClampedToGlass);
         var (width, height) = Millimetres(resolved.PageSize!);
-        Assert.Equal(100m, width);
-        Assert.Equal(100m, height);
+        Assert.Equal(216m, width);
+        Assert.Equal(297m, height);
     }
 
     [Theory]

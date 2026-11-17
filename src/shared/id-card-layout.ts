@@ -94,10 +94,10 @@ function printedSlotMm(paperSize: PaperSize, side: IdSide): MmRect {
 }
 
 /**
- * The card sits at the top-left corner of the scan. Turning the scan clockwise
- * moves that corner: 90 to top-right, 180 to bottom-right, 270 to bottom-left.
- * The scan is placed so the card, assumed landscape after the turn, lands on
- * the fixed card position.
+ * The scan (already cropped to the card when the card was found) is centred in
+ * its slot, whatever the rotation. A region larger than the slot is shrunk to
+ * fit, so a whole-glass fallback still shows everything. The slot clip keeps
+ * the two sides apart.
  */
 function printedRegionMm(
   paperSize: PaperSize,
@@ -109,20 +109,19 @@ function printedRegionMm(
   const quarterTurn = input.rotationDeg === 90 || input.rotationDeg === 270;
   const rotatedWidth = quarterTurn ? height : width;
   const rotatedHeight = quarterTurn ? width : height;
-  const card = printedCardMm(paperSize, side);
-  const offsetX =
-    input.rotationDeg === 90 || input.rotationDeg === 180
-      ? rotatedWidth - ID_CARD_WIDTH_MM
-      : 0;
-  const offsetY =
-    input.rotationDeg === 180 || input.rotationDeg === 270
-      ? rotatedHeight - ID_CARD_HEIGHT_MM
-      : 0;
+  const slot = printedSlotMm(paperSize, side);
+  const shrink = Math.min(
+    1,
+    slot.width / rotatedWidth,
+    slot.height / rotatedHeight,
+  );
+  const fittedWidth = rotatedWidth * shrink;
+  const fittedHeight = rotatedHeight * shrink;
   return {
-    x: card.x - offsetX,
-    y: card.y - offsetY,
-    width: rotatedWidth,
-    height: rotatedHeight,
+    x: slot.x + (slot.width - fittedWidth) / 2,
+    y: slot.y + (slot.height - fittedHeight) / 2,
+    width: fittedWidth,
+    height: fittedHeight,
   };
 }
 

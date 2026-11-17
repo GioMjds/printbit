@@ -62,7 +62,11 @@ describe('IdCopySessionStore', () => {
 
     expect(exists(oldFront)).toBe(false);
     expect(after.front!.rotationDeg).toBe(0);
-    expect(after.back).toEqual({ fileName: backFile, rotationDeg: 90 });
+    expect(after.back).toEqual({
+      fileName: backFile,
+      rotationDeg: 90,
+      cardBox: null,
+    });
     expect(exists(backFile)).toBe(true);
   });
 

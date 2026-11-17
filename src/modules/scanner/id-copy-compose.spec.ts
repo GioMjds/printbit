@@ -51,6 +51,18 @@ describe('composeIdSheet', () => {
     },
   );
 
+  it('crops each side to its card box', async () => {
+    const front = await writeSidePdf('front.pdf');
+    const cardBox = { x: 10, y: 20, width: 92 * MM_TO_PT, height: 60 * MM_TO_PT };
+    const bytes = await composeIdSheet({
+      paperSize: 'A4',
+      front: { filePath: front, rotationDeg: 0, cardBox },
+      back: { filePath: front, rotationDeg: 90, cardBox },
+    });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(1);
+  });
+
   it('builds a valid sheet from the front alone', async () => {
     const front = await writeSidePdf('front.pdf');
     const bytes = await composeIdSheet({
