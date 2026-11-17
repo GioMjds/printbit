@@ -18,7 +18,11 @@ import {
   type Orientation,
   type PaperSize,
 } from '../../shared/print-configuration';
-import { slotFractions, type IdSide } from '../../shared/id-card-layout';
+import {
+  slotFractions,
+  type IdRotation,
+  type IdSide,
+} from '../../shared/id-card-layout';
 import {
   ID_SESSION_EXPIRED_CODE,
   type IdScanWarningCode,
@@ -109,6 +113,11 @@ let idSessionId: string | null = null;
 /** Paper and orientation of the scanned document, from the preview render. */
 let documentLayout: { paperSize: PaperSize; orientation: Orientation } | null =
   null;
+/** What the current ID sheet was built with. Not persisted. */
+let sheetSpec: {
+  paperSize: PaperSize;
+  rotations: Record<IdSide, IdRotation>;
+} | null = null;
 let previewRendered = false;
 let previewRequestId = 0;
 let composing = false;
@@ -565,7 +574,11 @@ function clearSimulatedError(): void {
   closeCopyAdfModal();
   closeCopyPrinterPanelModal();
   render();
-  if (previewPath && !previewRendered) void showPreview(previewPath);
+  if (flow.copyType === 'id' && idSessionId && !isSheetCurrent()) {
+    void recompose();
+  } else if (previewPath && !previewRendered) {
+    void showPreview(previewPath);
+  }
 }
 
 // ── Printer sockets ─────────────────────────────────────────────────────────
@@ -752,6 +765,17 @@ const WARNING_TEXT: Record<IdScanWarningCode, string> = {
   sides_identical: 'Front and back look the same. Did you flip your ID?',
 };
 
+/** False when an ID sheet no longer matches the paper size or rotations. */
+function isSheetCurrent(): boolean {
+  if (flow.copyType === 'document') return true;
+  return (
+    sheetSpec !== null &&
+    sheetSpec.paperSize === settings.paperSize &&
+    sheetSpec.rotations.front === flow.rotations.front &&
+    sheetSpec.rotations.back === flow.rotations.back
+  );
+}
+
 function outputPaperSize(): PaperSize {
   return flow.copyType === 'document'
     ? (documentLayout?.paperSize ?? documentSize)
@@ -918,7 +942,11 @@ function render(): void {
   setHidden(continueBtn, inCapture);
   setDisabled(
     continueBtn,
-    !canContinue(flow) || !hasPreview || errorShown || composing,
+    !canContinue(flow) ||
+      !hasPreview ||
+      errorShown ||
+      composing ||
+      !isSheetCurrent(),
   );
 
   renderWarningDialog();
@@ -988,6 +1016,7 @@ function startOver(): void {
   previewReleaseToken = null;
   idSessionId = null;
   documentLayout = null;
+  sheetSpec = null;
   previewRendered = false;
   retryAction = null;
   hideError();
@@ -999,6 +1028,7 @@ function resetAfterExpiry(message: string): void {
   previewPath = null;
   previewReleaseToken = null;
   idSessionId = null;
+  sheetSpec = null;
   previewRendered = false;
   flow = createCopyFlowState('id');
   retryAction = () => scanIdSide('front');
@@ -1084,10 +1114,11 @@ async function scanIdSide(side: IdSide): Promise<void> {
   if (!beginScan(side)) return;
   retryAction = () => scanIdSide(side);
 
+  const sentPaperSize = settings.paperSize;
   const result = await idCapture.scanSide({
     sessionId: idSessionId,
     side,
-    paperSize: settings.paperSize,
+    paperSize: sentPaperSize,
   });
   endScan();
 
@@ -1096,6 +1127,10 @@ async function scanIdSide(side: IdSide): Promise<void> {
     adoptPreview(result.sheet.previewPath, result.sheet.releaseToken);
     retryAction = null;
     dispatch({ type: 'side-scanned', side, warnings: result.sheet.warnings });
+    sheetSpec = {
+      paperSize: sentPaperSize,
+      rotations: { ...flow.rotations },
+    };
     await showPreview(result.sheet.previewPath);
     return;
   }
@@ -1107,22 +1142,23 @@ async function scanIdSide(side: IdSide): Promise<void> {
 /** Rebuilds the ID sheet for the current paper size and rotations. */
 async function recompose(): Promise<void> {
   if (!idSessionId || composing || flow.scanning !== null) return;
-  retryAction = async () => {
-    hideError();
-    await recompose();
-  };
+  hideError();
+  retryAction = recompose;
   composing = true;
   render();
 
+  const sentPaperSize = settings.paperSize;
+  const sentRotations = { ...flow.rotations };
   const result = await idCapture.compose({
     sessionId: idSessionId,
-    paperSize: settings.paperSize,
-    rotations: flow.rotations,
+    paperSize: sentPaperSize,
+    rotations: sentRotations,
   });
   composing = false;
 
   if (result.kind === 'sheet') {
     adoptPreview(result.sheet.previewPath, result.sheet.releaseToken);
+    sheetSpec = { paperSize: sentPaperSize, rotations: sentRotations };
     retryAction = null;
     persist();
     await showPreview(result.sheet.previewPath);
@@ -1149,6 +1185,10 @@ async function retryLastScan(): Promise<void> {
   }
   hideError();
   render();
+  if (flow.copyType === 'id' && idSessionId && !isSheetCurrent()) {
+    await recompose();
+    return;
+  }
   if (previewPath && !previewRendered) {
     await showPreview(previewPath);
     return;
@@ -1265,7 +1305,7 @@ backBtn?.addEventListener('click', () => {
 
 continueBtn?.addEventListener('click', () => {
   if (!canContinue(flow) || !previewPath || !previewRendered) return;
-  if (errorShown || composing) return;
+  if (errorShown || composing || !isSheetCurrent()) return;
   const orientation: Orientation =
     flow.copyType === 'document'
       ? (documentLayout?.orientation ?? 'portrait')
@@ -1332,6 +1372,12 @@ async function initializeCopyPage(): Promise<void> {
     // Back from /confirm, or a reload: restore scans, rotations and settings.
     settings = parseCopySettings(sessionStorage.getItem(STORAGE_KEYS.settings));
     flow = reduceCopyFlow(flow, { type: 'restored', snapshot });
+    if (flow.copyType === 'id') {
+      sheetSpec = {
+        paperSize: settings.paperSize,
+        rotations: { ...flow.rotations },
+      };
+    }
   } else if (previewPath && !snapshot) {
     // A preview saved by the page before this change: a document scan.
     flow = reduceCopyFlow(flow, { type: 'document-scanned' });
