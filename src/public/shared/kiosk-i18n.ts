@@ -11,6 +11,20 @@ const STORAGE_LANGUAGE_KEY = 'printbit.kiosk.language';
 const STORAGE_CONTRAST_KEY = 'printbit.kiosk.highContrast';
 export const KIOSK_LANGUAGE_CHANGED_EVENT = 'printbit:language-changed';
 
+/**
+ * Elements carrying this attribute manage their own language (the idle
+ * screen alternates English and Filipino), so the kiosk-wide translator
+ * leaves their text and attributes alone.
+ */
+export const I18N_SKIP_ATTRIBUTE = 'data-i18n-skip';
+
+export function isI18nSkipped(node: Node | null): boolean {
+  if (!node) return false;
+  const element =
+    node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  return Boolean(element?.closest(`[${I18N_SKIP_ATTRIBUTE}]`));
+}
+
 let currentLanguage: SupportedLanguage = 'en';
 let currentTranslations: Record<string, string> = {};
 let initialized = false;
@@ -51,6 +65,7 @@ function translatePhrase(text: string): string {
 }
 
 function applyTextNodeTranslation(node: Text): void {
+  if (isI18nSkipped(node)) return;
   const current = node.nodeValue ?? '';
   if (!originalTextNodes.has(node)) {
     originalTextNodes.set(node, current);
@@ -78,6 +93,7 @@ function applyTextNodeTranslation(node: Text): void {
 }
 
 function applyAttributeTranslation(el: Element): void {
+  if (isI18nSkipped(el)) return;
   let snapshot = originalAttributes.get(el);
   if (!snapshot) {
     snapshot = new Map<string, string>();
