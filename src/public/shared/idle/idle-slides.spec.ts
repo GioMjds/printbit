@@ -27,7 +27,6 @@ const info = (overrides: Partial<IdleInfo> = {}): IdleInfo => ({
 
 const CATALOG = [
   'welcome',
-  'status',
   'howToPrint',
   'howToCopy',
   'idCardCopy',
@@ -45,7 +44,7 @@ describe('IDLE_SLIDES', () => {
       expect(slide.src).toMatch(/^\/assets\/lottie\/idle\/[a-z-]+\.lottie$/);
       expect(slide.poster).toMatch(/^\/assets\/lottie\/idle\/posters\/[a-z-]+\.svg$/);
     }
-    expect(new Set(IDLE_SLIDES.map((slide) => slide.src)).size).toBe(10);
+    expect(new Set(IDLE_SLIDES.map((slide) => slide.src)).size).toBe(9);
   });
 
   it('finds a slide by id', () => {
@@ -55,82 +54,56 @@ describe('IDLE_SLIDES', () => {
 
 describe('buildPlaylist', () => {
   it('shows the whole catalog on a healthy kiosk', () => {
-    expect(buildPlaylist(info(), 0).slides).toEqual(CATALOG);
+    expect(buildPlaylist(info())).toEqual(CATALOG);
   });
 
   it('removes slides the admin turned off', () => {
     const settings = createDefaultIdleScreenSettings();
     settings.slides.prices = false;
     settings.slides.howToCopy = false;
-    const slides = buildPlaylist(info({ settings }), 0).slides;
+    const slides = buildPlaylist(info({ settings }));
     expect(slides).not.toContain('prices');
     expect(slides).not.toContain('howToCopy');
   });
 
-  it('always keeps welcome and status', () => {
+  it('always keeps welcome', () => {
     const settings = createDefaultIdleScreenSettings();
     for (const key of Object.keys(settings.slides) as Array<
       keyof typeof settings.slides
     >) {
       settings.slides[key] = false;
     }
-    expect(buildPlaylist(info({ settings }), 0).slides).toEqual(['welcome', 'status']);
+    expect(buildPlaylist(info({ settings }))).toEqual(['welcome']);
   });
 
-  it('skips slides for an unavailable service and leads with repeated status', () => {
+  it('skips slides for an unavailable service', () => {
     const degraded = info();
     degraded.services.copy = { state: 'unavailable', reason: 'paper_out' };
-    expect(buildPlaylist(degraded, 0).slides).toEqual([
-      'status',
-      'welcome',
-      'howToPrint',
-      'status',
-      'scanToPhone',
-      'prices',
-      'status',
-      'paying',
-      'supportedFiles',
-      'status',
-      'privacyReceipt',
-    ]);
+    expect(buildPlaylist(degraded)).toEqual(
+      CATALOG.filter((id) => id !== 'howToCopy' && id !== 'idCardCopy'),
+    );
   });
 
   it('skips print slides when print is unavailable', () => {
     const degraded = info();
     degraded.services.print = { state: 'unavailable', reason: 'printer_offline' };
-    const slides = buildPlaylist(degraded, 0).slides;
+    const slides = buildPlaylist(degraded);
     expect(slides).not.toContain('howToPrint');
     expect(slides).not.toContain('supportedFiles');
   });
 
-  it('keeps how-to slides for a limited service but leads with status', () => {
+  it('keeps how-to slides for a limited service', () => {
     const limited = info();
     limited.services.print = { state: 'limited', reason: 'paper_low' };
-    const slides = buildPlaylist(limited, 0).slides;
-    expect(slides[0]).toBe('status');
-    expect(slides).toContain('howToPrint');
-  });
-
-  it('treats exact-coins-only as degraded', () => {
-    expect(
-      buildPlaylist(info({ change: { exactCoinsOnly: true } }), 0).slides[0],
-    ).toBe('status');
+    expect(buildPlaylist(limited)).toEqual(CATALOG);
   });
 
   it('drops prices when pricing is missing', () => {
-    expect(buildPlaylist(info({ pricing: null }), 0).slides).not.toContain('prices');
+    expect(buildPlaylist(info({ pricing: null }))).not.toContain('prices');
   });
 
-  it('works before any info has arrived', () => {
-    const playlist = buildPlaylist(null, 0);
-    expect(playlist.slides).toEqual(CATALOG.filter((id) => id !== 'prices'));
-    expect(playlist.lang).toBe('en');
-  });
-
-  it('alternates English and Filipino by cycle', () => {
-    expect(buildPlaylist(info(), 0).lang).toBe('en');
-    expect(buildPlaylist(info(), 1).lang).toBe('fil');
-    expect(buildPlaylist(info(), 2).lang).toBe('en');
+  it('skips prices before any info has arrived', () => {
+    expect(buildPlaylist(null)).toEqual(CATALOG.filter((id) => id !== 'prices'));
   });
 });
 

@@ -1,30 +1,20 @@
 /**
- * Idle screen text in English and Filipino. The idle overlay opts out of the
- * kiosk-wide phrase translator (data-i18n-skip) because it alternates
- * languages per cycle, so its strings live here instead of locales/.
+ * Idle screen text in English and Filipino. The idle overlay follows the
+ * kiosk's current language but opts out of the kiosk-wide phrase translator
+ * (data-i18n-skip) because its text changes every slide, so its strings live
+ * here instead of locales/.
  */
 import type {
   IdleInfo,
-  IdlePaperLevel,
   IdlePricingSummary,
-  IdleServiceName,
-  IdleServiceReason,
-  IdleServiceState,
-  IdleServiceStatus,
   IdleSlideId,
 } from '@/shared/idle-screen-contract';
-import { isIdleDegraded } from '@/shared/idle-screen-contract';
 import { formatPeso } from '../pricing-guide';
 
 export type IdleLang = 'en' | 'fil';
 
 export const IDLE_FALLBACK_COINS: readonly number[] = [1, 5, 10, 20];
 export const IDLE_FALLBACK_MAX_UPLOAD_MB = 25;
-export const IDLE_SERVICE_ORDER: readonly IdleServiceName[] = [
-  'print',
-  'copy',
-  'scan',
-];
 
 export interface IdleSlideText {
   eyebrow: string;
@@ -43,18 +33,7 @@ type FixedSlideId =
   | 'privacyReceipt';
 
 interface IdleLangTable {
-  ui: { cta: string; overlayLabel: string; chipsLabel: string };
-  services: Record<IdleServiceName, string>;
-  states: Record<IdleServiceState, string>;
-  reasons: Record<IdleServiceReason, string>;
-  paper: Record<Exclude<IdlePaperLevel, 'unknown'>, string>;
-  exactCoins: string;
-  status: {
-    eyebrow: string;
-    titleReady: string;
-    titleLimited: string;
-    titleChecking: string;
-  };
+  ui: { cta: string; overlayLabel: string };
   fixed: Record<FixedSlideId, IdleSlideText>;
   prices: {
     eyebrow: string;
@@ -80,29 +59,6 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
     ui: {
       cta: 'Tap anywhere to start',
       overlayLabel: 'PrintBit kiosk is idle. Tap anywhere to start.',
-      chipsLabel: 'Service status',
-    },
-    services: { print: 'Print', copy: 'Copy', scan: 'Scan' },
-    states: {
-      ready: 'Ready',
-      limited: 'Limited',
-      unavailable: 'Unavailable',
-      unknown: 'Checking…',
-    },
-    reasons: {
-      printer_offline: 'printer is offline',
-      printer_error: 'printer needs attention',
-      paper_out: 'out of paper',
-      paper_low: 'paper is running low',
-      scanner_unavailable: 'scanner is not available',
-    },
-    paper: { ok: 'Paper: OK', low: 'Paper: running low', out: 'Paper: out' },
-    exactCoins: "Exact coins only: change can't be given right now.",
-    status: {
-      eyebrow: 'Kiosk status',
-      titleReady: 'Everything is ready.',
-      titleLimited: 'Some services are limited.',
-      titleChecking: 'Checking the kiosk…',
     },
     fixed: {
       welcome: {
@@ -195,29 +151,6 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
       cta: 'Pindutin kahit saan para magsimula',
       overlayLabel:
         'Nakatigil ang PrintBit kiosk. Pindutin kahit saan para magsimula.',
-      chipsLabel: 'Kalagayan ng serbisyo',
-    },
-    services: { print: 'Print', copy: 'Copy', scan: 'Scan' },
-    states: {
-      ready: 'Handa',
-      limited: 'Limitado',
-      unavailable: 'Hindi magagamit',
-      unknown: 'Sinusuri…',
-    },
-    reasons: {
-      printer_offline: 'naka-offline ang printer',
-      printer_error: 'may problema ang printer',
-      paper_out: 'ubos ang papel',
-      paper_low: 'paubos na ang papel',
-      scanner_unavailable: 'hindi magamit ang scanner',
-    },
-    paper: { ok: 'Papel: OK', low: 'Papel: paubos na', out: 'Papel: ubos na' },
-    exactCoins: 'Eksaktong barya lang: hindi makakapagsukli sa ngayon.',
-    status: {
-      eyebrow: 'Kalagayan ng kiosk',
-      titleReady: 'Handa na ang lahat.',
-      titleLimited: 'May limitadong serbisyo ngayon.',
-      titleChecking: 'Sinusuri ang kiosk…',
     },
     fixed: {
       welcome: {
@@ -312,33 +245,6 @@ export const IDLE_UI_TEXT: Record<IdleLang, IdleLangTable['ui']> = {
   fil: TEXT.fil.ui,
 };
 
-export function serviceLabel(name: IdleServiceName, lang: IdleLang): string {
-  return TEXT[lang].services[name];
-}
-
-export function chipStateLabel(state: IdleServiceState, lang: IdleLang): string {
-  return TEXT[lang].states[state];
-}
-
-export function statusLines(info: IdleInfo | null, lang: IdleLang): string[] {
-  const t = TEXT[lang];
-  const lines = IDLE_SERVICE_ORDER.map((name) => {
-    const status: IdleServiceStatus = info
-      ? info.services[name]
-      : { state: 'unknown', reason: null };
-    const base = `${t.services[name]} — ${t.states[status.state]}`;
-    return status.reason ? `${base}: ${t.reasons[status.reason]}` : base;
-  });
-  const level = info?.paper.level ?? 'unknown';
-  if (level !== 'unknown') lines.push(t.paper[level]);
-  if (info?.change.exactCoinsOnly) lines.push(t.exactCoins);
-  return lines;
-}
-
-export function statusSummary(info: IdleInfo | null, lang: IdleLang): string {
-  return statusLines(info, lang).join('. ');
-}
-
 export function renderSlideText(
   id: IdleSlideId,
   lang: IdleLang,
@@ -346,20 +252,6 @@ export function renderSlideText(
 ): IdleSlideText {
   const t = TEXT[lang];
   switch (id) {
-    case 'status': {
-      const title = !info
-        ? t.status.titleChecking
-        : isIdleDegraded(info)
-          ? t.status.titleLimited
-          : t.status.titleReady;
-      return {
-        eyebrow: t.status.eyebrow,
-        title,
-        body: '',
-        lines: statusLines(info, lang),
-        stepped: false,
-      };
-    }
     case 'prices':
       return {
         eyebrow: t.prices.eyebrow,

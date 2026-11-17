@@ -17,11 +17,6 @@ import type { IdleLottiePlayer } from './idle-lottie';
 
 const MARKUP = `
   <div id="idleOverlay" data-i18n-skip>
-    <ul data-idle="chips">
-      <li data-service="print" data-state="unknown"><span data-idle="chip-name"></span><span data-idle="chip-state"></span></li>
-      <li data-service="copy" data-state="unknown"><span data-idle="chip-name"></span><span data-idle="chip-state"></span></li>
-      <li data-service="scan" data-state="unknown"><span data-idle="chip-name"></span><span data-idle="chip-state"></span></li>
-    </ul>
     <span data-idle="clock-time"></span><span data-idle="clock-date"></span>
     <div data-idle="slide">
       <img data-idle="poster" hidden />
@@ -29,7 +24,6 @@ const MARKUP = `
       <p data-idle="eyebrow"></p><h2 data-idle="title"></h2><p data-idle="body"></p>
       <ol data-idle="steps"></ol>
     </div>
-    <p data-idle="status-line"></p>
     <span data-idle="progress"></span>
     <p data-idle="cta"></p>
   </div>`;
@@ -81,7 +75,10 @@ function setup(fetchInfo: () => Promise<IdleInfo>) {
 
 describe('createIdleAttract', () => {
   beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => {
+    jest.useRealTimers();
+    document.documentElement.lang = '';
+  });
 
   it('returns null when the markup is incomplete', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -90,25 +87,43 @@ describe('createIdleAttract', () => {
     warn.mockRestore();
   });
 
-  it('renders text and Checking… chips before idle info arrives', async () => {
-    const { root, attract, text } = setup(() => new Promise<IdleInfo>(() => {}));
+  it('renders the first slide before idle info arrives', async () => {
+    const { attract, text } = setup(() => new Promise<IdleInfo>(() => {}));
     attract.start();
     await flush();
     expect(text('title')).toBe('Print, copy, and scan.');
     expect(text('cta')).toBe('Tap anywhere to start');
-    const printChip = root.querySelector('[data-service="print"]') as HTMLElement;
-    expect(printChip.dataset.state).toBe('unknown');
-    expect(printChip.textContent).toContain('Checking…');
     attract.stop();
   });
 
-  it('shows live chip states once idle info arrives', async () => {
-    const { root, attract, text } = setup(async () => INFO);
+  it('follows the kiosk language instead of alternating', async () => {
+    document.documentElement.lang = 'fil';
+    const { attract, text } = setup(async () => INFO);
     attract.start();
     await flush();
-    const copyChip = root.querySelector('[data-service="copy"]') as HTMLElement;
-    expect(copyChip.dataset.state).toBe('unavailable');
-    expect(text('status-line')).toContain('Copy — Unavailable: out of paper');
+    expect(text('cta')).toBe('Pindutin kahit saan para magsimula');
+    jest.advanceTimersByTime(8000 * 12);
+    await flush();
+    expect(text('cta')).toBe('Pindutin kahit saan para magsimula');
+    document.documentElement.lang = 'en';
+    jest.advanceTimersByTime(8000);
+    await flush();
+    expect(text('cta')).toBe('Tap anywhere to start');
+    attract.stop();
+  });
+
+  it('skips slides for an unavailable service once idle info arrives', async () => {
+    const { attract, text } = setup(async () => INFO);
+    attract.start();
+    await flush();
+    const titles: string[] = [];
+    for (let i = 0; i < 9; i += 1) {
+      jest.advanceTimersByTime(8000);
+      await flush();
+      titles.push(text('title') ?? '');
+    }
+    expect(titles).toContain('From your phone to paper.');
+    expect(titles).not.toContain('Photocopy in a few taps.');
     attract.stop();
   });
 

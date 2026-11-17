@@ -3,14 +3,7 @@ import {
   createDefaultIdleScreenSettings,
   type IdleInfo,
 } from '@/shared/idle-screen-contract';
-import {
-  IDLE_UI_TEXT,
-  chipStateLabel,
-  renderSlideText,
-  serviceLabel,
-  statusLines,
-  statusSummary,
-} from './idle-copy';
+import { IDLE_UI_TEXT, renderSlideText } from './idle-copy';
 
 const info = (overrides: Partial<IdleInfo> = {}): IdleInfo => ({
   settings: createDefaultIdleScreenSettings(),
@@ -70,51 +63,13 @@ describe('renderSlideText', () => {
     expect(renderSlideText('howToPrint', 'en', info()).stepped).toBe(true);
     expect(renderSlideText('howToPrint', 'en', info()).lines).toHaveLength(4);
     expect(renderSlideText('prices', 'en', info()).stepped).toBe(false);
-    expect(renderSlideText('status', 'en', info()).stepped).toBe(false);
   });
 
-  it('titles the status slide by kiosk health', () => {
-    expect(renderSlideText('status', 'en', info()).title).toBe('Everything is ready.');
-    const down = info();
-    down.services.copy = { state: 'unavailable', reason: 'paper_out' };
-    expect(renderSlideText('status', 'en', down).title).toBe(
-      'Some services are limited.',
-    );
-    expect(renderSlideText('status', 'en', null).title).toBe('Checking the kiosk…');
-  });
 });
 
-describe('status text', () => {
-  it('describes each service with its reason, paper, and change', () => {
-    const down = info({ paper: { level: 'out' }, change: { exactCoinsOnly: true } });
-    down.services.copy = { state: 'unavailable', reason: 'paper_out' };
-    expect(statusLines(down, 'en')).toEqual([
-      'Print — Ready',
-      'Copy — Unavailable: out of paper',
-      'Scan — Ready',
-      'Paper: out',
-      "Exact coins only: change can't be given right now.",
-    ]);
-  });
-
-  it('says Checking… for every service before info arrives', () => {
-    expect(statusLines(null, 'en')).toEqual([
-      'Print — Checking…',
-      'Copy — Checking…',
-      'Scan — Checking…',
-    ]);
-    expect(statusLines(null, 'fil')[0]).toBe('Print — Sinusuri…');
-  });
-
-  it('joins lines for screen readers', () => {
-    expect(statusSummary(null, 'en')).toBe(
-      'Print — Checking…. Copy — Checking…. Scan — Checking…',
-    );
-  });
-
-  it('labels chips and UI in both languages', () => {
-    expect(serviceLabel('scan', 'en')).toBe('Scan');
-    expect(chipStateLabel('limited', 'fil')).toBe('Limitado');
+describe('IDLE_UI_TEXT', () => {
+  it('labels the overlay in both languages', () => {
+    expect(IDLE_UI_TEXT.en.cta).toBe('Tap anywhere to start');
     expect(IDLE_UI_TEXT.fil.cta).toBe('Pindutin kahit saan para magsimula');
   });
 });

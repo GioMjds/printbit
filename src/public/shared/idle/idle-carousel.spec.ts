@@ -24,17 +24,17 @@ describe('IdleCarousel', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('shows slides in order, then starts the next cycle in Filipino', () => {
+  it('shows slides in order, then loops back to the first slide', () => {
     const showSlide = jest.fn();
     const carousel = new IdleCarousel({ getInfo: () => info(), showSlide });
     carousel.start();
-    expect(showSlide).toHaveBeenLastCalledWith('welcome', 'en', 8000);
+    expect(showSlide).toHaveBeenLastCalledWith('welcome', 8000);
     jest.advanceTimersByTime(8000);
-    expect(showSlide).toHaveBeenLastCalledWith('status', 'en', 8000);
-    jest.advanceTimersByTime(8000 * 8);
-    expect(showSlide).toHaveBeenLastCalledWith('privacyReceipt', 'en', 8000);
+    expect(showSlide).toHaveBeenLastCalledWith('howToPrint', 8000);
+    jest.advanceTimersByTime(8000 * 7);
+    expect(showSlide).toHaveBeenLastCalledWith('privacyReceipt', 8000);
     jest.advanceTimersByTime(8000);
-    expect(showSlide).toHaveBeenLastCalledWith('welcome', 'fil', 8000);
+    expect(showSlide).toHaveBeenLastCalledWith('welcome', 8000);
     carousel.stop();
   });
 
@@ -47,7 +47,7 @@ describe('IdleCarousel', () => {
       showSlide,
     });
     carousel.start();
-    expect(showSlide).toHaveBeenLastCalledWith('welcome', 'en', 12000);
+    expect(showSlide).toHaveBeenLastCalledWith('welcome', 12000);
     carousel.stop();
   });
 
@@ -55,7 +55,7 @@ describe('IdleCarousel', () => {
     const showSlide = jest.fn();
     const carousel = new IdleCarousel({ getInfo: () => null, showSlide });
     carousel.start();
-    expect(showSlide).toHaveBeenLastCalledWith('welcome', 'en', 8000);
+    expect(showSlide).toHaveBeenLastCalledWith('welcome', 8000);
     carousel.stop();
   });
 
@@ -71,19 +71,19 @@ describe('IdleCarousel', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it('rebuilds after invalidate and leads with status once degraded', () => {
-    let current: IdleInfo | null = null;
+  it('rebuilds after invalidate and drops an unavailable service', () => {
+    let current: IdleInfo | null = info();
     const showSlide = jest.fn();
     const carousel = new IdleCarousel({ getInfo: () => current, showSlide });
     carousel.start();
-    expect(showSlide).toHaveBeenLastCalledWith('welcome', 'en', 8000);
-
     const degraded = info();
     degraded.services.scan = { state: 'unavailable', reason: 'scanner_unavailable' };
     current = degraded;
     carousel.invalidate();
-    jest.advanceTimersByTime(8000);
-    expect(showSlide).toHaveBeenLastCalledWith('status', 'en', 8000);
+    jest.advanceTimersByTime(8000 * 9);
+    const shown = showSlide.mock.calls.slice(1).map(([id]) => id);
+    expect(shown).not.toContain('scanToPhone');
+    expect(shown).toContain('howToPrint');
     carousel.stop();
   });
 
@@ -95,7 +95,8 @@ describe('IdleCarousel', () => {
     current = info();
     carousel.invalidate();
     jest.advanceTimersByTime(8000);
-    expect(showSlide).toHaveBeenLastCalledWith('status', 'en', 8000);
+    expect(showSlide).toHaveBeenLastCalledWith('howToPrint', 8000);
+    expect(showSlide).toHaveBeenCalledTimes(2);
     carousel.stop();
   });
 });

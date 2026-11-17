@@ -13,8 +13,8 @@ export const KIOSK_LANGUAGE_CHANGED_EVENT = 'printbit:language-changed';
 
 /**
  * Elements carrying this attribute manage their own language (the idle
- * screen alternates English and Filipino), so the kiosk-wide translator
- * leaves their text and attributes alone.
+ * screen renders its own English or Filipino text), so the kiosk-wide
+ * translator leaves their text and attributes alone.
  */
 export const I18N_SKIP_ATTRIBUTE = 'data-i18n-skip';
 

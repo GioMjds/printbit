@@ -8,6 +8,21 @@ Scope: `src/public/index.html`, `src/public/idle-screen.css`,
 `src/core/database/` (settings), `src/modules/admin/` (settings validation),
 `src/public/admin/` (settings UI), `src/locales/en`, `src/locales/fil`
 
+## Revision after owner review (2026-11-17)
+
+These override the sections below where they disagree.
+
+- **Language:** no English/Filipino alternation per cycle. The idle screen
+  follows the kiosk's current language (`<html lang>`, set by kiosk-i18n).
+- **No kiosk status on the idle screen:** the Print/Copy/Scan header chips,
+  the screen-reader status line, and the `status` slide are removed. Service
+  health still drops how-to slides for an unavailable service.
+- **One animation per slide:** no two slides share a slot file. Welcome,
+  Paying (the ₱1, ₱5, ₱10, ₱20 coins by size), Supported files, and Privacy
+  are authored by `scripts/generate-idle-lottie-assets.js` into
+  `assets/lottie/idle-src/` and packed by `build-idle-lottie-slots.js`.
+- `IdleInfo.paper` is still served but no longer shown.
+
 ## Goal
 
 When nobody uses the kiosk, the homepage idle screen should tell a passer-by

@@ -5,7 +5,6 @@
 
 export const IDLE_SLIDE_IDS = [
   'welcome',
-  'status',
   'howToPrint',
   'howToCopy',
   'idCardCopy',
@@ -17,7 +16,7 @@ export const IDLE_SLIDE_IDS = [
 ] as const;
 export type IdleSlideId = (typeof IDLE_SLIDE_IDS)[number];
 
-/** Every slide except `welcome` and `status`, which always show. */
+/** Every slide except `welcome`, which always shows. */
 export const DISABLEABLE_IDLE_SLIDE_IDS = [
   'howToPrint',
   'howToCopy',
@@ -186,12 +185,3 @@ export function applyIdleScreenSettingsPatch(
   };
 }
 
-/** True when the idle screen should lead with the status slide. */
-export function isIdleDegraded(info: IdleInfo | null): boolean {
-  if (!info) return false;
-  if (info.change.exactCoinsOnly) return true;
-  return Object.values(info.services).some(
-    (service) =>
-      service.state === 'limited' || service.state === 'unavailable',
-  );
-}

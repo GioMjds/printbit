@@ -21,6 +21,11 @@ export interface IdleAttractOverrides {
   reducedMotion?: boolean;
 }
 
+/** The kiosk's current language, as set on <html lang> by kiosk-i18n. */
+function currentKioskLanguage(): IdleLang {
+  return document.documentElement.lang === 'fil' ? 'fil' : 'en';
+}
+
 function prefersReducedMotion(): boolean {
   return (
     typeof window.matchMedia === 'function' &&
@@ -61,7 +66,6 @@ export function createIdleAttract(
   const poller = new IdleStatusPoller({
     fetchInfo: overrides.fetchInfo ?? fetchIdleInfo,
     onUpdate: (info) => {
-      view.renderChips(info, lang);
       const signature = playlistSignature(info);
       if (signature !== lastSignature) {
         lastSignature = signature;
@@ -72,10 +76,9 @@ export function createIdleAttract(
 
   const carousel = new IdleCarousel({
     getInfo: () => poller.latest,
-    showSlide: (id, slideLang, durationMs) => {
-      lang = slideLang;
+    showSlide: (id, durationMs) => {
+      lang = currentKioskLanguage();
       view.renderLanguage(lang);
-      view.renderChips(poller.latest, lang);
       view.renderClock(new Date(), lang);
       view.showSlide(renderSlideText(id, lang, poller.latest), durationMs, () =>
         stage.show(getSlideDef(id)),
@@ -92,9 +95,8 @@ export function createIdleAttract(
     start() {
       if (running) return;
       running = true;
-      lang = 'en';
+      lang = currentKioskLanguage();
       view.renderLanguage(lang);
-      view.renderChips(poller.latest, lang);
       view.renderClock(new Date(), lang);
       clockTimer = setInterval(
         () => view.renderClock(new Date(), lang),

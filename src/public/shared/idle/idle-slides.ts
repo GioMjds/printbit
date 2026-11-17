@@ -1,12 +1,10 @@
 import {
   createDefaultIdleScreenSettings,
   isDisableableIdleSlideId,
-  isIdleDegraded,
   type IdleInfo,
   type IdleServiceName,
   type IdleSlideId,
 } from '@/shared/idle-screen-contract';
-import type { IdleLang } from './idle-copy';
 
 const SLOT_BASE = '/assets/lottie/idle';
 
@@ -35,7 +33,6 @@ const slot = (
 
 export const IDLE_SLIDES: readonly IdleSlideDef[] = [
   slot('welcome', 'welcome', null),
-  slot('status', 'status', null),
   slot('howToPrint', 'how-to-print', 'print'),
   slot('howToCopy', 'how-to-copy', 'copy'),
   slot('idCardCopy', 'id-card-copy', 'copy'),
@@ -52,22 +49,13 @@ export function getSlideDef(id: IdleSlideId): IdleSlideDef {
   return def;
 }
 
-export interface IdlePlaylist {
-  slides: IdleSlideId[];
-  lang: IdleLang;
-}
-
 /**
  * Orders one cycle of slides. Disabled slides, slides for unavailable
- * services, and prices without pricing data are dropped. When the kiosk is
- * degraded, status leads and repeats after every two other slides.
+ * services, and prices without pricing data are dropped.
  */
-export function buildPlaylist(
-  info: IdleInfo | null,
-  cycleIndex: number,
-): IdlePlaylist {
+export function buildPlaylist(info: IdleInfo | null): IdleSlideId[] {
   const settings = info?.settings ?? createDefaultIdleScreenSettings();
-  const base = IDLE_SLIDES.filter((slide) => {
+  return IDLE_SLIDES.filter((slide) => {
     if (
       slide.disableable &&
       isDisableableIdleSlideId(slide.id) &&
@@ -81,18 +69,6 @@ export function buildPlaylist(
     if (slide.id === 'prices' && !info?.pricing) return false;
     return true;
   }).map((slide) => slide.id);
-
-  const lang: IdleLang = cycleIndex % 2 === 0 ? 'en' : 'fil';
-  if (!isIdleDegraded(info)) return { slides: base, lang };
-
-  const others = base.filter((id) => id !== 'status');
-  const slides: IdleSlideId[] = ['status'];
-  others.forEach((id, index) => {
-    slides.push(id);
-    const isLast = index === others.length - 1;
-    if ((index + 1) % 2 === 0 && !isLast) slides.push('status');
-  });
-  return { slides, lang };
 }
 
 /** Changes only when something that reorders the playlist changes. */

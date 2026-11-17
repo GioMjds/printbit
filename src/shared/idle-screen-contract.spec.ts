@@ -3,27 +3,11 @@ import {
   applyIdleScreenSettingsPatch,
   createDefaultIdleScreenSettings,
   isDisableableIdleSlideId,
-  isIdleDegraded,
+  IDLE_SLIDE_IDS,
   normalizeIdleScreenSettings,
   validateIdleScreenSettingsPatch,
-  type IdleInfo,
 } from './idle-screen-contract';
 
-const healthyInfo = (overrides: Partial<IdleInfo> = {}): IdleInfo => ({
-  settings: createDefaultIdleScreenSettings(),
-  pricing: null,
-  services: {
-    print: { state: 'ready', reason: null },
-    copy: { state: 'ready', reason: null },
-    scan: { state: 'ready', reason: null },
-  },
-  paper: { level: 'ok' },
-  change: { exactCoinsOnly: false },
-  coins: [1, 5, 10, 20],
-  maxUploadMb: 25,
-  wordUploads: true,
-  ...overrides,
-});
 
 describe('idle screen contract', () => {
   it('defaults to 8 seconds with every slide on', () => {
@@ -40,10 +24,14 @@ describe('idle screen contract', () => {
     expect(createDefaultIdleScreenSettings().slides.prices).toBe(true);
   });
 
+  it('has no status slide', () => {
+    expect(IDLE_SLIDE_IDS).not.toContain('status');
+    expect(IDLE_SLIDE_IDS).toHaveLength(9);
+  });
+
   it('knows which slides can be turned off', () => {
     expect(isDisableableIdleSlideId('prices')).toBe(true);
     expect(isDisableableIdleSlideId('welcome')).toBe(false);
-    expect(isDisableableIdleSlideId('status')).toBe(false);
     expect(isDisableableIdleSlideId('bogus')).toBe(false);
   });
 
@@ -131,34 +119,4 @@ describe('idle screen contract', () => {
     expect(next.slideDurationSeconds).toBe(8);
   });
 
-  describe('isIdleDegraded', () => {
-    it('is false for null info and a healthy kiosk', () => {
-      expect(isIdleDegraded(null)).toBe(false);
-      expect(isIdleDegraded(healthyInfo())).toBe(false);
-    });
-
-    it('is false when a service is only unknown', () => {
-      const info = healthyInfo();
-      info.services.scan = { state: 'unknown', reason: null };
-      expect(isIdleDegraded(info)).toBe(false);
-    });
-
-    it('is true for a limited or unavailable service', () => {
-      const limited = healthyInfo();
-      limited.services.print = { state: 'limited', reason: 'paper_low' };
-      expect(isIdleDegraded(limited)).toBe(true);
-      const down = healthyInfo();
-      down.services.scan = {
-        state: 'unavailable',
-        reason: 'scanner_unavailable',
-      };
-      expect(isIdleDegraded(down)).toBe(true);
-    });
-
-    it('is true when only exact coins are accepted', () => {
-      expect(
-        isIdleDegraded(healthyInfo({ change: { exactCoinsOnly: true } })),
-      ).toBe(true);
-    });
-  });
 });

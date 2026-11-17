@@ -1,17 +1,7 @@
-import type { IdleInfo } from '@/shared/idle-screen-contract';
-import {
-  IDLE_SERVICE_ORDER,
-  IDLE_UI_TEXT,
-  chipStateLabel,
-  serviceLabel,
-  statusSummary,
-  type IdleLang,
-  type IdleSlideText,
-} from './idle-copy';
+import { IDLE_UI_TEXT, type IdleLang, type IdleSlideText } from './idle-copy';
 
 export interface IdleViewElements {
   overlay: HTMLElement;
-  chips: HTMLElement;
   clockTime: HTMLElement;
   clockDate: HTMLElement;
   slide: HTMLElement;
@@ -21,7 +11,6 @@ export interface IdleViewElements {
   title: HTMLElement;
   body: HTMLElement;
   steps: HTMLElement;
-  statusLine: HTMLElement;
   progressBar: HTMLElement;
   cta: HTMLElement;
 }
@@ -33,7 +22,6 @@ export function queryIdleViewElements(
     root.querySelector<T>(`[data-idle="${name}"]`);
   const els = {
     overlay: root,
-    chips: hook<HTMLElement>('chips'),
     clockTime: hook<HTMLElement>('clock-time'),
     clockDate: hook<HTMLElement>('clock-date'),
     slide: hook<HTMLElement>('slide'),
@@ -43,7 +31,6 @@ export function queryIdleViewElements(
     title: hook<HTMLElement>('title'),
     body: hook<HTMLElement>('body'),
     steps: hook<HTMLElement>('steps'),
-    statusLine: hook<HTMLElement>('status-line'),
     progressBar: hook<HTMLElement>('progress'),
     cta: hook<HTMLElement>('cta'),
   };
@@ -59,7 +46,6 @@ export interface IdleViewOptions {
 export class IdleView {
   private fadeTimer: ReturnType<typeof setTimeout> | null = null;
   private stepTimer: ReturnType<typeof setInterval> | null = null;
-  private lastStateSignature = '';
 
   constructor(
     private readonly els: IdleViewElements,
@@ -88,31 +74,6 @@ export class IdleView {
     const ui = IDLE_UI_TEXT[lang];
     this.els.cta.textContent = ui.cta;
     this.els.overlay.setAttribute('aria-label', ui.overlayLabel);
-    this.els.chips.setAttribute('aria-label', ui.chipsLabel);
-  }
-
-  renderChips(info: IdleInfo | null, lang: IdleLang): void {
-    for (const name of IDLE_SERVICE_ORDER) {
-      const chip = this.els.chips.querySelector<HTMLElement>(
-        `[data-service="${name}"]`,
-      );
-      if (!chip) continue;
-      const state = info ? info.services[name].state : 'unknown';
-      chip.dataset.state = state;
-      const nameEl = chip.querySelector('[data-idle="chip-name"]');
-      const stateEl = chip.querySelector('[data-idle="chip-state"]');
-      if (nameEl) nameEl.textContent = serviceLabel(name, lang);
-      if (stateEl) stateEl.textContent = chipStateLabel(state, lang);
-    }
-    // Announce only when a state changes, not on every poll or language swap.
-    const signature = info
-      ? IDLE_SERVICE_ORDER.map((name) => info.services[name].state).join('|') +
-        `|${info.change.exactCoinsOnly}`
-      : 'none';
-    if (signature !== this.lastStateSignature) {
-      this.lastStateSignature = signature;
-      this.els.statusLine.textContent = statusSummary(info, lang);
-    }
   }
 
   renderClock(now: Date, lang: IdleLang): void {

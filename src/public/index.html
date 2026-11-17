@@ -1133,9 +1133,10 @@
     <!--
       Shown after the homepage idle timeout and right after boot.
       shared/idle-screen.ts toggles .is-visible / .is-leaving.
-      shared/idle/idle-controller.ts fills slides, chips, and clock.
-      data-i18n-skip: idle text alternates English and Filipino per cycle,
-      so the kiosk-wide translator leaves this subtree alone.
+      shared/idle/idle-controller.ts fills slides and the clock.
+      data-i18n-skip: idle text follows the kiosk language from
+      shared/idle/idle-copy.ts, so the kiosk-wide translator leaves this
+      subtree alone.
     -->
     <div
       class="idle-overlay"
@@ -1152,20 +1153,6 @@
             <span class="idle-brand__mark" aria-hidden="true"></span>
             <span class="idle-brand__name">PrintBit</span>
           </div>
-          <ul class="idle-chips" data-idle="chips" aria-label="Service status">
-            <li class="idle-chip" data-service="print" data-state="unknown">
-              <span class="idle-chip__name" data-idle="chip-name">Print</span>
-              <span class="idle-chip__state" data-idle="chip-state">Checking…</span>
-            </li>
-            <li class="idle-chip" data-service="copy" data-state="unknown">
-              <span class="idle-chip__name" data-idle="chip-name">Copy</span>
-              <span class="idle-chip__state" data-idle="chip-state">Checking…</span>
-            </li>
-            <li class="idle-chip" data-service="scan" data-state="unknown">
-              <span class="idle-chip__name" data-idle="chip-name">Scan</span>
-              <span class="idle-chip__state" data-idle="chip-state">Checking…</span>
-            </li>
-          </ul>
           <div class="idle-clock" aria-hidden="true">
             <span class="idle-clock__time" data-idle="clock-time"></span>
             <span class="idle-clock__date" data-idle="clock-date"></span>
@@ -1190,7 +1177,6 @@
           </div>
         </div>
 
-        <p class="idle-sr-only" data-idle="status-line" aria-live="polite"></p>
 
         <div class="idle-footer">
           <div class="idle-progress" aria-hidden="true">
