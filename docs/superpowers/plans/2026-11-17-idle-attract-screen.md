@@ -29,10 +29,12 @@ esbuild client bundles, static HTML/CSS.
   Never stage them. Stage only the files each task names; never `git add -A` or
   `git add .`.
 - Every commit message ends with these two lines:
-  ```
+
+  ```text
   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
   Claude-Session: https://claude.ai/code/session_014rjHKifhi2dZSffedNp7Z9
   ```
+
 - No new npm dependencies.
 - No CSS `@keyframes` anywhere in the idle screen. Idle motion is the Lottie
   canvas plus CSS `opacity` and `transform` transitions only.
@@ -438,7 +440,8 @@ export interface IdleScreenSettingsPatch {
 }
 
 export type IdleScreenPatchResult =
-  { ok: true; patch: IdleScreenSettingsPatch } | { ok: false; error: string };
+  | { ok: true; patch: IdleScreenSettingsPatch }
+  | { ok: false; error: string };
 
 /** Validates a partial `idleScreen` object from PUT /api/admin/settings. */
 export function validateIdleScreenSettingsPatch(
@@ -1010,7 +1013,10 @@ import {
 } from '@/shared/idle-screen-contract';
 
 export type PrinterProjectionStatus =
-  'ready' | 'printing' | 'offline' | 'error';
+  | 'ready'
+  | 'printing'
+  | 'offline'
+  | 'error';
 
 export interface PaperForecastReading {
   enabled: boolean;

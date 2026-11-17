@@ -566,8 +566,8 @@ body {
   margin: auto;
   box-sizing: border-box;
   width: 100%;
-  max-width: 480px;
-  max-height: min(92vh, 840px);
+  max-width: min(94vw, 680px);
+  max-height: min(94vh, 960px);
   overflow-y: auto;
   overflow-x: hidden;
   background: linear-gradient(
@@ -577,8 +577,8 @@ body {
     rgba(24, 23, 48, 0.98) 100%
   );
   border: 1.5px solid rgba(242, 110, 107, 0.22);
-  border-radius: 32px;
-  padding: 32px 36px 32px;
+  border-radius: 36px;
+  padding: 48px 52px 44px;
   box-shadow:
     0 0 0 1px rgba(242, 110, 107, 0.08),
     0 24px 80px rgba(0, 0, 0, 0.6),
@@ -652,9 +652,9 @@ body {
 /* ── Animated error icon ──────────────────────────────────── */
 
 .printer-error-modal__icon-ring {
-  width: 80px;
-  height: 80px;
-  margin-bottom: 16px;
+  width: 116px;
+  height: 116px;
+  margin-bottom: 22px;
   animation: error-icon-pop 500ms 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -729,10 +729,10 @@ body {
 /* ── Title ────────────────────────────────────────────────── */
 
 .printer-error-modal__title {
-  font-size: 26px;
+  font-size: 36px;
   font-weight: 800;
   color: #fca5a5;
-  margin: 0 0 8px;
+  margin: 0 0 12px;
   letter-spacing: -0.3px;
   line-height: 1.2;
 }
@@ -742,14 +742,14 @@ body {
 .printer-error-modal__severity-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
+  gap: 10px;
+  padding: 8px 20px;
   border-radius: 40px;
-  font-size: 13px;
+  font-size: 15.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
   /* default = recoverable / amber */
   background: rgba(251, 191, 36, 0.12);
   border: 1px solid rgba(251, 191, 36, 0.3);
@@ -757,8 +757,8 @@ body {
 }
 
 .printer-error-modal__severity-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: currentcolor;
   animation: severity-blink 1.8s ease-in-out infinite;
@@ -817,23 +817,23 @@ body {
 /* ── Message & hint ───────────────────────────────────────── */
 
 .printer-error-modal__message {
-  font-size: 18.5px;
+  font-size: 22px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.92);
-  margin: 0 0 10px;
+  margin: 0 0 14px;
   line-height: 1.55;
-  max-width: 420px;
+  max-width: 560px;
 }
 
 .printer-error-modal__hint {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 500;
   color: var(--lavender);
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   opacity: 0.75;
   font-style: italic;
   line-height: 1.5;
-  max-width: 420px;
+  max-width: 560px;
 }
 
 /* ── Dismiss button (warnings only) ───────────────────────── */
@@ -841,15 +841,16 @@ body {
 .printer-error-modal__dismiss {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-  padding: 14px 32px;
+  gap: 10px;
+  margin-top: 26px;
+  min-height: 64px;
+  padding: 18px 44px;
   border: 1.5px solid rgba(167, 170, 225, 0.2);
-  border-radius: 14px;
+  border-radius: 16px;
   background: rgba(167, 170, 225, 0.08);
   color: var(--lavender);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -860,8 +861,8 @@ body {
 }
 
 .printer-error-modal__dismiss svg {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .printer-error-modal__dismiss:hover {
@@ -928,13 +929,36 @@ body {
 }
 
 .printer-error-modal__subtitle {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 500;
   color: var(--lavender);
   opacity: 0.85;
-  margin: -2px 0 14px;
-  max-width: 520px;
+  margin: -2px 0 18px;
+  max-width: 580px;
   line-height: 1.45;
+}
+
+/* Wide (staff maintenance) variant keeps its compact type so the
+   resolution bento still fits; only the base error card is enlarged. */
+.printer-error-modal-overlay.printer-error-modal--wide .printer-error-modal__subtitle,
+.printer-error-modal-overlay.printer-error-modal-overlay--wide .printer-error-modal__subtitle,
+.printer-error-modal.printer-error-modal--wide .printer-error-modal__subtitle,
+.printer-error-modal:has(.maintenance-resolution:not([hidden])) .printer-error-modal__subtitle {
+  font-size: 15px;
+}
+
+.printer-error-modal-overlay.printer-error-modal--wide .printer-error-modal__message,
+.printer-error-modal-overlay.printer-error-modal-overlay--wide .printer-error-modal__message,
+.printer-error-modal.printer-error-modal--wide .printer-error-modal__message,
+.printer-error-modal:has(.maintenance-resolution:not([hidden])) .printer-error-modal__message {
+  font-size: 18.5px;
+}
+
+.printer-error-modal-overlay.printer-error-modal--wide .printer-error-modal__hint,
+.printer-error-modal-overlay.printer-error-modal-overlay--wide .printer-error-modal__hint,
+.printer-error-modal.printer-error-modal--wide .printer-error-modal__hint,
+.printer-error-modal:has(.maintenance-resolution:not([hidden])) .printer-error-modal__hint {
+  font-size: 15px;
 }
 
 .maintenance-resolution__bento {
@@ -1120,13 +1144,13 @@ body {
 
 /* Progress text styling */
 .printer-error-modal__progress {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-secondary);
   background: rgba(167, 170, 225, 0.08);
-  padding: 8px 16px;
-  border-radius: 10px;
-  margin-top: 12px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  margin-top: 14px;
   display: inline-block;
 }
 
@@ -1140,7 +1164,7 @@ body {
   }
 
   .printer-error-modal__title {
-    font-size: 22px;
+    font-size: 28px;
   }
 }
 
@@ -1725,13 +1749,13 @@ body {
 
 .modal-sheet {
   width: 100%;
-  max-width: 560px;
-  max-height: min(92vh, 740px);
+  max-width: min(94vw, 720px);
+  max-height: min(94vh, 960px);
   overflow-y: auto;
   background: #181730;
   border: 1.5px solid rgba(167, 170, 225, 0.22);
-  border-radius: 28px;
-  padding: 28px 30px 24px;
+  border-radius: 32px;
+  padding: 44px 48px 38px;
   box-shadow:
     0 28px 72px rgba(0, 0, 0, 0.65),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -1750,10 +1774,10 @@ body {
 
 /* When 2 QR codes are present (Scan mode), widen the sheet to comfortably fit side-by-side */
 .modal-sheet.modal-sheet--dual-qr {
-  max-width: 840px;
+  max-width: min(94vw, 960px);
 }
 
-/* Pattern 3: fullscreen — used by jamRefundOverlay, idleWarningModal */
+/* Pattern 3: fullscreen — used by trayIssueOverlay */
 .modal--fs {
   align-items: center;
   justify-content: center;
@@ -1761,15 +1785,15 @@ body {
 
 .modal-fs {
   width: 100%;
-  max-width: 480px;
-  max-height: min(92vh, 680px);
+  max-width: min(94vw, 680px);
+  max-height: min(94vh, 900px);
   overflow-y: auto;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 0 24px;
+  gap: 20px;
+  padding: 0 32px;
   box-sizing: border-box;
   transform: translateY(16px) scale(0.96);
   transition:
@@ -2445,15 +2469,6 @@ body {
   width: 19px;
   height: 19px;
 }
-.modal-btn--alert {
-  background: #f26e6b;
-  color: var(--white);
-  box-shadow: 0 4px 16px rgba(242, 110, 107, 0.35);
-}
-.modal-btn--alert:hover {
-  background: #ff7e7b;
-  box-shadow: 0 8px 24px rgba(242, 110, 107, 0.5);
-}
 .modal-btn--help {
   background: #b87914;
   color: var(--white);
@@ -2469,9 +2484,9 @@ body {
 }
 
 .status-animation {
-  width: clamp(180px, 24vw, 220px);
+  width: min(clamp(220px, 30vw, 300px), 34vh);
   aspect-ratio: 1;
-  margin: 0 auto 12px;
+  margin: 0 auto 18px;
 }
 
 .status-animation .status-icon {
@@ -2479,9 +2494,9 @@ body {
 }
 
 .status-icon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 12px;
+  width: 104px;
+  height: 104px;
+  margin: 0 auto 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2502,9 +2517,6 @@ body {
 }
 
 .status-icon--check {
-  animation: pop-in 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.status-icon--error {
   animation: pop-in 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .status-icon--help {
@@ -2571,10 +2583,10 @@ body {
   color: #86db93;
 }
 .printing-stage {
-  min-height: 24px;
-  margin: 6px 0 0;
+  min-height: 30px;
+  margin: 10px 0 0;
   color: #c4c7f7;
-  font-size: 17.5px;
+  font-size: 21px;
   font-weight: 750;
   text-align: center;
 }
@@ -2582,6 +2594,47 @@ body {
 .modal-btn--wide {
   width: 100%;
   margin-top: 0;
+}
+
+/* ── Enlarged state modals (printing / thank-you / tray help) ──
+   Scoped so the two-step #confirmModal card and Wi-Fi modal keep
+   their own sizing. */
+.modal-sheet--status .modal-title,
+.modal-fs .modal-title {
+  font-size: 36px;
+  letter-spacing: -0.5px;
+}
+
+.modal-sheet--status .modal-subtitle,
+.modal-fs .modal-subtitle {
+  font-size: 20px;
+  line-height: 1.45;
+  margin-top: 8px;
+}
+
+.modal-sheet--status .modal-subtitle--hint,
+.modal-fs .modal-subtitle--hint {
+  font-size: 17.5px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.modal-sheet--status .modal-subtitle--remaining {
+  font-size: 17.5px;
+}
+
+.modal-sheet--status .modal-btn,
+.modal-fs .modal-btn {
+  min-height: 64px;
+  padding: 16px 28px;
+  border-radius: 16px;
+  font-size: 19px;
+}
+
+.modal-sheet--status .modal-btn svg,
+.modal-fs .modal-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* ── Success QR Grid & QR Cards (Enlarged Kiosk Touch & Scan) ──── */
@@ -2978,8 +3031,8 @@ body {
 /* Print progress indicator — shown for print jobs as soon as the total is
  * known, then advanced by worker lifecycle telemetry. */
 .printing-progress-text {
-  margin: 14px 0 0;
-  font-size: 17.5px;
+  margin: 16px 0 0;
+  font-size: 20px;
   line-height: 1.4;
   color: var(--lavender);
   opacity: 0.95;
@@ -2992,9 +3045,9 @@ body {
 }
 
 .printing-progress-bar {
-  margin: 10px auto 0;
-  width: min(100%, 360px);
-  height: 10px;
+  margin: 12px auto 0;
+  width: min(100%, 480px);
+  height: 14px;
   border-radius: 999px;
   background: rgba(167, 170, 225, 0.2);
   border: 1px solid rgba(167, 170, 225, 0.16);

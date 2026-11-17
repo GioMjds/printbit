@@ -207,14 +207,23 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-const scanLoadingController =
-  scanLoadingAnimation && scanLoadingCanvas
-    ? mountLoadingAnimation({
-        root: scanLoadingAnimation,
-        canvas: scanLoadingCanvas,
-        mode: 'scan',
-      })
-    : null;
+// Feeder scans show the ADF animation; glass scans keep the document-to-phone one.
+type ScanLoadingMode = 'copy-adf' | 'scan';
+let scanLoadingMode: ScanLoadingMode | null = null;
+let scanLoadingController: ReturnType<typeof mountLoadingAnimation> | null =
+  null;
+
+function mountScanLoadingAnimation(mode: ScanLoadingMode): void {
+  if (!scanLoadingAnimation || !scanLoadingCanvas) return;
+  if (mode === scanLoadingMode) return;
+  scanLoadingController?.destroy();
+  scanLoadingController = mountLoadingAnimation({
+    root: scanLoadingAnimation,
+    canvas: scanLoadingCanvas,
+    mode,
+  });
+  scanLoadingMode = mode;
+}
 
 window.addEventListener('pagehide', (event) => {
   if (!event.persisted) scanLoadingController?.destroy();
@@ -265,6 +274,12 @@ function getSelectedScanSource(): ScanSource {
   }
   return SCAN_SOURCE;
 }
+
+function scanLoadingModeFor(source: ScanSource): ScanLoadingMode {
+  return source === 'feeder' ? 'copy-adf' : 'scan';
+}
+
+mountScanLoadingAnimation(scanLoadingModeFor(getSelectedScanSource()));
 
 function resolveScanDpi(source: ScanSource = getSelectedScanSource()): ScanDpi {
   const isAdf = source === 'feeder';
@@ -597,6 +612,9 @@ function showPreview(
   name: 'idle' | 'scanning' | 'result' | 'error',
   hint?: string,
 ): void {
+  if (name === 'scanning') {
+    mountScanLoadingAnimation(scanLoadingModeFor(getSelectedScanSource()));
+  }
   scanLoadingController?.setActive(name === 'scanning');
   for (const [key, el] of Object.entries(PREVIEW_STATES)) {
     el.classList.toggle('hidden', key !== name);
