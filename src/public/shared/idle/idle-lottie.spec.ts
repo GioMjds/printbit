@@ -39,7 +39,7 @@ function setup(
     players.push(player);
     return player;
   });
-  const fetchAsset = jest.fn(async (_src: string) => new ArrayBuffer(8));
+  const fetchAsset = jest.fn(async () => new ArrayBuffer(8));
   const stage = new IdleLottieStage({
     canvas,
     poster,
