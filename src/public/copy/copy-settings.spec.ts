@@ -3,8 +3,11 @@ import {
   copiesLimits,
   parseCopySettings,
   parsePaperSize,
+  parseSheetSpec,
   serializeCopySettings,
+  serializeSheetSpec,
   stepCopies,
+  type SheetSpec,
 } from './copy-settings';
 
 describe('parsePaperSize', () => {
@@ -75,6 +78,40 @@ describe('parseCopySettings', () => {
     expect(parseCopySettings(serializeCopySettings(settings))).toEqual(
       settings,
     );
+  });
+});
+
+describe('parseSheetSpec', () => {
+  const valid: SheetSpec = {
+    paperSize: 'Long',
+    rotations: { front: 90, back: 270 },
+  };
+
+  it('round-trips through serializeSheetSpec', () => {
+    expect(parseSheetSpec(serializeSheetSpec(valid))).toEqual(valid);
+  });
+
+  it('returns null when nothing is stored', () => {
+    expect(parseSheetSpec(null)).toBeNull();
+  });
+
+  it('returns null for text that is not JSON', () => {
+    expect(parseSheetSpec('not json')).toBeNull();
+  });
+
+  it('returns null for a bad paper size', () => {
+    const raw = JSON.stringify({ ...valid, paperSize: 'B5' });
+    expect(parseSheetSpec(raw)).toBeNull();
+  });
+
+  it('returns null for a bad rotation', () => {
+    const raw = JSON.stringify({ ...valid, rotations: { front: 45, back: 0 } });
+    expect(parseSheetSpec(raw)).toBeNull();
+  });
+
+  it('returns null when a side is missing', () => {
+    const raw = JSON.stringify({ ...valid, rotations: { front: 0 } });
+    expect(parseSheetSpec(raw)).toBeNull();
   });
 });
 

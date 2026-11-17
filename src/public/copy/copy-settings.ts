@@ -2,6 +2,7 @@
  * The four print settings on /copy and how they are kept in session storage.
  * Pure: no DOM, no storage access.
  */
+import type { IdRotation, IdSide } from '../../shared/id-card-layout';
 import type { PaperSize } from '../../shared/print-configuration';
 import { clampCopies, MAX_COPIES } from '../shared/copy-config';
 
@@ -55,6 +56,44 @@ export function parseCopySettings(raw: string | null): CopySettings {
 
 export function serializeCopySettings(settings: CopySettings): string {
   return JSON.stringify({ ...settings, copies: clampCopies(settings.copies) });
+}
+
+/** What the current ID sheet was built with. */
+export interface SheetSpec {
+  paperSize: PaperSize;
+  rotations: Record<IdSide, IdRotation>;
+}
+
+function parseRotation(value: unknown): IdRotation | null {
+  return value === 0 || value === 90 || value === 180 || value === 270
+    ? value
+    : null;
+}
+
+/** Null when nothing is stored or any field is invalid. */
+export function parseSheetSpec(raw: string | null): SheetSpec | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const source = parsed as Record<string, unknown>;
+  const paperSize = parsePaperSize(source.paperSize);
+  const rotations = source.rotations;
+  if (!paperSize || typeof rotations !== 'object' || rotations === null) {
+    return null;
+  }
+  const front = parseRotation((rotations as Record<string, unknown>).front);
+  const back = parseRotation((rotations as Record<string, unknown>).back);
+  if (front === null || back === null) return null;
+  return { paperSize, rotations: { front, back } };
+}
+
+export function serializeSheetSpec(spec: SheetSpec): string {
+  return JSON.stringify(spec);
 }
 
 export function stepCopies(copies: number, delta: 1 | -1): number {

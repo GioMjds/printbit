@@ -20,7 +20,6 @@ import {
 } from '../../shared/print-configuration';
 import {
   slotFractions,
-  type IdRotation,
   type IdSide,
 } from '../../shared/id-card-layout';
 import {
@@ -57,9 +56,12 @@ import {
   copiesLimits,
   parseCopySettings,
   parsePaperSize,
+  parseSheetSpec,
   serializeCopySettings,
+  serializeSheetSpec,
   stepCopies,
   type CopySettings,
+  type SheetSpec,
 } from './copy-settings';
 import { createIdCaptureClient, type IdCaptureResult } from './id-capture';
 
@@ -90,6 +92,7 @@ const STORAGE_KEYS = {
   flow: 'printbit.copyFlow',
   idSession: 'printbit.copyIdSessionId',
   settings: COPY_SETTINGS_STORAGE_KEY,
+  sheetSpec: 'printbit.copySheetSpec',
 } as const;
 
 function setOrRemove(key: string, value: string | null): void {
@@ -113,11 +116,8 @@ let idSessionId: string | null = null;
 /** Paper and orientation of the scanned document, from the preview render. */
 let documentLayout: { paperSize: PaperSize; orientation: Orientation } | null =
   null;
-/** What the current ID sheet was built with. Not persisted. */
-let sheetSpec: {
-  paperSize: PaperSize;
-  rotations: Record<IdSide, IdRotation>;
-} | null = null;
+/** What the current ID sheet was built with. */
+let sheetSpec: SheetSpec | null = null;
 let previewRendered = false;
 let previewRequestId = 0;
 let composing = false;
@@ -964,6 +964,10 @@ function persist(): void {
   setOrRemove(STORAGE_KEYS.previewPath, previewPath);
   setOrRemove(STORAGE_KEYS.releaseToken, previewReleaseToken);
   setOrRemove(STORAGE_KEYS.idSession, idSessionId);
+  setOrRemove(
+    STORAGE_KEYS.sheetSpec,
+    sheetSpec ? serializeSheetSpec(sheetSpec) : null,
+  );
 }
 
 function dispatch(event: CopyFlowEvent): void {
@@ -1131,6 +1135,7 @@ async function scanIdSide(side: IdSide): Promise<void> {
       paperSize: sentPaperSize,
       rotations: { ...flow.rotations },
     };
+    persist();
     await showPreview(result.sheet.previewPath);
     return;
   }
@@ -1373,10 +1378,10 @@ async function initializeCopyPage(): Promise<void> {
     settings = parseCopySettings(sessionStorage.getItem(STORAGE_KEYS.settings));
     flow = reduceCopyFlow(flow, { type: 'restored', snapshot });
     if (flow.copyType === 'id') {
-      sheetSpec = {
-        paperSize: settings.paperSize,
-        rotations: { ...flow.rotations },
-      };
+      // Saved settings may be newer than the sheet if a compose failed.
+      sheetSpec = parseSheetSpec(
+        sessionStorage.getItem(STORAGE_KEYS.sheetSpec),
+      );
     }
   } else if (previewPath && !snapshot) {
     // A preview saved by the page before this change: a document scan.
@@ -1392,6 +1397,16 @@ async function initializeCopyPage(): Promise<void> {
   positionBackSlot();
   persist();
   render();
+  if (
+    flow.copyType === 'id' &&
+    sheetSpec === null &&
+    isSheetComplete(flow) &&
+    idSessionId
+  ) {
+    // Unknown what the saved sheet was built with: rebuild it for the
+    // current settings. The new sheet's preview supersedes the old one.
+    void recompose();
+  }
   if (previewPath) await showPreview(previewPath);
 }
 
