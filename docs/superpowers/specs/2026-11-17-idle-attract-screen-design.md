@@ -66,21 +66,24 @@ The background is the current deep-space gradient, static.
 
 ### Slide catalog
 
-| Slide id         | Content                                                                                         | Depends on service | Can disable | Slot file                     | First-version source    |
-| ---------------- | ----------------------------------------------------------------------------------------------- | ------------------ | ----------- | ----------------------------- | ----------------------- |
-| `welcome`        | "Print, Copy, Scan — coins and your phone."                                                     | none               | no          | `idle/welcome.lottie`         | free LottieFiles asset  |
-| `status`         | Each service with state and reason. Paper level. "Exact coins only" when change is unavailable. | none               | no          | `idle/status.lottie`          | `paper-tray.lottie`     |
-| `howToPrint`     | 4 steps: scan the QR, upload from phone, choose settings, insert coins.                         | print              | yes         | `idle/how-to-print.lottie`    | `upload.lottie`         |
-| `howToCopy`      | Place on the glass or in the feeder, set copies, pay.                                           | copy               | yes         | `idle/how-to-copy.lottie`     | `copy-glass.lottie`     |
-| `idCardCopy`     | Front and back of an ID on one sheet.                                                           | copy               | yes         | `idle/id-card-copy.lottie`    | `copy-adf.lottie`       |
-| `scanToPhone`    | Scan, scan the QR, the file goes to your phone.                                                 | scan               | yes         | `idle/scan-to-phone.lottie`   | `scan-transfer.lottie`  |
-| `prices`         | Live prices: B/W per page, color surcharge, copy per page, scan per document.                   | none               | yes         | `idle/prices.lottie`          | `coin-insertion.lottie` |
-| `paying`         | Accepted coins ₱1, ₱5, ₱10, ₱20. Whole pesos. Change is returned.                               | none               | yes         | `idle/paying.lottie`          | `coin-insertion.lottie` |
-| `supportedFiles` | PDF, Word, PowerPoint, Excel, images, and the upload size limit.                                | print              | yes         | `idle/supported-files.lottie` | `upload.lottie`         |
-| `privacyReceipt` | Files are deleted after the job. You get an e-receipt on your phone.                            | none               | yes         | `idle/privacy-receipt.lottie` | free LottieFiles asset  |
+| Slide id         | Content                                                                                         | Depends on service | Can disable | Slot file                     | First-version source                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------- | ------------------ | ----------- | ----------------------------- | ------------------------------------------------------------------- |
+| `welcome`        | "Print, Copy, Scan — coins and your phone."                                                     | none               | no          | `idle/welcome.lottie`         | `printing.lottie` until a free LottieFiles asset is dropped in      |
+| `status`         | Each service with state and reason. Paper level. "Exact coins only" when change is unavailable. | none               | no          | `idle/status.lottie`          | `paper-tray.lottie`                                                 |
+| `howToPrint`     | 4 steps: scan the QR, upload from phone, choose settings, insert coins.                         | print              | yes         | `idle/how-to-print.lottie`    | `upload.lottie`                                                     |
+| `howToCopy`      | Place on the glass or in the feeder, set copies, pay.                                           | copy               | yes         | `idle/how-to-copy.lottie`     | `copy-glass.lottie`                                                 |
+| `idCardCopy`     | Front and back of an ID on one sheet.                                                           | copy               | yes         | `idle/id-card-copy.lottie`    | `copy-adf.lottie`                                                   |
+| `scanToPhone`    | Scan, scan the QR, the file goes to your phone.                                                 | scan               | yes         | `idle/scan-to-phone.lottie`   | `scan-transfer.lottie`                                              |
+| `prices`         | Live "from" prices: B/W print, color print, B/W copy, color copy, scan per document.            | none               | yes         | `idle/prices.lottie`          | `coin-insertion.json`, packed to `.lottie`                          |
+| `paying`         | Accepted coins ₱1, ₱5, ₱10, ₱20. Whole pesos. Change is returned.                               | none               | yes         | `idle/paying.lottie`          | `coin-insertion.json`, packed to `.lottie`                          |
+| `supportedFiles` | PDF, Word, PowerPoint, Excel, images, and the upload size limit.                                | print              | yes         | `idle/supported-files.lottie` | `upload.lottie`                                                     |
+| `privacyReceipt` | Files are deleted after the job. You get an e-receipt on your phone.                            | none               | yes         | `idle/privacy-receipt.lottie` | `scan-transfer.lottie` until a free LottieFiles asset is dropped in |
 
 Slot files live in `src/public/assets/lottie/idle/`. The first version copies
-the listed source file into each slot. Each slide also has a static poster in
+the listed source file into each slot with `scripts/build-idle-lottie-slots.js`.
+The player accepts only `.lottie` (zip) as binary data, so the script packs
+`coin-insertion.json` into a `.lottie`. Swapping in a custom or downloaded
+animation means overwriting the slot file; no code change. Each slide also has a static poster in
 `src/public/assets/lottie/idle/posters/<slot-name>.svg`, used when the Lottie
 cannot render.
 
@@ -88,9 +91,10 @@ Step lists are static text. The current step is shown by moving an `is-current`
 class from step to step on a timer inside the slide. The class changes `color`
 and `opacity` with a CSS transition.
 
-The `paying` slide reads the accepted coin values and the `supportedFiles` slide
-reads the size limit from the same sources the kiosk uses today. The plan names
-the exact constants.
+The `paying` slide reads the accepted coin values (`ACCEPTED_COIN_VALUES` in
+`src/modules/financial/financial.service.ts`, exported for this) and the
+`supportedFiles` slide reads the size limit (`MAX_FILE_SIZE_BYTES` in
+`src/utils/file-types.ts`). Both come through `/api/idle/info`.
 
 ### Playlist rules
 
@@ -146,10 +150,11 @@ Response shape:
     }
   },
   "pricing": {
-    "printPerPage": 2,
-    "colorSurcharge": 3,
-    "copyPerPage": 2,
-    "scanDocument": 5
+    "printBwFrom": 3,
+    "printColorFrom": 18,
+    "copyBw": 3,
+    "copyColor": 5,
+    "scan": 5
   },
   "services": {
     "print": { "state": "ready", "reason": null },
@@ -157,9 +162,18 @@ Response shape:
     "scan": { "state": "ready", "reason": null }
   },
   "paper": { "level": "low" },
-  "change": { "exactCoinsOnly": false }
+  "change": { "exactCoinsOnly": false },
+  "coins": [1, 5, 10, 20],
+  "maxUploadMb": 25
 }
 ```
+
+Print pricing is per coverage tier and paper size, so the idle screen shows a
+"from" price: `printBwFrom` is the lowest `paperCost + bwPrint.low` across the
+three paper profiles in `pricingEngine`; `printColorFrom` is the same with
+`colorPrint.low`. Copy and scan use `copyBwPerPage` (falling back to
+`copyPerPage`), `copyColorPerPage`, and `scanDocument`, with the same defaults
+as `GET /api/pricing-config`. `pricing` is `null` if reading pricing throws.
 
 `state` is one of `ready`, `limited`, `unavailable`, `unknown`.
 `reason` is one of `null`, `printer_offline`, `printer_error`, `paper_out`,
@@ -168,20 +182,37 @@ Response shape:
 
 ### Derivation rules
 
-Sources: the printer state projection snapshot
-(`src/services/printer-state-projection.ts`), `ScannerService.getStatus()`,
-the hopper's last error code (`src/services/hopper.ts`), settings
-`consumablesForecasting`, and settings pricing.
+Sources:
 
-| Condition                                                        | Effect                                               |
-| ---------------------------------------------------------------- | ---------------------------------------------------- |
-| Printer offline                                                  | print, copy: `unavailable`, `printer_offline`        |
-| Printer has an active error other than paper                     | print, copy: `unavailable`, `printer_error`          |
-| Printer reports paper out, or `paperCurrentSheets` is 0          | print, copy: `unavailable`, `paper_out`; paper `out` |
-| `paperCurrentSheets` ≤ max(10, 10% of `paperTrayCapacitySheets`) | print, copy: `limited`, `paper_low`; paper `low`     |
-| Forecasting disabled and printer reports no paper state          | paper `unknown`                                      |
-| Scanner not ready                                                | scan, copy: `unavailable`, `scanner_unavailable`     |
-| Hopper last error is `EMPTY`                                     | `exactCoinsOnly: true`                               |
+- printer status from `printerStateProjection.getSnapshot().status`
+  (`src/services/printer-state-projection.ts`);
+- the active printer error code from `printerErrorStateManager.getActiveError()`
+  (`src/services/printer-error-state.ts`), ignored when its `status` is
+  `cleared`;
+- scanner readiness from the cached runtime status `getScannerStatus()`
+  (`src/services/scanner.ts`): `connected || usingStub`. No device probe, so
+  polling stays cheap;
+- the hopper's last failure message `db.data.hopperStats.lastError`;
+- settings `consumablesForecasting` (`enabled`, `paperCurrentSheets`,
+  `paperTrayCapacitySheets`).
+
+`paperCurrentSheets` is an estimate that staff keep current by logging refills.
+It can read 0 while the tray is full. So only the printer's own `E_NO_PAPER`
+signal can make a service `unavailable` for paper. The estimate can only make it
+`limited`.
+
+| Condition (checked in this order)                                         | Effect                                               |
+| ------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Active printer error `E_NO_PAPER`                                         | print, copy: `unavailable`, `paper_out`; paper `out` |
+| Printer status `offline`, or active error `E_OFFLINE`                     | print, copy: `unavailable`, `printer_offline`        |
+| Any other active error except `W_INK_LOW`, or printer status `error`      | print, copy: `unavailable`, `printer_error`          |
+| Forecasting enabled and `paperCurrentSheets` ≤ max(10, ⌈10% of capacity⌉) | print, copy: `limited`, `paper_low`; paper `low`     |
+| Forecasting enabled and above that threshold                              | paper `ok`                                           |
+| Forecasting disabled (and no `E_NO_PAPER`)                                | paper `unknown`                                      |
+| Scanner not ready                                                         | scan, copy: `unavailable`, `scanner_unavailable`     |
+| Hopper `lastError` contains `EMPTY` (case-insensitive)                    | `exactCoinsOnly: true`                               |
+| Reading printer sources throws                                            | print, copy: `unknown`; paper `unknown`              |
+| Reading scanner source throws                                             | scan, copy: `unknown`                                |
 
 When several rules hit one service, the worst state wins
 (`unavailable` > `limited` > `unknown` > `ready`). For equal states, the first
@@ -209,11 +240,15 @@ field: one switch per disableable slide and a number input for duration.
 
 ### Client units (`src/public/shared/idle/`)
 
-- **`idle-screen.ts`** (moves from `shared/`): keeps the timer, server timeout,
-  boot flag, and tap-to-dismiss logic. Its `onShow` starts the status poller and
-  the carousel. Its `onHide` stops both and pauses the player.
-- **`idle-slides.ts`**: the slide catalog (id, i18n keys, slot path, poster
-  path, service dependency, disableable flag) and the pure `buildPlaylist`.
+- **`src/public/shared/idle-screen.ts`** stays where it is: it keeps the timer,
+  server timeout, boot flag, and tap-to-dismiss logic. `app.ts` passes `onShow`
+  and `onHide` callbacks that start and stop the attract controller.
+- **`idle-slides.ts`**: the slide catalog (id, slot path, poster path, service
+  dependency, disableable flag) and the pure `buildPlaylist`.
+- **`idle-controller.ts`**: wires the poller, carousel, view, and stage together
+  for one overlay, and owns the `visibilitychange` listener and the clock.
+- **`idle-view.ts`**: writes slide text, chips, clock, and progress bar to the
+  DOM, and runs the crossfade and step highlight timers.
 - **`idle-carousel.ts`**: runs the playlist with a single `setTimeout` chain.
   On each step it fades the slide area out, swaps text and animation, fades in,
   and restarts the progress bar. `start()` and `stop()`; `stop()` clears every
@@ -222,16 +257,27 @@ field: one switch per disableable slide and a number input for duration.
   - Calls `DotLottie.setWasmUrl('/vendor/dotlottie/dotlottie-player.wasm')`.
   - On first show, fetches every slot file in the playlist once and keeps the
     `ArrayBuffer`s for the page's lifetime.
-  - Swaps with `load({ data, loop: true, autoplay: true, useFrameInterpolation: false, renderConfig: { devicePixelRatio: 1, freezeOnOffscreen: true, autoResize: true } })`.
-    `useFrameInterpolation: false` limits rendering to the file's own frame
-    rate. Slot files must be authored at 30 fps or less.
+  - Swaps with `load({ data, autoplay: false, loop: false, renderConfig: { devicePixelRatio: 1, autoResize: true, freezeOnOffscreen: true } })`.
+  - Does not use the player's own playback loop. It steps frames itself with
+    `setFrame()` from one 30 Hz `setInterval`, computing the frame from elapsed
+    time, `duration`, and `totalFrames`. This caps rendering at 30 fps whatever
+    frame rate a slot file was authored at (two current sources are 60 fps).
   - Pauses on `document.visibilitychange` to hidden and on overlay hide.
   - Shows the slide's poster on `loadError` or `renderError`.
 - **`idle-status.ts`**: fetches `/api/idle/info` when the overlay shows, then
   every 30 s while it stays visible. No requests while the overlay is hidden.
   Exposes the last good response.
-- **`idle-i18n.ts`**: looks up `idle.*` keys in the `en` or `fil` dictionary
-  for the cycle's language. Prices use the existing peso formatter.
+- **`idle-copy.ts`**: English and Filipino text for every idle string, as one
+  typed table, and pure functions that fill in prices, coins, and the size
+  limit. Prices use the existing `formatPeso`.
+
+The kiosk's localization (`src/public/shared/kiosk-i18n.ts`) is keyed by English
+phrase and rewrites DOM text to the selected language through a
+`MutationObserver`. That would undo the per-cycle language. So the idle overlay
+carries `data-i18n-skip`, and `kiosk-i18n.ts` gains an exported
+`isI18nSkipped(node)` check that leaves text and attributes inside such a
+subtree alone. Idle strings therefore live in `idle-copy.ts`, not in
+`src/locales/*/translation.json`.
 
 ### Removed
 
@@ -240,7 +286,13 @@ field: one switch per disableable slide and a number input for duration.
   markup.
 - Every `@keyframes` rule and animation declaration in
   `src/public/idle-screen.css`, and the reduced-motion and `globals.css`
-  override blocks that existed only to fight them.
+  override blocks that existed only to fight them. The overlay's own show and
+  hide fades become `opacity` transitions.
+- `globals.css` turns off all transitions under `html[data-kiosk-static='true']`
+  with `!important`. The new `idle-screen.css` re-enables only the idle
+  `opacity` and `transform` transitions with higher-specificity `!important`
+  rules. The separate `.idle-warning-overlay` (session timeout warning) is not
+  touched.
 
 ## Failure handling
 
@@ -259,9 +311,9 @@ field: one switch per disableable slide and a number input for duration.
 
 Acceptance criteria, checked on the kiosk PC:
 
-- While idle shows: at most one `requestAnimationFrame` loop (the player),
-  zero running CSS `@keyframes` animations, zero `box-shadow` or `filter`
-  transitions.
+- While idle shows: one 30 Hz frame-step interval at most, the player's own
+  `requestAnimationFrame` playback never started, zero running CSS `@keyframes`
+  animations, zero `box-shadow` or `filter` transitions.
 - After idle hides: zero timers left by the carousel or poller, and the player
   is paused.
 - A Chrome DevTools Performance recording of 60 s idle on the current build and
@@ -280,9 +332,13 @@ Acceptance criteria, checked on the kiosk PC:
 
 Jest, following the repo's `*.spec.ts` pattern.
 
-- `deriveIdleServices`: all ready; printer offline; printer error; paper out by
-  printer; paper out by count; paper low; forecasting disabled; scanner not
-  ready; hopper empty; one source throws; several rules on one service.
+- `deriveIdleServices`: all ready; printer offline; printer error; ink-low
+  warning ignored; paper out by printer (status `error` still says
+  `paper_out`); estimate at 0 gives only `limited`/`paper_low`; paper low;
+  forecasting disabled; scanner not ready; hopper empty; one source throws;
+  several rules on one service.
+- `isI18nSkipped`: text inside `[data-i18n-skip]` is skipped; text outside is
+  not.
 - `buildPlaylist`: all on; slides disabled; `welcome` and `status` cannot be
   disabled; unavailable service skips its slides; degraded moves and repeats
   `status`; no pricing skips `prices`; language alternates by cycle; everything
