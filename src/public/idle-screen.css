@@ -25,11 +25,24 @@
   inset: 0;
   z-index: 9000;
   background:
-    radial-gradient(ellipse at 20% 5%, rgba(105, 111, 199, 0.3), transparent 58%),
-    radial-gradient(ellipse at 82% 92%, rgba(242, 174, 187, 0.16), transparent 52%),
+    radial-gradient(
+      ellipse at 20% 5%,
+      rgba(105, 111, 199, 0.3),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse at 82% 92%,
+      rgba(242, 174, 187, 0.16),
+      transparent 52%
+    ),
     linear-gradient(165deg, #0e0d1f 0%, #100f22 45%, #0a0918 100%);
   color: var(--idle-text);
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family:
+    'Plus Jakarta Sans',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
   font-synthesis: none;
   opacity: 0;
   visibility: hidden;
@@ -96,8 +109,8 @@ html.kiosk-boot-idle .kiosk-shell {
 }
 
 .idle-brand__mark {
-  width: 36px;
-  height: 36px;
+  width: 90px;
+  height: 90px;
   background: url('/assets/logo.png') center / contain no-repeat;
 }
 
@@ -188,8 +201,26 @@ html.kiosk-boot-idle .kiosk-shell {
 }
 
 .idle-slide__body:empty,
-.idle-slide__steps:empty {
+.idle-slide__steps:empty,
+.idle-slide__coins:empty {
   display: none;
+}
+
+.idle-slide__coins {
+  gap: clamp(16px, 2vw, 32px);
+}
+
+.idle-slide__coins .coin-strip__img {
+  width: clamp(64px, 6vw, 112px);
+  height: clamp(64px, 6vw, 112px);
+}
+
+.idle-slide__coins .coin-strip__img + .coin-strip__img {
+  margin-left: clamp(-72px, -3.9vw, -42px);
+}
+
+.idle-slide__coins .coin-strip__value {
+  font-size: clamp(18px, 1.7vw, 26px);
 }
 
 .idle-slide__steps {

@@ -22,7 +22,7 @@ const MARKUP = `
       <img data-idle="poster" hidden />
       <canvas data-idle="canvas" hidden></canvas>
       <p data-idle="eyebrow"></p><h2 data-idle="title"></h2><p data-idle="body"></p>
-      <ol data-idle="steps"></ol>
+      <ol data-idle="steps"></ol><ul data-idle="coins"></ul>
     </div>
     <span data-idle="progress"></span>
     <p data-idle="cta"></p>

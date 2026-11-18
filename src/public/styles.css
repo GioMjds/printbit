@@ -124,6 +124,59 @@ body {
   justify-content: flex-end;
 }
 
+/* Accepted coins – left slot: the right slot sits under the fixed Language/ink FABs */
+.coin-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.coin-strip__label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--lavender);
+}
+
+.coin-strip__coins {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coin-strip__coin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.coin-strip__stack {
+  display: flex;
+}
+
+.coin-strip__img {
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Old/new pair: new coin overlaps the old one */
+.coin-strip__img + .coin-strip__img {
+  margin-left: -36px;
+}
+
+.coin-strip__value {
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .pricing-summary__button {
   border: 1px solid rgba(167, 170, 225, 0.36);
   border-radius: 999px;
@@ -1567,6 +1620,23 @@ body {
   .clock-time {
     font-size: 32px;
     letter-spacing: -1px;
+  }
+
+  .coin-strip__coins {
+    gap: 6px;
+  }
+
+  .coin-strip__img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .coin-strip__img + .coin-strip__img {
+    margin-left: -24px;
+  }
+
+  .coin-strip__value {
+    font-size: 12px;
   }
 
   .guide-print-carousel__frame,

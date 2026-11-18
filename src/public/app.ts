@@ -21,6 +21,8 @@ import {
   formatScanPricingGuide,
 } from './shared/pricing-guide';
 import { initPrinterGuard } from '@/guards/printer-guard';
+import { ACCEPTED_COIN_VALUES } from '@/shared/accepted-coins';
+import { renderCoinList } from './shared/coin-strip';
 
 type SocketLike = {
   on: (event: string, cb: (...args: unknown[]) => void) => void;
@@ -139,6 +141,9 @@ const homeSocket = typeof ioFactory === 'function' ? ioFactory() : null;
 attachPowerSafetyOverlay({ socket: homeSocket });
 attachUiBlockingOverlay({ socket: homeSocket });
 void initPrinterGuard(homeSocket, { mode: 'kiosk_wide_only' });
+
+const coinStripCoins = document.getElementById('coinStripCoins');
+if (coinStripCoins) renderCoinList(coinStripCoins, ACCEPTED_COIN_VALUES);
 
 const homeLowInkWarning = document.getElementById('homeLowInkWarning');
 const homeInkOutWarning = document.getElementById('homeInkOutWarning');

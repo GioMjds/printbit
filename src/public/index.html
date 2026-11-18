@@ -27,7 +27,16 @@
     <div class="kiosk-shell">
       <!-- Top Bar -->
       <header class="topbar" role="banner">
-        <div class="brand"></div>
+        <div class="brand">
+          <div class="coin-strip">
+            <span class="coin-strip__label" id="coinStripLabel">Accepted coins</span>
+            <ul
+              class="coin-strip__coins"
+              id="coinStripCoins"
+              aria-labelledby="coinStripLabel"
+            ></ul>
+          </div>
+        </div>
 
         <div
           class="clock-block"
@@ -1174,6 +1183,12 @@
             <h2 class="idle-slide__title" data-idle="title"></h2>
             <p class="idle-slide__body" data-idle="body"></p>
             <ol class="idle-slide__steps" data-idle="steps"></ol>
+            <!-- Body text already names the coins; photos are visual only -->
+            <ul
+              class="coin-strip__coins idle-slide__coins"
+              data-idle="coins"
+              aria-hidden="true"
+            ></ul>
           </div>
         </div>
 

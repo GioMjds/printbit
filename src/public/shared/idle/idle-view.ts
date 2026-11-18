@@ -1,3 +1,4 @@
+import { renderCoinList } from '../coin-strip';
 import { IDLE_UI_TEXT, type IdleLang, type IdleSlideText } from './idle-copy';
 
 export interface IdleViewElements {
@@ -11,6 +12,7 @@ export interface IdleViewElements {
   title: HTMLElement;
   body: HTMLElement;
   steps: HTMLElement;
+  coins: HTMLElement;
   progressBar: HTMLElement;
   cta: HTMLElement;
 }
@@ -31,6 +33,7 @@ export function queryIdleViewElements(
     title: hook<HTMLElement>('title'),
     body: hook<HTMLElement>('body'),
     steps: hook<HTMLElement>('steps'),
+    coins: hook<HTMLElement>('coins'),
     progressBar: hook<HTMLElement>('progress'),
     cta: hook<HTMLElement>('cta'),
   };
@@ -107,6 +110,7 @@ export class IdleView {
         return item;
       }),
     );
+    renderCoinList(this.els.coins, text.coins ?? []);
   }
 
   private restartProgress(durationMs: number): void {

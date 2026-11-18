@@ -22,6 +22,8 @@ export interface IdleSlideText {
   body: string;
   lines: string[];
   stepped: boolean;
+  /** Coin values to picture under the text (paying slide only). */
+  coins?: readonly number[];
 }
 
 type FixedSlideId =
@@ -54,7 +56,7 @@ interface IdleLangTable {
   };
 }
 
-const TEXT: Record<IdleLang, IdleLangTable> = {
+const TEXT = {
   en: {
     ui: {
       cta: 'Tap anywhere to start',
@@ -135,7 +137,8 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
       title: 'Coins only, whole pesos.',
       body: (coins) =>
         `Accepted coins: ${coins}. The kiosk gives back your change.`,
-      exactCoins: "Change can't be given right now. Please pay the exact amount.",
+      exactCoins:
+        "Change can't be given right now. Please pay the exact amount.",
     },
     supportedFiles: {
       eyebrow: 'What files are supported?',
@@ -192,7 +195,8 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
         stepped: false,
       },
       scanToPhone: {
-        eyebrow: 'Paano ko maiko-convert ang aking dokumento para maging soft copy?',
+        eyebrow:
+          'Paano ko maiko-convert ang aking dokumento para maging soft copy?',
         title: 'Papel papunta sa bulsa mo.',
         body: '',
         lines: [
@@ -238,12 +242,12 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
           : `PDF at mga larawan (JPG, PNG, GIF, WebP, BMP), hanggang ${mb} MB bawat file.`,
     },
   },
-};
+} satisfies Record<IdleLang, IdleLangTable>;
 
-export const IDLE_UI_TEXT: Record<IdleLang, IdleLangTable['ui']> = {
+export const IDLE_UI_TEXT = {
   en: TEXT.en.ui,
   fil: TEXT.fil.ui,
-};
+} satisfies Record<IdleLang, IdleLangTable['ui']>;
 
 export function renderSlideText(
   id: IdleSlideId,
@@ -261,7 +265,8 @@ export function renderSlideText(
         stepped: false,
       };
     case 'paying': {
-      const coins = (info?.coins ?? IDLE_FALLBACK_COINS)
+      const values = info?.coins ?? IDLE_FALLBACK_COINS;
+      const coins = values
         .map(formatPeso)
         .join(', ');
       const body = info?.change.exactCoinsOnly
@@ -273,6 +278,7 @@ export function renderSlideText(
         body,
         lines: [],
         stepped: false,
+        coins: values,
       };
     }
     case 'supportedFiles':
