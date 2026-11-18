@@ -165,16 +165,27 @@
                 </div>
 
                 <div class="paper-placeholder copy-placement" id="paperPlaceholder">
+                  <!-- Lottie follows the copy type and original size (glass, ID, or ADF); the diagrams are its fallback -->
                   <div
-                    class="copy-placement__glass"
-                    data-for="document"
+                    class="copy-placement__anim lottie-loading"
+                    id="copyPlacementAnimation"
                     aria-hidden="true"
                   >
-                    <div class="copy-placement__doc"></div>
-                  </div>
-                  <div class="copy-placement__glass" data-for="id" aria-hidden="true">
-                    <div class="copy-placement__corner"></div>
-                    <div class="copy-placement__card"></div>
+                    <canvas
+                      class="lottie-loading__canvas"
+                      id="copyPlacementCanvas"
+                      width="512"
+                      height="512"
+                    ></canvas>
+                    <div class="lottie-loading__fallback">
+                      <div class="copy-placement__glass" data-for="document">
+                        <div class="copy-placement__doc"></div>
+                      </div>
+                      <div class="copy-placement__glass" data-for="id">
+                        <div class="copy-placement__corner"></div>
+                        <div class="copy-placement__card"></div>
+                      </div>
+                    </div>
                   </div>
                   <p class="paper-placeholder__text" id="copyPlaceholderLabel">
                     Place your document face-down, then tap Check Document

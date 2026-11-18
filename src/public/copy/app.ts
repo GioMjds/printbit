@@ -349,8 +349,39 @@ function setCopyLoadingAnimation(target: ScanTarget | null): void {
 // the CSS fallback; the ADF one is mounted on demand.
 mountCopyLoadingAnimation('copy-glass');
 
+// The empty sheet shows how to load the original: ID cards in the glass
+// corner, Long Bond documents through the ADF, everything else on the glass.
+type CopyPlacementMode = 'place-glass' | 'place-id' | 'place-adf';
+const copyPlacementAnimation = byId('copyPlacementAnimation');
+const copyPlacementCanvas = byId<HTMLCanvasElement>('copyPlacementCanvas');
+let copyPlacementMode: CopyPlacementMode | null = null;
+let copyPlacementController: ReturnType<typeof mountLoadingAnimation> | null =
+  null;
+
+function copyPlacementModeFor(): CopyPlacementMode {
+  if (flow.copyType === 'id') return 'place-id';
+  return documentSize === 'Long' ? 'place-adf' : 'place-glass';
+}
+
+function syncCopyPlacementAnimation(visible: boolean): void {
+  if (!copyPlacementAnimation || !copyPlacementCanvas) return;
+  const mode = copyPlacementModeFor();
+  if (mode !== copyPlacementMode) {
+    copyPlacementController?.destroy();
+    copyPlacementController = mountLoadingAnimation({
+      root: copyPlacementAnimation,
+      canvas: copyPlacementCanvas,
+      mode,
+    });
+    copyPlacementMode = mode;
+  }
+  copyPlacementController?.setActive(visible);
+}
+
 window.addEventListener('pagehide', (event) => {
-  if (!event.persisted) copyLoadingController?.destroy();
+  if (event.persisted) return;
+  copyLoadingController?.destroy();
+  copyPlacementController?.destroy();
 });
 
 const RELEASE_TIMEOUT_MS = 1_500;
@@ -945,6 +976,8 @@ function render(): void {
   setDisabled(rotateBackBtn, busy || !flow.back);
 
   setHidden(paperPlaceholder, hasPreview);
+  // Paused under the full-screen scan overlay, which plays its own animation.
+  syncCopyPlacementAnimation(!hasPreview && flow.scanning === null);
   if (previewCanvas)
     previewCanvas.style.display = hasPreview ? 'block' : 'none';
   if (copyPlaceholderLabel)

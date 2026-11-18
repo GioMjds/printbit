@@ -225,8 +225,25 @@ function mountScanLoadingAnimation(mode: ScanLoadingMode): void {
   scanLoadingMode = mode;
 }
 
+// Idle preview: how to load the ADF. Plays only while the idle state shows.
+const scanFeedAnimation = document.getElementById('scanFeedAnimation');
+const scanFeedCanvas = document.getElementById(
+  'scanFeedCanvas',
+) as HTMLCanvasElement | null;
+const scanFeedController =
+  scanFeedAnimation && scanFeedCanvas
+    ? mountLoadingAnimation({
+        root: scanFeedAnimation,
+        canvas: scanFeedCanvas,
+        mode: 'place-adf',
+        active: !stateIdle.classList.contains('hidden'),
+      })
+    : null;
+
 window.addEventListener('pagehide', (event) => {
-  if (!event.persisted) scanLoadingController?.destroy();
+  if (event.persisted) return;
+  scanLoadingController?.destroy();
+  scanFeedController?.destroy();
 });
 
 const PREVIEW_STATES: Record<
@@ -616,6 +633,7 @@ function showPreview(
     mountScanLoadingAnimation(scanLoadingModeFor(getSelectedScanSource()));
   }
   scanLoadingController?.setActive(name === 'scanning');
+  scanFeedController?.setActive(name === 'idle');
   for (const [key, el] of Object.entries(PREVIEW_STATES)) {
     el.classList.toggle('hidden', key !== name);
   }

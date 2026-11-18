@@ -113,7 +113,19 @@
             <div class="preview-area" id="previewArea">
               <!-- Idle state -->
               <div class="preview-state" id="stateIdle">
-                <div class="scan-bed" aria-hidden="true">
+                <!-- Lottie: page feeds face-up into the ADF; the scan bed is its fallback -->
+                <div
+                  class="scan-feed-anim lottie-loading"
+                  id="scanFeedAnimation"
+                  aria-hidden="true"
+                >
+                <canvas
+                  class="lottie-loading__canvas"
+                  id="scanFeedCanvas"
+                  width="512"
+                  height="512"
+                ></canvas>
+                <div class="scan-bed lottie-loading__fallback">
                   <div class="scan-bed__frame">
                     <div class="scan-bed__corner scan-bed__corner--tl"></div>
                     <div class="scan-bed__corner scan-bed__corner--tr"></div>
@@ -128,6 +140,7 @@
                       <div class="scan-bed__line scan-bed__line--short"></div>
                     </div>
                   </div>
+                </div>
                 </div>
                 <p class="preview-state__label">
                   Insert your document into the feeder slot

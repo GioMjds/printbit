@@ -868,6 +868,19 @@ body {
   opacity: 0.75;
 }
 
+/* ── Placement animation on the empty sheet (diagrams below are its fallback) ── */
+.copy-placement__anim {
+  width: min(220px, 100%);
+  aspect-ratio: 1;
+  flex-shrink: 1;
+  min-height: 0;
+}
+
+.copy-placement__anim .lottie-loading__fallback {
+  display: grid;
+  place-items: center;
+}
+
 /* ── Placement diagrams on the empty sheet ── */
 .copy-placement__glass {
   position: relative;

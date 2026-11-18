@@ -6,7 +6,11 @@ export type LoadingAnimationMode =
   | 'copy-glass'
   | 'copy-adf'
   | 'scan'
-  | 'upload';
+  | 'upload'
+  | 'receive-files'
+  | 'place-glass'
+  | 'place-id'
+  | 'place-adf';
 
 const DOTLOTTIE_WASM_URL = '/vendor/dotlottie/dotlottie-player.wasm';
 const REDUCED_MOTION_FRAME = 28;
@@ -18,6 +22,10 @@ const LOADING_ANIMATION_ASSETS = {
   'copy-adf': '/assets/lottie/copy-adf.lottie',
   scan: '/assets/lottie/scan-transfer.lottie',
   upload: '/assets/lottie/upload.lottie',
+  'receive-files': '/assets/lottie/panes/receive-files.lottie',
+  'place-glass': '/assets/lottie/panes/place-glass.lottie',
+  'place-id': '/assets/lottie/panes/place-id.lottie',
+  'place-adf': '/assets/lottie/panes/place-adf.lottie',
 } satisfies Record<LoadingAnimationMode, string>;
 
 DotLottie.setWasmUrl(DOTLOTTIE_WASM_URL);
@@ -76,14 +84,8 @@ export interface LoadingAnimationController {
 }
 
 export function resolveLoadingAnimationAsset(mode: unknown): string {
-  if (
-    mode === 'copy' ||
-    mode === 'copy-glass' ||
-    mode === 'copy-adf' ||
-    mode === 'scan' ||
-    mode === 'upload'
-  ) {
-    return LOADING_ANIMATION_ASSETS[mode];
+  if (typeof mode === 'string' && Object.hasOwn(LOADING_ANIMATION_ASSETS, mode)) {
+    return LOADING_ANIMATION_ASSETS[mode as LoadingAnimationMode];
   }
 
   return LOADING_ANIMATION_ASSETS.print;

@@ -185,6 +185,26 @@ const preloadLoadingController: LoadingAnimationController | null =
         active: false,
       })
     : null;
+
+const receiveFilesAnimation = document.getElementById('receiveFilesAnimation');
+const receiveFilesCanvas = document.getElementById(
+  'receiveFilesCanvas',
+) as HTMLCanvasElement | null;
+const receiveFilesController: LoadingAnimationController | null =
+  receiveFilesAnimation && receiveFilesCanvas
+    ? mountLoadingAnimation({
+        root: receiveFilesAnimation,
+        canvas: receiveFilesCanvas,
+        mode: 'receive-files',
+        active: !filesEmpty?.classList.contains('hidden'),
+      })
+    : null;
+
+/** The waiting state's animation only plays while that state is on screen. */
+function setFilesEmptyVisible(visible: boolean): void {
+  filesEmpty?.classList.toggle('hidden', !visible);
+  receiveFilesController?.setActive(visible);
+}
 let selectedFileRecord: UploadedFile | null = null;
 const printLimitTipMessage = document.getElementById(
   'printLimitTipMessage',
@@ -501,7 +521,7 @@ let incomingUploadSkeletonEl: HTMLElement | null = null;
 function showIncomingUploadSkeleton(filename: string): void {
   if (!fileList) return;
 
-  filesEmpty?.classList.add('hidden');
+  setFilesEmptyVisible(false);
   fileList.classList.remove('hidden');
 
   if (!incomingUploadSkeletonEl) {
@@ -551,7 +571,7 @@ function setWaitingForFilesState(): void {
   sessionStorage.removeItem('printbit.uploadedFiles');
   sessionStorage.removeItem('printbit.largePrintNoticeShown');
   setFilesCount(0);
-  filesEmpty?.classList.remove('hidden');
+  setFilesEmptyVisible(true);
   fileList?.classList.add('hidden');
   if (continueBtn) {
     continueBtn.disabled = true;
@@ -777,7 +797,7 @@ function renderFiles(files: UploadedFile[]): void {
 
   files.forEach(addFileToList);
   setFilesCount(files.length);
-  filesEmpty?.classList.add('hidden');
+  setFilesEmptyVisible(false);
   fileList?.classList.remove('hidden');
   sessionStorage.setItem(
     'printbit.uploadedFiles',

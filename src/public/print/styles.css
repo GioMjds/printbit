@@ -666,7 +666,12 @@ body {
   }
 }
 
-/* Hero illustration */
+/* Hero illustration: Lottie canvas, with the SVG below as its fallback */
+.empty-hero-anim {
+  width: min(280px, 100%);
+  aspect-ratio: 512 / 224;
+  flex-shrink: 0;
+}
 .empty-hero {
   width: min(230px, 100%);
   height: auto;
@@ -887,7 +892,7 @@ body {
     gap: 12px;
     padding: 12px 20px;
   }
-  .empty-hero {
+  .empty-hero-anim {
     display: none;
   }
   .files-empty__title {
