@@ -2,6 +2,13 @@
 <html lang="en" data-kiosk-static="true" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Copy settings live on /copy now. Only the query decides: a stale
+      // printbit.mode in session storage must not move a print customer.
+      if (new URLSearchParams(window.location.search).get('mode') === 'copy') {
+        window.location.replace('/copy');
+      }
+    </script>
     <meta name="google" content="notranslate" />
     <meta
       name="viewport"

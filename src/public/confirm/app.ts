@@ -1787,7 +1787,11 @@ function renderPrintProgress(input: {
       totalPages !== null ? String(totalPages) : '—';
   }
 
-  const stage = getPrintingStage({ pagesPrinted: currentPage, totalPages });
+  const stage = getPrintingStage({
+    pagesPrinted: currentPage,
+    totalPages,
+    mode: config.mode,
+  });
   if (printingStage) printingStage.textContent = stage.label;
   if (printingProgressFill && stage.progress !== null) {
     printingProgressFill.style.setProperty(

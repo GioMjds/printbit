@@ -1,6 +1,8 @@
 export interface PrintingStageInput {
   pagesPrinted: number;
   totalPages: number | null;
+  /** Copy jobs mirror the printer's own "Copying n/N" wording. */
+  mode?: 'print' | 'copy' | 'scan';
 }
 
 export interface PrintingStage {
@@ -50,7 +52,10 @@ export function getPrintingStage(input: PrintingStageInput): PrintingStage {
 
   const currentPage = Math.min(input.pagesPrinted, input.totalPages);
   return {
-    label: `Printing page ${currentPage} of ${input.totalPages}`,
+    label:
+      input.mode === 'copy'
+        ? `Copying ${currentPage}/${input.totalPages}`
+        : `Printing page ${currentPage} of ${input.totalPages}`,
     progress: Math.round((currentPage / input.totalPages) * 100),
   };
 }

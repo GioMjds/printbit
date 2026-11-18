@@ -40,7 +40,7 @@ export interface ScanJobSettings {
   colorMode: 'colored' | 'grayscale';
   duplex: boolean;
   format: ScanFormat;
-  paperSize: 'A4' | 'Short' | 'Long';
+  paperSize: 'A4' | 'Short' | 'Long' | 'IdCard';
   maxPages?: number;
 }
 

@@ -17,7 +17,10 @@ import {
   listRemovableDrives,
   type RemovableDrive,
 } from '@/services/usb-drives';
-import { analyzeDocument } from '@/services/document-analysis';
+import {
+  analyzeDocument,
+  renderPdfGrayThumbnail,
+} from '@/services/document-analysis';
 import { jobStore, type ScanJobSettings } from '@/services/job-store';
 import { ReceiptService } from '@/modules/receipt/receipt.service';
 import { adminService } from '@/services/admin';
@@ -42,12 +45,20 @@ import {
 import type { Server as SocketIOServer } from 'socket.io';
 import {
   buildCopyPreviewScanSettings,
+  buildIdCopyScanSettings,
   resolveScannerDpi,
 } from './copy-preview-settings';
 import {
   describeScanPreviewFailure,
   type ScanPreviewFailureCode,
 } from './scan-preview-failure';
+import type { IdRotation, IdSide } from '@/shared/id-card-layout';
+import type {
+  IdCopyFailureResponse,
+  IdCopySheetResponse,
+} from '@/shared/id-copy-contract';
+import { IdCopyService } from './id-copy.service';
+import { IdCopySessionStore, purgeIdCopyFiles } from './id-copy-session';
 
 const VALID_SOURCES = new Set(['adf', 'flatbed']);
 const VALID_DPI = new Set([150, 300, 600]);
@@ -184,6 +195,35 @@ export class ScannerService {
   private readonly chargedScanFiles = new Map<string, number>();
   private readonly releaseTokens = new Map<string, ScanReleaseTokenRecord>();
   private readonly receiptService = new ReceiptService();
+  private readonly idCopySessions = new IdCopySessionStore({
+    scansDir: path.resolve('uploads', 'scans'),
+  });
+  private readonly idCopy = new IdCopyService({
+    scansDir: path.resolve('uploads', 'scans'),
+    sessions: this.idCopySessions,
+    scanIdRegion: () =>
+      getAdapter().scan(
+        buildIdCopyScanSettings(db.data?.settings?.scannerDpi),
+        'uploads/scans',
+      ),
+    describeFailure: (error) => {
+      const failure = describeScanPreviewFailure(error, 'flatbed');
+      void adminService.appendAdminLog(
+        'scan_preview_failed',
+        'ID copy scan failed.',
+        {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          code: failure.code,
+          source: 'flatbed',
+        },
+      );
+      return { code: failure.code, error: failure.error };
+    },
+    registerReleaseToken: (fileName) => this.registerReleaseToken(fileName),
+    invalidateReleaseTokens: (fileName) =>
+      this.invalidateReleaseTokensForFilename(fileName),
+    thumbnail: (filePath) => renderPdfGrayThumbnail(filePath),
+  });
 
   toSafeScanFilename(raw: unknown): string | null {
     return toSafeTransientScanFileName(raw);
@@ -941,6 +981,42 @@ export class ScannerService {
     }
   }
 
+  /** Deletes ID files left by an earlier process and starts the expiry timer. */
+  startIdCopyHousekeeping(): void {
+    void purgeIdCopyFiles(path.resolve('uploads', 'scans'));
+    this.idCopySessions.startSweeper();
+  }
+
+  async scanIdCopySide(input: {
+    sessionId?: string | null;
+    side: IdSide;
+    paperSize: string;
+  }): Promise<IdCopySheetResponse | IdCopyFailureResponse> {
+    if (!VALID_PAPER_SIZES.has(input.paperSize)) {
+      throw new Error('Invalid paperSize. Accepted: "A4", "Short", "Long"');
+    }
+    return this.idCopy.scanSide({
+      sessionId: input.sessionId,
+      side: input.side,
+      paperSize: normalizeScannerPaperSize(input.paperSize),
+    });
+  }
+
+  async composeIdCopy(input: {
+    sessionId: string;
+    paperSize: string;
+    rotations: Partial<Record<IdSide, IdRotation>>;
+  }): Promise<IdCopySheetResponse> {
+    if (!VALID_PAPER_SIZES.has(input.paperSize)) {
+      throw new Error('Invalid paperSize. Accepted: "A4", "Short", "Long"');
+    }
+    return this.idCopy.compose({
+      sessionId: input.sessionId,
+      paperSize: normalizeScannerPaperSize(input.paperSize),
+      rotations: input.rotations,
+    });
+  }
+
   getPreviewPath(filename: string): string | null {
     const absPath = path.resolve('uploads', 'scans', filename);
     if (!fs.existsSync(absPath)) return null;
@@ -953,6 +1029,16 @@ export class ScannerService {
     const token = typeof releaseToken === 'string' ? releaseToken.trim() : '';
     if (!token) {
       throw new Error('Invalid release token.');
+    }
+
+    const idRelease = await this.idCopy.releaseByToken(token);
+    if (idRelease) {
+      this.releaseTokens.delete(token);
+      return {
+        deleted: true,
+        alreadyMissing: false,
+        fileName: idRelease.fileName,
+      };
     }
 
     const record = this.consumeReleaseToken(token);

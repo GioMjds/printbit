@@ -754,6 +754,122 @@
                       attractor screen. Minimum 10 s · Maximum 600 s (10 min)
                     </p>
                   </div>
+                  <div class="field">
+                    <label class="field__lbl" for="settingIdleSlideDuration"
+                      >Idle slide duration</label
+                    >
+                    <div class="field__wrap field__wrap--post">
+                      <input
+                        id="settingIdleSlideDuration"
+                        type="number"
+                        min="5"
+                        max="20"
+                        step="1"
+                        class="field__input"
+                        required
+                      />
+                      <span class="field__affix">sec</span>
+                    </div>
+                    <p class="field__hint">
+                      How long each idle screen slide stays up. Minimum 5 s ·
+                      Maximum 20 s
+                    </p>
+                  </div>
+                  <fieldset class="field" id="settingIdleSlides">
+                    <legend class="field__lbl">Idle screen slides</legend>
+                    <p class="field__hint">
+                      Welcome and Kiosk status always show. Slides for a service
+                      that is down are skipped automatically.
+                    </p>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingIdleSlide-howToPrint">
+                        <input
+                          type="checkbox"
+                          id="settingIdleSlide-howToPrint"
+                          class="checkbox-input"
+                          data-idle-slide="howToPrint"
+                        />
+                        <span>How to print</span>
+                      </label>
+                    </div>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingIdleSlide-howToCopy">
+                        <input
+                          type="checkbox"
+                          id="settingIdleSlide-howToCopy"
+                          class="checkbox-input"
+                          data-idle-slide="howToCopy"
+                        />
+                        <span>How to copy</span>
+                      </label>
+                    </div>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingIdleSlide-idCardCopy">
+                        <input
+                          type="checkbox"
+                          id="settingIdleSlide-idCardCopy"
+                          class="checkbox-input"
+                          data-idle-slide="idCardCopy"
+                        />
+                        <span>ID card copy</span>
+                      </label>
+                    </div>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingIdleSlide-scanToPhone">
+                        <input
+                          type="checkbox"
+                          id="settingIdleSlide-scanToPhone"
+                          class="checkbox-input"
+                          data-idle-slide="scanToPhone"
+                        />
+                        <span>Scan to phone</span>
+                      </label>
+                    </div>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingIdleSlide-prices">
+                        <input
+                          type="checkbox"
+                          id="settingIdleSlide-prices"
+                          class="checkbox-input"
+                          data-idle-slide="prices"
+                        />
+                        <span>Prices</span>
+                      </label>
+                    </div>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingIdleSlide-paying">
+                        <input
+                          type="checkbox"
+                          id="settingIdleSlide-paying"
+                          class="checkbox-input"
+                          data-idle-slide="paying"
+                        />
+                        <span>Paying with coins</span>
+                      </label>
+                    </div>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingIdleSlide-supportedFiles">
+                        <input
+                          type="checkbox"
+                          id="settingIdleSlide-supportedFiles"
+                          class="checkbox-input"
+                          data-idle-slide="supportedFiles"
+                        />
+                        <span>Supported files</span>
+                      </label>
+                    </div>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingIdleSlide-privacyReceipt">
+                        <input
+                          type="checkbox"
+                          id="settingIdleSlide-privacyReceipt"
+                          class="checkbox-input"
+                          data-idle-slide="privacyReceipt"
+                        />
+                        <span>Privacy and e-receipt</span>
+                      </label>
+                    </div>
+                  </fieldset>
                 </div>
               </div>
 

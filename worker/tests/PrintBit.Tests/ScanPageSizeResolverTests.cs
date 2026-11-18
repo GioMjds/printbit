@@ -76,4 +76,30 @@ public class ScanPageSizeResolverTests
     {
         Assert.Null(ScanPageSizeResolver.Resolve(null, isFeeder: true).PageSize);
     }
+
+    [Theory]
+    [InlineData("idcard", false)]
+    [InlineData("IdCard", false)]
+    [InlineData(" IDCARD ", false)]
+    [InlineData("idcard", true)]
+    public void IdCard_IsTheWholeGlass(string paperSize, bool isFeeder)
+    {
+        var resolved = ScanPageSizeResolver.Resolve(paperSize, isFeeder);
+
+        Assert.False(resolved.ClampedToGlass);
+        var (width, height) = Millimetres(resolved.PageSize!);
+        Assert.Equal(216m, width);
+        Assert.Equal(297m, height);
+    }
+
+    [Theory]
+    [InlineData("idcard", true)]
+    [InlineData(" IdCard ", true)]
+    [InlineData("a4", false)]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    public void IsIdCard_MatchesOnlyTheIdCardSize(string? paperSize, bool expected)
+    {
+        Assert.Equal(expected, ScanPageSizeResolver.IsIdCard(paperSize));
+    }
 }

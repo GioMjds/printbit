@@ -1,3 +1,4 @@
+import { ACCEPTED_COIN_VALUES as ACCEPTED_COIN_VALUE_LIST } from '@/shared/accepted-coins';
 import type { Request, Response } from 'express';
 import {
   coinSimulation,
@@ -112,7 +113,7 @@ interface ConfirmPaymentBody {
   paymentLeaseId?: string;
 }
 
-const ACCEPTED_COIN_VALUES = new Set([1, 5, 10, 20]);
+const ACCEPTED_COIN_VALUES = new Set<number>(ACCEPTED_COIN_VALUE_LIST);
 type CoinSource = 'test-ui' | 'esp32-http';
 const COIN_BRIDGE_EVENTS_TABLE = 'coin_bridge_events';
 

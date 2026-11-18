@@ -977,6 +977,11 @@ body {
 }
 
 /* ── Scan bed illustration (idle) ── */
+.scan-feed-anim {
+  width: 260px;
+  height: 260px;
+  flex-shrink: 0;
+}
 .scan-bed {
   flex-shrink: 0;
 }

@@ -14,12 +14,22 @@ public static class ScanPageSizeResolver
     public const decimal GlassMaxLengthMm = 297m;
     private const decimal LongLengthMm = 330m;
 
+
+    public static bool IsIdCard(string? paperSize) =>
+        string.Equals(paperSize?.Trim(), "idcard", StringComparison.OrdinalIgnoreCase);
+
     public readonly record struct Resolution(PageSize? PageSize, bool ClampedToGlass);
 
     public static Resolution Resolve(string? paperSize, bool isFeeder)
     {
         switch (paperSize?.Trim().ToLowerInvariant())
         {
+            case "idcard":
+                // The whole glass: the card may lie anywhere on it. Node finds
+                // the card on the scan and crops to it before merging.
+                return new Resolution(
+                    new PageSize(GlassWidthMm, GlassMaxLengthMm, PageSizeUnit.Millimetre),
+                    false);
             case "a4":
                 return new Resolution(PageSize.A4, false);
             case "letter" or "short":

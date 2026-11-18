@@ -15,6 +15,7 @@ export function registerScannerModule(
   deps: ScannerModuleDeps,
 ): void {
   const scannerService = new ScannerService();
+  scannerService.startIdCopyHousekeeping();
   const scannerController = new ScannerController(scannerService, {
     io: deps.io,
     resolvePublicBaseUrl: deps.resolvePublicBaseUrl,

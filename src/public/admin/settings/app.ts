@@ -1,4 +1,11 @@
 import {
+  IDLE_SLIDE_DURATION_MAX_SECONDS,
+  IDLE_SLIDE_DURATION_MIN_SECONDS,
+  isDisableableIdleSlideId,
+  normalizeIdleScreenSettings,
+  type DisableableIdleSlideId,
+} from '@/shared/idle-screen-contract';
+import {
   PaperPricingProfile,
   SettingsResponse,
   SummaryResponse,
@@ -128,6 +135,12 @@ const settingIdleTimeout = document.getElementById(
 const settingIdleScreenTimeout = document.getElementById(
   'settingIdleScreenTimeout',
 ) as HTMLInputElement | null;
+const settingIdleSlideDuration = document.getElementById(
+  'settingIdleSlideDuration',
+) as HTMLInputElement | null;
+const settingIdleSlideToggles = Array.from(
+  document.querySelectorAll<HTMLInputElement>('input[data-idle-slide]'),
+);
 const inkMonitoringEnabled = document.getElementById(
   'inkMonitoringEnabled',
 ) as HTMLInputElement | null;
@@ -351,6 +364,16 @@ function applySettings(settings: SettingsResponse): void {
   }
   if (settingIdleScreenTimeout) {
     settingIdleScreenTimeout.value = String(settings.idleScreenTimeoutSeconds);
+  }
+  const idleScreen = normalizeIdleScreenSettings(settings.idleScreen);
+  if (settingIdleSlideDuration) {
+    settingIdleSlideDuration.value = String(idleScreen.slideDurationSeconds);
+  }
+  for (const toggle of settingIdleSlideToggles) {
+    const slideId = toggle.dataset.idleSlide;
+    if (slideId && isDisableableIdleSlideId(slideId)) {
+      toggle.checked = idleScreen.slides[slideId];
+    }
   }
 
   // Document Processing & Upload Pipeline
@@ -937,6 +960,28 @@ settingsForm.addEventListener('submit', (e) => {
       return;
     }
     payload.idleScreenTimeoutSeconds = idleScreenTimeoutValue;
+  }
+
+  if (settingIdleSlideDuration) {
+    const slideDuration = Number(settingIdleSlideDuration.value);
+    if (
+      !Number.isInteger(slideDuration) ||
+      slideDuration < IDLE_SLIDE_DURATION_MIN_SECONDS ||
+      slideDuration > IDLE_SLIDE_DURATION_MAX_SECONDS
+    ) {
+      setMessage(
+        `Idle slide duration must be a whole number between ${IDLE_SLIDE_DURATION_MIN_SECONDS} and ${IDLE_SLIDE_DURATION_MAX_SECONDS} seconds.`,
+      );
+      return;
+    }
+    const slides: Partial<Record<DisableableIdleSlideId, boolean>> = {};
+    for (const toggle of settingIdleSlideToggles) {
+      const slideId = toggle.dataset.idleSlide;
+      if (slideId && isDisableableIdleSlideId(slideId)) {
+        slides[slideId] = toggle.checked;
+      }
+    }
+    payload.idleScreen = { slideDurationSeconds: slideDuration, slides };
   }
 
   if (inkMonitoringEnabled) {

@@ -290,9 +290,20 @@
               >
             </div>
 
-            <!-- Hero: phone → kiosk (decorative) -->
+            <!-- Hero: phone → kiosk (decorative); the SVG is the Lottie fallback -->
+            <div
+              class="empty-hero-anim lottie-loading"
+              id="receiveFilesAnimation"
+              aria-hidden="true"
+            >
+            <canvas
+              class="lottie-loading__canvas"
+              id="receiveFilesCanvas"
+              width="512"
+              height="224"
+            ></canvas>
             <svg
-              class="empty-hero"
+              class="empty-hero lottie-loading__fallback"
               viewBox="0 0 320 112"
               fill="none"
               aria-hidden="true"
@@ -334,6 +345,7 @@
               />
               <path class="empty-hero__doc-fold" d="M278 40v8h8" />
             </svg>
+            </div>
 
             <div class="empty-copy">
               <h3 class="files-empty__title">Ready for your file</h3>

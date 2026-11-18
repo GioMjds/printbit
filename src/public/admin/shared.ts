@@ -1,3 +1,4 @@
+import type { IdleScreenSettings } from '@/shared/idle-screen-contract';
 import {
   computeTotalNavBadge,
   DrawerController,
@@ -243,6 +244,7 @@ export interface PaperPricingProfile {
 }
 
 export interface AdminSettings {
+  idleScreen?: IdleScreenSettings;
   pricing: {
     printPerPage: number;
     copyPerPage: number;

@@ -24,7 +24,7 @@ dotnet publish .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.cs
   -r win-x64 `
   --self-contained true `
   -p:PublishSingleFile=true `
-  -o C:\Users\printbit\printbit-worker
+  -o C:\Users\printbit\printbit\worker\publish
 ```
 
 ---
@@ -78,8 +78,8 @@ Run the following in **Administrator PowerShell** (adjust IPs/SSIDs as needed fo
 # ============================================================
 # Node.js <-> C# Worker Service IPC
 # ============================================================
-[Environment]::SetEnvironmentVariable("PRINTBIT_WORKER_QUEUE_DIR", "C:\Users\printbit\printbit-worker\queue", "Machine")
-[Environment]::SetEnvironmentVariable("PRINTBIT_WORKER_FAILED_DIR", "C:\Users\printbit\printbit-worker\failed", "Machine")
+[Environment]::SetEnvironmentVariable("PRINTBIT_WORKER_QUEUE_DIR", "C:\Users\printbit\printbit\worker\queue", "Machine")
+[Environment]::SetEnvironmentVariable("PRINTBIT_WORKER_FAILED_DIR", "C:\Users\printbit\printbit\worker\failed", "Machine")
 [Environment]::SetEnvironmentVariable("PRINTBIT_WORKER_PIPE_NAME", "printbit-node-errors", "Machine")
 [Environment]::SetEnvironmentVariable("PRINTBIT_WORKER_RETURN_PIPE_NAME", "printbit-worker-events", "Machine")
 [Environment]::SetEnvironmentVariable("PRINTBIT_WORKER_COMMAND_PIPE_NAME", "printbit-worker-commands", "Machine")
@@ -140,8 +140,8 @@ net localgroup Administrators printbit-admin /add
 
 ```powershell
 # Create queue and binary folders
-New-Item -ItemType Directory -Path "C:\Users\printbit\worker\queue" -Force
-New-Item -ItemType Directory -Path "C:\Users\printbit\worker\failed" -Force
+New-Item -ItemType Directory -Path "C:\Users\printbit\printbit\worker\queue" -Force
+New-Item -ItemType Directory -Path "C:\Users\printbit\printbit\worker\failed" -Force
 New-Item -ItemType Directory -Path "C:\Users\printbit\bin" -Force
 Copy-Item ".\bin\SumatraPDF.exe" "C:\Users\printbit\bin\SumatraPDF.exe" -Force
 
@@ -149,7 +149,7 @@ Copy-Item ".\bin\SumatraPDF.exe" "C:\Users\printbit\bin\SumatraPDF.exe" -Force
 Add-Printer -Name "PrintBit - High" -DriverName "EPSON L5290 Series" -PortName "USB001"
 
 # Register the C# Worker Service as LocalSystem
-$workerExe = "C:\Users\printbit\worker\publish\PrintBit.HardwareService.exe"
+$workerExe = "C:\Users\printbit\printbit\worker\publish\PrintBit.HardwareService.exe"
 sc.exe create PrintBitHardware `
   binPath= "`"$workerExe`"" `
   start= auto `
@@ -159,6 +159,57 @@ sc.exe create PrintBitHardware `
 
 sc.exe start PrintBitHardware
 sc.exe queryex PrintBitHardware
+
+# Confirm the service runs the exe you just published (BINARY_PATH_NAME)
+sc.exe qc PrintBitHardware
+```
+
+All worker paths live under `C:\Users\printbit\printbit\worker\`, matching
+`worker/src/PrintBit.HardwareService/appsettings.json`:
+
+| Purpose            | Path                                          |
+| ------------------ | --------------------------------------------- |
+| Published exe      | `C:\Users\printbit\printbit\worker\publish`   |
+| Print queue        | `C:\Users\printbit\printbit\worker\queue`     |
+| Failed jobs        | `C:\Users\printbit\printbit\worker\failed`    |
+
+`PRINTBIT_WORKER_QUEUE_DIR` and `PRINTBIT_WORKER_FAILED_DIR` (step 2) must name
+the same folders as `PrintQueueDirectory` and `FailedDirectory` in
+`appsettings.json`, or Node writes jobs where the worker never looks.
+
+### 4.1.1 Updating the Worker
+
+The service runs the exe at its registered `binPath`. Always republish into
+that same folder, or the old build keeps running. Do not run `sc.exe create`
+again.
+
+```powershell
+cd C:\Users\printbit\printbit
+sc.exe stop PrintBitHardware
+# Wait until: sc.exe query PrintBitHardware reports STATE: 1 STOPPED
+
+dotnet publish .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj `
+  -c Release `
+  -r win-x64 `
+  --self-contained true `
+  -p:PublishSingleFile=true `
+  -o C:\Users\printbit\printbit\worker\publish
+
+# Rebuild Node too: the startup task runs dist\server.js
+pnpm run build
+
+sc.exe start PrintBitHardware
+pnpm run worker-pipe:verify
+```
+
+If an earlier install used `C:\Users\printbit\printbit-worker` or
+`C:\Users\printbit\worker\publish`, point the existing service at the new exe
+once, then reset the queue variables from step 2:
+
+```powershell
+sc.exe stop PrintBitHardware
+sc.exe config PrintBitHardware binPath= "`"C:\Users\printbit\printbit\worker\publish\PrintBit.HardwareService.exe`""
+sc.exe start PrintBitHardware
 ```
 
 ### 4.2 Verify Worker IPC Connectivity

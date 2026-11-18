@@ -1,5 +1,6 @@
 import {
   buildCopyPreviewScanSettings,
+  buildIdCopyScanSettings,
   resolveScannerDpi,
 } from './copy-preview-settings';
 
@@ -56,5 +57,23 @@ describe('buildCopyPreviewScanSettings', () => {
       paperSize: 'Short',
       maxPages: 1,
     });
+  });
+});
+
+describe('buildIdCopyScanSettings', () => {
+  it('scans the ID region on the glass at the admin copy DPI', () => {
+    expect(buildIdCopyScanSettings({ copyGlass: 600, copyAdf: 150 })).toEqual({
+      source: 'flatbed',
+      dpi: 600,
+      colorMode: 'colored',
+      duplex: false,
+      format: 'pdf',
+      paperSize: 'IdCard',
+      maxPages: 1,
+    });
+  });
+
+  it('defaults to 300 DPI', () => {
+    expect(buildIdCopyScanSettings(undefined).dpi).toBe(300);
   });
 });

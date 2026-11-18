@@ -1,3 +1,4 @@
+import type { IdleScreenSettings } from '@/shared/idle-screen-contract';
 import { getSqliteDb, withTransaction } from '../sqlite-storage';
 import { LogMeta, TrustedTimestampMeta, SupportedLanguage } from '../shared.schema';
 import { AnomalySeverity } from './anomaly-incident.model';
@@ -187,6 +188,7 @@ export interface AdminSettings {
   pricingEngine: PricingEngineSettings;
   idleTimeoutSeconds: number;
   idleScreenTimeoutSeconds: number;
+  idleScreen: IdleScreenSettings;
   adminPin: string;
   adminLocalOnly: boolean;
   kioskPreferences: KioskPreferences;
