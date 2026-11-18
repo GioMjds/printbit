@@ -62,14 +62,14 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
     },
     fixed: {
       welcome: {
-        eyebrow: 'PrintBit self-service',
+        eyebrow: 'Your self-service printing kiosk!',
         title: 'Print, copy, and scan.',
         body: 'All you need is coins and your phone.',
         lines: [],
         stepped: false,
       },
       howToPrint: {
-        eyebrow: 'How to print',
+        eyebrow: 'How to send my file(s) to print?',
         title: 'From your phone to paper.',
         body: '',
         lines: [
@@ -81,7 +81,7 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
         stepped: true,
       },
       howToCopy: {
-        eyebrow: 'How to copy',
+        eyebrow: 'How to photocopy?',
         title: 'Photocopy in a few taps.',
         body: '',
         lines: [
@@ -93,14 +93,14 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
         stepped: true,
       },
       idCardCopy: {
-        eyebrow: 'ID card copy',
+        eyebrow: 'Want your ID to be copied?',
         title: 'Both sides on one sheet.',
         body: 'Scan the front, flip the card, scan the back. See the sheet before you pay.',
         lines: [],
         stepped: false,
       },
       scanToPhone: {
-        eyebrow: 'Scan to phone',
+        eyebrow: 'Want to convert your document to your phone?',
         title: 'Paper to your pocket.',
         body: '',
         lines: [
@@ -111,7 +111,7 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
         stepped: true,
       },
       privacyReceipt: {
-        eyebrow: 'Privacy',
+        eyebrow: 'Privacy matters',
         title: 'Your files stay yours.',
         body: 'Files are deleted after your job. Your e-receipt goes to your phone.',
         lines: [],
@@ -131,14 +131,14 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
       ],
     },
     paying: {
-      eyebrow: 'Paying',
+      eyebrow: 'What coins are supported?',
       title: 'Coins only, whole pesos.',
       body: (coins) =>
         `Accepted coins: ${coins}. The kiosk gives back your change.`,
       exactCoins: "Change can't be given right now. Please pay the exact amount.",
     },
     supportedFiles: {
-      eyebrow: 'Supported files',
+      eyebrow: 'What files are supported?',
       title: 'Bring your document.',
       body: (mb, word) =>
         word
@@ -154,14 +154,14 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
     },
     fixed: {
       welcome: {
-        eyebrow: 'PrintBit self-service',
+        eyebrow: 'Ang iyong self-service printing kiosk!',
         title: 'Mag-print, mag-copy, at mag-scan.',
         body: 'Barya at cellphone lang ang kailangan mo.',
         lines: [],
         stepped: false,
       },
       howToPrint: {
-        eyebrow: 'Paano mag-print',
+        eyebrow: 'Paano ko ipapadala ang file ko para i-print?',
         title: 'Mula cellphone hanggang papel.',
         body: '',
         lines: [
@@ -173,7 +173,7 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
         stepped: true,
       },
       howToCopy: {
-        eyebrow: 'Paano mag-copy',
+        eyebrow: 'Paano magpa-photocopy?',
         title: 'Photocopy sa ilang tap lang.',
         body: '',
         lines: [
@@ -185,14 +185,14 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
         stepped: true,
       },
       idCardCopy: {
-        eyebrow: 'Kopya ng ID',
+        eyebrow: 'Gusto mo bang i-photocopy ang iyong ID?',
         title: 'Harap at likod sa iisang papel.',
         body: 'I-scan ang harap, baligtarin ang card, at i-scan ang likod. Makikita mo muna ang papel bago magbayad.',
         lines: [],
         stepped: false,
       },
       scanToPhone: {
-        eyebrow: 'I-scan papunta sa cellphone',
+        eyebrow: 'Paano ko maiko-convert ang aking dokumento para maging soft copy?',
         title: 'Papel papunta sa bulsa mo.',
         body: '',
         lines: [
@@ -203,7 +203,7 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
         stepped: true,
       },
       privacyReceipt: {
-        eyebrow: 'Privacy',
+        eyebrow: 'Ang iyong privacy ay mahalaga',
         title: 'Sa iyo lang ang mga file mo.',
         body: 'Binubura ang mga file pagkatapos ng job. Sa cellphone mo ipapadala ang e-receipt.',
         lines: [],
@@ -223,14 +223,14 @@ const TEXT: Record<IdleLang, IdleLangTable> = {
       ],
     },
     paying: {
-      eyebrow: 'Pagbabayad',
+      eyebrow: 'Anong mga barya lamang ang tinatanggap?',
       title: 'Barya lang, buong piso.',
       body: (coins) => `Tinatanggap: ${coins}. Isusukli ng kiosk ang sobra.`,
       exactCoins:
         'Hindi makakapagsukli sa ngayon. Pakibayaran ang eksaktong halaga.',
     },
     supportedFiles: {
-      eyebrow: 'Mga file na puwede',
+      eyebrow: 'Anong mga file ang tinatanggap?',
       title: 'Dalhin ang dokumento mo.',
       body: (mb, word) =>
         word
