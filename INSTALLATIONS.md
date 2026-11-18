@@ -118,9 +118,9 @@ dotnet publish .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.cs
   -r win-x64 `
   --self-contained true `
   -p:PublishSingleFile=true `
-  -o C:\Users\printbit\printbit-worker
+  -o C:\Users\printbit\printbit\worker\publish
 
-$workerExe = "C:\Users\printbit\printbit-worker\PrintBit.HardwareService.exe"
+$workerExe = "C:\Users\printbit\printbit\worker\publish\PrintBit.HardwareService.exe"
 sc.exe create PrintBitHardware `
   binPath= "`"$workerExe`"" `
   start= auto `
@@ -139,7 +139,7 @@ sc.exe queryex PrintBitHardware
 Set up the watched queue directory and ensure `SumatraPDF.exe` is available:
 
 ```powershell
-New-Item -ItemType Directory -Path "C:\Users\printbit\printbit-worker\queue" -Force
+New-Item -ItemType Directory -Path "C:\Users\printbit\printbit\worker\queue" -Force
 New-Item -ItemType Directory -Path "C:\Users\printbit\bin" -Force
 Copy-Item ".\bin\SumatraPDF.exe" "C:\Users\printbit\bin\SumatraPDF.exe" -Force
 ```
@@ -159,7 +159,7 @@ pnpm install
 pnpm run build
 
 # Set system-wide environment variables (Administrator)
-setx PRINTBIT_WORKER_QUEUE_DIR "C:\Users\printbit\printbit-worker\queue" /M
+setx PRINTBIT_WORKER_QUEUE_DIR "C:\Users\printbit\printbit\worker\queue" /M
 setx PRINTBIT_KIOSK_USER ".\printbit" /M
 ```
 
@@ -224,7 +224,7 @@ When deploying a new build to an active kiosk:
      -r win-x64 `
      --self-contained true `
      -p:PublishSingleFile=true `
-     -o C:\Users\printbit\printbit-worker
+     -o C:\Users\printbit\printbit\worker\publish
    ```
 
 5. Restart worker service & verify IPC:
@@ -238,7 +238,7 @@ When deploying a new build to an active kiosk:
 
 ## 6) Preflight checklist
 
-- [ ] `PRINTBIT_WORKER_QUEUE_DIR` is set and points to `C:\Users\printbit\printbit-worker\queue`.
+- [ ] `PRINTBIT_WORKER_QUEUE_DIR` is set and points to `C:\Users\printbit\printbit\worker\queue`.
 - [ ] `PrintBitHardware` service is running (`sc.exe query PrintBitHardware`).
 - [ ] Named pipes connected: `printbit-worker-commands`, `printbit-worker-events`, `printbit-node-errors`.
 - [ ] Automated verification passes: `pnpm run worker-pipe:verify`.

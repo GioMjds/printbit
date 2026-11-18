@@ -7,7 +7,7 @@
 - Type-check: `pnpm exec tsc --noEmit --ignoreDeprecations 6.0`
 - Build C# worker: `cd worker && dotnet build`
 - Run C# worker locally (console host): `dotnet run --project .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj`
-- Publish worker Windows service: `dotnet publish .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o C:\Users\printbit\printbit-worker`
+- Publish worker Windows service: `dotnet publish .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o C:\Users\printbit\printbit\worker\publish`
 - Query worker service: `sc.exe queryex PrintBitHardware`
 - Start/stop worker service: `sc.exe start PrintBitHardware` / `sc.exe stop PrintBitHardware`
 - Verify worker command pipe IPC: `pnpm run worker-pipe:verify`
@@ -28,7 +28,7 @@
 1. C# Worker Service & print pipeline:
    - `PrintBitHardware` Windows service is running (`sc.exe query PrintBitHardware`).
    - Worker IPC command & event pipes verified: `pnpm run worker-pipe:verify`.
-   - Worker queue directory exists and is writable (`C:\Users\printbit\printbit-worker\queue` or `PRINTBIT_WORKER_QUEUE_DIR`).
+   - Worker queue directory exists and is writable (`C:\Users\printbit\printbit\worker\queue` or `PRINTBIT_WORKER_QUEUE_DIR`).
    - `SumatraPDF.exe` exists in `bin/` or `C:\Users\printbit\bin\SumatraPDF.exe`.
    - Both Windows logical printer queues are configured: `EPSON L5290 Series` (Standard) and `PrintBit - High` (High).
 2. Printer is installed, online, paper is loaded, and USB port mapping is stable (typically `USB001`).
@@ -268,8 +268,7 @@ Get-Process -Name "PrintBit.HardwareService"
 
 ### Investigating worker logs
 
-Worker logs are written via Serilog to:
-`C:\Users\printbit\printbit-worker\logs\printbit-worker-.log` (or within the service directory).
+The worker has no log file (Serilog is referenced but no file sink is configured). As a Windows service it logs warnings and errors to **Event Viewer > Windows Logs > Application**, source `PrintBitHardware`. For full logs, stop the service and run the published exe from a console.
 
 - Check for `Global\PrintBitHardwareWorker` mutex collision (exit code 2).
 - Check for spooler submission timeouts or SumatraPDF errors.
@@ -286,7 +285,7 @@ dotnet publish .\worker\src\PrintBit.HardwareService\PrintBit.HardwareService.cs
   -r win-x64 `
   --self-contained true `
   -p:PublishSingleFile=true `
-  -o C:\Users\printbit\printbit-worker
+  -o C:\Users\printbit\printbit\worker\publish
 
 sc.exe start PrintBitHardware
 pnpm run worker-pipe:verify
@@ -296,10 +295,10 @@ pnpm run worker-pipe:verify
 
 - Verify `PrintBitHardware` Windows service is running: `sc.exe queryex PrintBitHardware`.
 - Run `pnpm run worker-pipe:verify` to confirm command and event pipe integrity.
-- Check `C:\Users\printbit\printbit-worker\queue` (or `PRINTBIT_WORKER_QUEUE_DIR`) for accumulating or stalled `.json` sidecars or `.pdf` files.
+- Check `C:\Users\printbit\printbit\worker\queue` (or `PRINTBIT_WORKER_QUEUE_DIR`) for accumulating or stalled `.json` sidecars or `.pdf` files.
 - Verify `SumatraPDF.exe` is present and executable (`C:\Users\printbit\bin\SumatraPDF.exe` or `bin/`).
 - Verify the Windows logical queues (`EPSON L5290 Series` and `PrintBit - High`) are online and not in an error/paused state.
-- Inspect the worker log file in `C:\Users\printbit\printbit-worker\logs\`.
+- Inspect worker warnings and errors in Event Viewer (Application log, source `PrintBitHardware`).
 - Check default Windows printer status and restart spooler if needed (`Restart-Service Spooler` or admin action).
 
 ## Print dispatcher phased rollout gate (Issue #112)
