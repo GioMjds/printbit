@@ -150,9 +150,10 @@ body {
 .confirm-layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 1.1fr 1.4fr 0.9fr;
+  /* Job summary (left) gets the room; payment (right) is a focused column. */
+  grid-template-columns: 1.25fr 1fr;
   gap: 20px;
-  padding: 20px 0 8px;
+  padding: 20px 0 24px;
   min-height: 0;
 }
 
@@ -169,259 +170,192 @@ body {
   scrollbar-color: rgba(167, 170, 225, 0.15) transparent;
 }
 
-/* ── LEFT: payment column ─────────────────────────────────── */
-.payment-col {
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 28px 20px;
-}
-
-/* Coin illustration */
-.payment-col__icon {
-  width: 110px;
-  height: 110px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.coin-lottie-wrapper {
-  width: 110px;
-  height: 110px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.coin-lottie-canvas {
-  width: 110px;
-  height: 110px;
-  display: block;
-}
-
-.coin-fallback-icon {
-  display: none;
-  width: 80px;
-  height: 80px;
-}
-
-.coin-lottie-wrapper.is-fallback .coin-lottie-canvas {
-  display: none;
-}
-
-.coin-lottie-wrapper.is-fallback .coin-fallback-icon {
-  display: block;
-}
-
-.payment-col__cta {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--lavender);
-  opacity: 0.8;
-  margin: 0;
-  text-align: center;
-}
-
-/* ── Coin insertion guidance notice ────────────────────────── */
+/* ── Coin insertion guidance + accepted coins (right column) ─ */
 .payment-col__notice {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  background: rgba(251, 191, 36, 0.1);
-  border: 1.5px solid rgba(251, 191, 36, 0.35);
-  border-radius: 14px;
-  padding: 10px 14px;
-  max-width: 330px;
-  width: 100%;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(251, 191, 36, 0.12);
+  border: 2px solid rgba(251, 191, 36, 0.55);
+  border-radius: 18px;
+  padding: clamp(10px, 1.6vh, 14px) 14px;
   box-sizing: border-box;
   text-align: left;
   transition: opacity 300ms ease, border-color 300ms ease, background-color 300ms ease;
 }
 
-.payment-col__notice-icon {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
+/* Slot locked (paid in full, printer not ready, …): instructions step back */
+.payment-col__notice.is-locked {
+  opacity: 0.5;
+  border-color: rgba(167, 170, 225, 0.25);
+  background: rgba(167, 170, 225, 0.05);
+}
+
+.payment-col__notice.is-locked .payment-col__notice-icon {
+  background: rgba(167, 170, 225, 0.3);
+  color: var(--white);
+}
+
+.payment-col__notice.is-locked .payment-col__notice-title {
+  color: var(--lavender);
+}
+
+/* Paid in full: dim, never hide. Hiding would shift the Confirm button under the customer's finger. */
+.action-col.is-ready .payment-col__notice {
+  opacity: 0.5;
+  border-color: rgba(167, 170, 225, 0.25);
+  background: rgba(167, 170, 225, 0.05);
+}
+
+.action-col.is-ready .payment-col__notice-icon {
+  background: rgba(167, 170, 225, 0.3);
+  color: var(--white);
+}
+
+.action-col.is-ready .payment-col__notice-title {
+  color: var(--lavender);
+}
+
+.payment-col__notice-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin-top: 1px;
+  gap: 12px;
 }
 
-.payment-col__notice-icon svg {
-  width: 15px;
-  height: 15px;
-  display: block;
-}
-
-.payment-col__notice-content {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1;
+/* A single "coin" with the number 1 */
+.payment-col__notice-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fbbf24;
+  color: #14122b;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 0 0 3px rgba(20, 18, 43, 0.18);
 }
 
 .payment-col__notice-title {
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: clamp(16px, 2.3vh, 20px);
+  text-wrap: balance;
+  font-weight: 800;
   color: #fbbf24;
-  letter-spacing: 0.15px;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .payment-col__note {
   margin: 0;
-  font-size: 12.5px;
+  font-size: clamp(15px, 2vh, 17px);
   line-height: 1.4;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.95);
   text-align: left;
 }
 
-/* Supported coins indicator */
+/* Accepted coins: same photos as the homepage coin strip */
+/* Label beside the coins (not above) to keep the column short on 768px screens */
 .payment-col__supported-coins {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 6px;
+  justify-content: center;
+  gap: 14px;
   padding-top: 6px;
-  border-top: 1px solid rgba(251, 191, 36, 0.2);
+  border-top: 1px solid rgba(251, 191, 36, 0.25);
 }
 
 .supported-coins__label {
-  font-size: 11px;
+  max-width: 6.5em;
+  font-size: 15px;
   font-weight: 700;
-  color: #fbbf24;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
+  line-height: 1.2;
+  text-align: right;
+  color: var(--lavender);
 }
 
-.supported-coins__chips {
+.payment-col__supported-coins .coin-strip__coins {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.coin-chip {
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-  box-sizing: border-box;
-  user-select: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  letter-spacing: -0.2px;
-  transition: transform 180ms ease, opacity 200ms ease;
+  gap: clamp(8px, 1.4vw, 20px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.coin-chip--sm {
-  min-width: 23px;
-  height: 23px;
-  font-size: 9.5px;
-}
-
-/* ₱1 coin: Silver/steel finish */
-.coin-chip--1 {
-  background: rgba(226, 232, 240, 0.12);
-  border: 1.5px solid rgba(226, 232, 240, 0.65);
-  color: #f8fafc;
-}
-
-/* ₱5 coin: Silver/steel finish */
-.coin-chip--5 {
-  background: rgba(226, 232, 240, 0.16);
-  border: 1.5px solid rgba(226, 232, 240, 0.85);
-  color: #ffffff;
-}
-
-/* ₱10 coin: Two-tone / Ringed design */
-.coin-chip--10 {
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.25) 50%, rgba(226, 232, 240, 0.2) 55%);
-  border: 1.5px solid rgba(251, 191, 36, 0.75);
-  color: #fef08a;
-}
-
-/* ₱20 coin: Bimetallic (bronze center / silver outer ring) */
-.coin-chip--20 {
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.35) 48%, rgba(226, 232, 240, 0.22) 53%);
-  border: 1.5px solid #f59e0b;
-  color: #fed7aa;
-  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.3);
-}
-
-/* ── Balance ring ─────────────────────────────────────────── */
-.balance-ring {
-  position: relative;
-  width: 160px;
-  height: 160px;
-  flex-shrink: 0;
-  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.balance-ring.balance-pop {
-  animation: balance-pop-effect 450ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes balance-pop-effect {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.08);
-    filter: drop-shadow(0 0 24px rgba(245, 178, 140, 0.6));
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.balance-ring__svg {
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 0 16px rgba(105, 111, 199, 0.35));
-}
-
-/* Arc fill — JS transitions stroke-dashoffset */
-#balanceArc {
-  transition:
-    stroke-dashoffset 600ms cubic-bezier(0.4, 0, 0.2, 1),
-    stroke 400ms ease;
-}
-
-.balance-ring__inner {
-  position: absolute;
-  inset: 0;
+.payment-col__supported-coins .coin-strip__coin {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 2px;
 }
 
-.balance-ring__amount {
-  font-size: 28px;
+.payment-col__supported-coins .coin-strip__stack {
+  display: flex;
+}
+
+/* Sized by height too so the right column still fits 768px-tall screens. */
+.payment-col__supported-coins .coin-strip__img {
+  width: clamp(34px, min(5.4vh, 4.4vw), 56px);
+  height: clamp(34px, min(5.4vh, 4.4vw), 56px);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Old/new pair: new coin overlaps the old one */
+.payment-col__supported-coins .coin-strip__img + .coin-strip__img {
+  margin-left: calc(clamp(34px, min(5.4vh, 4.4vw), 56px) * -0.65);
+}
+
+.payment-col__supported-coins .coin-strip__value {
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Amount due + coins inserted so far ───────────────────── */
+.pay-card {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.4vh, 14px);
+  padding: clamp(12px, 1.8vh, 18px) 18px;
+  border-radius: 18px;
+  border: 1.5px solid rgba(167, 170, 225, 0.16);
+  background: rgba(14, 13, 31, 0.45);
+}
+
+.balance-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.balance-meter__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.balance-meter__label {
+  font-size: clamp(16px, 2.3vh, 18px);
+  font-weight: 700;
+  color: var(--lavender);
+}
+
+.balance-meter__amount {
+  display: inline-block;
+  font-size: clamp(24px, 3.6vh, 30px);
   font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--white);
-  transition: color 300ms ease, transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-variant-numeric: tabular-nums;
+  transition: color 300ms ease;
 }
 
-.balance-ring__amount.count-anim {
+/* Each counted coin: the amount flashes so the customer knows to insert the next one */
+.balance-meter__amount.count-anim {
   animation: amount-shimmer 400ms ease-out;
 }
 
@@ -441,45 +375,78 @@ body {
   }
 }
 
-.balance-ring__label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--lavender);
-  opacity: 0.6;
+.balance-meter__track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(167, 170, 225, 0.15);
+  overflow: hidden;
 }
 
-/* Ring changes colour when balance meets price */
-.balance-ring.is-ready .balance-ring__svg {
-  filter: drop-shadow(0 0 20px rgba(167, 225, 170, 0.4));
+/* JS sets transform: scaleX(inserted / total) */
+.balance-meter__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--indigo);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    transform 600ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 400ms ease;
 }
-.balance-ring.is-ready #balanceArc {
-  stroke: #6ac47a;
+
+.balance-meter.balance-pop .balance-meter__track {
+  animation: balance-pop-effect 450ms ease-out;
 }
-.balance-ring.is-ready .balance-ring__amount {
+
+@keyframes balance-pop-effect {
+  40% {
+    box-shadow: 0 0 18px rgba(245, 178, 140, 0.6);
+  }
+}
+
+/* Paid in full */
+.balance-meter.is-ready .balance-meter__fill {
+  background: #6ac47a;
+}
+
+.balance-meter.is-ready .balance-meter__amount {
   color: #a3e6ac;
+}
+
+.balance-meter__change .balance-meter__label,
+.balance-meter__change-value {
+  color: #a3e6ac;
+}
+
+.balance-meter__change-value {
+  font-size: clamp(20px, 2.9vh, 24px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Status badge ─────────────────────────────────────────── */
 .status-badge {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 40px;
+  justify-content: center;
+  gap: 10px;
+  padding: clamp(8px, 1.4vh, 14px) 14px;
+  border-radius: 16px;
   background: rgba(167, 170, 225, 0.08);
-  border: 1px solid rgba(167, 170, 225, 0.15);
-  font-size: 13px;
-  font-weight: 600;
+  border: 1.5px solid rgba(167, 170, 225, 0.2);
+  font-size: clamp(16px, 2.3vh, 19px);
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
   transition:
     background 300ms,
     border-color 300ms;
 }
 
 .status-badge__dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--lavender);
   animation: pulse-dot 1.8s ease-in-out infinite;
@@ -492,8 +459,8 @@ body {
 
 /* Ready state */
 .status-badge[data-state='ready'] {
-  background: rgba(106, 196, 122, 0.12);
-  border-color: rgba(106, 196, 122, 0.3);
+  background: rgba(106, 196, 122, 0.16);
+  border-color: rgba(106, 196, 122, 0.55);
 }
 .status-badge[data-state='ready'] .status-badge__dot {
   background: #6ac47a;
@@ -1168,186 +1135,205 @@ body {
   }
 }
 
-/* ── Coin toast ───────────────────────────────────────────── */
-.coin-toast {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--peach);
-  opacity: 0.75;
-  min-height: 20px;
-  text-align: center;
-  transition: opacity 300ms;
-}
 
 /* ── MIDDLE: summary column ───────────────────────────────── */
 .summary-col {
   padding: 24px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: clamp(14px, 2.4vh, 22px);
 }
 
 .summary-col__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 2px;
 }
 
+.summary-col__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .summary-col__title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1.3px;
-  text-transform: uppercase;
-  color: var(--lavender);
-  opacity: 0.75;
+  font-size: clamp(20px, 3vh, 24px);
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--white);
   margin: 0;
+}
+
+.summary-col__sub {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--lavender);
 }
 
 .summary-mode-badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: 6px 14px;
   border-radius: 20px;
   background: rgba(167, 170, 225, 0.12);
   border: 1px solid rgba(167, 170, 225, 0.2);
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.8px;
   color: var(--lavender);
   text-transform: uppercase;
 }
 
-/* ── Table-Based Job Summary Listing ──────────────────────── */
-.summary-table-wrap {
-  background: rgba(255, 255, 255, 0.035);
-  border: 1.5px solid rgba(167, 170, 225, 0.14);
-  border-radius: 18px;
-  overflow: hidden;
-  box-sizing: border-box;
-  flex: 1;
+/* ── Job summary: labeled groups, one fact per line ───────── */
+.summary-group {
   display: flex;
   flex-direction: column;
-}
-
-.summary-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-  height: 100%;
-}
-
-.summary-table-row {
-  border-bottom: 1px solid rgba(167, 170, 225, 0.09);
-  transition: background 150ms ease;
-}
-
-.summary-table-row:last-child {
-  border-bottom: none;
-}
-
-.summary-table-row[hidden] {
-  display: none !important;
-}
-
-.summary-table-row:hover {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.summary-table-label {
-  width: 36%;
-  padding: 12px 16px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--lavender);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  vertical-align: middle;
-}
-
-.summary-table-label__inner {
-  display: flex;
-  align-items: center;
   gap: 8px;
 }
 
-.summary-table-label__inner svg {
-  width: 16px;
-  height: 16px;
-  color: var(--lavender);
-  opacity: 0.85;
-  flex-shrink: 0;
-}
-
-.summary-table-value {
-  padding: 12px 16px;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--white);
-  vertical-align: middle;
-}
-
-/* File Cell */
-.summary-table-file-cell {
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.summary-filename-text {
-  font-size: 14.5px;
-  font-weight: 700;
-  color: var(--white);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 250px;
-  display: inline-block;
-  vertical-align: middle;
-}
-
-/* Pages Cell */
-.summary-table-pages-cell {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.summary-table-primary-text {
-  font-size: 15.5px;
+.summary-group__title {
+  margin: 0;
+  font-size: 16px;
   font-weight: 800;
-  color: var(--white);
-}
-
-.summary-table-primary-text--color {
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
   color: var(--peach);
 }
 
-.summary-table-range-tag {
-  font-size: 12px;
-  font-weight: 700;
+.summary-group__note {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
   color: var(--lavender);
-  background: rgba(167, 170, 225, 0.1);
-  padding: 3px 9px;
-  border-radius: 6px;
-  border: 1px solid rgba(167, 170, 225, 0.15);
+}
+
+.summary-list {
+  margin: 0;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1.5px solid rgba(167, 170, 225, 0.14);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.summary-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: clamp(6px, 1.1vh, 13px) 16px;
+  border-bottom: 1px solid rgba(167, 170, 225, 0.09);
+}
+
+.summary-list__row:last-child {
+  border-bottom: none;
+}
+
+.summary-list dt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: clamp(16px, 2.3vh, 19px);
+  font-weight: 600;
+  color: var(--lavender);
+}
+
+.summary-list dt svg {
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
 }
 
-.summary-table-breakdown {
+.summary-list dd {
+  margin: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 6px;
+  text-align: right;
+  font-size: clamp(17px, 2.5vh, 20px);
+  font-weight: 800;
+  color: var(--white);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-list__tag {
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(167, 170, 225, 0.2);
+  background: rgba(167, 170, 225, 0.12);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--lavender);
+}
+
+.summary-list__hint {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lavender);
+}
+
+/* Colored / B&W lines sit under "Pages"; the dot lines up with the label text. */
+.summary-list__row--sub {
+  padding-left: 46px;
+  background: rgba(14, 13, 31, 0.25);
+}
+
+.summary-list__row--sub dt {
+  color: var(--white);
+}
+
+.summary-list__row--sub dd {
+  font-size: clamp(19px, 2.8vh, 23px);
+}
+
+.summary-list__row.is-zero dt,
+.summary-list__row.is-zero dd {
+  opacity: 0.5;
+}
+
+.summary-list__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.summary-list__dot--color {
+  background: linear-gradient(135deg, #f43f5e, var(--pink), var(--indigo));
+}
+
+.summary-list__dot--bw {
+  background: linear-gradient(135deg, #f8fafc 50%, #4b5563 50%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.summary-list__row--total dt {
+  color: var(--white);
+  font-weight: 700;
+}
+
+/* Narrow kiosk screens: the group titles already name the mode. */
+@media (max-width: 1100px) {
+  .summary-col {
+    padding: 18px;
+  }
+  .summary-mode-badge {
+    display: none;
+  }
 }
 
 .summary-mini-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--lavender);
   background: rgba(14, 13, 31, 0.5);
@@ -1376,22 +1362,8 @@ body {
   background: linear-gradient(135deg, #f43f5e, var(--pink), var(--indigo));
 }
 
-/* Color Cell */
-.summary-table-color-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.summary-table-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  align-items: center;
-}
-
 .sub-badge {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 6px;
@@ -1411,151 +1383,66 @@ body {
   border: 1px solid rgba(245, 178, 140, 0.25);
 }
 
-/* Paper & Layout Cell */
-.summary-table-paper-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.summary-table-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  align-items: center;
-}
-
-.info-tag {
-  font-size: 12.5px;
-  font-weight: 600;
-  background: rgba(167, 170, 225, 0.08);
-  color: var(--lavender);
-  padding: 3px 9px;
-  border-radius: 6px;
-  border: 1px solid rgba(167, 170, 225, 0.14);
-}
-
-/* Scan Cell */
-.summary-table-scan-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.scan-card__subtext {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink-muted);
-  line-height: 1.3;
-}
-
-/* Grounded Financial Footer */
-.summary-finance-footer {
-  background: rgba(14, 13, 31, 0.45);
-  border: 1.5px solid rgba(167, 170, 225, 0.12);
-  border-radius: 16px;
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.summary-finance-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.summary-finance-row__label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--white);
-}
-
-.summary-finance-row__amount {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--peach);
-  letter-spacing: -0.3px;
-}
-
-.summary-finance-row--change .summary-finance-row__label {
-  color: #a3e6ac;
-  font-size: 12px;
-}
-
-.summary-finance-row--change .summary-finance-row__amount {
-  color: #6ac47a;
-  font-size: 17px;
-}
-
-/* ── Footer (slimmed — tip only) ─────────────────────────── */
-.confirm-footer {
-  border-top: 1px solid rgba(167, 170, 225, 0.1);
-  padding: 12px 0 20px;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.footer-notice {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 16px;
-  border-radius: 9999px;
-  background: rgba(251, 191, 36, 0.08);
-  border: 1px solid rgba(251, 191, 36, 0.25);
-  max-width: 90vw;
-  box-sizing: border-box;
-}
-
-.footer-notice__icon {
-  width: 16px;
-  height: 16px;
-  color: #fbbf24;
-  flex-shrink: 0;
-  display: block;
-}
-
-.footer-notice__badge {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #fbbf24;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-}
-
-.footer-note {
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
+/* ── Price breakdown under "Total to pay" (rows hide when ₱0) ── */
+.price-breakdown {
   margin: 0;
-  line-height: 1.35;
-  transition: color 300ms;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-block: 1px solid rgba(167, 170, 225, 0.14);
+  text-align: left;
 }
 
-.footer-note.ready {
-  color: #a3e6ac;
+/* Nothing to break down (scan job, or quote still loading) */
+.price-breakdown:not(:has(> :not([hidden]))) {
+  display: none;
 }
 
-.footer-notice__coins {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: 2px;
+.price-breakdown__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
 }
+
+.price-breakdown__row dt {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--lavender);
+}
+
+.price-breakdown__row dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--white);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.price-breakdown__row--savings dt,
+.price-breakdown__row--savings dd {
+  color: #4ade80;
+  font-size: 15px;
+}
+
+
 
 /* ── RIGHT: Action column ─────────────────────────────────── */
 .action-col {
-  align-items: stretch;
-  justify-content: center;
-  gap: 28px;
-  padding: 32px 24px;
+  align-items: center;
+  justify-content: safe center;
+  gap: clamp(10px, 1.6vh, 18px);
+  padding: clamp(12px, 1.6vh, 24px) 20px;
   text-align: center;
+}
+
+/* Wide screens: keep the payment stack at a readable width */
+.action-col > * {
+  width: 100%;
+  max-width: 560px;
+  box-sizing: border-box;
 }
 
 .action-col__price-block {
@@ -1566,16 +1453,13 @@ body {
 }
 
 .action-col__price-eyebrow {
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
   color: var(--lavender);
-  opacity: 0.7;
 }
 
 .action-col__price {
-  font-size: 72px;
+  font-size: clamp(44px, 6.8vh, 72px);
   font-weight: 800;
   letter-spacing: -2px;
   line-height: 1;
@@ -1592,14 +1476,14 @@ body {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 22px 32px;
+  padding: clamp(14px, 2.2vh, 22px) 24px;
   border: none;
   border-radius: 18px;
   background: var(--indigo);
   color: var(--white);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 19px;
-  font-weight: 700;
+  font-size: 21px;
+  font-weight: 800;
   cursor: pointer;
   box-shadow: 0 4px 20px rgba(105, 111, 199, 0.35);
   transition:
@@ -1856,10 +1740,12 @@ body {
    targets #confirmModal. */
 #confirmModal .modal-card,
 .modal-card--kiosk {
-  width: 780px;
-  max-width: min(95vw, 840px);
-  max-height: min(94vh, 760px);
-  padding: 24px 34px 22px;
+  width: 940px;
+  max-width: 95vw;
+  max-height: 96vh;
+  /* Scroll only as a last resort on short screens; never clip the buttons. */
+  overflow-y: auto;
+  padding: clamp(14px, 2.4vh, 22px) 34px;
   border-radius: 28px;
   gap: 12px;
   display: flex;
@@ -1904,11 +1790,11 @@ body {
 }
 .modal-step__badge {
   align-self: center;
-  padding: 4px 14px;
+  padding: 5px 16px;
   border-radius: 999px;
   background: rgba(105, 111, 199, 0.18);
   color: var(--lavender);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -1917,16 +1803,16 @@ body {
 /* ── Step 1 Lottie Tray Animation ── */
 .modal-tray-lottie-wrap {
   align-self: center;
-  width: 240px;
-  height: 240px;
+  width: clamp(90px, 14vh, 180px);
+  height: clamp(90px, 14vh, 180px);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
 }
 .modal-tray-lottie-canvas {
-  width: 240px;
-  height: 240px;
+  width: 100%;
+  height: 100%;
   display: block;
 }
 .modal-tray-fallback-icon {
@@ -1958,11 +1844,13 @@ body {
 }
 .modal-step--tray .modal-title {
   margin-top: 0;
-  font-size: 26.5px;
+  font-size: clamp(28px, 4vh, 34px);
 }
 .modal-step--tray .modal-subtitle {
-  font-size: 16px;
-  margin: 2px 0 0;
+  font-size: clamp(17px, 2.4vh, 19px);
+  color: var(--lavender);
+  margin: 2px auto 0;
+  max-width: 46ch;
 }
 .modal-step--tray .modal-paper-alert {
   text-align: left;
@@ -1970,6 +1858,13 @@ body {
 }
 .modal-actions--tray {
   margin-top: 2px;
+}
+.modal-step--review .modal-title {
+  font-size: clamp(26px, 3.8vh, 32px);
+}
+.modal-step--review .modal-subtitle {
+  font-size: 18px;
+  color: var(--lavender);
 }
 
 /* ── Step 2 Lottie Review Animation ── */
@@ -2012,7 +1907,7 @@ body {
   background: rgba(251, 191, 36, 0.12);
   border: 1.5px solid rgba(251, 191, 36, 0.38);
   border-radius: 14px;
-  padding: 9px 16px;
+  padding: 12px 18px;
   box-sizing: border-box;
 }
 .modal-paper-alert[hidden] {
@@ -2032,7 +1927,7 @@ body {
   height: 24px;
 }
 .modal-paper-alert__content {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.95);
   line-height: 1.35;
@@ -2042,7 +1937,7 @@ body {
   flex-wrap: wrap;
 }
 .modal-paper-alert__title {
-  font-size: 13.5px;
+  font-size: 16px;
   font-weight: 800;
   color: #fbbf24;
   text-transform: uppercase;
@@ -2064,16 +1959,16 @@ body {
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(167, 170, 225, 0.14);
   border-radius: 14px;
-  padding: 9px 13px;
+  padding: 12px 16px;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   box-sizing: border-box;
 }
 .modal-tray-check-item__icon {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: rgba(106, 196, 122, 0.2);
   color: #6ac47a;
@@ -2087,50 +1982,78 @@ body {
   height: 15px;
 }
 .modal-tray-check-item__content {
-  font-size: 14px;
+  font-size: 17px;
   color: rgba(255, 255, 255, 0.9);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 .modal-tray-check-item__content strong {
   color: var(--white);
-  font-weight: 750;
+  font-weight: 800;
   display: block;
-  font-size: 15px;
+  font-size: 19px;
   margin-bottom: 2px;
 }
 
-/* ── Step 1 Help Banner ─────────────────────────────────── */
-.modal-tray-help-banner {
-  background: rgba(105, 111, 199, 0.08);
-  border: 1px dashed rgba(167, 170, 225, 0.25);
-  border-radius: 14px;
-  padding: 8px 14px;
-  text-align: left;
+/* ── Step 1: what happens if paper runs out or jams ─────── */
+.modal-tray-outcomes {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  box-sizing: border-box;
+  gap: 8px;
+  text-align: left;
 }
-.modal-tray-help-banner__header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13.5px;
+.modal-tray-outcomes__title {
+  margin: 4px 0 0;
+  font-size: 18px;
   font-weight: 800;
   color: #fbbf24;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
 }
-.modal-tray-help-banner__header svg {
-  width: 17px;
-  height: 17px;
+.modal-tray-outcomes__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.modal-tray-outcome {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.modal-tray-outcome__icon {
   flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(251, 191, 36, 0.16);
+  color: #fbbf24;
 }
-.modal-tray-help-banner__body {
+.modal-tray-outcome__icon svg {
+  width: 24px;
+  height: 24px;
+}
+.modal-tray-outcome__text strong {
+  display: block;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--white);
+  margin-bottom: 2px;
+}
+.modal-tray-outcome__text p {
   margin: 0;
-  font-size: 14px;
-  color: var(--ink-muted);
-  line-height: 1.35;
+  font-size: 17px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+}
+.modal-tray-outcomes__note {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--lavender);
+  text-align: center;
 }
 
 /* ── Step 2 Table-Based Print Details Listing ─────────────── */
@@ -2160,13 +2083,11 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 .modal-details-label {
-  width: 32%;
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 750;
+  width: 30%;
+  padding: 9px 16px;
+  font-size: 17px;
+  font-weight: 700;
   color: var(--lavender);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
   vertical-align: middle;
 }
 .modal-details-label__inner {
@@ -2175,14 +2096,14 @@ body {
   gap: 8px;
 }
 .modal-details-label__inner svg {
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
   opacity: 0.85;
   flex-shrink: 0;
 }
 .modal-details-value {
-  padding: 7px 14px;
-  font-size: 15.5px;
+  padding: 9px 16px;
+  font-size: 19px;
   font-weight: 700;
   color: var(--white);
   vertical-align: middle;
@@ -2191,9 +2112,9 @@ body {
   color: var(--peach);
 }
 .modal-details-subvalue {
-  font-size: 14.5px;
+  font-size: 17px;
   font-weight: 500;
-  color: var(--ink-muted);
+  color: var(--lavender);
   margin-left: 5px;
 }
 .modal-details-subvalue strong {
@@ -2209,9 +2130,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.6px;
   flex-shrink: 0;
@@ -2233,7 +2154,7 @@ body {
   border: 1px solid rgba(106, 196, 122, 0.35);
 }
 .modal-method-title {
-  font-size: 15.5px;
+  font-size: 19px;
   font-weight: 750;
   color: var(--white);
 }
@@ -2252,9 +2173,9 @@ body {
 }
 .modal-details-range-tag {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 750;
   background: rgba(105, 111, 199, 0.2);
   color: var(--lavender);
@@ -2293,8 +2214,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13.5px;
-  color: var(--ink-muted);
+  font-size: 17px;
+  color: var(--lavender);
 }
 .modal-pricing-summary__row[hidden] {
   display: none !important;
@@ -2337,14 +2258,14 @@ body {
   background: rgba(167, 170, 225, 0.15);
 }
 .modal-finance-bar__label {
-  font-size: 13.5px;
+  font-size: 16px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--ink-muted);
+  letter-spacing: 0.6px;
+  color: var(--lavender);
 }
 .modal-finance-bar__value {
-  font-size: 29px;
+  font-size: clamp(30px, 4.6vh, 38px);
   font-weight: 850;
   line-height: 1.1;
   color: var(--white);
@@ -2360,8 +2281,8 @@ body {
 }
 .modal-charge-note {
   margin: -1px 2px 0;
-  color: var(--ink-muted);
-  font-size: 15px;
+  color: var(--lavender);
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.35;
   text-align: center;
@@ -2389,9 +2310,9 @@ body {
   width: 100%;
 }
 #confirmModal .modal-btn {
-  min-height: 64px;
+  min-height: 68px;
   padding: 16px 28px;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 750;
   border-radius: 18px;
   letter-spacing: 0.2px;
@@ -2418,7 +2339,7 @@ body {
   border: 2px solid rgba(255, 255, 255, 0.22);
   color: var(--white);
   box-shadow: 0 6px 22px rgba(46, 139, 68, 0.45);
-  font-size: 18.5px;
+  font-size: 21px;
 }
 #confirmModal .modal-btn--confirm:hover {
   background: #369f4f;
@@ -2879,100 +2800,12 @@ body {
     grid-template-columns: 1fr;
     height: auto;
   }
-  .payment-col,
   .summary-col,
   .action-col {
     min-height: 280px;
   }
 }
 
-/* ── Locked coin slot state ────────────────────────────────────── */
-
-/* Swap coin CTA text color to green when locked */
-.payment-col--locked .payment-col__cta {
-  color: #a3e6ac;
-}
-
-/* Padlock icon entrance animation */
-#padlockIcon {
-  animation: padlock-pop 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes padlock-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.6) rotate(-8deg);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-  }
-}
-
-/* Balance ring turns green when locked */
-.payment-col--locked .balance-ring__svg {
-  filter: drop-shadow(0 0 20px rgba(58, 158, 82, 0.5));
-}
-
-.payment-col--locked #balanceArc {
-  stroke: #6ac47a;
-}
-
-.payment-col--locked .balance-ring__amount {
-  color: #a3e6ac;
-}
-
-/* Coin slot locked status badge variant */
-.payment-col--locked .status-badge {
-  background: rgba(106, 196, 122, 0.12);
-  border-color: rgba(106, 196, 122, 0.3);
-}
-
-.payment-col--locked .status-badge__dot {
-  background: #6ac47a;
-  animation: none;
-}
-
-.payment-col--locked .status-badge__text {
-  color: #a3e6ac;
-}
-
-/* Coin notice state when slot is locked */
-.payment-col--locked .payment-col__notice {
-  background: rgba(167, 170, 225, 0.05);
-  border-color: rgba(167, 170, 225, 0.16);
-  opacity: 0.65;
-}
-
-.payment-col--locked .payment-col__notice-icon {
-  background: rgba(167, 170, 225, 0.1);
-  color: var(--lavender);
-}
-
-.payment-col--locked .payment-col__notice-title {
-  color: var(--lavender);
-}
-
-.payment-col--locked .payment-col__note {
-  color: var(--lavender);
-  opacity: 0.85;
-}
-
-.payment-col--locked .payment-col__supported-coins {
-  border-top-color: rgba(167, 170, 225, 0.12);
-}
-
-.payment-col--locked .supported-coins__label {
-  color: var(--lavender);
-}
-
-.payment-col--locked .coin-chip {
-  opacity: 0.55;
-  border-color: rgba(167, 170, 225, 0.25);
-  background: rgba(167, 170, 225, 0.08);
-  color: var(--lavender);
-  box-shadow: none;
-}
 
 /* ── Thank-you continuation prompt ─────────────────────────────── */
 
@@ -3171,13 +3004,11 @@ body {
     scroll-behavior: auto !important;
   }
 
-  .coin-lottie-canvas,
   .modal-tray-lottie-canvas,
   .modal-review-lottie-canvas {
     display: none !important;
   }
 
-  .coin-fallback-icon,
   .modal-tray-fallback-icon {
     display: flex !important;
   }

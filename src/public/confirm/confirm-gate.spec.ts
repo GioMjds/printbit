@@ -102,7 +102,7 @@ function legacyGate(f: Flags): ConfirmGate {
       confirmEnabled: true,
       badge: 'ready',
       message:
-        f.override ?? 'Sufficient balance detected. You can confirm now.',
+        f.override ?? 'Paid in full. You can confirm now.',
       highlightReady: true,
     };
   }

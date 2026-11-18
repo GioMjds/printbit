@@ -67,198 +67,208 @@
 
       <!-- Main content: three columns -->
       <main class="confirm-layout" role="main">
-        <!-- ── LEFT: Payment column ── -->
-        <section class="payment-col panel" aria-label="Payment">
-          <div class="payment-col__icon" aria-hidden="true">
-            <div class="coin-lottie-wrapper" id="coinLottieWrapper">
-              <canvas
-                id="coinLottieCanvas"
-                class="coin-lottie-canvas"
-                width="160"
-                height="160"
-              ></canvas>
-              <!-- Fallback SVG icon: visible when lottie is loading or in reduced motion -->
-              <svg id="coinIcon" class="coin-fallback-icon" viewBox="0 0 80 80" fill="none">
-                <!-- Coin stack -->
-                <ellipse
-                  cx="40"
-                  cy="62"
-                  rx="22"
-                  ry="7"
-                  fill="var(--peach)"
-                  opacity=".5"
-                />
-                <ellipse
-                  cx="40"
-                  cy="56"
-                  rx="22"
-                  ry="7"
-                  fill="var(--peach)"
-                  opacity=".7"
-                />
-                <ellipse cx="40" cy="50" rx="22" ry="7" fill="var(--peach)" />
-                <rect x="18" y="50" width="44" height="10" fill="var(--peach)" />
-                <ellipse cx="40" cy="50" rx="22" ry="7" fill="#f5d3c4" />
-                <!-- Shine -->
-                <ellipse
-                  cx="34"
-                  cy="48"
-                  rx="5"
-                  ry="2"
-                  fill="white"
-                  opacity=".3"
-                  transform="rotate(-20 34 48)"
-                />
-                <!-- Arrow down into slot -->
-                <path
-                  d="M40 14v18M33 26l7 7 7-7"
-                  stroke="var(--lavender)"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  opacity=".8"
-                />
-              </svg>
+        <!-- ── LEFT: Job summary column ── -->
+        <section class="summary-col panel" aria-label="Job summary">
+          <div class="summary-col__header">
+            <div class="summary-col__heading">
+              <h2 class="summary-col__title">Job Summary</h2>
+              <p class="summary-col__sub">Check your order before you pay.</p>
             </div>
-
-            <!-- Padlock icon: hidden by default, shown when slot is locked -->
-            <svg id="padlockIcon" viewBox="0 0 80 80" fill="none" hidden>
-              <!-- Shackle (arc) -->
-              <path
-                d="M27 36v-8a13 13 0 0126 0v8"
-                stroke="#6ac47a"
-                stroke-width="3.5"
-                stroke-linecap="round"
-                fill="none"
-              />
-              <!-- Lock body -->
-              <rect
-                x="18"
-                y="36"
-                width="44"
-                height="30"
-                rx="6"
-                fill="rgba(58,158,82,0.2)"
-              />
-              <rect
-                x="18"
-                y="36"
-                width="44"
-                height="30"
-                rx="6"
-                stroke="#6ac47a"
-                stroke-width="2"
-                fill="none"
-              />
-              <!-- Keyhole circle -->
-              <circle cx="40" cy="50" r="5" fill="#6ac47a" opacity=".7" />
-              <!-- Keyhole stem -->
-              <rect
-                x="38"
-                y="50"
-                width="4"
-                height="7"
-                rx="2"
-                fill="#6ac47a"
-                opacity=".7"
-              />
-              <!-- Check mark inside body -->
-              <path
-                d="M32 51l5 5 11-10"
-                stroke="#a3e6ac"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                opacity=".9"
-              />
-            </svg>
+            <span class="summary-mode-badge" id="modeValue">PRINT</span>
           </div>
 
-          <p class="payment-col__cta">
-            Insert coins into the kiosk slot to pay
-          </p>
-          <!-- Coin insertion guidance notice banner -->
+          <!-- What gets printed: pages split into colored vs black & white -->
+          <section class="summary-group" id="summaryPagesGroup" aria-labelledby="summaryPagesTitle">
+            <h3 class="summary-group__title" id="summaryPagesTitle">What will be printed</h3>
+            <dl class="summary-list">
+              <div class="summary-list__row summary-list__row--lead">
+                <dt>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" />
+                    <path d="M14 3v5h5" />
+                  </svg>
+                  <span>Pages</span>
+                </dt>
+                <dd>
+                  <span id="pagesTotalCount">1 page</span>
+                  <span class="summary-list__tag" id="pagesRangeValue">All Pages</span>
+                </dd>
+              </div>
+              <div class="summary-list__row summary-list__row--sub" id="colorPagesRow">
+                <dt>
+                  <span class="summary-list__dot summary-list__dot--color" aria-hidden="true"></span>
+                  <span>Colored pages</span>
+                </dt>
+                <dd id="pagesColorCount">0</dd>
+              </div>
+              <div class="summary-list__row summary-list__row--sub" id="bwPagesRow">
+                <dt>
+                  <span class="summary-list__dot summary-list__dot--bw" aria-hidden="true"></span>
+                  <span>Black &amp; white pages</span>
+                </dt>
+                <dd id="pagesBwCount">1</dd>
+              </div>
+              <div class="summary-list__row summary-list__row--total" id="printedTotalRow" hidden>
+                <dt><span>Total printed</span></dt>
+                <dd>
+                  <span id="printedTotalValue">2 pages</span>
+                  <span class="summary-list__hint" id="printedTotalHint">1 page × 2 copies</span>
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <!-- Print settings: one labeled line per setting -->
+          <section class="summary-group" id="summarySettingsGroup" aria-labelledby="summarySettingsTitle">
+            <h3 class="summary-group__title" id="summarySettingsTitle">Print settings</h3>
+            <dl class="summary-list">
+              <div class="summary-list__row">
+                <dt>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="6" y="2" width="12" height="20" rx="1.5" />
+                  </svg>
+                  <span>Bond paper</span>
+                </dt>
+                <dd id="paperSizePrimary">A4</dd>
+              </div>
+              <div class="summary-list__row">
+                <dt>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="8" y="8" width="12" height="13" rx="1.5" />
+                    <path d="M16 8V5a1.5 1.5 0 00-1.5-1.5h-9A1.5 1.5 0 004 5v11a1.5 1.5 0 001.5 1.5H8" />
+                  </svg>
+                  <span>Copies</span>
+                </dt>
+                <dd id="copiesValue">1 copy</dd>
+              </div>
+              <div class="summary-list__row">
+                <dt>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="6" width="18" height="12" rx="1.5" />
+                    <rect x="8" y="2" width="8" height="20" rx="1.5" opacity=".45" />
+                  </svg>
+                  <span>Orientation</span>
+                </dt>
+                <dd id="orientationValue">Portrait</dd>
+              </div>
+              <div class="summary-list__row">
+                <dt>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3l2.7 5.5 6 .9-4.4 4.2 1 6L12 16.8 6.7 19.6l1-6L3.3 9.4l6-.9z" />
+                  </svg>
+                  <span>Print quality</span>
+                </dt>
+                <dd id="qualityValue">Standard</dd>
+              </div>
+              <div class="summary-list__row">
+                <dt>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="4" y="3" width="11" height="15" rx="1.5" />
+                    <path d="M9 21h9.5a1.5 1.5 0 001.5-1.5V8" />
+                  </svg>
+                  <span>Sides</span>
+                </dt>
+                <dd id="sidesValue">1-sided</dd>
+              </div>
+            </dl>
+          </section>
+
+          <!-- Scan Service (Scan Mode Only) -->
+          <section class="summary-group" id="scanCard" aria-labelledby="summaryScanTitle" hidden>
+            <h3 class="summary-group__title" id="summaryScanTitle">What you will get</h3>
+            <dl class="summary-list">
+              <div class="summary-list__row">
+                <dt>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                  <span>Scan service</span>
+                </dt>
+                <dd>High-Resolution Soft Copy</dd>
+              </div>
+            </dl>
+            <p class="summary-group__note">Scan the QR code on the next screen to download it to your phone.</p>
+          </section>
+        </section>
+
+        <!-- ── RIGHT: Payment column (how to pay, balance, total, confirm) ── -->
+        <section class="action-col panel" aria-label="Payment">
+          <!-- Coin insertion guidance: the acceptor misses coins dropped too fast -->
           <div
             class="payment-col__notice"
             id="coinInsertNotice"
             role="note"
             aria-label="Coin insertion guidance"
           >
-            <div class="payment-col__notice-icon" aria-hidden="true">
-              <svg viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </div>
-            <div class="payment-col__notice-content">
+            <div class="payment-col__notice-head">
+              <span class="payment-col__notice-icon" aria-hidden="true">1</span>
               <span class="payment-col__notice-title">Insert 1 coin at a time</span>
-              <p class="payment-col__note" id="coinInsertNote">
-                Please insert coins slowly. Rapid insertion may not be detected by the kiosk.
-              </p>
-              <div
-                class="payment-col__supported-coins"
-                aria-label="Supported coins: ₱1, ₱5, ₱10, and ₱20"
-              >
-                <span class="supported-coins__label">Accepted:</span>
-                <div class="supported-coins__chips" role="list">
-                  <span class="coin-chip coin-chip--1" role="listitem" title="₱1 peso coin">₱1</span>
-                  <span class="coin-chip coin-chip--5" role="listitem" title="₱5 peso coin">₱5</span>
-                  <span class="coin-chip coin-chip--10" role="listitem" title="₱10 peso coin">₱10</span>
-                  <span class="coin-chip coin-chip--20" role="listitem" title="₱20 peso coin">₱20</span>
-                </div>
+            </div>
+            <p class="payment-col__note" id="coinInsertNote">
+              Wait for your balance to go up before you insert the next coin. Coins inserted too fast may not be counted.
+            </p>
+            <!-- Accepted coins: real coin photos, filled by renderCoinList() -->
+            <div class="payment-col__supported-coins">
+              <span class="supported-coins__label" id="acceptedCoinsLabel">Accepted coins</span>
+              <ul
+                class="coin-strip__coins"
+                id="acceptedCoinList"
+                aria-labelledby="acceptedCoinsLabel"
+              ></ul>
+            </div>
+          </div>
+
+          <!-- Amount due, then how much has been inserted toward it -->
+          <div class="pay-card">
+            <div class="action-col__price-block">
+              <span class="action-col__price-eyebrow">Total to pay</span>
+              <span class="action-col__price" id="actionPriceValue">₱ 0</span>
+            </div>
+            <!-- Price breakdown: a line is hidden when its amount is ₱0 -->
+            <dl class="price-breakdown">
+              <div class="price-breakdown__row" id="paperCostRow" hidden>
+                <dt id="paperCostLabel">Paper</dt>
+                <dd id="paperCostValue">₱ 0</dd>
+              </div>
+              <div class="price-breakdown__row" id="printCostRow" hidden>
+                <dt>Printing</dt>
+                <dd id="printCostValue">₱ 0</dd>
+              </div>
+              <div class="price-breakdown__row" id="qualityCostRow" hidden>
+                <dt>High quality</dt>
+                <dd id="qualityCostValue">₱ 0</dd>
+              </div>
+              <!-- Already inside the paper amount (paper is charged per physical sheet); not a deduction -->
+              <div class="price-breakdown__row price-breakdown__row--savings" id="duplexSavingsRow" hidden>
+                <dt>Saved with 2-sided (included)</dt>
+                <dd id="duplexSavingsValue">₱ 0</dd>
+              </div>
+            </dl>
+            <div
+              class="balance-meter"
+              id="balanceMeter"
+              role="meter"
+              aria-label="Coins inserted"
+              aria-valuemin="0"
+              aria-valuemax="0"
+              aria-valuenow="0"
+            >
+              <div class="balance-meter__row">
+                <span class="balance-meter__label">Inserted so far</span>
+                <span class="balance-meter__amount" id="balanceValue">₱ 0</span>
+              </div>
+              <div class="balance-meter__track" aria-hidden="true">
+                <span class="balance-meter__fill" id="balanceFill"></span>
+              </div>
+              <div class="balance-meter__row balance-meter__change" id="changeRow" hidden>
+                <span class="balance-meter__label">Your change</span>
+                <span class="balance-meter__change-value" id="changeValue">₱ 0</span>
               </div>
             </div>
           </div>
 
-          <!-- Balance ring -->
-          <div
-            class="balance-ring"
-            id="balanceRing"
-            role="meter"
-            aria-label="Coin balance"
-            aria-valuemin="0"
-            aria-valuemax="0"
-            aria-valuenow="0"
-          >
-            <svg
-              class="balance-ring__svg"
-              viewBox="0 0 120 120"
-              aria-hidden="true"
-            >
-              <!-- Track -->
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                stroke="rgba(167,170,225,.15)"
-                stroke-width="8"
-                fill="none"
-              />
-              <!-- Progress arc — dashoffset controlled by JS -->
-              <circle
-                id="balanceArc"
-                cx="60"
-                cy="60"
-                r="52"
-                stroke="var(--indigo)"
-                stroke-width="8"
-                fill="none"
-                stroke-linecap="round"
-                stroke-dasharray="326.7"
-                stroke-dashoffset="326.7"
-                transform="rotate(-90 60 60)"
-              />
-            </svg>
-            <div class="balance-ring__inner">
-              <span class="balance-ring__amount" id="balanceValue">₱0</span>
-              <span class="balance-ring__label">balance</span>
-            </div>
-          </div>
-
-          <!-- Status message -->
+          <!-- Payment status sits next to the button customers are about to tap -->
           <div
             class="status-badge"
             id="statusBadge"
@@ -270,155 +280,6 @@
             <span class="status-badge__text" id="statusMessage"
               >Waiting for coins…</span
             >
-          </div>
-
-          <!-- Coin event toast -->
-          <div
-            class="coin-toast"
-            id="coinToast"
-            aria-live="polite"
-            aria-atomic="true"
-          ></div>
-        </section>
-
-        <!-- ── MIDDLE: Job summary column ── -->
-        <section class="summary-col panel" aria-label="Job summary">
-          <div class="summary-col__header">
-            <h2 class="summary-col__title">Job Summary</h2>
-            <span class="summary-mode-badge" id="modeValue">PRINT</span>
-          </div>
-
-          <!-- Table-Based Job Summary Listing -->
-          <div class="summary-table-wrap">
-            <table class="summary-table" role="table" aria-label="Job Summary Details">
-              <tbody>
-                <!-- Pages & Range Row (Print & Copy) -->
-                <tr id="pagesCard" class="summary-table-row">
-                  <th scope="row" class="summary-table-label">
-                    <div class="summary-table-label__inner">
-                      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                        <path d="M3 4a1 1 0 011-1h8a1 1 0 011 1v1H3V4zm0 3h10v5a1 1 0 01-1 1H4a1 1 0 01-1-1V7z" />
-                      </svg>
-                      <span>Pages &amp; Range</span>
-                    </div>
-                  </th>
-                  <td class="summary-table-value">
-                    <div class="summary-table-pages-cell">
-                      <span class="summary-table-primary-text" id="pagesTotalCount">1 page</span>
-                      <span class="summary-table-range-tag" id="pagesRangeValue">All Pages</span>
-                    </div>
-                    <div class="summary-table-breakdown" id="pagesMetrics">
-                      <span class="summary-mini-chip summary-mini-chip--bw" id="bwPagesChip">
-                        <span class="summary-mini-chip__dot"></span>
-                        B&amp;W: <strong id="pagesBwCount">1</strong>
-                      </span>
-                      <span class="summary-mini-chip summary-mini-chip--color" id="colorPagesChip">
-                        <span class="summary-mini-chip__dot"></span>
-                        Color: <strong id="pagesColorCount">0</strong>
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Color Mode Row -->
-                <tr id="colorCard" class="summary-table-row">
-                  <th scope="row" class="summary-table-label">
-                    <div class="summary-table-label__inner">
-                      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                        <circle cx="5" cy="8" r="3" opacity=".6" />
-                        <circle cx="11" cy="8" r="3" opacity=".4" />
-                        <circle cx="8" cy="11" r="3" opacity=".5" />
-                      </svg>
-                      <span>Color Mode</span>
-                    </div>
-                  </th>
-                  <td class="summary-table-value">
-                    <div class="summary-table-color-cell">
-                      <span class="summary-table-primary-text summary-table-primary-text--color" id="colorModePrimary">Black &amp; White</span>
-                      <div class="summary-table-badges" id="colorBadgesWrap">
-                        <span class="sub-badge sub-badge--detected" id="colorDetectedBadge" hidden>Detected: Color</span>
-                        <span class="sub-badge sub-badge--selected" id="colorSelectedBadge" hidden>Selected: B&amp;W</span>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Paper & Layout Row -->
-                <tr id="paperCard" class="summary-table-row">
-                  <th scope="row" class="summary-table-label">
-                    <div class="summary-table-label__inner">
-                      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                        <rect x="3" y="1" width="10" height="14" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" />
-                      </svg>
-                      <span>Paper &amp; Layout</span>
-                    </div>
-                  </th>
-                  <td class="summary-table-value">
-                    <div class="summary-table-paper-cell">
-                      <span class="summary-table-primary-text" id="paperSizePrimary">A4 Bond Paper</span>
-                      <div class="summary-table-tags" id="settingsGrid">
-                        <span class="info-tag" id="copiesTag">1 Copy</span>
-                        <span class="info-tag" id="orientationTag">Portrait</span>
-                        <span class="info-tag" id="qualityTag">Standard</span>
-                        <span class="info-tag" id="duplexTag" hidden>2-Sided</span>
-                        <span class="info-tag" id="rotationTag" hidden>0°</span>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Scan Service Row (Scan Mode Only) -->
-                <tr id="scanCard" class="summary-table-row" hidden>
-                  <th scope="row" class="summary-table-label">
-                    <div class="summary-table-label__inner">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                        <polyline points="22,6 12,13 2,6" />
-                      </svg>
-                      <span>Scan Service</span>
-                    </div>
-                  </th>
-                  <td class="summary-table-value">
-                    <div class="summary-table-scan-cell">
-                      <span class="summary-table-primary-text">High-Resolution Soft Copy</span>
-                      <span class="scan-card__subtext">Direct QR code download to your phone</span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Grounded Financial Summary -->
-          <div class="summary-finance-footer">
-            <div class="summary-finance-row summary-finance-row--subtotal" id="paperCostRow" hidden>
-              <span class="summary-finance-row__label" id="paperCostLabel">Paper Sheets</span>
-              <span class="summary-finance-row__amount" id="paperCostValue">₱ 0</span>
-            </div>
-            <div class="summary-finance-row summary-finance-row--subtotal" id="printCostRow" hidden>
-              <span class="summary-finance-row__label">Print Ink Metering</span>
-              <span class="summary-finance-row__amount" id="printCostValue">₱ 0</span>
-            </div>
-            <div class="summary-finance-row summary-finance-row--savings" id="duplexSavingsRow" hidden style="color: #4ade80;">
-              <span class="summary-finance-row__label">Duplex Paper Savings</span>
-              <span class="summary-finance-row__amount" id="duplexSavingsValue">-₱ 0</span>
-            </div>
-            <div class="summary-finance-row summary-finance-row--total">
-              <span class="summary-finance-row__label">Total Price</span>
-              <span class="summary-finance-row__amount" id="priceValue">₱ 0</span>
-            </div>
-            <div class="summary-finance-row summary-finance-row--change" id="changeRow" hidden>
-              <span class="summary-finance-row__label">Calculated Change</span>
-              <span class="summary-finance-row__amount" id="changeValue">₱ 0</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- ── RIGHT: Action column ── -->
-        <section class="action-col panel" aria-label="Confirm action">
-          <div class="action-col__price-block">
-            <span class="action-col__price-eyebrow">Total to pay</span>
-            <span class="action-col__price" id="actionPriceValue">₱ 0</span>
           </div>
 
           <button
@@ -444,33 +305,6 @@
         </section>
       </main>
 
-      <!-- Footer (slimmed — no button) -->
-      <footer class="confirm-footer">
-        <div class="footer-notice" role="note" aria-label="Coin insertion reminder">
-          <svg
-            class="footer-notice__icon"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          <span class="footer-notice__badge">1 Coin at a Time</span>
-          <p class="footer-note" id="footerNote">
-            Please insert coins slowly. Rapid insertion may not be detected by the kiosk.
-          </p>
-          <div class="footer-notice__coins" aria-label="Accepted coins: ₱1, ₱5, ₱10, and ₱20">
-            <span class="coin-chip coin-chip--sm coin-chip--1" title="₱1 peso coin">₱1</span>
-            <span class="coin-chip coin-chip--sm coin-chip--5" title="₱5 peso coin">₱5</span>
-            <span class="coin-chip coin-chip--sm coin-chip--10" title="₱10 peso coin">₱10</span>
-            <span class="coin-chip coin-chip--sm coin-chip--20" title="₱20 peso coin">₱20</span>
-          </div>
-        </div>
-      </footer>
     </div>
 
     <!-- Printer Error Modal — z-index 200, shown via hidden attr (own animation) -->
@@ -752,7 +586,7 @@
 
           <h2 class="modal-title" id="modalTrayTitle">Check the Paper Tray</h2>
           <p class="modal-subtitle" id="modalTraySubtitle">
-            Please ensure the tray is properly loaded before proceeding to print.
+            Make sure the paper is loaded correctly. If the tray is empty, ask a staff member before you continue.
           </p>
 
           <!-- Paper Tray Safety Alert -->
@@ -788,7 +622,7 @@
                 </svg>
               </div>
               <div class="modal-tray-check-item__content">
-                <strong>Loaded Straight:</strong> Paper is aligned snug against the guides with no slant.
+                <strong>Paper is straight</strong> Sheets sit flat and snug against the paper guides.
               </div>
             </div>
 
@@ -799,23 +633,47 @@
                 </svg>
               </div>
               <div class="modal-tray-check-item__content">
-                <strong>Clean &amp; Decluttered:</strong> Sheets are fanned out, unwrinkled, and free of clips or staples.
+                <strong>Paper is clean</strong> No wrinkles, folds, clips, or staples.
               </div>
             </div>
           </div>
 
-          <!-- Inline Tray Help & Coin Notice -->
-          <div class="modal-tray-help-banner">
-            <div class="modal-tray-help-banner__header">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-              </svg>
-              <span>Need help with the tray?</span>
+          <!-- What happens if the paper fails mid-job (matches recovery-guidance.ts) -->
+          <section class="modal-tray-outcomes" aria-labelledby="trayOutcomesTitle">
+            <h3 class="modal-tray-outcomes__title" id="trayOutcomesTitle">
+              If something goes wrong while printing
+            </h3>
+            <div class="modal-tray-outcomes__grid">
+              <div class="modal-tray-outcome">
+                <span class="modal-tray-outcome__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 14h18v6H3z" />
+                    <path d="M7 14V9M17 14V9" />
+                    <path d="M10 5l4 4M14 5l-4 4" />
+                  </svg>
+                </span>
+                <div class="modal-tray-outcome__text">
+                  <strong>Out of paper</strong>
+                  <p>Printing pauses. Ask a staff member to load more paper, then printing can continue.</p>
+                </div>
+              </div>
+              <div class="modal-tray-outcome">
+                <span class="modal-tray-outcome__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 3h12v8l-3 2-3-2-3 2-3-2z" />
+                    <path d="M6 21v-5l3 2 3-2 3 2 3-2v5z" />
+                  </svg>
+                </span>
+                <div class="modal-tray-outcome__text">
+                  <strong>Paper jam</strong>
+                  <p>Printing stops. Keep this screen open and ask a staff member to clear the jam.</p>
+                </div>
+              </div>
             </div>
-            <p class="modal-tray-help-banner__body">
-              If the tray is empty, jammed, or misaligned, please ask assistance from a staff member before continuing.
+            <p class="modal-tray-outcomes__note">
+              Either way, this screen shows a receipt QR code as your proof of payment.
             </p>
-          </div>
+          </section>
 
           <!-- Tray-check step actions -->
           <div class="modal-actions modal-actions--tray">
@@ -1060,12 +918,17 @@
               <span class="modal-pricing-summary__amount" id="modalPaperCostValue">₱ 0</span>
             </div>
             <div class="modal-pricing-summary__row" id="modalPrintCostRow" hidden>
-              <span class="modal-pricing-summary__label">Print Ink Metering</span>
+              <span class="modal-pricing-summary__label">Printing</span>
               <span class="modal-pricing-summary__amount" id="modalPrintCostValue">₱ 0</span>
             </div>
+            <div class="modal-pricing-summary__row" id="modalQualityCostRow" hidden>
+              <span class="modal-pricing-summary__label">High quality</span>
+              <span class="modal-pricing-summary__amount" id="modalQualityCostValue">₱ 0</span>
+            </div>
+            <!-- Already inside the paper amount; not a deduction -->
             <div class="modal-pricing-summary__row modal-pricing-summary__row--savings" id="modalDuplexSavingsRow" hidden>
-              <span class="modal-pricing-summary__label">Duplex Paper Savings</span>
-              <span class="modal-pricing-summary__amount" id="modalDuplexSavingsValue">-₱ 0</span>
+              <span class="modal-pricing-summary__label">Saved with 2-sided (included)</span>
+              <span class="modal-pricing-summary__amount" id="modalDuplexSavingsValue">₱ 0</span>
             </div>
           </div>
 

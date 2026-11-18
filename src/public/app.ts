@@ -20,6 +20,10 @@ import {
   formatCopyPricingGuide,
   formatScanPricingGuide,
 } from './shared/pricing-guide';
+import {
+  buildWifiQrPayload,
+  type HotspotConfig,
+} from './shared/wifi-troubleshooting';
 import { initPrinterGuard } from '@/guards/printer-guard';
 import { ACCEPTED_COIN_VALUES } from '@/shared/accepted-coins';
 import { renderCoinList } from './shared/coin-strip';
@@ -56,21 +60,8 @@ function syncFabVisibility(): void {
   const isGuideOpen = Boolean(
     document.getElementById('guideOverlay')?.classList.contains('is-visible'),
   );
-  const isReportOpen = Boolean(
-    document.getElementById('reportOverlay')?.classList.contains('is-visible'),
-  );
-  const isFeedbackOpen = Boolean(
-    document
-      .getElementById('feedbackOverlay')
-      ?.classList.contains('is-visible'),
-  );
-  const isWifiOpen = Boolean(
-    document.getElementById('wifiOverlay')?.classList.contains('is-visible'),
-  );
-  const isPrintWifiOpen = Boolean(
-    document
-      .getElementById('printWifiOverlay')
-      ?.classList.contains('is-visible'),
+  const isConnectOpen = Boolean(
+    document.getElementById('connectOverlay')?.classList.contains('is-visible'),
   );
   const isAdminOpen = Boolean(
     document.getElementById('adminOverlay')?.classList.contains('is-visible'),
@@ -91,10 +82,7 @@ function syncFabVisibility(): void {
   const shouldHide =
     isPricingOpen ||
     isGuideOpen ||
-    isReportOpen ||
-    isFeedbackOpen ||
-    isWifiOpen ||
-    isPrintWifiOpen ||
+    isConnectOpen ||
     isAdminOpen ||
     isIdleAttractorOpen ||
     isIdleWarningOpen;
@@ -435,118 +423,199 @@ window.addEventListener('pagehide', (event) => {
   }
 });
 
-// ── Print Wi-Fi Confirmation Intercept Modal ───────────────────────────────
-const printWifiOverlay = document.getElementById('printWifiOverlay');
-const printWifiConnectedBtn = document.getElementById('printWifiConnectedBtn');
-const printWifiNotYetBtn = document.getElementById('printWifiNotYetBtn');
-let wifiPulseTimeout: ReturnType<typeof setTimeout> | null = null;
+// ── Connect modal: PrintBit Wi-Fi gate for every phone-based flow ────────────
+// Print and Scan continue to their page after "I'm connected". Report and
+// Feedback also show the form QR, which only opens once the phone is on
+// PrintBit Wi-Fi. The Wi-Fi Help button shows the same steps on their own.
 
-function openPrintWifiConfirmModal(): void {
-  printWifiOverlay?.classList.add('is-visible');
-  printWifiOverlay?.setAttribute('aria-hidden', 'false');
-  syncFabVisibility();
-  printWifiConnectedBtn?.focus();
-}
-
-function closePrintWifiConfirmModal(): void {
-  printWifiOverlay?.classList.remove('is-visible');
-  printWifiOverlay?.setAttribute('aria-hidden', 'true');
-  syncFabVisibility();
-}
-
-function highlightHomeWifiCard(): void {
-  const card = document.querySelector<HTMLElement>('.wifi-inline-card');
-  if (!card) return;
-
-  if (wifiPulseTimeout !== null) {
-    clearTimeout(wifiPulseTimeout);
-  }
-  card.classList.remove('wifi-inline-card--pulse');
-  void card.offsetWidth;
-  card.classList.add('wifi-inline-card--pulse');
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-  wifiPulseTimeout = setTimeout(() => {
-    card.classList.remove('wifi-inline-card--pulse');
-    wifiPulseTimeout = null;
-  }, 2400);
-}
-
-openPrint?.addEventListener('click', () => {
-  openPrintWifiConfirmModal();
-});
-
-printWifiConnectedBtn?.addEventListener('click', () => {
-  closePrintWifiConfirmModal();
-  navigateTo('/print');
-});
-
-printWifiNotYetBtn?.addEventListener('click', () => {
-  closePrintWifiConfirmModal();
-  highlightHomeWifiCard();
-});
-
-printWifiOverlay?.addEventListener('click', (e) => {
-  if (e.target === printWifiOverlay) closePrintWifiConfirmModal();
-});
-
-document.addEventListener('keydown', (e) => {
-  if (
-    e.key === 'Escape' &&
-    printWifiOverlay?.classList.contains('is-visible')
-  ) {
-    closePrintWifiConfirmModal();
-  }
-});
-openCopy?.addEventListener('click', () => navigateTo('/copy'));
-openScan?.addEventListener('click', () => navigateTo('/scan'));
-
-// ── Hotspot Wi-Fi connection modal (Public ESP32 Hotspot) ─────────────────────
-
-type HotspotConfig = {
-  provider?: string;
-  ssid?: string;
-  password?: string;
-  authType?: string;
-  captivePortalPath?: string;
-  startsManagedHotspot?: boolean;
+type ConnectMode = 'print' | 'scan' | 'report' | 'feedback' | 'help';
+type ConnectForm = {
+  label: string;
+  step: string;
+  resolveUrl: () => Promise<string>;
 };
+
+const CONNECT_COPY: Record<
+  ConnectMode,
+  { eyebrow: string; title: string; sub: string }
+> = {
+  print: {
+    eyebrow: 'Before you print',
+    title: 'Connect your phone to PrintBit Wi-Fi',
+    sub: 'Your files travel from your phone to this kiosk over PrintBit Wi-Fi.',
+  },
+  scan: {
+    eyebrow: 'Before you scan',
+    title: 'Connect your phone to PrintBit Wi-Fi',
+    sub: 'Your soft copy downloads to your phone over PrintBit Wi-Fi.',
+  },
+  report: {
+    eyebrow: 'Report a problem',
+    title: 'Something went wrong? Let us know.',
+    sub: 'Join PrintBit Wi-Fi first, then scan QR code 2 to open the report form.',
+  },
+  feedback: {
+    eyebrow: 'Share your feedback',
+    title: 'Help us improve your PrintBit experience.',
+    sub: 'Join PrintBit Wi-Fi first, then scan QR code 2 to open the feedback form.',
+  },
+  help: {
+    eyebrow: 'Wi-Fi help',
+    title: 'Connect your phone to PrintBit Wi-Fi',
+    sub: 'Scan the QR code, or join the network in your Wi-Fi settings.',
+  },
+};
+
+const CONNECT_ROUTES: Partial<Record<ConnectMode, string>> = {
+  print: '/print',
+  scan: '/scan',
+};
+
+const CONNECT_FORMS: Partial<Record<ConnectMode, ConnectForm>> = {
+  report: {
+    label: 'Open the report form',
+    step: 'The report form opens in your phone browser.',
+    resolveUrl: resolveReportQrUrl,
+  },
+  feedback: {
+    label: 'Open the feedback form',
+    step: 'The feedback form opens in your phone browser.',
+    resolveUrl: resolveFeedbackQrUrl,
+  },
+};
+
+const connectOverlay = document.getElementById('connectOverlay');
+const connectModal = document.getElementById('connectModal');
+const connectEyebrow = document.getElementById('connectEyebrow');
+const connectTitle = document.getElementById('connectTitle');
+const connectSub = document.getElementById('connectSub');
+const connectFormLabel = document.getElementById('connectFormLabel');
+const connectFormStep = document.getElementById('connectFormStep');
+const connectFormStatus = document.getElementById('connectFormStatus');
+const connectFormQrCanvas = document.getElementById(
+  'connectFormQrCanvas',
+) as HTMLCanvasElement | null;
+const connectCloseBtn = document.getElementById('connectCloseBtn');
+const connectCancelBtn = document.getElementById('connectCancelBtn');
+const connectContinueBtn = document.getElementById('connectContinueBtn');
+const connectDoneBtn = document.getElementById('connectDoneBtn');
+const openReportBtn = document.getElementById('openReportBtn');
+const openFeedbackBtn = document.getElementById('openFeedbackBtn');
+const openWifiBtn = document.getElementById('openWifiBtn');
+
+let connectMode: ConnectMode | null = null;
+let connectTrigger: HTMLElement | null = null;
+
+function setConnectFormStatus(msg: string): void {
+  if (connectFormStatus) connectFormStatus.textContent = msg;
+}
+
+async function renderConnectFormQr(form: ConnectForm): Promise<void> {
+  if (!connectFormQrCanvas) return;
+  const mode = connectMode;
+  connectFormQrCanvas
+    .getContext('2d')
+    ?.clearRect(0, 0, connectFormQrCanvas.width, connectFormQrCanvas.height);
+  setConnectFormStatus('Generating QR code…');
+  try {
+    const url = await form.resolveUrl();
+    // The modal may have switched to another form while the URL resolved.
+    if (connectMode !== mode) return;
+    await QRCode.toCanvas(connectFormQrCanvas, url, {
+      width: 220,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+    setConnectFormStatus('Use your phone camera to scan.');
+  } catch {
+    setConnectFormStatus('Could not generate QR code. Please try again.');
+  }
+}
+
+function openConnectModal(
+  mode: ConnectMode,
+  trigger: HTMLElement | null,
+): void {
+  if (!connectOverlay || !connectModal) return;
+  connectMode = mode;
+  connectTrigger = trigger;
+
+  const copy = CONNECT_COPY[mode];
+  const form = CONNECT_FORMS[mode];
+  const isGate = Boolean(CONNECT_ROUTES[mode]);
+
+  connectModal.dataset.mode = mode;
+  if (connectEyebrow) connectEyebrow.textContent = copy.eyebrow;
+  if (connectTitle) connectTitle.textContent = copy.title;
+  if (connectSub) connectSub.textContent = copy.sub;
+  connectModal
+    .querySelectorAll('[data-connect-form]')
+    .forEach((el) => {
+      // toggleAttribute: SVGElement has no .hidden property.
+      el.toggleAttribute('hidden', !form);
+    });
+  if (form) {
+    if (connectFormLabel) connectFormLabel.textContent = form.label;
+    if (connectFormStep) connectFormStep.textContent = form.step;
+    void renderConnectFormQr(form);
+  }
+  if (connectCancelBtn) connectCancelBtn.hidden = !isGate;
+  if (connectContinueBtn) connectContinueBtn.hidden = !isGate;
+  if (connectDoneBtn) connectDoneBtn.hidden = isGate;
+
+  renderHomeWifiQr();
+  connectOverlay.classList.add('is-visible');
+  connectOverlay.setAttribute('aria-hidden', 'false');
+  syncFabVisibility();
+  (isGate ? connectContinueBtn : connectDoneBtn)?.focus();
+}
+
+function closeConnectModal(): void {
+  if (!connectOverlay?.classList.contains('is-visible')) return;
+  connectOverlay.classList.remove('is-visible');
+  connectOverlay.setAttribute('aria-hidden', 'true');
+  connectMode = null;
+  syncFabVisibility();
+  connectTrigger?.focus();
+}
+
+openPrint?.addEventListener('click', () => openConnectModal('print', openPrint));
+openScan?.addEventListener('click', () => openConnectModal('scan', openScan));
+openReportBtn?.addEventListener('click', () =>
+  openConnectModal('report', openReportBtn),
+);
+openFeedbackBtn?.addEventListener('click', () =>
+  openConnectModal('feedback', openFeedbackBtn),
+);
+openWifiBtn?.addEventListener('click', () =>
+  openConnectModal('help', openWifiBtn),
+);
+openCopy?.addEventListener('click', () => navigateTo('/copy'));
+
+connectContinueBtn?.addEventListener('click', () => {
+  const route = connectMode ? CONNECT_ROUTES[connectMode] : undefined;
+  closeConnectModal();
+  if (route) navigateTo(route);
+});
+[connectCloseBtn, connectCancelBtn, connectDoneBtn].forEach((btn) =>
+  btn?.addEventListener('click', closeConnectModal),
+);
+connectOverlay?.addEventListener('click', (e) => {
+  if (e.target === connectOverlay) closeConnectModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeConnectModal();
+});
+
+// ── Hotspot Wi-Fi details (Public ESP32 Hotspot) ─────────────────────────────
 
 let hotspotConfig: HotspotConfig | null = null;
 
-const wifiOverlay = document.getElementById('wifiOverlay');
-const homeWifiQrCanvas = document.getElementById(
-  'homeWifiQrCanvas',
+const connectWifiQrCanvas = document.getElementById(
+  'connectWifiQrCanvas',
 ) as HTMLCanvasElement | null;
-const openWifiBtn = document.getElementById('openWifiBtn');
-const openWifiHelpBtn = document.getElementById('openWifiHelpBtn');
-const closeWifiBtn = document.getElementById('closeWifiBtn');
 const wifiSsidVal = document.getElementById('wifiSsidVal');
 const wifiPasswordVal = document.getElementById('wifiPasswordVal');
-
-function escapeWifiQrValue(value: string): string {
-  return value.replace(/([\\;,:"])/g, '\\$1');
-}
-
-function buildWifiQrPayload(
-  ssid: string,
-  password: string,
-  authType?: string,
-): string {
-  const safeSsid = escapeWifiQrValue(ssid);
-  const safePassword = escapeWifiQrValue(password);
-  const normalizedAuth = authType?.trim().toLowerCase() ?? '';
-  const isOpenNetwork =
-    normalizedAuth === 'nopass' ||
-    normalizedAuth === 'open' ||
-    normalizedAuth === 'none' ||
-    safePassword.length === 0;
-
-  if (isOpenNetwork) {
-    return `WIFI:T:nopass;S:${safeSsid};;`;
-  }
-  return `WIFI:T:WPA;S:${safeSsid};P:${safePassword};;`;
-}
 
 function renderHomeWifiQr(): void {
   const configuredSsid = hotspotConfig?.ssid?.trim() ?? '';
@@ -558,13 +627,13 @@ function renderHomeWifiQr(): void {
   if (wifiPasswordVal) {
     wifiPasswordVal.textContent =
       configuredPassword.length > 0
-        ? configuredPassword
-        : 'Open (No password required)';
+        ? `Password: ${configuredPassword}`
+        : 'No password';
   }
 
-  if (homeWifiQrCanvas) {
+  if (connectWifiQrCanvas) {
     const wifiPayload = buildWifiQrPayload(ssid, configuredPassword, authType);
-    void QRCode.toCanvas(homeWifiQrCanvas, wifiPayload, {
+    void QRCode.toCanvas(connectWifiQrCanvas, wifiPayload, {
       width: 220,
       margin: 1,
       color: { dark: '#1a1a2e', light: '#ffffff' },
@@ -585,35 +654,7 @@ async function loadHotspotConfig(): Promise<void> {
   renderHomeWifiQr();
 }
 
-function openWifiModal(): void {
-  renderHomeWifiQr();
-  wifiOverlay?.classList.add('is-visible');
-  wifiOverlay?.setAttribute('aria-hidden', 'false');
-  syncFabVisibility();
-  closeWifiBtn?.focus();
-}
-
-function closeWifiModal(): void {
-  wifiOverlay?.classList.remove('is-visible');
-  wifiOverlay?.setAttribute('aria-hidden', 'true');
-  syncFabVisibility();
-}
-
-openWifiBtn?.addEventListener('click', openWifiModal);
-openWifiHelpBtn?.addEventListener('click', openWifiModal);
-closeWifiBtn?.addEventListener('click', closeWifiModal);
-wifiOverlay?.addEventListener('click', (e) => {
-  if (e.target === wifiOverlay) closeWifiModal();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && wifiOverlay?.classList.contains('is-visible')) {
-    closeWifiModal();
-  }
-});
-
 void loadHotspotConfig();
-void resolveFeedbackQrUrl();
-void resolveReportQrUrl();
 
 powerOff?.addEventListener('click', () => {
   const ok = confirm('Power off device?');
@@ -1045,15 +1086,7 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-// ── Feedback QR modal ─────────────────────────────────────────────────────────
-
-const openFeedbackBtn = document.getElementById('openFeedbackBtn');
-const feedbackOverlay = document.getElementById('feedbackOverlay');
-const closeFeedbackBtn = document.getElementById('closeFeedbackBtn');
-const feedbackQrCanvas = document.getElementById(
-  'feedbackQrCanvas',
-) as HTMLCanvasElement | null;
-const feedbackModalStatus = document.getElementById('feedbackModalStatus');
+// ── Feedback / report form URLs (shown as QR code 2 in the connect modal) ────
 
 let cachedFeedbackQrUrl: string | null = null;
 let cachedReportQrUrl: string | null = null;
@@ -1128,93 +1161,9 @@ async function resolveReportQrUrl(): Promise<string> {
   return `${window.location.origin}/report`;
 }
 
-function setFeedbackStatus(msg: string): void {
-  if (feedbackModalStatus) feedbackModalStatus.textContent = msg;
-}
-
-async function renderFeedbackQr(): Promise<void> {
-  if (!feedbackQrCanvas) return;
-  setFeedbackStatus('Generating QR code\u2026');
-  try {
-    const feedbackUrl = await resolveFeedbackQrUrl();
-    await QRCode.toCanvas(feedbackQrCanvas, feedbackUrl, {
-      width: 220,
-      margin: 1,
-      color: { dark: '#000000', light: '#ffffff' },
-    });
-    setFeedbackStatus('Use your phone camera to scan.');
-  } catch {
-    setFeedbackStatus('Could not generate QR code. Please try again.');
-  }
-}
-
-function openFeedbackModal(): void {
-  feedbackOverlay?.classList.add('is-visible');
-  feedbackOverlay?.setAttribute('aria-hidden', 'false');
-  syncFabVisibility();
-  void renderFeedbackQr();
-}
-
-function closeFeedbackModal(): void {
-  feedbackOverlay?.classList.remove('is-visible');
-  feedbackOverlay?.setAttribute('aria-hidden', 'true');
-  syncFabVisibility();
-}
-
-openFeedbackBtn?.addEventListener('click', openFeedbackModal);
-closeFeedbackBtn?.addEventListener('click', closeFeedbackModal);
-feedbackOverlay?.addEventListener('click', (e) => {
-  if (e.target === feedbackOverlay) closeFeedbackModal();
-});
-
-// ── Report QR modal ───────────────────────────────────────────────────────────
-
-const openReportBtn = document.getElementById('openReportBtn');
-const reportOverlay = document.getElementById('reportOverlay');
-const closeReportBtn = document.getElementById('closeReportBtn');
-const reportQrCanvas = document.getElementById(
-  'reportQrCanvas',
-) as HTMLCanvasElement | null;
-const reportModalStatus = document.getElementById('reportModalStatus');
-
-function setReportStatus(msg: string): void {
-  if (reportModalStatus) reportModalStatus.textContent = msg;
-}
-
-async function renderReportQr(): Promise<void> {
-  if (!reportQrCanvas) return;
-  setReportStatus('Generating QR code\u2026');
-  try {
-    const reportUrl = await resolveReportQrUrl();
-    await QRCode.toCanvas(reportQrCanvas, reportUrl, {
-      width: 220,
-      margin: 1,
-      color: { dark: '#000000', light: '#ffffff' },
-    });
-    setReportStatus('Use your phone camera to scan.');
-  } catch {
-    setReportStatus('Could not generate QR code. Please try again.');
-  }
-}
-
-function openReportModal(): void {
-  reportOverlay?.classList.add('is-visible');
-  reportOverlay?.setAttribute('aria-hidden', 'false');
-  syncFabVisibility();
-  void renderReportQr();
-}
-
-function closeReportModal(): void {
-  reportOverlay?.classList.remove('is-visible');
-  reportOverlay?.setAttribute('aria-hidden', 'true');
-  syncFabVisibility();
-}
-
-openReportBtn?.addEventListener('click', openReportModal);
-closeReportBtn?.addEventListener('click', closeReportModal);
-reportOverlay?.addEventListener('click', (e) => {
-  if (e.target === reportOverlay) closeReportModal();
-});
+// Warm the URL caches so QR code 2 renders instantly on first open.
+void resolveFeedbackQrUrl();
+void resolveReportQrUrl();
 
 export { navigateTo };
 

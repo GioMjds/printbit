@@ -964,146 +964,46 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 28px;
+  gap: clamp(16px, 2.5vh, 28px);
   /* Side padding keeps content clear of the fixed support dock (right)
      and the language button; symmetric so the layout stays centred. */
-  padding: 24px 76px;
+  padding: 16px 76px 24px;
 }
 
-.action-hint {
-  font-size: clamp(14px, 1.5vw, 18px);
-  font-weight: 500;
-  color: var(--ink-muted);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-/* ── Inline WiFi QR card (step 1, above the action grid) ──────────────── */
-.wifi-inline-card {
-  display: flex;
-  align-items: center;
-  gap: clamp(16px, 2vw, 28px);
-  padding: clamp(14px, 1.6vw, 20px) clamp(20px, 2.4vw, 30px);
-  background: linear-gradient(
-    145deg,
-    rgba(105, 111, 199, 0.16) 0%,
-    rgba(105, 111, 199, 0.05) 100%
-  );
-  border: 1.5px solid rgba(167, 170, 225, 0.25);
-  border-radius: 22px;
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  max-width: 1100px;
-  width: 100%;
-}
-
-.wifi-inline-card__qr {
-  flex-shrink: 0;
-  display: flex;
-}
-
-.wifi-inline-card__text {
+/* ── Homepage heading (Wi-Fi steps now live in the connect modal) ─────── */
+.action-intro {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  text-align: left;
-}
-
-.wifi-inline-card__step {
-  display: inline-flex;
-  padding: 3px 12px;
-  border-radius: 999px;
-  background: rgba(74, 222, 128, 0.14);
-  border: 1px solid rgba(74, 222, 128, 0.3);
-  color: #4ade80;
-  font-size: 11.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.wifi-inline-card__title {
-  font-size: clamp(18px, 2vw, 24px);
-  font-weight: 700;
-  letter-spacing: -0.4px;
-  color: var(--white);
-  margin: 2px 0 0;
-}
-
-.wifi-inline-card__sub {
-  font-size: clamp(12px, 1.2vw, 26px);
-  color: var(--ink-muted);
-  line-height: 1.4;
-  margin: 0;
-  max-width: 56ch;
-}
-
-.wifi-inline-card__help-btn {
-  display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
-  padding: 5px 14px;
-  border-radius: 999px;
-  background: rgba(74, 222, 128, 0.12);
-  border: 1px solid rgba(74, 222, 128, 0.3);
-  color: #4ade80;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    transform 120ms ease;
-  -webkit-tap-highlight-color: transparent;
+  text-align: center;
 }
 
-.wifi-inline-card__help-btn:hover {
-  background: rgba(74, 222, 128, 0.22);
-  border-color: rgba(74, 222, 128, 0.5);
-  transform: translateY(-1px);
+.action-intro__title {
+  margin: 0;
+  font-size: clamp(28px, 3.4vw, 48px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--white);
 }
 
-.wifi-inline-card__help-btn:active {
-  transform: scale(0.97);
-}
-
-.wifi-inline-card__help-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-/* On short kiosk viewports, tighten the vertical rhythm so the card
-   doesn't push the action-grid toward clipping (see .action-area gap) */
-@media (max-height: 760px) {
-  .wifi-inline-card {
-    padding: clamp(8px, 1.2vw, 12px) clamp(16px, 2vw, 22px);
-    gap: clamp(12px, 1.5vw, 18px);
-  }
-  .wifi-inline-card__title {
-    font-size: clamp(16px, 1.8vw, 20px);
-  }
-  .wifi-inline-card__help-btn {
-    margin-top: 3px;
-    padding: 3px 10px;
-    font-size: 11px;
-  }
-  .qr-frame--sm canvas {
-    width: 88px !important;
-    height: 88px !important;
-  }
+.action-intro__sub {
+  margin: 0;
+  font-size: clamp(14px, 1.4vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lavender);
 }
 
 /* ── Action grid ──────────────────────────────────────────── */
 .action-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: clamp(16px, 2vw, 36px);
+  gap: clamp(16px, 2vw, 32px);
   width: 100%;
-  max-width: 1100px;
+  max-width: 1200px;
 }
 
 /* ── Action card (button) ─────────────────────────────────── */
@@ -1114,9 +1014,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: clamp(12px, 1.5vw, 18px);
-  /* Extra top padding reserves a row for the label pills (prices / help) */
-  padding: clamp(60px, 4.4vw, 68px) clamp(20px, 2.5vw, 42px)
-    clamp(24px, 3vw, 40px);
+  /* Top padding clears the 56px price / guide buttons (top: 14px) */
+  padding: 78px clamp(16px, 2vw, 32px) clamp(24px, 3vh, 40px);
   border: none;
   border-radius: 28px;
   cursor: pointer;
@@ -1220,8 +1119,9 @@ body {
 
 /* Icon */
 .action-card__icon-wrap {
-  width: clamp(100px, 13vw, 164px);
-  height: clamp(100px, 13vw, 164px);
+  /* Bounded by height too, so the larger cards still fit short kiosk screens */
+  width: clamp(130px, min(18vw, 28vh), 260px);
+  height: clamp(130px, min(18vw, 28vh), 260px);
   border-radius: 28px;
   display: grid;
   place-items: center;
@@ -1244,82 +1144,96 @@ body {
 
 /* Title */
 .action-card__title {
-  font-size: clamp(26px, 3.2vw, 46px);
-  font-weight: 700;
+  font-size: clamp(32px, min(4.2vw, 6.5vh), 60px);
+  font-weight: 800;
   letter-spacing: -1px;
   color: var(--white);
   margin: 0;
 }
 
 /* Sub */
+/* Sentence case at full opacity: easier to read at a glance than spaced caps */
 .action-card__sub {
-  text-transform: uppercase;
-  font-size: clamp(12px, 1.1vw, 15px);
-  font-weight: 500;
+  max-width: 22ch;
+  font-size: clamp(16px, min(1.7vw, 2.7vh), 22px);
+  font-weight: 600;
   line-height: 1.35;
-  letter-spacing: 0.3px;
   text-wrap: balance;
   color: inherit;
-  opacity: 0.85;
   margin: 0;
 }
 
-/* ── Labelled pills on each card (help = every card, prices = Print only) ── */
+/* ── Icon buttons on each card: prices (left) and how-to guide (right) ──
+   Icon only; the accessible name comes from each button's aria-label. */
+.action-card {
+  --card-accent-rgb: 167, 170, 225;
+}
+
+.action-card--copy {
+  --card-accent-rgb: 62, 207, 178;
+}
+
+.action-card--scan {
+  --card-accent-rgb: 242, 174, 187;
+}
+
 .action-card__help,
 .action-card__price {
   position: absolute;
   top: 14px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 14px 0 6px;
-  border-radius: 999px;
-  border: 1.5px solid rgba(255, 255, 255, 0.32);
-  background: rgba(14, 13, 31, 0.55);
-  color: var(--white);
-  font-size: clamp(12px, 1vw, 14px);
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  white-space: nowrap;
-  cursor: pointer;
   z-index: 2;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  border: 1.5px solid rgba(var(--card-accent-rgb), 0.5);
+  background: rgba(14, 13, 31, 0.62);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  cursor: pointer;
   transition:
-    background 150ms,
-    border-color 150ms,
-    transform 120ms;
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 120ms ease;
   -webkit-tap-highlight-color: transparent;
-}
-
-.action-card__help {
-  right: 14px;
 }
 
 .action-card__price {
   left: 14px;
 }
 
+.action-card__help {
+  right: 14px;
+}
+
 .action-card__help:hover,
 .action-card__price:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(var(--card-accent-rgb), 0.22);
+  border-color: rgba(var(--card-accent-rgb), 0.85);
 }
 
 .action-card__help:active,
 .action-card__price:active {
-  transform: scale(0.96);
+  transform: scale(0.92);
+}
+
+.action-card__help:focus-visible,
+.action-card__price:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .action-card__pill-icon {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgb(var(--card-accent-rgb));
   color: #14122b;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1;
 }
@@ -1694,622 +1608,446 @@ body {
   }
 
   .action-grid {
-    max-width: 1100px;
+    max-width: 1320px;
   }
 }
 
-/* ── Report overlay ───────────────────────────────────────── */
-.report-overlay {
+/* ── Connect modal: PrintBit Wi-Fi gate (print, scan, report, feedback, help) ── */
+.connect-overlay {
   position: fixed;
   inset: 0;
   z-index: 300;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(14, 13, 31, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    opacity 240ms ease,
-    visibility 240ms ease;
-}
-
-.report-overlay.is-visible {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.report-modal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  width: 440px;
-  max-width: 94vw;
-  padding: 40px 36px 32px;
-  background: #1f1512;
-  border: 1.5px solid rgba(245, 211, 196, 0.25);
-  border-radius: 28px;
-  box-shadow:
-    0 28px 72px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  text-align: center;
-  transform: translateY(16px) scale(0.96);
-  transition:
-    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 240ms ease;
-}
-
-.report-overlay.is-visible .report-modal {
-  transform: translateY(0) scale(1);
-  opacity: 1;
-}
-
-.report-modal__title {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--white);
-  letter-spacing: -0.4px;
-  margin: 0;
-}
-
-.report-modal__badge,
-.feedback-modal__badge {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  color: var(--peach);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.report-modal__badge svg,
-.feedback-modal__badge svg {
-  width: 26px;
-  height: 26px;
-}
-
-.report-modal__eyebrow,
-.feedback-modal__eyebrow {
-  margin: 0 -4px -8px;
-  color: var(--peach);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.report-modal__sub {
-  font-size: 14px;
-  color: var(--ink-muted);
-  line-height: 1.55;
-  margin: 0;
-}
-
-.report-modal__qr-wrap {
-  background: #fff;
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.report-modal__status {
-  font-size: 13px;
-  color: var(--ink-muted);
-  margin: 0;
-}
-
-.report-modal__timer {
-  font-size: 13px;
-  color: var(--peach);
-  font-weight: 600;
-  margin: 0;
-}
-
-.report-modal__close {
-  margin-top: 4px;
-  padding: 12px 36px;
-  min-height: 44px;
-  border: none;
-  border-radius: 16px;
-  background: rgba(245, 211, 196, 0.18);
-  color: var(--peach);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    background 140ms,
-    transform 120ms;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.report-modal__close:hover {
-  background: rgba(245, 211, 196, 0.32);
-  transform: scale(1.02);
-}
-
-.report-modal__close:active {
-  transform: scale(0.97);
-}
-
-/* ── Feedback overlay ─────────────────────────────────────── */
-.feedback-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(14, 13, 31, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    opacity 240ms ease,
-    visibility 240ms ease;
-}
-
-.feedback-overlay.is-visible {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.feedback-modal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  width: 440px;
-  max-width: 94vw;
-  padding: 40px 36px 32px;
-  background: #181730;
-  border: 1.5px solid rgba(167, 170, 225, 0.25);
-  border-radius: 28px;
-  box-shadow:
-    0 28px 72px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  text-align: center;
-  transform: translateY(16px) scale(0.96);
-  transition:
-    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 240ms ease;
-}
-
-.feedback-overlay.is-visible .feedback-modal {
-  transform: translateY(0) scale(1);
-  opacity: 1;
-}
-
-.feedback-modal__title {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--white);
-  letter-spacing: -0.4px;
-  margin: 0;
-}
-
-.feedback-modal__sub {
-  font-size: 14px;
-  color: var(--ink-muted);
-  line-height: 1.55;
-  margin: 0;
-}
-
-.feedback-modal__qr-wrap {
-  background: #fff;
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.feedback-modal__status {
-  font-size: 13px;
-  color: var(--ink-muted);
-  margin: 0;
-}
-
-.feedback-modal__timer {
-  font-size: 13px;
-  color: var(--lavender);
-  font-weight: 600;
-  margin: 0;
-}
-
-.feedback-modal__close {
-  margin-top: 4px;
-  padding: 12px 36px;
-  border: none;
-  border-radius: 16px;
-  background: rgba(105, 111, 199, 0.2);
-  color: var(--lavender);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 140ms;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.feedback-modal__close:hover {
-  background: rgba(105, 111, 199, 0.35);
-}
-
-/* ── Wi-Fi pill button (topbar right) ─────────────────────────────── */
-.wifi-pill-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 16px 8px 12px;
-  border-radius: 999px;
-  background: rgba(105, 111, 199, 0.14);
-  border: 1.5px solid rgba(167, 170, 225, 0.25);
-  color: var(--white);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  cursor: pointer;
-  transition:
-    background 160ms,
-    border-color 160ms,
-    transform 140ms cubic-bezier(0.34, 1.4, 0.64, 1),
-    box-shadow 160ms;
-  -webkit-tap-highlight-color: transparent;
-}
-.wifi-pill-btn:hover {
-  background: rgba(105, 111, 199, 0.25);
-  border-color: rgba(167, 170, 225, 0.45);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(105, 111, 199, 0.25);
-}
-
-/* ── Wi-Fi Overlay & Modal ─────────────────────────────────────── */
-.wifi-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(14, 13, 31, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 220ms ease;
   padding: 16px;
   box-sizing: border-box;
+  background: rgba(14, 13, 31, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 240ms ease,
+    visibility 240ms ease;
 }
 
-.wifi-overlay.is-visible {
+.connect-overlay.is-visible {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
-.wifi-modal {
+.connect-modal {
+  --connect-accent: #4ade80;
+  --wifi-green: #4ade80;
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: 620px;
-  max-width: 94vw;
-  overflow: hidden;
-  padding: 26px 32px 22px;
+  gap: 18px;
+  width: min(960px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 28px 32px 24px;
+  box-sizing: border-box;
   background: #181730;
   border: 1.5px solid rgba(167, 170, 225, 0.22);
   border-radius: 28px;
   box-shadow:
     0 28px 72px rgba(0, 0, 0, 0.65),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  text-align: center;
   transform: translateY(16px) scale(0.96);
   transition:
     transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
     opacity 240ms ease;
-  box-sizing: border-box;
 }
 
-.wifi-overlay.is-visible .wifi-modal {
-  transform: translateY(0) scale(1);
-  opacity: 1;
+.connect-overlay.is-visible .connect-modal {
+  transform: none;
 }
 
-.wifi-modal .step-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  border-radius: 999px;
-  background: rgba(74, 222, 128, 0.12);
-  border: 1px solid rgba(74, 222, 128, 0.3);
-  color: #4ade80;
-  font-size: 12px;
-  font-weight: 700;
+.connect-modal[data-mode='report'] {
+  --connect-accent: var(--peach);
 }
 
-.wifi-modal .step-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.connect-modal[data-mode='feedback'] {
+  --connect-accent: var(--lavender);
 }
 
-.wifi-modal .step-icon svg {
-  width: 14px;
-  height: 14px;
+/* Several children set display; keep the hidden attribute authoritative. */
+.connect-modal [hidden] {
+  display: none !important;
 }
 
-.wifi-modal__title {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--white);
-  letter-spacing: -0.4px;
-  margin: 0;
-}
-
-.wifi-modal__sub {
-  font-size: 14px;
-  color: var(--ink-muted);
-  line-height: 1.45;
-  margin: 0;
-}
-
-.wifi-modal__qr-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 4px 0;
-}
-
-/* Base qr-frame — white backing (required for QR scan contrast against the
-   dark kiosk theme), shared by both the wifi-modal and the inline homepage
-   card. Size and radius are overridden per-context below. */
-.qr-frame {
-  position: relative;
-  display: inline-flex;
-  padding: 10px;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow:
-    0 0 0 1px rgba(167, 170, 225, 0.2),
-    0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.wifi-modal .qr-frame canvas {
-  width: 190px !important;
-  height: 190px !important;
-  display: block;
-}
-
-/* Small qr-frame variant — inline homepage WiFi card. Only overrides
-   size; position/background/shadow are inherited from the base above. */
-.qr-frame--sm {
-  padding: 8px;
-  border-radius: 14px;
-}
-
-.qr-frame--sm canvas {
-  width: 110px !important;
-  height: 110px !important;
-  display: block;
-}
-
-.wifi-modal .qr-corner {
+.connect-modal__x {
   position: absolute;
-  width: 14px;
-  height: 14px;
-  border-color: var(--indigo);
-  border-style: solid;
-  pointer-events: none;
-}
-.wifi-modal .qr-corner--tl {
-  top: -3px;
-  left: -3px;
-  border-width: 3px 0 0 3px;
-  border-top-left-radius: 6px;
-}
-.wifi-modal .qr-corner--tr {
-  top: -3px;
-  right: -3px;
-  border-width: 3px 3px 0 0;
-  border-top-right-radius: 6px;
-}
-.wifi-modal .qr-corner--bl {
-  bottom: -3px;
-  left: -3px;
-  border-width: 0 0 3px 3px;
-  border-bottom-left-radius: 6px;
-}
-.wifi-modal .qr-corner--br {
-  bottom: -3px;
-  right: -3px;
-  border-width: 0 3px 3px 0;
-  border-bottom-right-radius: 6px;
-}
-
-.wifi-info-card {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(167, 170, 225, 0.12);
-  border-radius: 16px;
-  padding: 10px 14px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-align: left;
-}
-
-.wifi-info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-}
-
-.wifi-info-label {
-  font-weight: 600;
-  color: var(--ink-muted);
-}
-
-.wifi-info-val {
-  font-weight: 700;
-  color: var(--white);
-}
-
-.wifi-modal__badge {
+  top: 16px;
+  right: 16px;
   width: 52px;
   height: 52px;
+  display: grid;
+  place-items: center;
   border-radius: 16px;
-  background: rgba(74, 222, 128, 0.12);
-  border: 1px solid rgba(74, 222, 128, 0.28);
-  display: flex;
+  border: 1px solid rgba(167, 170, 225, 0.22);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--lavender);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    transform 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.connect-modal__x svg {
+  width: 22px;
+  height: 22px;
+}
+
+.connect-modal__x:active {
+  transform: scale(0.94);
+}
+
+.connect-modal__head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 16px;
+  row-gap: 2px;
   align-items: center;
-  justify-content: center;
-  color: #4ade80;
-}
-.wifi-modal__badge svg {
-  width: 26px;
-  height: 26px;
-}
-
-.wifi-modal__eyebrow {
-  margin: 0;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: #4ade80;
-}
-
-.wifi-modal-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
+  padding-right: 64px;
   text-align: left;
 }
 
-.wifi-modal-step {
+.connect-modal__badge {
+  grid-row: 1 / span 3;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--connect-accent);
+}
+
+.connect-modal__badge svg {
+  width: 30px;
+  height: 30px;
+}
+
+.connect-modal__eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--connect-accent);
+}
+
+.connect-modal__title {
+  margin: 0;
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--white);
+}
+
+.connect-modal__sub {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--lavender);
+}
+
+.connect-modal__body {
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+}
+
+.connect-modal__qrs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  padding: 12px 0 0 12px; /* room for the corner number badges */
+}
+
+.connect-modal__arrow {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  color: var(--connect-accent);
+}
+
+.connect-qr {
+  --qr-accent: var(--wifi-green);
+  position: relative;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 14px;
+  border-radius: 22px;
+  border: 1.5px solid rgba(167, 170, 225, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.connect-qr--form {
+  --qr-accent: var(--connect-accent);
+}
+
+.connect-qr__num {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--qr-accent);
+  color: #14122b;
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+/* White backing keeps the QR scannable on the dark theme. */
+.connect-qr__frame {
+  padding: 10px;
+  border-radius: 16px;
+  background: #ffffff;
+  line-height: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.connect-qr__frame canvas {
+  display: block;
+  width: 184px !important;
+  height: 184px !important;
+}
+
+.connect-qr__caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 204px;
+  text-align: center;
+}
+
+.connect-qr__caption strong {
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.connect-qr__meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  color: var(--lavender);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.connect-steps {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connect-step {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(167, 170, 225, 0.12);
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(167, 170, 225, 0.1);
-  border-radius: 14px;
 }
 
-.wifi-modal-step__num {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(74, 222, 128, 0.15);
-  border: 1px solid rgba(74, 222, 128, 0.35);
-  color: #4ade80;
-  font-size: 12px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.connect-step__num {
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
-  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--wifi-green);
+  font-size: 13px;
+  font-weight: 800;
 }
 
-.wifi-modal-step__content {
+.connect-step[data-connect-form] .connect-step__num {
+  border-color: var(--connect-accent);
+  background: transparent;
+  color: var(--connect-accent);
+}
+
+.connect-step__text {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12.5px;
-  line-height: 1.4;
-  color: var(--ink-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--lavender);
 }
 
-.wifi-modal-step__content strong {
+.connect-step__text strong {
   color: var(--white);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
 }
 
-.wifi-modal-step__content em {
-  font-style: normal;
-  color: var(--lavender);
-  font-weight: 600;
-}
-
-.wifi-modal-tip {
+.connect-modal__note {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(251, 146, 60, 0.3);
   background: rgba(251, 146, 60, 0.08);
-  border: 1px solid rgba(251, 146, 60, 0.28);
-  border-radius: 14px;
-  width: 100%;
-  box-sizing: border-box;
-  text-align: left;
+  color: #fed7aa;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-.wifi-modal-tip__icon {
-  color: #fb923c;
+.connect-modal__note svg {
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+  margin-top: 1px;
+  color: #fb923c;
+}
+
+.connect-modal__note p {
+  margin: 0;
+}
+
+.connect-modal__note strong {
+  color: #fb923c;
+}
+
+.connect-modal__actions {
   display: flex;
+  gap: 12px;
+}
+
+.connect-btn {
+  flex: 1;
+  min-height: 60px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 2px;
+  gap: 8px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background 140ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.wifi-modal-tip__icon svg {
+.connect-btn:active {
+  transform: scale(0.98);
+}
+
+.connect-btn:focus-visible,
+.connect-modal__x:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.connect-btn--primary {
+  flex: 2;
+  border: none;
+  background: #2d8443; /* 4.6:1 with white text */
+  color: #ffffff;
+  box-shadow: 0 4px 18px rgba(58, 158, 82, 0.35);
+}
+
+.connect-btn--primary:hover {
+  background: #33914b;
+}
+
+.connect-btn--primary svg {
   width: 18px;
   height: 18px;
 }
 
-.wifi-modal-tip__text {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #fed7aa;
+.connect-btn--ghost {
+  border: 1px solid rgba(167, 170, 225, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--lavender);
 }
 
-.wifi-modal-tip__text strong {
-  color: #fb923c;
-}
-
-.wifi-modal__close {
-  width: 100%;
-  margin-top: 4px;
-  padding: 13px 24px;
-  border: none;
-  border-radius: 14px;
-  background: #3a9e52;
+.connect-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.09);
   color: var(--white);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(58, 158, 82, 0.35);
-  transition:
-    background 140ms,
-    transform 120ms;
-  -webkit-tap-highlight-color: transparent;
 }
-.wifi-modal__close:hover {
-  background: #45b560;
+
+@media (max-height: 760px) {
+  .connect-modal {
+    gap: 14px;
+    padding: 20px 24px 18px;
+  }
+  .connect-qr__frame canvas {
+    width: 148px !important;
+    height: 148px !important;
+  }
+  .connect-step {
+    padding: 8px 12px;
+  }
 }
-.wifi-modal__close:active {
-  transform: scale(0.97);
+
+@media (max-width: 820px) {
+  .connect-modal__body {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .connect-modal {
+    padding: 20px 16px 16px;
+  }
+  .connect-modal__head {
+    grid-template-columns: 1fr;
+  }
+  .connect-modal__badge {
+    display: none;
+  }
+  .connect-modal__qrs {
+    flex-direction: column;
+  }
+  .connect-modal__arrow {
+    transform: rotate(90deg);
+  }
+  .connect-modal__actions {
+    flex-direction: column-reverse;
+  }
+}
+
+html[data-high-contrast='true'] .connect-modal {
+  background: #000 !important;
+  border: 2px solid #fff !important;
 }
 
 /* ── Admin PIN modal ──────────────────────────────────────── */
@@ -2588,194 +2326,4 @@ html[data-high-contrast='true'] .home-ink-out-fab {
   color: #ef4444 !important;
   box-shadow: none !important;
   animation: none !important;
-}
-
-
-
-/* ── Print Wi-Fi Confirmation Intercept Modal ── */
-.print-wifi-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 310;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(14, 13, 31, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 220ms ease;
-  padding: 0 16px 16px;
-  box-sizing: border-box;
-}
-
-.print-wifi-overlay.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.print-wifi-modal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  width: 560px;
-  max-width: 92vw;
-  padding: 32px 28px 24px;
-  background: #181730;
-  border: 1.5px solid rgba(167, 170, 225, 0.22);
-  border-radius: 28px 28px 20px 20px;
-  box-shadow:
-    0 28px 72px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  text-align: center;
-  transform: translateY(100%);
-  transition:
-    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 240ms ease;
-  box-sizing: border-box;
-}
-
-.print-wifi-overlay.is-visible .print-wifi-modal {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.print-wifi-modal__badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: rgba(105, 111, 199, 0.16);
-  border: 1.5px solid rgba(105, 111, 199, 0.4);
-  color: #a7aae1;
-}
-
-.print-wifi-modal__badge svg {
-  width: 28px;
-  height: 28px;
-}
-
-.print-wifi-modal__title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.02em;
-}
-
-.print-wifi-modal__sub {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
-  color: #a7aae1;
-}
-
-.print-wifi-modal__sub strong {
-  color: #ffffff;
-}
-
-.print-wifi-modal__tip {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(245, 211, 196, 0.08);
-  border: 1px solid rgba(245, 211, 196, 0.2);
-  color: #f5d3c4;
-  font-size: 13px;
-  line-height: 1.45;
-  text-align: left;
-  box-sizing: border-box;
-}
-
-.print-wifi-modal__tip svg {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.print-wifi-modal__tip strong {
-  color: #ffffff;
-}
-
-.print-wifi-modal__actions {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.print-wifi-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 20px 24px;
-  border-radius: 16px;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 120ms ease, background 140ms ease, opacity 140ms ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.print-wifi-btn:active {
-  transform: scale(0.98);
-}
-
-.print-wifi-btn--primary {
-  border: none;
-  background: #3a9e52;
-  color: #ffffff;
-  box-shadow: 0 4px 18px rgba(58, 158, 82, 0.35);
-}
-
-.print-wifi-btn--primary:hover {
-  background: #45b560;
-}
-
-.print-wifi-btn--primary svg {
-  width: 18px;
-  height: 18px;
-}
-
-.print-wifi-btn--subtle {
-  border: 1px solid rgba(167, 170, 225, 0.25);
-  background: rgba(255, 255, 255, 0.05);
-  color: #a7aae1;
-}
-
-.print-wifi-btn--subtle:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: #ffffff;
-}
-
-/* ── Pulse Animation for Step 1 Wi-Fi Card ── */
-@keyframes wifiCardPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(105, 111, 199, 0.8);
-    border-color: #696fc7;
-  }
-  50% {
-    box-shadow: 0 0 0 16px rgba(105, 111, 199, 0);
-    border-color: #a7aae1;
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(105, 111, 199, 0);
-    border-color: rgba(167, 170, 225, 0.22);
-  }
-}
-
-.wifi-inline-card--pulse {
-  animation: wifiCardPulse 1.2s ease-out 2;
 }

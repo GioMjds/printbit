@@ -10,7 +10,7 @@ export interface CoverageTierInfo {
 export function getCoverageTierInfo(coveragePercent: number): CoverageTierInfo {
   const p = Math.max(0, Math.min(100, Math.round(coveragePercent)));
   if (p <= 10) {
-    return { tier: 'low', label: 'Low', rangeLabel: '0% - 10%' };
+    return { tier: 'low', label: 'Low', rangeLabel: '1% - 10%' };
   }
   if (p <= 40) {
     return { tier: 'medium', label: 'Medium', rangeLabel: '11% - 40%' };

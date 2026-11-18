@@ -53,36 +53,10 @@
 
       <!-- Main Action Area -->
       <main class="action-area" role="main" aria-label="Main actions">
-        <div
-          class="wifi-inline-card"
-          aria-label="Connect to PrintBit Wi-Fi first"
-        >
-          <div class="wifi-inline-card__qr">
-            <div class="qr-frame qr-frame--sm">
-              <canvas
-                id="homeWifiQrCanvas"
-                width="130"
-                height="130"
-                aria-label="QR code to join PrintBit Wi-Fi"
-              ></canvas>
-              <span class="qr-corner qr-corner--tl" aria-hidden="true"></span>
-              <span class="qr-corner qr-corner--tr" aria-hidden="true"></span>
-              <span class="qr-corner qr-corner--bl" aria-hidden="true"></span>
-              <span class="qr-corner qr-corner--br" aria-hidden="true"></span>
-            </div>
-          </div>
-          <div class="wifi-inline-card__text">
-            <span class="wifi-inline-card__step">Step 1</span>
-            <h2 class="wifi-inline-card__title">Scan to connect to PrintBit</h2>
-            <p class="wifi-inline-card__sub">
-              Connect to PrintBit Wi-Fi using Google Lens (Android) or native
-              camera (iOS) before uploading files, download E-Receipt, download
-              your soft copy, report issues, and submit feedback.
-            </p>
-          </div>
-        </div>
-
-        <p class="action-hint">Then select a print method</p>
+        <header class="action-intro">
+          <h1 class="action-intro__title">What would you like to do?</h1>
+          <p class="action-intro__sub">Tap a service to begin</p>
+        </header>
 
         <div class="action-grid">
           <!-- Print Card -->
@@ -101,7 +75,6 @@
               <span class="action-card__pill-icon" aria-hidden="true"
                 >&#8369;</span
               >
-              <span class="action-card__pill-label">Printing prices</span>
             </span>
             <span
               class="action-card__help"
@@ -110,7 +83,6 @@
               aria-label="How to print"
             >
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
-              <span class="action-card__pill-label">How to print</span>
             </span>
             <div class="action-card__glow"></div>
             <div
@@ -154,7 +126,7 @@
               </svg>
             </div>
             <h2 class="action-card__title">Print</h2>
-            <p class="action-card__sub">Send files from your phone to print</p>
+            <p class="action-card__sub">Print files from your phone</p>
           </button>
 
           <!-- Copy Card -->
@@ -173,7 +145,6 @@
               <span class="action-card__pill-icon" aria-hidden="true"
                 >&#8369;</span
               >
-              <span class="action-card__pill-label">Copy prices</span>
             </span>
             <span
               class="action-card__help"
@@ -182,7 +153,6 @@
               aria-label="How to photocopy"
             >
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
-              <span class="action-card__pill-label">How to copy</span>
             </span>
             <div class="action-card__glow"></div>
             <div
@@ -240,9 +210,7 @@
               </svg>
             </div>
             <h2 class="action-card__title">Copy</h2>
-            <p class="action-card__sub">
-              Make photocopies of your paper document
-            </p>
+            <p class="action-card__sub">Photocopy your paper documents</p>
           </button>
 
           <!-- Scan Card -->
@@ -261,7 +229,6 @@
               <span class="action-card__pill-icon" aria-hidden="true"
                 >&#8369;</span
               >
-              <span class="action-card__pill-label">Scan prices</span>
             </span>
             <span
               class="action-card__help"
@@ -270,7 +237,6 @@
               aria-label="How to scan"
             >
               <span class="action-card__pill-icon" aria-hidden="true">?</span>
-              <span class="action-card__pill-label">How to scan</span>
             </span>
             <div class="action-card__glow"></div>
             <div
@@ -355,9 +321,7 @@
               </svg>
             </div>
             <h2 class="action-card__title">Scan</h2>
-            <p class="action-card__sub">
-              Paper to soft copy, sent straight to your phone
-            </p>
+            <p class="action-card__sub">Turn paper into a soft copy on your phone</p>
           </button>
         </div>
       </main>
@@ -817,178 +781,43 @@
       <span class="home-ink-out-fab__label">Ink Out</span>
     </div>
 
-    <!-- Report QR modal -->
-    <div class="report-overlay" id="reportOverlay" aria-hidden="true">
-      <div
-        class="report-modal"
+    <!--
+      Connect modal: one Wi-Fi gate for every phone-based flow.
+      app.ts sets data-mode (print | scan | report | feedback | help) and the
+      matching copy. Print/Scan continue after "I'm connected"; Report and
+      Feedback add a second QR that opens the form once the phone is on
+      PrintBit Wi-Fi.
+    -->
+    <div class="connect-overlay" id="connectOverlay" aria-hidden="true">
+      <section
+        class="connect-modal"
+        id="connectModal"
+        data-mode="print"
         role="dialog"
-        aria-labelledby="reportModalTitle"
         aria-modal="true"
+        aria-labelledby="connectTitle"
+        aria-describedby="connectSub"
       >
-        <div class="report-modal__badge" aria-hidden="true">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-          >
-            <path
-              d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"
-            />
-            <path d="M8 8h3v3H8zM13 13h3v3h-3z" />
-          </svg>
-        </div>
-        <p class="report-modal__eyebrow">Report A Problem</p>
-        <h3 class="report-modal__title" id="reportModalTitle">
-          Something went wrong? Let us know.
-        </h3>
-        <p class="report-modal__sub">
-          Scan the QR code to report the issue and get assistance.
-        </p>
-        <div class="report-modal__qr-wrap" id="reportQrWrap">
-          <canvas id="reportQrCanvas"></canvas>
-        </div>
-        <p class="report-modal__status" id="reportModalStatus">
-          Generating QR code…
-        </p>
         <button
-          class="report-modal__close"
+          class="connect-modal__x"
+          id="connectCloseBtn"
           type="button"
-          id="closeReportBtn"
-          aria-label="Close report modal"
+          aria-label="Close"
         >
-          Close
-        </button>
-      </div>
-    </div>
-
-    <!-- Feedback QR modal -->
-    <div class="feedback-overlay" id="feedbackOverlay" aria-hidden="true">
-      <div
-        class="feedback-modal"
-        role="dialog"
-        aria-labelledby="feedbackModalTitle"
-        aria-modal="true"
-      >
-        <div class="feedback-modal__badge" aria-hidden="true">
           <svg
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="1.8"
-          >
-            <path
-              d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.7A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z"
-            />
-            <path d="M8 12h.01M12 12h.01M16 12h.01" stroke-linecap="round" />
-          </svg>
-        </div>
-        <p class="feedback-modal__eyebrow">Share your Feedback</p>
-        <h3 class="feedback-modal__title" id="feedbackModalTitle">
-          Help us improve your PrintBit experience.
-        </h3>
-        <p class="feedback-modal__sub">
-          Scan the QR code to send us your feedback and suggestions.
-        </p>
-        <div class="feedback-modal__qr-wrap" id="feedbackQrWrap">
-          <canvas id="feedbackQrCanvas"></canvas>
-        </div>
-        <p class="feedback-modal__status" id="feedbackModalStatus">
-          Generating QR code…
-        </p>
-        <button
-          class="feedback-modal__close"
-          type="button"
-          id="closeFeedbackBtn"
-          aria-label="Close feedback modal"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-
-    <!-- Wi-Fi Help Modal -->
-    <div class="wifi-overlay" id="wifiOverlay" aria-hidden="true">
-      <div
-        class="wifi-modal"
-        role="dialog"
-        aria-labelledby="wifiModalTitle"
-        aria-describedby="wifiModalSub"
-        aria-modal="true"
-      >
-        <div class="wifi-modal__badge" aria-hidden="true">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+            stroke-width="2.5"
             stroke-linecap="round"
-            stroke-linejoin="round"
+            aria-hidden="true"
           >
-            <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-            <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-            <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-            <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
+            <path d="M18 6 6 18M6 6l12 12" />
           </svg>
-        </div>
-        <p class="wifi-modal__eyebrow">Step 1 Alternative</p>
-        <h3 class="wifi-modal__title" id="wifiModalTitle">
-          Wi-Fi Connection Help
-        </h3>
-        <p class="wifi-modal__sub" id="wifiModalSub">
-          Follow these steps if scanning the QR code with your phone camera
-          doesn't work.
-        </p>
+        </button>
 
-        <div class="wifi-info-card">
-          <div class="wifi-info-row">
-            <span class="wifi-info-label">Network (SSID)</span>
-            <span class="wifi-info-val" id="wifiSsidVal">PrintBit</span>
-          </div>
-          <div class="wifi-info-row">
-            <span class="wifi-info-label">Password</span>
-            <span class="wifi-info-val" id="wifiPasswordVal"
-              >Open (No password required)</span
-            >
-          </div>
-        </div>
-
-        <div class="wifi-modal-steps">
-          <div class="wifi-modal-step">
-            <span class="wifi-modal-step__num">1</span>
-            <div class="wifi-modal-step__content">
-              <strong>Connect manually in Wi-Fi settings</strong>
-              <span
-                >Open your phone Settings &rarr; Wi-Fi and choose the network
-                name above.</span
-              >
-            </div>
-          </div>
-          <div class="wifi-modal-step">
-            <span class="wifi-modal-step__num">2</span>
-            <div class="wifi-modal-step__content">
-              <strong>Open network</strong>
-              <span
-                >PrintBit Wi-Fi is an open network. No password is
-                required.</span
-              >
-            </div>
-          </div>
-          <div class="wifi-modal-step">
-            <span class="wifi-modal-step__num">3</span>
-            <div class="wifi-modal-step__content">
-              <strong>Continue without internet</strong>
-              <span
-                >If your phone prompts &ldquo;No internet connection&rdquo;,
-                select <em>Keep Connected</em> or <em>Continue</em>. You can
-                proceed even without internet.</span
-              >
-            </div>
-          </div>
-        </div>
-
-        <div class="wifi-modal-tip">
-          <div class="wifi-modal-tip__icon" aria-hidden="true">
+        <header class="connect-modal__head">
+          <span class="connect-modal__badge" aria-hidden="true">
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -997,85 +826,151 @@
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
+              <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+              <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+              <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
             </svg>
-          </div>
-          <p class="wifi-modal-tip__text">
-            <strong>Important:</strong> Turn off your mobile data (cellular) so
-            your phone doesn't bypass the kiosk connection. (If using Canva,
-            Google Drive, or Word, download or export your file to your phone
-            storage first.)
+          </span>
+          <p class="connect-modal__eyebrow" id="connectEyebrow">
+            Before you print
           </p>
+          <h2 class="connect-modal__title" id="connectTitle">
+            Connect your phone to PrintBit Wi-Fi
+          </h2>
+          <p class="connect-modal__sub" id="connectSub">
+            Your files travel from your phone to this kiosk over PrintBit Wi-Fi.
+          </p>
+        </header>
+
+        <div class="connect-modal__body">
+          <div class="connect-modal__qrs">
+            <figure class="connect-qr connect-qr--wifi">
+              <span class="connect-qr__num" aria-hidden="true">1</span>
+              <div class="connect-qr__frame">
+                <canvas
+                  id="connectWifiQrCanvas"
+                  width="200"
+                  height="200"
+                  aria-label="QR code to join PrintBit Wi-Fi"
+                ></canvas>
+              </div>
+              <figcaption class="connect-qr__caption">
+                <strong>Join Wi-Fi</strong>
+                <span class="connect-qr__meta">
+                  <span id="wifiSsidVal">PrintBit</span>
+                  <span aria-hidden="true">&middot;</span>
+                  <span id="wifiPasswordVal">No password</span>
+                </span>
+              </figcaption>
+            </figure>
+
+            <svg
+              class="connect-modal__arrow"
+              data-connect-form
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              hidden
+            >
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+
+            <figure class="connect-qr connect-qr--form" data-connect-form hidden>
+              <span class="connect-qr__num" aria-hidden="true">2</span>
+              <div class="connect-qr__frame">
+                <canvas
+                  id="connectFormQrCanvas"
+                  width="200"
+                  height="200"
+                  aria-labelledby="connectFormLabel"
+                ></canvas>
+              </div>
+              <figcaption class="connect-qr__caption">
+                <strong id="connectFormLabel">Open the report form</strong>
+                <span
+                  class="connect-qr__meta"
+                  id="connectFormStatus"
+                  aria-live="polite"
+                  >Generating QR code…</span
+                >
+              </figcaption>
+            </figure>
+          </div>
+
+          <ol class="connect-steps">
+            <li class="connect-step">
+              <span class="connect-step__num" aria-hidden="true">1</span>
+              <span class="connect-step__text">
+                <strong>Scan the Wi-Fi QR code</strong>
+                <span>Use the Camera app (iPhone) or Google Lens (Android).</span>
+              </span>
+            </li>
+            <li class="connect-step">
+              <span class="connect-step__num" aria-hidden="true">2</span>
+              <span class="connect-step__text">
+                <strong>Tap Join or Connect</strong>
+                <span
+                  >No QR scanner? Open Wi-Fi settings and pick the network
+                  shown under the QR code.</span
+                >
+              </span>
+            </li>
+            <li class="connect-step">
+              <span class="connect-step__num" aria-hidden="true">3</span>
+              <span class="connect-step__text">
+                <strong>Stay connected</strong>
+                <span
+                  >If your phone says &ldquo;No internet&rdquo;, choose Keep
+                  connected.</span
+                >
+              </span>
+            </li>
+            <li class="connect-step" data-connect-form hidden>
+              <span class="connect-step__num" aria-hidden="true">4</span>
+              <span class="connect-step__text">
+                <strong>Scan QR code 2</strong>
+                <span id="connectFormStep"
+                  >The report form opens in your phone browser.</span
+                >
+              </span>
+            </li>
+          </ol>
         </div>
 
-        <button
-          class="wifi-modal__close"
-          type="button"
-          id="closeWifiBtn"
-          aria-label="Close Wi-Fi help modal"
-        >
-          Got it
-        </button>
-      </div>
-    </div>
-
-        <!-- Print Wi-Fi Confirmation Intercept Modal -->
-    <div
-      class="print-wifi-overlay"
-      id="printWifiOverlay"
-      aria-hidden="true"
-    >
-      <div
-        class="print-wifi-modal"
-        role="dialog"
-        aria-labelledby="printWifiModalTitle"
-        aria-describedby="printWifiModalSub"
-        aria-modal="true"
-      >
-        <div class="print-wifi-modal__badge" aria-hidden="true">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-            <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-            <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-            <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="2.5" />
-          </svg>
-        </div>
-
-        <h3 class="print-wifi-modal__title" id="printWifiModalTitle">
-          Connected to PrintBit Wi-Fi?
-        </h3>
-
-        <p class="print-wifi-modal__sub" id="printWifiModalSub">
-          Your phone must be connected to <strong>PrintBit</strong> Wi-Fi to send files to this kiosk.
-        </p>
-
-        <div class="print-wifi-modal__tip">
+        <div class="connect-modal__note" role="note">
           <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path
               fill-rule="evenodd"
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
               clip-rule="evenodd"
             />
           </svg>
-          <span>If using <strong>Canva</strong> or <strong>Google Drive</strong>, download your files to your phone storage first before connecting.</span>
+          <p>
+            <strong>Turn off mobile data</strong> so your phone stays on
+            PrintBit Wi-Fi. Using Canva, Google Drive, or Word? Download the
+            file to your phone first.
+          </p>
         </div>
 
-        <div class="print-wifi-modal__actions">
+        <div class="connect-modal__actions">
           <button
             type="button"
-            class="print-wifi-btn print-wifi-btn--primary"
-            id="printWifiConnectedBtn"
+            class="connect-btn connect-btn--ghost"
+            id="connectCancelBtn"
           >
-            <span>Connected</span>
+            Back
+          </button>
+          <button
+            type="button"
+            class="connect-btn connect-btn--primary"
+            id="connectContinueBtn"
+          >
+            <span>I'm connected</span>
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fill-rule="evenodd"
@@ -1086,13 +981,14 @@
           </button>
           <button
             type="button"
-            class="print-wifi-btn print-wifi-btn--subtle"
-            id="printWifiNotYetBtn"
+            class="connect-btn connect-btn--primary"
+            id="connectDoneBtn"
+            hidden
           >
-            Not yet
+            Done
           </button>
         </div>
-      </div>
+      </section>
     </div>
 
 <!-- Admin PIN modal — no visible entry point, triggered by hidden tap sequence -->
@@ -1122,7 +1018,7 @@
             id="adminCancelBtn"
             type="button"
           >
-            Cancel
+            Back
           </button>
           <button
             class="admin-modal__btn admin-modal__btn--submit"

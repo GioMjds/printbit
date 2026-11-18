@@ -7,6 +7,8 @@ import {
 import { initKioskLocalization } from '../shared/kiosk-i18n';
 import { navigateWithKioskMotion } from '../shared/kiosk-navigation';
 import { mountLoadingAnimation } from '../shared/loading-animation';
+import { renderCoinList } from '../shared/coin-strip';
+import { ACCEPTED_COIN_VALUES } from '@/shared/accepted-coins';
 import type { ConfirmationOutcomeIdentity } from './confirmation-outcome';
 import {
   createJobState,
@@ -216,6 +218,7 @@ type PrintQuote = {
   physicalSheets?: number;
   paperSubtotal?: number;
   printSubtotal?: number;
+  qualitySubtotal?: number;
   duplexSavings?: number;
   quoteId?: string;
   expiresAt?: string;
@@ -280,54 +283,53 @@ function truncateFilename(name: string, maxLen = 32): string {
 }
 
 const modeValue = document.getElementById('modeValue');
-const priceValue = document.getElementById('priceValue');
 const paperCostRow = document.getElementById('paperCostRow');
 const paperCostLabel = document.getElementById('paperCostLabel');
 const paperCostValue = document.getElementById('paperCostValue');
 const printCostRow = document.getElementById('printCostRow');
 const printCostValue = document.getElementById('printCostValue');
+const qualityCostRow = document.getElementById('qualityCostRow');
+const qualityCostValue = document.getElementById('qualityCostValue');
 const duplexSavingsRow = document.getElementById('duplexSavingsRow');
 const duplexSavingsValue = document.getElementById('duplexSavingsValue');
-const duplexTag = document.getElementById('duplexTag');
 const balanceValue = document.getElementById('balanceValue');
-const balanceRing = document.getElementById('balanceRing');
-const balanceArc = document.getElementById('balanceArc') as SVGCircleElement | null;
+const balanceMeter = document.getElementById('balanceMeter');
+const balanceFill = document.getElementById('balanceFill');
 const changeValue = document.getElementById('changeValue');
 const changeRow = document.getElementById('changeRow');
 const statusMessage = document.getElementById('statusMessage');
 const statusBadge = document.getElementById('statusBadge');
+const coinInsertNotice = document.getElementById('coinInsertNotice');
 const coinInsertNote = document.getElementById('coinInsertNote');
-const footerNote = document.getElementById('footerNote');
+const acceptedCoinList = document.getElementById('acceptedCoinList');
+if (acceptedCoinList) renderCoinList(acceptedCoinList, ACCEPTED_COIN_VALUES);
 const confirmBtn = document.getElementById('confirmBtn') as HTMLButtonElement;
 
-// Summary Table DOM Refs
+// Job summary DOM refs
 const fileValue = document.getElementById('fileValue');
-const pagesCard = document.getElementById('pagesCard');
+const summaryPagesGroup = document.getElementById('summaryPagesGroup');
+const summaryPagesTitle = document.getElementById('summaryPagesTitle');
+const summarySettingsGroup = document.getElementById('summarySettingsGroup');
+const summarySettingsTitle = document.getElementById('summarySettingsTitle');
 const pagesRangeValue = document.getElementById('pagesRangeValue');
 const pagesTotalCount = document.getElementById('pagesTotalCount');
-const bwPagesChip = document.getElementById('bwPagesChip');
-const pagesBwCount = document.getElementById('pagesBwCount');
-const colorPagesChip = document.getElementById('colorPagesChip');
+const colorPagesRow = document.getElementById('colorPagesRow');
 const pagesColorCount = document.getElementById('pagesColorCount');
+const bwPagesRow = document.getElementById('bwPagesRow');
+const pagesBwCount = document.getElementById('pagesBwCount');
+const printedTotalRow = document.getElementById('printedTotalRow');
+const printedTotalValue = document.getElementById('printedTotalValue');
+const printedTotalHint = document.getElementById('printedTotalHint');
 
-const settingsGrid = document.getElementById('settingsGrid');
-const colorCard = document.getElementById('colorCard');
-const colorModePrimary = document.getElementById('colorModePrimary');
-const colorDetectedBadge = document.getElementById('colorDetectedBadge');
-const colorSelectedBadge = document.getElementById('colorSelectedBadge');
-
-const paperCard = document.getElementById('paperCard');
 const paperSizePrimary = document.getElementById('paperSizePrimary');
-const copiesTag = document.getElementById('copiesTag');
-const orientationTag = document.getElementById('orientationTag');
-const qualityTag = document.getElementById('qualityTag');
-const rotationTag = document.getElementById('rotationTag');
+const copiesValue = document.getElementById('copiesValue');
+const orientationValue = document.getElementById('orientationValue');
+const qualityValue = document.getElementById('qualityValue');
+const sidesValue = document.getElementById('sidesValue');
 
 const scanCard = document.getElementById('scanCard');
 
 // Coin Lottie Refs
-const coinLottieCanvas = document.getElementById('coinLottieCanvas') as HTMLCanvasElement | null;
-const coinLottieWrapper = document.getElementById('coinLottieWrapper');
 
 // Confirmation Modal Lottie Refs
 const modalTrayLottieCanvas = document.getElementById('modalTrayLottieCanvas') as HTMLCanvasElement | null;
@@ -427,6 +429,8 @@ const modalPaperCostLabel = document.getElementById('modalPaperCostLabel');
 const modalPaperCostValue = document.getElementById('modalPaperCostValue');
 const modalPrintCostRow = document.getElementById('modalPrintCostRow');
 const modalPrintCostValue = document.getElementById('modalPrintCostValue');
+const modalQualityCostRow = document.getElementById('modalQualityCostRow');
+const modalQualityCostValue = document.getElementById('modalQualityCostValue');
 const modalDuplexSavingsRow = document.getElementById('modalDuplexSavingsRow');
 const modalDuplexSavingsValue = document.getElementById(
   'modalDuplexSavingsValue',
@@ -651,11 +655,9 @@ function recordConfirmationTerminalSuccess(
 let powerSafetyOverlay: PowerSafetyOverlayController;
 
 const DEFAULT_COIN_INSERT_GUIDANCE_MESSAGE =
-  'Please insert coins slowly. Rapid insertion may not be detected by the kiosk.';
+  'Wait for your balance to go up before you insert the next coin. Coins inserted too fast may not be counted.';
 const COIN_INSERT_GUIDANCE_MESSAGE =
-  coinInsertNote?.textContent?.trim() ||
-  footerNote?.textContent?.trim() ||
-  DEFAULT_COIN_INSERT_GUIDANCE_MESSAGE;
+  coinInsertNote?.textContent?.trim() || DEFAULT_COIN_INSERT_GUIDANCE_MESSAGE;
 
 function renderPrinterError(err: PrintError): void {
   printer = reducePrinterReadiness(printer, { type: 'error-raised', error: err });
@@ -867,7 +869,6 @@ function clearPrinterError(): void {
 
 function syncCoinInsertGuidanceMessage(): void {
   if (coinInsertNote) coinInsertNote.textContent = COIN_INSERT_GUIDANCE_MESSAGE;
-  if (footerNote) footerNote.textContent = COIN_INSERT_GUIDANCE_MESSAGE;
 }
 
 syncCoinInsertGuidanceMessage();
@@ -914,7 +915,6 @@ window.addEventListener('pagehide', (event) => {
   void releasePaymentLease('pagehide', true);
   if (!event.persisted) {
     confirmLoadingController?.destroy();
-    coinLottiePlayer?.destroy();
     modalTrayLottiePlayer?.destroy();
     modalReviewLottiePlayer?.destroy();
   }
@@ -990,6 +990,10 @@ function pageRangeLabel(sel?: PageRangeSelection): string {
   if (!sel || sel.type === 'all') return 'All Pages';
   if (sel.type === 'single') return `Page ${sel.page}`;
   return sel.range ? `Pages ${sel.range}` : 'Pages (custom)';
+}
+
+function formatPageCount(count: number): string {
+  return `${count} ${count === 1 ? 'page' : 'pages'}`;
 }
 
 function pageRangeFingerprint(sel?: PageRangeSelection): string {
@@ -1104,35 +1108,6 @@ if (modalReviewStepBadge && config.mode === 'scan') {
   modalReviewStepBadge.setAttribute('hidden', '');
 }
 
-let coinLottiePlayer: DotLottie | null = null;
-
-function initCoinLottieAnimation(): void {
-  if (!coinLottieCanvas) return;
-  try {
-    DotLottie.setWasmUrl('/vendor/dotlottie/dotlottie-player.wasm');
-    coinLottiePlayer = new DotLottie({
-      canvas: coinLottieCanvas,
-      src: '/assets/lottie/coin-insertion.json',
-      autoplay: true,
-      loop: true,
-      layout: { fit: 'contain', align: [0.5, 0.5] },
-    });
-
-    coinLottiePlayer.addEventListener('load', () => {
-      coinLottieWrapper?.classList.remove('is-fallback');
-    });
-    coinLottiePlayer.addEventListener('loadError', () => {
-      coinLottieWrapper?.classList.add('is-fallback');
-    });
-    coinLottiePlayer.addEventListener('renderError', () => {
-      coinLottieWrapper?.classList.add('is-fallback');
-    });
-  } catch (err) {
-    console.warn('[COIN-LOTTIE] Failed to initialize DotLottie player:', err);
-    coinLottieWrapper?.classList.add('is-fallback');
-  }
-}
-
 let modalTrayLottiePlayer: DotLottie | null = null;
 let modalReviewLottiePlayer: DotLottie | null = null;
 
@@ -1214,11 +1189,9 @@ export function populateJobSummary(cfg: PrintConfig): void {
   }
 
   if (cfg.mode === 'scan') {
-    // Hide print/copy table rows, show scan row
-    pagesCard?.setAttribute('hidden', '');
-    colorCard?.setAttribute('hidden', '');
-    paperCard?.setAttribute('hidden', '');
-    settingsGrid?.setAttribute('hidden', '');
+    // Hide print/copy groups, show the scan group
+    summaryPagesGroup?.setAttribute('hidden', '');
+    summarySettingsGroup?.setAttribute('hidden', '');
     scanCard?.removeAttribute('hidden');
 
     // Hide scan-irrelevant rows in the confirmation modal
@@ -1243,98 +1216,83 @@ export function populateJobSummary(cfg: PrintConfig): void {
   }
 
   // Print / Copy mode:
-  pagesCard?.removeAttribute('hidden');
-  colorCard?.removeAttribute('hidden');
-  paperCard?.removeAttribute('hidden');
-  settingsGrid?.removeAttribute('hidden');
+  summaryPagesGroup?.removeAttribute('hidden');
+  summarySettingsGroup?.removeAttribute('hidden');
   scanCard?.setAttribute('hidden', '');
 
-  // 1. Pages & Range Card
+  const isCopy = cfg.mode === 'copy';
+  if (summaryPagesTitle) {
+    summaryPagesTitle.textContent = isCopy
+      ? 'What will be copied'
+      : 'What will be printed';
+  }
+  if (summarySettingsTitle) {
+    summarySettingsTitle.textContent = isCopy ? 'Copy settings' : 'Print settings';
+  }
+
+  // 1. Pages, split into colored vs black & white (counts are per copy)
   if (pagesRangeValue) {
     pagesRangeValue.textContent = pageRangeLabel(cfg.pageRange);
+    // "All Pages" says nothing the page count doesn't; only show a real range.
+    pagesRangeValue.toggleAttribute(
+      'hidden',
+      !cfg.pageRange || cfg.pageRange.type === 'all',
+    );
   }
 
   const quote = getQuote(pricing);
-  const totalSheets = quote
-    ? quote.selectedPages
-    : (cfg.totalPages ?? 1);
-  const totalDisplay = quote
-    ? `${quote.selectedPages} of ${quote.totalPages} ${quote.totalPages === 1 ? 'page' : 'pages'}`
-    : `${totalSheets} ${totalSheets === 1 ? 'page' : 'pages'}`;
-
+  const pagesPerCopy = quote ? quote.selectedPages : (cfg.totalPages ?? 1);
   if (pagesTotalCount) {
-    pagesTotalCount.textContent = totalDisplay;
+    pagesTotalCount.textContent =
+      quote && quote.selectedPages !== quote.totalPages
+        ? `${quote.selectedPages} of ${formatPageCount(quote.totalPages)}`
+        : formatPageCount(pagesPerCopy);
   }
 
-  if (quote) {
-    if (pagesBwCount) pagesBwCount.textContent = `${quote.billableBwPages}`;
-    if (pagesColorCount) pagesColorCount.textContent = `${quote.billableColorPages}`;
-    bwPagesChip?.removeAttribute('hidden');
-    colorPagesChip?.removeAttribute('hidden');
-  } else {
-    const isColor = cfg.colorMode === 'colored';
-    if (pagesBwCount) pagesBwCount.textContent = isColor ? '0' : `${totalSheets}`;
-    if (pagesColorCount) pagesColorCount.textContent = isColor ? `${totalSheets}` : '0';
+  const printsInColor = getDisplayColorMode() === 'colored';
+  const colorPages = quote
+    ? quote.billableColorPages
+    : printsInColor
+      ? pagesPerCopy
+      : 0;
+  const bwPages = quote ? quote.billableBwPages : printsInColor ? 0 : pagesPerCopy;
+  if (pagesColorCount) pagesColorCount.textContent = String(colorPages);
+  if (pagesBwCount) pagesBwCount.textContent = String(bwPages);
+  colorPagesRow?.classList.toggle('is-zero', colorPages === 0);
+  bwPagesRow?.classList.toggle('is-zero', bwPages === 0);
+
+  const copies = Math.max(1, cfg.copies || 1);
+  printedTotalRow?.toggleAttribute('hidden', copies === 1);
+  if (printedTotalValue) {
+    printedTotalValue.textContent = formatPageCount(pagesPerCopy * copies);
+  }
+  if (printedTotalHint) {
+    printedTotalHint.textContent = `${formatPageCount(pagesPerCopy)} × ${copies} copies`;
   }
 
-  // 2. Color Mode Card
-  const displayColor = getDisplayColorMode();
-  if (colorModePrimary) {
-    colorModePrimary.textContent = formatColorMode(displayColor);
+  // 2. Settings, one line each
+  // The row label already says "Bond paper", so the value is just the size.
+  if (paperSizePrimary) paperSizePrimary.textContent = cfg.paperSize;
+  if (copiesValue) {
+    copiesValue.textContent = `${copies} ${copies === 1 ? 'copy' : 'copies'}`;
   }
-
-  if (
-    cfg.mode === 'print' &&
-    cfg.detectedColorMode &&
-    cfg.detectedColorMode !== cfg.colorMode
-  ) {
-    if (colorDetectedBadge) {
-      colorDetectedBadge.textContent = `Detected: ${formatColorMode(cfg.detectedColorMode)}`;
-      colorDetectedBadge.removeAttribute('hidden');
-    }
-    if (colorSelectedBadge) {
-      colorSelectedBadge.textContent = `Selected: ${formatColorMode(cfg.colorMode)}`;
-      colorSelectedBadge.removeAttribute('hidden');
-    }
-  } else {
-    colorDetectedBadge?.setAttribute('hidden', '');
-    colorSelectedBadge?.setAttribute('hidden', '');
+  if (orientationValue) {
+    const orientation = cfg.orientation === 'landscape' ? 'Landscape' : 'Portrait';
+    orientationValue.textContent = cfg.rotationDeg
+      ? `${orientation} (rotated ${cfg.rotationDeg}°)`
+      : orientation;
   }
-
-  // 3. Paper & Layout Card
-  if (paperSizePrimary) {
-    paperSizePrimary.textContent = formatPaperSizeForPricing(cfg.paperSize);
+  if (qualityValue) {
+    qualityValue.textContent = cfg.quality === 'high' ? 'High quality' : 'Standard';
   }
-  if (copiesTag) {
-    copiesTag.textContent = `${cfg.copies} ${cfg.copies === 1 ? 'Copy' : 'Copies'}`;
-  }
-  if (orientationTag) {
-    orientationTag.textContent =
-      cfg.orientation === 'landscape' ? 'Landscape' : 'Portrait';
-  }
-  if (qualityTag) {
-    qualityTag.textContent =
-      cfg.quality === 'high' ? 'High Quality' : 'Standard';
-  }
-  if (rotationTag) {
-    if (cfg.rotationDeg && cfg.rotationDeg !== 0) {
-      rotationTag.textContent = `${cfg.rotationDeg}°`;
-      rotationTag.removeAttribute('hidden');
-    } else {
-      rotationTag.setAttribute('hidden', '');
-    }
+  if (sidesValue) {
+    sidesValue.textContent = cfg.duplex ? '2-sided (both sides)' : '1-sided';
   }
 
   // Populate modal quality if present
   if (modalQuality) {
     modalQuality.textContent =
       cfg.quality === 'high' ? 'High Quality' : 'Standard';
-  }
-
-  if (cfg.duplex) {
-    duplexTag?.removeAttribute('hidden');
-  } else {
-    duplexTag?.setAttribute('hidden', '');
   }
 
   if (
@@ -1349,16 +1307,23 @@ export function populateJobSummary(cfg: PrintConfig): void {
     if (paperCostValue) {
       paperCostValue.textContent = `₱ ${quote.paperSubtotal}`;
     }
-    paperCostRow?.removeAttribute('hidden');
+    // A ₱0 paper line (free paper, or copy jobs) explains nothing; leave it out.
+    paperCostRow?.toggleAttribute('hidden', quote.paperSubtotal <= 0);
 
     if (printCostValue) {
       printCostValue.textContent = `₱ ${quote.printSubtotal}`;
     }
     printCostRow?.removeAttribute('hidden');
 
+    // Total = paper + printing + high-quality surcharge, so the lines add up.
+    const qualitySubtotal = quote.qualitySubtotal ?? 0;
+    if (qualityCostValue) qualityCostValue.textContent = `₱ ${qualitySubtotal}`;
+    qualityCostRow?.toggleAttribute('hidden', qualitySubtotal <= 0);
+
+    // Savings are already inside the paper amount; shown without a minus.
     if (quote.duplexSavings && quote.duplexSavings > 0) {
       if (duplexSavingsValue) {
-        duplexSavingsValue.textContent = `-₱ ${quote.duplexSavings}`;
+        duplexSavingsValue.textContent = `₱ ${quote.duplexSavings}`;
       }
       duplexSavingsRow?.removeAttribute('hidden');
     } else {
@@ -1367,34 +1332,16 @@ export function populateJobSummary(cfg: PrintConfig): void {
   } else {
     paperCostRow?.setAttribute('hidden', '');
     printCostRow?.setAttribute('hidden', '');
+    qualityCostRow?.setAttribute('hidden', '');
     duplexSavingsRow?.setAttribute('hidden', '');
   }
 }
 
 populateJobSummary(config);
-if (priceValue) priceValue.textContent = 'Loading...';
 
+// Locked slot (paid in full, printer not ready, …): dim the coin instructions.
 function applyLockState(locked: boolean): void {
-  const paymentColEl = document.querySelector<HTMLElement>('.payment-col');
-  const coinIcon = document.getElementById('coinIcon');
-  const padlockIcon = document.getElementById('padlockIcon');
-  const ctaText = document.querySelector<HTMLElement>('.payment-col__cta');
-
-  if (locked) {
-    paymentColEl?.classList.add('payment-col--locked');
-    if (padlockIcon) padlockIcon.removeAttribute('hidden');
-    if (coinLottieWrapper) coinLottieWrapper.setAttribute('hidden', '');
-    if (coinIcon) coinIcon.setAttribute('hidden', '');
-    coinLottiePlayer?.pause();
-    if (ctaText) ctaText.textContent = 'Coin slot locked — ready to confirm';
-  } else {
-    paymentColEl?.classList.remove('payment-col--locked');
-    if (coinLottieWrapper) coinLottieWrapper.removeAttribute('hidden');
-    if (padlockIcon) padlockIcon.setAttribute('hidden', '');
-    coinLottiePlayer?.play();
-    if (ctaText)
-      ctaText.textContent = 'Insert coins into the kiosk slot to pay';
-  }
+  coinInsertNotice?.classList.toggle('is-locked', locked);
 }
 
 function stopPaymentHeartbeat(): void {
@@ -1577,10 +1524,10 @@ function animateBalanceCounter(targetBalance: number): void {
 
   if (diff > 0) {
     // Trigger pop bounce & shimmer animation on coin insertion
-    if (balanceRing) {
-      balanceRing.classList.remove('balance-pop');
-      void balanceRing.offsetWidth;
-      balanceRing.classList.add('balance-pop');
+    if (balanceMeter) {
+      balanceMeter.classList.remove('balance-pop');
+      void balanceMeter.offsetWidth;
+      balanceMeter.classList.add('balance-pop');
     }
     if (balanceValue) {
       balanceValue.classList.remove('count-anim');
@@ -1618,31 +1565,25 @@ function animateBalanceCounter(targetBalance: number): void {
   balanceAnimFrameId = requestAnimationFrame(step);
 }
 
-function updateBalanceRingArc(balance: number): void {
-  if (balanceRing) {
-    balanceRing.setAttribute('aria-valuenow', String(balance));
-    balanceRing.setAttribute('aria-valuemax', String(getTotalPrice(pricing)));
+function updateBalanceMeter(balance: number): void {
+  const total = getTotalPrice(pricing);
+  if (balanceMeter) {
+    balanceMeter.setAttribute('aria-valuenow', String(balance));
+    balanceMeter.setAttribute('aria-valuemax', String(total));
+    balanceMeter.classList.toggle(
+      'is-ready',
+      isPricingReady(pricing) && total > 0 && balance >= total,
+    );
   }
-  if (!balanceArc) return;
-  const circumference = 326.7;
-  const ratio =
-    getTotalPrice(pricing) > 0 ? Math.min(1, Math.max(0, balance / getTotalPrice(pricing))) : 0;
-  const offset = circumference * (1 - ratio);
-  balanceArc.style.strokeDashoffset = String(offset);
-
-  if (balanceRing) {
-    if (isPricingReady(pricing) && getTotalPrice(pricing) > 0 && balance >= getTotalPrice(pricing)) {
-      balanceRing.classList.add('is-ready');
-    } else {
-      balanceRing.classList.remove('is-ready');
-    }
-  }
+  if (!balanceFill) return;
+  const ratio = total > 0 ? Math.min(1, Math.max(0, balance / total)) : 0;
+  balanceFill.style.transform = `scaleX(${ratio})`;
 }
 
 function updateBalanceUI(balance: number): void {
   currentBalance = balance;
   animateBalanceCounter(balance);
-  updateBalanceRingArc(balance);
+  updateBalanceMeter(balance);
   updateChangeDisplay(balance);
   if (isPricingReady(pricing) && getTotalPrice(pricing) > 0 && currentBalance >= getTotalPrice(pricing)) {
     void releasePaymentLease('target_reached');
@@ -1903,10 +1844,9 @@ async function loadPricing(): Promise<void> {
         totalPrice: payload.quote.requiredAmount,
         quote: payload.quote,
       });
-      if (priceValue) priceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
       if (actionPriceValue) actionPriceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
       populateJobSummary(config);
-      updateBalanceRingArc(currentBalance);
+      updateBalanceMeter(currentBalance);
       updateChangeDisplay(currentBalance);
       syncPaymentLeaseState();
       applyConfirmGate();
@@ -1916,7 +1856,6 @@ async function loadPricing(): Promise<void> {
           ? error.message
           : `Failed to load ${config.mode === 'print' ? 'print' : 'copy'} quote.`;
       pricing = reducePricing(pricing, { type: 'quote-failed', message });
-      if (priceValue) priceValue.textContent = 'Unavailable';
       if (actionPriceValue) actionPriceValue.textContent = '₱ 0';
       updateChangeDisplay(currentBalance);
       syncPaymentLeaseState();
@@ -1938,7 +1877,6 @@ async function loadPricing(): Promise<void> {
     totalPrice: safePricing.scanDocument,
     quote: null,
   });
-  if (priceValue) priceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
   if (actionPriceValue) actionPriceValue.textContent = `₱ ${getTotalPrice(pricing)}`;
   updateChangeDisplay(currentBalance);
   syncPaymentLeaseState();
@@ -2592,16 +2530,22 @@ function showModal(): void {
       if (modalPaperCostValue) {
         modalPaperCostValue.textContent = `₱ ${quote.paperSubtotal}`;
       }
-      modalPaperCostRow?.removeAttribute('hidden');
+      modalPaperCostRow?.toggleAttribute('hidden', quote.paperSubtotal <= 0);
 
       if (modalPrintCostValue) {
         modalPrintCostValue.textContent = `₱ ${quote.printSubtotal}`;
       }
       modalPrintCostRow?.removeAttribute('hidden');
 
+      const modalQualitySubtotal = quote.qualitySubtotal ?? 0;
+      if (modalQualityCostValue) {
+        modalQualityCostValue.textContent = `₱ ${modalQualitySubtotal}`;
+      }
+      modalQualityCostRow?.toggleAttribute('hidden', modalQualitySubtotal <= 0);
+
       if (quote.duplexSavings && quote.duplexSavings > 0) {
         if (modalDuplexSavingsValue) {
-          modalDuplexSavingsValue.textContent = `-₱ ${quote.duplexSavings}`;
+          modalDuplexSavingsValue.textContent = `₱ ${quote.duplexSavings}`;
         }
         modalDuplexSavingsRow?.removeAttribute('hidden');
       } else {
@@ -2611,6 +2555,7 @@ function showModal(): void {
       modalPricingSummary?.setAttribute('hidden', '');
       modalPaperCostRow?.setAttribute('hidden', '');
       modalPrintCostRow?.setAttribute('hidden', '');
+      modalQualityCostRow?.setAttribute('hidden', '');
       modalDuplexSavingsRow?.setAttribute('hidden', '');
     }
   }
@@ -3609,7 +3554,6 @@ async function loadActivePrinterError(): Promise<void> {
 }
 
 async function boot(): Promise<void> {
-  initCoinLottieAnimation();
   initModalLottieAnimations();
   await Promise.all([
     loadPrinterStatus(),

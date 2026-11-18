@@ -112,7 +112,7 @@ export function deriveConfirmGate<Q, E extends GateError>(
       confirmEnabled: true,
       badge: 'ready',
       message:
-        statusOverride ?? 'Sufficient balance detected. You can confirm now.',
+        statusOverride ?? 'Paid in full. You can confirm now.',
       highlightReady: true,
     };
   }
