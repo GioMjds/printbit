@@ -39,9 +39,11 @@ describe('deriveIdleServices', () => {
     expect(result.services.scan).toEqual(READY);
   });
 
-  it('treats an active E_OFFLINE error as offline', () => {
+  it('trusts the live printer state over a stale E_OFFLINE error', () => {
+    // E_OFFLINE raised at boot does not auto-clear; the printer is back.
     const result = derive({ activePrinterErrorCode: () => 'E_OFFLINE' });
-    expect(result.services.print.reason).toBe('printer_offline');
+    expect(result.services.print).toEqual(READY);
+    expect(result.services.copy).toEqual(READY);
   });
 
   it('marks a non-paper printer error as printer_error', () => {

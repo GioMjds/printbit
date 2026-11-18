@@ -101,7 +101,10 @@ export function deriveIdleServices(
       raise(PRINTER_SERVICES, 'unavailable', 'paper_out');
       paper = 'out';
     }
-    if (status === 'offline' || code === 'E_OFFLINE') {
+    // Offline comes from the live printer state only. E_OFFLINE does not
+    // auto-clear, so a code raised while the printer was connecting at boot
+    // would otherwise hide print and copy after the printer came back.
+    if (status === 'offline') {
       raise(PRINTER_SERVICES, 'unavailable', 'printer_offline');
     }
     const otherError =
