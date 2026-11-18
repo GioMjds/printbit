@@ -6,8 +6,13 @@ import type { IdScanWarning } from '@/shared/id-copy-contract';
  * as an even light gray. Tune on the real scanner (see the hardware checklist).
  */
 export const ID_BLANK_STDDEV_THRESHOLD = 6;
-/** Mean gray difference under this means "the same side twice". Tune likewise. */
-export const ID_IDENTICAL_MEAN_DIFF_THRESHOLD = 8;
+/** A thumbnail cell this far from the glass gray holds part of a card. Tune likewise. */
+export const ID_CARD_CELL_GRAY_DELTA = 30;
+/**
+ * Card cells both sides share at or above this mean the sides overlap on the
+ * merged sheet (one cell is about 9 mm of glass). Tune likewise.
+ */
+export const ID_OVERLAP_MIN_CELLS = 3;
 export const ID_CHECK_TIMEOUT_MS = 5000;
 
 export function grayStandardDeviation(thumbnail: Uint8Array): number {
@@ -20,12 +25,30 @@ export function grayStandardDeviation(thumbnail: Uint8Array): number {
   return Math.sqrt(squares / thumbnail.length);
 }
 
-export function meanAbsoluteDifference(a: Uint8Array, b: Uint8Array): number {
+/** Gray of the empty glass: the median, since a card covers little of it. */
+function glassGray(thumbnail: Uint8Array): number {
+  const sorted = Array.from(thumbnail).sort((x, y) => x - y);
+  return sorted[Math.floor(sorted.length / 2)] ?? 255;
+}
+
+/**
+ * Cells where both scans show something other than glass. Both scans are
+ * stacked at the same place on the sheet, so shared cells overlap on paper.
+ */
+export function sharedCardCells(a: Uint8Array, b: Uint8Array): number {
   const length = Math.min(a.length, b.length);
-  if (length === 0) return 255;
-  let total = 0;
-  for (let i = 0; i < length; i += 1) total += Math.abs(a[i] - b[i]);
-  return total / length;
+  const glassA = glassGray(a);
+  const glassB = glassGray(b);
+  let shared = 0;
+  for (let i = 0; i < length; i += 1) {
+    if (
+      Math.abs(a[i] - glassA) > ID_CARD_CELL_GRAY_DELTA &&
+      Math.abs(b[i] - glassB) > ID_CARD_CELL_GRAY_DELTA
+    ) {
+      shared += 1;
+    }
+  }
+  return shared;
 }
 
 export interface IdScanCheckInput {
@@ -80,10 +103,10 @@ export async function checkIdScan(
     }
     if (!otherPath) return [];
     const other = await withTimeout(deps.thumbnail(otherPath), timeoutMs);
-    if (
-      meanAbsoluteDifference(scanned, other) < ID_IDENTICAL_MEAN_DIFF_THRESHOLD
-    ) {
-      return [{ code: 'sides_identical', side: input.scannedSide }];
+    // shortcut: compares the scans as placed on the glass and ignores the
+    // rotate buttons; compare rotated thumbnails if customers rotate a lot.
+    if (sharedCardCells(scanned, other) >= ID_OVERLAP_MIN_CELLS) {
+      return [{ code: 'sides_overlap', side: input.scannedSide }];
     }
     return [];
   } catch (error) {

@@ -1,17 +1,12 @@
 import fs from 'node:fs';
 import {
+  BlendMode,
   PDFDocument,
-  clip,
   degrees,
-  endPath,
-  popGraphicsState,
-  pushGraphicsState,
-  rectangle,
   type PDFEmbeddedPage,
 } from 'pdf-lib';
 import {
   idCardSheetLayout,
-  type IdRect,
   type IdRotation,
   type IdSide,
   type IdSidePlacement,
@@ -21,8 +16,6 @@ import { PAPER_POINTS, type PaperSize } from '@/shared/print-configuration';
 export interface IdSheetSideInput {
   filePath: string;
   rotationDeg: IdRotation;
-  /** Part of the scan holding the card, in points. Omitted: the whole scan. */
-  cardBox?: IdRect | null;
 }
 
 export interface ComposeIdSheetInput {
@@ -64,24 +57,12 @@ export function regionDrawOptions(
 
 async function embedFirstPage(
   out: PDFDocument,
-  side: IdSheetSideInput,
+  filePath: string,
 ): Promise<PDFEmbeddedPage> {
-  const bytes = await fs.promises.readFile(side.filePath);
+  const bytes = await fs.promises.readFile(filePath);
   const source = await PDFDocument.load(bytes, { ignoreEncryption: true });
-  const box = side.cardBox;
-  if (!box) {
-    const [embedded] = await out.embedPdf(source, [0]);
-    return embedded;
-  }
-  // Only the card: the rest of the glass never reaches the sheet.
-  const page = source.getPage(0);
-  const { x: originX, y: originY } = page.getMediaBox();
-  return out.embedPage(page, {
-    left: originX + box.x,
-    bottom: originY + box.y,
-    right: originX + box.x + box.width,
-    top: originY + box.y + box.height,
-  });
+  const [embedded] = await out.embedPdf(source, [0]);
+  return embedded;
 }
 
 /** Builds the one-page ID copy sheet. A side that is null is left empty. */
@@ -97,8 +78,8 @@ export async function composeIdSheet(
   const page = out.addPage([pageWidth, pageHeight]);
 
   const embedded: Record<IdSide, PDFEmbeddedPage | null> = {
-    front: input.front ? await embedFirstPage(out, input.front) : null,
-    back: input.back ? await embedFirstPage(out, input.back) : null,
+    front: input.front ? await embedFirstPage(out, input.front.filePath) : null,
+    back: input.back ? await embedFirstPage(out, input.back.filePath) : null,
   };
 
   const sideInput = (side: IdSide) => {
@@ -121,25 +102,16 @@ export async function composeIdSheet(
     const pageRef = embedded[side];
     if (!placement || !pageRef) continue;
     const draw = regionDrawOptions(placement);
-    page.pushOperators(
-      pushGraphicsState(),
-      rectangle(
-        placement.slot.x,
-        placement.slot.y,
-        placement.slot.width,
-        placement.slot.height,
-      ),
-      clip(),
-      endPath(),
-    );
+    // Multiply keeps the white glass of one scan from covering the card on
+    // the other, like toner from two passes on the same paper.
     page.drawPage(pageRef, {
       x: draw.x,
       y: draw.y,
       width: draw.width,
       height: draw.height,
       rotate: degrees(draw.rotateDeg),
+      blendMode: BlendMode.Multiply,
     });
-    page.pushOperators(popGraphicsState());
   }
 
   return out.save();

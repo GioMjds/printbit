@@ -920,24 +920,6 @@ body {
   background: rgba(105, 111, 199, 0.3);
 }
 
-/* ── Dashed slot for the back side (positioned by app.ts) ── */
-.copy-slot-overlay {
-  position: absolute;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  border: 3px dashed rgba(105, 111, 199, 0.75);
-  border-radius: 6px;
-  background: rgba(105, 111, 199, 0.06);
-  color: #4b4f9a;
-  font-size: 13px;
-  font-weight: 700;
-  text-align: center;
-  pointer-events: none;
-}
-
 /* ── Buttons ── */
 .copy-preview-actions {
   display: flex;

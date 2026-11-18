@@ -97,13 +97,13 @@ describe('scanSide', () => {
         ...sheet,
         warnings: [
           { code: 'blurry', side: 'front' },
-          { code: 'sides_identical', side: 'back' },
+          { code: 'sides_overlap', side: 'back' },
         ],
       }),
     );
     const result = await capture.scanSide(frontRequest);
     expect(result.kind === 'sheet' && result.sheet.warnings).toEqual([
-      { code: 'sides_identical', side: 'back' },
+      { code: 'sides_overlap', side: 'back' },
     ]);
   });
 

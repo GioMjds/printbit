@@ -18,10 +18,7 @@ import {
   type Orientation,
   type PaperSize,
 } from '../../shared/print-configuration';
-import {
-  slotFractions,
-  type IdSide,
-} from '../../shared/id-card-layout';
+import type { IdSide } from '../../shared/id-card-layout';
 import {
   ID_SESSION_EXPIRED_CODE,
   type IdScanWarningCode,
@@ -181,7 +178,6 @@ const paperSheet = byId('paperSheet');
 const previewCanvas = byId<HTMLCanvasElement>('previewCanvas');
 const paperPlaceholder = byId('paperPlaceholder');
 const copyPlaceholderLabel = byId('copyPlaceholderLabel');
-const backSlotOverlay = byId('backSlotOverlay');
 const previewStatusText = byId('previewStatusText');
 const copyPreviewActions = byId('copyPreviewActions');
 const scanAgainBtn = byId<HTMLButtonElement>('scanAgainBtn');
@@ -585,7 +581,7 @@ const OVERLAY_TITLES: Record<ScanTarget, string> = {
 
 function overlaySubtitle(target: ScanTarget): string {
   if (target !== 'document') {
-    return 'Keep the lid closed and your ID on the marked corner.';
+    return 'Keep the lid closed and your ID face-down on the glass.';
   }
   return documentSize === 'Long'
     ? 'Please keep the document straight in the feeder.'
@@ -702,16 +698,6 @@ function emptySheetPaperSize(): PaperSize {
   return flow.copyType === 'document' ? documentSize : settings.paperSize;
 }
 
-/** Places the dashed back slot where the back will print. */
-function positionBackSlot(): void {
-  if (!backSlotOverlay) return;
-  const slot = slotFractions(settings.paperSize, 'back');
-  backSlotOverlay.style.left = `${slot.left * 100}%`;
-  backSlotOverlay.style.top = `${slot.top * 100}%`;
-  backSlotOverlay.style.width = `${slot.width * 100}%`;
-  backSlotOverlay.style.height = `${slot.height * 100}%`;
-}
-
 async function renderPdfPreview(
   buf: ArrayBuffer,
   paperSizeHint: PaperSize,
@@ -817,8 +803,9 @@ async function showPreview(filename: string): Promise<void> {
 
 const WARNING_TEXT: Record<IdScanWarningCode, string> = {
   side_blank:
-    'This side looks empty. Is your ID on the marked corner, face-down?',
-  sides_identical: 'Front and back look the same. Did you flip your ID?',
+    'This side looks empty. Is your ID face-down on the glass?',
+  sides_overlap:
+    'Front and back overlap. Move your ID to an empty part of the glass, then retake.',
 };
 
 /** False when an ID sheet no longer matches the paper size or rotations. */
@@ -840,7 +827,7 @@ function outputPaperSize(): PaperSize {
 
 function placeholderText(): string {
   if (flow.copyType === 'id') {
-    return 'Place your ID face-down on the marked corner, then tap Scan Front';
+    return 'Place your ID face-down anywhere on the glass, then tap Scan Front';
   }
   return documentSize === 'Long'
     ? 'Insert document face-up in the ADF, then tap Check Document'
@@ -982,10 +969,6 @@ function render(): void {
     previewCanvas.style.display = hasPreview ? 'block' : 'none';
   if (copyPlaceholderLabel)
     copyPlaceholderLabel.textContent = placeholderText();
-  setHidden(
-    backSlotOverlay,
-    !(hasPreview && flow.copyType === 'id' && flow.front && !flow.back),
-  );
   if (!hasPreview) sizePaperSheet(emptySheetPaperSize(), 'portrait');
   paperSheet?.toggleAttribute('data-gray', settings.colorMode === 'grayscale');
 
@@ -1293,7 +1276,6 @@ for (const radio of paperSizeRadios) {
     if (!radio.checked || !size || flow.copyType !== 'id') return;
     if (size === settings.paperSize) return;
     settings = { ...settings, paperSize: size };
-    positionBackSlot();
     persist();
     void recompose();
   });
@@ -1452,7 +1434,6 @@ async function initializeCopyPage(): Promise<void> {
     idSessionId = null;
   }
 
-  positionBackSlot();
   persist();
   render();
   if (

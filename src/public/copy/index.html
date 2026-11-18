@@ -156,14 +156,6 @@
                   style="display: none"
                 ></canvas>
 
-                <div
-                  class="copy-slot-overlay hidden"
-                  id="backSlotOverlay"
-                  aria-hidden="true"
-                >
-                  <span>Back side not scanned yet</span>
-                </div>
-
                 <div class="paper-placeholder copy-placement" id="paperPlaceholder">
                   <!-- Lottie follows the copy type and original size (glass, ID, or ADF); the diagrams are its fallback -->
                   <div
@@ -506,7 +498,7 @@
                 </li>
               </ol>
               <p class="copy-hint">
-                Place your ID face-down on the marked corner of the glass.
+                Place your ID face-down anywhere on the glass.
               </p>
 
               <div class="copy-flip-prompt hidden" id="flipPrompt" role="status">
@@ -551,8 +543,8 @@
                   />
                 </svg>
                 <p class="copy-flip-prompt__text">
-                  Front captured. Turn your ID over, place it on the same corner, then
-                  tap Scan Back.
+                  Front captured. Turn your ID over, place it on an empty part of the glass,
+                  then tap Scan Back.
                 </p>
                 <div class="copy-flip-prompt__actions">
                   <button

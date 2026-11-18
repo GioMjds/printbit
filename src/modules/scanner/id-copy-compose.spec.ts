@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { PDFDocument, rgb } from 'pdf-lib';
-import { MM_TO_PT } from '@/shared/id-card-layout';
 import { PAPER_POINTS, type PaperSize } from '@/shared/print-configuration';
 import { composeIdSheet, regionDrawOptions } from './id-copy-compose';
 
+const MM_TO_PT = 72 / 25.4;
 let dir: string;
 
 async function writeSidePdf(name: string): Promise<string> {
@@ -51,18 +51,6 @@ describe('composeIdSheet', () => {
     },
   );
 
-  it('crops each side to its card box', async () => {
-    const front = await writeSidePdf('front.pdf');
-    const cardBox = { x: 10, y: 20, width: 92 * MM_TO_PT, height: 60 * MM_TO_PT };
-    const bytes = await composeIdSheet({
-      paperSize: 'A4',
-      front: { filePath: front, rotationDeg: 0, cardBox },
-      back: { filePath: front, rotationDeg: 90, cardBox },
-    });
-    const doc = await PDFDocument.load(bytes);
-    expect(doc.getPageCount()).toBe(1);
-  });
-
   it('builds a valid sheet from the front alone', async () => {
     const front = await writeSidePdf('front.pdf');
     const bytes = await composeIdSheet({
@@ -91,11 +79,10 @@ describe('composeIdSheet', () => {
 });
 
 describe('regionDrawOptions', () => {
-  const slot = { x: 0, y: 0, width: 1, height: 1 };
   const region = { x: 10, y: 20, width: 300, height: 200 };
 
   it('draws an unrotated scan at its footprint', () => {
-    expect(regionDrawOptions({ slot, region, rotationDeg: 0 })).toEqual({
+    expect(regionDrawOptions({ region, rotationDeg: 0 })).toEqual({
       x: 10,
       y: 20,
       width: 300,
@@ -105,7 +92,7 @@ describe('regionDrawOptions', () => {
   });
 
   it('starts a 90 degree clockwise turn at the top-left corner', () => {
-    expect(regionDrawOptions({ slot, region, rotationDeg: 90 })).toEqual({
+    expect(regionDrawOptions({ region, rotationDeg: 90 })).toEqual({
       x: 10,
       y: 220,
       width: 200,
@@ -115,7 +102,7 @@ describe('regionDrawOptions', () => {
   });
 
   it('starts a half turn at the top-right corner', () => {
-    expect(regionDrawOptions({ slot, region, rotationDeg: 180 })).toEqual({
+    expect(regionDrawOptions({ region, rotationDeg: 180 })).toEqual({
       x: 310,
       y: 220,
       width: 300,
@@ -125,7 +112,7 @@ describe('regionDrawOptions', () => {
   });
 
   it('starts a 270 degree clockwise turn at the bottom-right corner', () => {
-    expect(regionDrawOptions({ slot, region, rotationDeg: 270 })).toEqual({
+    expect(regionDrawOptions({ region, rotationDeg: 270 })).toEqual({
       x: 310,
       y: 20,
       width: 200,

@@ -19,10 +19,8 @@ import {
 } from '@/services/usb-drives';
 import {
   analyzeDocument,
-  renderPdfGrayImage,
   renderPdfGrayThumbnail,
 } from '@/services/document-analysis';
-import { locateIdCard } from './id-card-locator';
 import { jobStore, type ScanJobSettings } from '@/services/job-store';
 import { ReceiptService } from '@/modules/receipt/receipt.service';
 import { adminService } from '@/services/admin';
@@ -225,7 +223,6 @@ export class ScannerService {
     invalidateReleaseTokens: (fileName) =>
       this.invalidateReleaseTokensForFilename(fileName),
     thumbnail: (filePath) => renderPdfGrayThumbnail(filePath),
-    locateCard: (filePath) => locateIdCard(filePath, renderPdfGrayImage),
   });
 
   toSafeScanFilename(raw: unknown): string | null {

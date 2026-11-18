@@ -1,7 +1,7 @@
 /** Wire types for the ID copy endpoints, shared by the server and /copy. */
 import type { IdSide } from './id-card-layout';
 
-export type IdScanWarningCode = 'side_blank' | 'sides_identical';
+export type IdScanWarningCode = 'side_blank' | 'sides_overlap';
 
 export interface IdScanWarning {
   code: IdScanWarningCode;

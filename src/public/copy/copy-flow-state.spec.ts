@@ -84,7 +84,7 @@ describe('ID card copy', () => {
       {
         type: 'side-scanned',
         side: 'back',
-        warnings: [{ code: 'sides_identical', side: 'back' }],
+        warnings: [{ code: 'sides_overlap', side: 'back' }],
       },
     ]);
     expect(warned.stage).toBe('capture');

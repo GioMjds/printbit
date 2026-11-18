@@ -46,7 +46,7 @@ const SCAN_FAILED_MESSAGE =
 const OFFLINE_MESSAGE = 'Could not reach the scanner. Please try again.';
 const EXPIRED_MESSAGE =
   'Your ID scan session expired. Please scan your ID again.';
-const WARNING_CODES = new Set<unknown>(['side_blank', 'sides_identical']);
+const WARNING_CODES = new Set<unknown>(['side_blank', 'sides_overlap']);
 const SIDES = new Set<unknown>(['front', 'back']);
 
 function text(payload: Record<string, unknown>, key: string): string | null {

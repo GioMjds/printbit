@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { PDFDocument } from 'pdf-lib';
-import type { IdRect } from '@/shared/id-card-layout';
 import { IdCopyService, parseIdRotations } from './id-copy.service';
 import {
   IdCopySessionNotFoundError,
@@ -16,7 +15,6 @@ let scanShouldFail: boolean;
 let scanCount: number;
 let thumbnailFor: (filePath: string) => Uint8Array;
 let onRegisterToken: (() => void) | null;
-let locateCardImpl: (filePath: string) => Promise<IdRect | null>;
 const tokens = new Map<string, string>();
 const invalidated: string[] = [];
 
@@ -36,7 +34,6 @@ beforeEach(async () => {
   scanShouldFail = false;
   scanCount = 0;
   onRegisterToken = null;
-  locateCardImpl = async () => null;
   tokens.clear();
   invalidated.length = 0;
   const seeds = new Map<string, number>();
@@ -71,7 +68,6 @@ beforeEach(async () => {
       invalidated.push(fileName);
     },
     thumbnail: async (filePath) => thumbnailFor(filePath),
-    locateCard: (filePath) => locateCardImpl(filePath),
   });
 });
 
@@ -258,29 +254,5 @@ describe('parseIdRotations', () => {
     expect(parseIdRotations({ back: '90' })).toBeNull();
     expect(parseIdRotations('front')).toBeNull();
     expect(parseIdRotations([90])).toBeNull();
-  });
-});
-
-describe('IdCopyService card locating', () => {
-  it('stores the found card box on the side', async () => {
-    const box = { x: 5, y: 6, width: 100, height: 80 };
-    locateCardImpl = async () => box;
-    const result = await service.scanSide({ side: 'front', paperSize: 'A4' });
-    if (!result.detected) throw new Error('expected a sheet');
-    const session = await sessions.get(result.sessionId);
-    expect(session!.front!.cardBox).toEqual(box);
-  });
-
-  it('merges the whole scan when locating fails', async () => {
-    locateCardImpl = async () => {
-      throw new Error('render failed');
-    };
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    const result = await service.scanSide({ side: 'front', paperSize: 'A4' });
-    warn.mockRestore();
-    if (!result.detected) throw new Error('expected a sheet');
-    const session = await sessions.get(result.sessionId);
-    expect(session!.front!.cardBox).toBeNull();
-    expect(exists(result.previewPath)).toBe(true);
   });
 });
