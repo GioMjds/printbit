@@ -2416,6 +2416,13 @@ void setup() {
   loadAdminCredentials();
   WiFi.mode(WIFI_AP);
 
+  // Pin the AP to 192.168.4.1/24 and start DHCP leases at .10 so 192.168.4.2-.9
+  // stays free for the kiosk tablet's static IP (192.168.4.2) and avoids conflicts
+  // with phones that would otherwise be leased .2.
+  if (!WiFi.softAPConfig(apIp, apIp, IPAddress(255, 255, 255, 0), IPAddress(192, 168, 4, 10))) {
+    Serial.println("wifi_ap_error:softAPConfig_failed");
+  }
+
   if (!WiFi.softAP(apSsid.c_str(), apPasswordEnabled ? apPassword.c_str() : nullptr, 1, 0)) {
     Serial.println("wifi_ap_error:softAP_start_failed");
   }
