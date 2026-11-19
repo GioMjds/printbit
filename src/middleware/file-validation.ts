@@ -269,6 +269,10 @@ function appendSecurityLog(
   });
 }
 
+// Shown to customers on the phone and kiosk; keep in sync with src/locales.
+const WORD_UPLOADS_OFF_MESSAGE =
+  'Word files are not accepted on this kiosk. Save the file as PDF, then send the PDF.';
+
 function validateIncomingFileType(
   req: Request,
   file: Express.Multer.File,
@@ -346,7 +350,9 @@ function validateIncomingFileType(
       req,
       file,
       'UNSUPPORTED_TYPE',
-      'File format not supported. Only PDF, DOCX, and images (JPG, PNG, GIF, WebP, BMP) are allowed.',
+      adminService.getPipelineSettings().documentConversionEnabled
+        ? 'File format not supported. Only PDF, Word (DOC, DOCX), and images (JPG, PNG, GIF, WebP, BMP) are allowed.'
+        : 'File format not supported. Only PDF and images (JPG, PNG, GIF, WebP, BMP) are allowed.',
       deps,
     );
     cb(
@@ -380,14 +386,12 @@ function validateIncomingFileType(
       req,
       file,
       'UNSUPPORTED_TYPE',
-      'Word document conversion is disabled on this kiosk.',
+      WORD_UPLOADS_OFF_MESSAGE,
       deps,
     );
     cb(
       Object.assign(
-        new Error(
-          'Document conversion is disabled. Only PDF and image files are allowed.',
-        ),
+        new Error(WORD_UPLOADS_OFF_MESSAGE),
         {
           code: 'UNSUPPORTED_TYPE',
         },

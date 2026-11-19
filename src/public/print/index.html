@@ -219,8 +219,11 @@
                 </svg>
                 <p class="upload-tip__text">
                   <strong class="upload-tip__badge">Tip:</strong>
-                  PDFs process instantly. Word documents &amp; images will be
-                  converted to PDF automatically.
+                  <span id="formatTipText"
+                    >Send a PDF for the fastest printing. Word files are
+                    converted to PDF at the kiosk, which takes longer and can
+                    fail.</span
+                  >
                 </p>
               </div>
             </div>
@@ -389,10 +392,11 @@
             <div class="empty-formats">
               <span class="empty-formats__label">Accepted</span>
               <ul class="empty-formats__list">
-                <li class="empty-format">
+                <li class="empty-format empty-format--recommended">
                   <svg aria-hidden="true"><use href="#icon-pdf" /></svg>PDF
+                  <span class="empty-format__badge">Fastest</span>
                 </li>
-                <li class="empty-format">
+                <li class="empty-format" id="emptyFormatWord">
                   <svg aria-hidden="true"><use href="#icon-doc" /></svg>Word
                 </li>
                 <li class="empty-format">
@@ -738,6 +742,7 @@
         <p class="modal-subtitle" id="conversionMessage" aria-live="polite">
           Checking pages and print quality…
         </p>
+        <p class="conversion-action" id="conversionAction" hidden></p>
 
         <p class="preload-assurance-text">
           <svg

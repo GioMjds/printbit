@@ -267,6 +267,8 @@ export class PageController {
       idleScreenTimeoutSeconds,
       maxPagesPerSession:
         db.data?.settings?.printLimits?.maxPagesPerSession ?? 30,
+      documentConversionEnabled:
+        db.data?.settings?.pipelineSettings?.documentConversionEnabled ?? true,
       uiBlocking: db.data?.settings?.uiBlocking ?? {
         enabled: false,
         mode: 'maintenance',

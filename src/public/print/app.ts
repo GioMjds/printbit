@@ -16,8 +16,15 @@ import {
 } from '../shared/loading-animation';
 import { fetchWithTimeout } from '../shared/fetch-with-timeout';
 import {
-  ANALYSIS_FAILED_TEXT,
-  ANALYSIS_PREPARING_TEXT,
+  WORD_CONVERTING_MESSAGE,
+  WORD_CONVERTING_TIP,
+  WORD_CONVERTING_TITLE,
+  describePreparationFailure,
+  isWordFile,
+  pdfRecommendation,
+  renderSentences,
+} from '../shared/document-formats';
+import {
   ANALYSIS_WAIT_TIMEOUT_MS,
   createCoalescedRunner,
   createSessionSocket,
@@ -168,6 +175,18 @@ const conversionMessage = document.getElementById(
 const conversionCancelBtn = document.getElementById(
   'conversionCancel',
 ) as HTMLButtonElement | null;
+const conversionAction = document.getElementById(
+  'conversionAction',
+) as HTMLElement | null;
+const conversionCard = conversionOverlay?.querySelector(
+  '.conversion-card',
+) as HTMLElement | null;
+const formatTipText = document.getElementById(
+  'formatTipText',
+) as HTMLElement | null;
+const emptyFormatWord = document.getElementById(
+  'emptyFormatWord',
+) as HTMLElement | null;
 const preloadLoadingAnimation = document.getElementById(
   'preloadLoadingAnimation',
 ) as HTMLElement | null;
@@ -234,6 +253,12 @@ function updatePrintLimitLabel(limit: number): void {
 }
 updatePrintLimitLabel(maxPagesPerSession);
 
+/** Admin can turn Word uploads off; the accepted-format hints must follow. */
+function applyWordUploadsEnabled(enabled: boolean): void {
+  if (emptyFormatWord) emptyFormatWord.hidden = !enabled;
+  if (formatTipText) formatTipText.textContent = pdfRecommendation(enabled);
+}
+
 async function fetchKioskSettings(): Promise<void> {
   try {
     const res = await fetch('/api/settings/idle-timeout');
@@ -249,6 +274,9 @@ async function fetchKioskSettings(): Promise<void> {
           String(maxPagesPerSession),
         );
         updatePrintLimitLabel(maxPagesPerSession);
+      }
+      if (typeof data.documentConversionEnabled === 'boolean') {
+        applyWordUploadsEnabled(data.documentConversionEnabled);
       }
     }
   } catch (err) {
@@ -1153,9 +1181,35 @@ function getFriendlyFileType(filename: string): string {
   return 'Document';
 }
 
-function setConversionStatus(title: string, message: string): void {
+function setConversionStatus(
+  title: string,
+  message: string,
+  action = '',
+): void {
   if (conversionTitle) conversionTitle.textContent = title;
   if (conversionMessage) conversionMessage.textContent = message;
+  if (conversionAction) {
+    conversionAction.textContent = action;
+    conversionAction.hidden = !action;
+  }
+}
+
+/** Switches the open dialog from "working" to a failure with a next step. */
+function showConversionFailure(
+  title: string,
+  message: string,
+  action = '',
+): void {
+  setConversionStatus(title, message, action);
+  preloadLoadingController?.setActive(false);
+  conversionCard?.classList.add('is-failed');
+  if (conversionCancelBtn) conversionCancelBtn.textContent = 'Close';
+  conversionCancelBtn?.focus();
+}
+
+function showPreparationFailure(filename: string, rawError: string): void {
+  const copy = describePreparationFailure(filename, rawError);
+  showConversionFailure(copy.title, copy.reason, copy.kioskAction);
 }
 
 function showConversionDialog(file?: UploadedFile | null): void {
@@ -1175,10 +1229,19 @@ function showConversionDialog(file?: UploadedFile | null): void {
     preloadFileIcon.innerHTML = `<use href="#${iconIdForFile(filename)}"/>`;
   }
 
+  conversionCard?.classList.remove('is-failed');
+  if (conversionCancelBtn) conversionCancelBtn.textContent = 'Cancel';
+
   if (isPdf) {
     setConversionStatus(
       'Preparing your document',
       'Checking pages and print quality…',
+    );
+  } else if (isWordFile(filename)) {
+    setConversionStatus(
+      WORD_CONVERTING_TITLE,
+      WORD_CONVERTING_MESSAGE,
+      WORD_CONVERTING_TIP,
     );
   } else {
     setConversionStatus(
@@ -1317,8 +1380,15 @@ function registerSocketHandlers(socket: SocketLike): void {
   });
   socket.on('systemSettingsChanged', (raw: unknown) => {
     const data = raw as
-      | { printLimits?: { maxPagesPerSession?: number } }
+      | {
+          printLimits?: { maxPagesPerSession?: number };
+          pipelineSettings?: { documentConversionEnabled?: boolean };
+        }
       | undefined;
+    const wordEnabled = data?.pipelineSettings?.documentConversionEnabled;
+    if (typeof wordEnabled === 'boolean') {
+      applyWordUploadsEnabled(wordEnabled);
+    }
     const limit = data?.printLimits?.maxPagesPerSession;
     if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
       maxPagesPerSession = limit;
@@ -1360,15 +1430,23 @@ function registerSocketHandlers(socket: SocketLike): void {
   });
 
   socket.on('AnalysisFailed', (info: unknown) => {
-    const docId =
-      typeof info === 'object' &&
-      info !== null &&
-      'documentId' in info &&
-      typeof (info as { documentId: unknown }).documentId === 'string'
-        ? (info as { documentId: string }).documentId
-        : null;
+    const data =
+      typeof info === 'object' && info !== null
+        ? (info as { documentId?: unknown; filename?: unknown; error?: unknown })
+        : {};
+    const docId = typeof data.documentId === 'string' ? data.documentId : null;
     if (docId) {
       updateFileAnalysisState(docId, 'failed');
+    }
+    // The open conversion dialog already explains it; otherwise use the footer.
+    if (footerHint && !conversionWaitInFlight) {
+      const copy = describePreparationFailure(
+        typeof data.filename === 'string' ? data.filename : '',
+        typeof data.error === 'string' ? data.error : '',
+      );
+      renderSentences(footerHint, [copy.reason, copy.kioskAction], copy.title);
+      footerHint.classList.remove('ready');
+      footerHint.classList.add('error');
     }
     void checkUploadStatus();
   });
@@ -1392,12 +1470,17 @@ function updateFileAnalysisState(
 
   statusEl.classList.remove('analyzing', 'ready', 'failed');
   statusEl.classList.add(state);
+  const badgeText =
+    getAnalysisBadge({
+      filename: fileItem.dataset.filename ?? '',
+      analysisStatus: state === 'analyzing' ? 'pending' : 'failed',
+    })?.text ?? '';
 
   switch (state) {
     case 'analyzing':
       statusEl.innerHTML = `
         <span class="analysis-spinner-mini" aria-hidden="true"></span>
-        <span class="analysis-label">${escapeHtml(ANALYSIS_PREPARING_TEXT)}</span>
+        <span class="analysis-label">${escapeHtml(badgeText)}</span>
       `;
       statusEl.style.display = 'inline-flex';
       break;
@@ -1406,7 +1489,7 @@ function updateFileAnalysisState(
       statusEl.style.display = 'none';
       break;
     case 'failed':
-      statusEl.textContent = ANALYSIS_FAILED_TEXT;
+      statusEl.textContent = badgeText;
       statusEl.style.display = 'inline-block';
       break;
   }
@@ -1592,11 +1675,10 @@ continueBtn?.addEventListener('click', async () => {
       );
       if (!queued) {
         if (!conversionWaitCancelled) {
-          setConversionStatus(
+          showConversionFailure(
             'Unable to prepare document',
             'Could not restart preparation. Check the connection, or re-upload the file.',
           );
-          conversionCancelBtn?.focus();
         }
         conversionWaitInFlight = false;
         setContinueButtonDisabled(false);
@@ -1609,11 +1691,14 @@ continueBtn?.addEventListener('click', async () => {
     );
     if (!result.ready) {
       if (!conversionWaitCancelled) {
-        setConversionStatus(
-          'Unable to prepare document',
-          result.message || 'Please try another file or re-upload.',
-        );
-        conversionCancelBtn?.focus();
+        if (result.failure) {
+          showPreparationFailure(selectedFilename, result.failure.error);
+        } else {
+          showConversionFailure(
+            'Unable to prepare document',
+            result.message || 'Please try another file or re-upload.',
+          );
+        }
       }
       conversionWaitInFlight = false;
       setContinueButtonDisabled(false);

@@ -893,3 +893,48 @@ body {
 }
 
 
+
+/* ── PDF recommendation ───────────────────────────────────── */
+.pdf-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(58, 158, 82, 0.1);
+  border: 1px solid rgba(134, 219, 147, 0.3);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--lavender);
+}
+
+.pdf-tip__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #86db93;
+}
+
+.pdf-tip__text {
+  margin: 0;
+}
+
+.pdf-tip__text strong {
+  color: var(--white);
+}
+
+.pdf-tip__howto {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+}
+
+.queue-item__note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--peach);
+}

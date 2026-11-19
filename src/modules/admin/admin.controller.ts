@@ -2817,6 +2817,10 @@ export class AdminController {
       printLimits: nextSettings.printLimits,
       scannerDpi: nextSettings.scannerDpi,
       developerMode: nextSettings.developerMode,
+      pipelineSettings: {
+        documentConversionEnabled:
+          nextSettings.pipelineSettings?.documentConversionEnabled ?? true,
+      },
     });
     if (refreshConsumablesAlerts) {
       await this.consumablesService.evaluateAndPublishForecastAlerts();

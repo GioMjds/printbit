@@ -115,6 +115,18 @@
           </div>
         </div>
 
+        <!-- PDF recommendation (text follows the admin Word-upload setting) -->
+        <div class="pdf-tip" role="note">
+          <svg viewBox="0 0 20 20" fill="currentColor" class="pdf-tip__icon" aria-hidden="true">
+            <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
+          </svg>
+          <p class="pdf-tip__text">
+            <strong>PDF works best.</strong>
+            <span id="pdfTipText">Send a PDF for the fastest printing. Word files are converted to PDF at the kiosk, which takes longer and can fail.</span>
+            <span class="pdf-tip__howto" id="pdfTipHowto">To save as PDF: in Word, tap File, then Save As, then PDF. In Google Docs, tap Share &amp; export, then Save as, then PDF.</span>
+          </p>
+        </div>
+
         <!-- Drop zone -->
         <form id="uploadForm" novalidate>
           <div

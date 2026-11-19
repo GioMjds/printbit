@@ -1,5 +1,16 @@
 export {};
 import { initKioskLocalization } from '../shared/kiosk-i18n';
+import {
+  SAVE_AS_PDF_HOWTO,
+  WORD_CONVERTING_MESSAGE,
+  WORD_CONVERTING_TITLE,
+  WORD_QUEUE_NOTE,
+  acceptedFormatsSummary,
+  describePreparationFailure,
+  fileInputAccept,
+  pdfRecommendation,
+  renderSentences,
+} from '../shared/document-formats';
 import { isLargePrintDocument } from '../shared/large-print-warning';
 import {
   UPLOAD_REQUEST_TIMEOUT_MS,
@@ -91,6 +102,14 @@ const uploadToast = document.getElementById(
 const toastCloseBtn = document.getElementById(
   'toastCloseBtn',
 ) as HTMLButtonElement | null;
+const pdfTipText = document.getElementById('pdfTipText') as HTMLElement | null;
+const pdfTipHowto = document.getElementById(
+  'pdfTipHowto',
+) as HTMLElement | null;
+
+/** Matches the server's rejection text so both translate the same way. */
+const WORD_UPLOADS_OFF_MESSAGE =
+  'Word files are not accepted on this kiosk. Save the file as PDF, then send the PDF.';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -175,6 +194,8 @@ type QueuedFile = {
   status: ItemStatus;
   /** Set when the last failure was transient, so Send can try this file again. */
   retryable?: boolean;
+  /** Delivered, but the kiosk could not prepare it; a kiosk retry may still succeed. */
+  preparationFailed?: boolean;
   el: HTMLElement;
 };
 
@@ -209,10 +230,19 @@ function setAppState(s: UploadState): void {
   updateDropZoneEnabled();
 }
 
-function setStatus(msg: string, cls: 'info' | 'ok' | 'error' | ''): void {
-  statusBox.textContent = msg;
+/** An array renders one span per sentence so each one stays translatable. */
+function setStatus(
+  msg: string | string[],
+  cls: 'info' | 'ok' | 'error' | '',
+  heading?: string,
+): void {
+  if (Array.isArray(msg) || heading) {
+    renderSentences(statusBox, Array.isArray(msg) ? msg : [msg], heading);
+  } else {
+    statusBox.textContent = msg;
+  }
   statusBox.className = cls ? `status-box ${cls}` : 'status-box';
-  if (msg) {
+  if (statusBox.textContent) {
     statusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
@@ -240,17 +270,10 @@ function formatBytes(bytes: number): string {
 function setDocumentConversionEnabled(enabled: boolean): void {
   documentConversionEnabled = enabled;
 
-  if (fileInput) {
-    fileInput.accept = enabled
-      ? '.pdf,.doc,.docx,.jpeg,.jpg,.png,.gif,.webp,.bmp,image/jpeg,image/png,image/gif,image/webp,image/bmp'
-      : '.pdf,.jpeg,.jpg,.png,.gif,.webp,.bmp,image/jpeg,image/png,image/gif,image/webp,image/bmp';
-  }
-
-  if (uploadSubTitle) {
-    uploadSubTitle.textContent = enabled
-      ? 'PDF, Word, JPG, PNG, GIF, WebP, and BMP files · up to 25 MB each'
-      : 'PDF, JPG, PNG, GIF, WebP, and BMP files · up to 25 MB each';
-  }
+  if (fileInput) fileInput.accept = fileInputAccept(enabled);
+  if (uploadSubTitle) uploadSubTitle.textContent = acceptedFormatsSummary(enabled);
+  if (pdfTipText) pdfTipText.textContent = pdfRecommendation(enabled);
+  if (pdfTipHowto) pdfTipHowto.textContent = SAVE_AS_PDF_HOWTO;
 
   if (dropZoneHint) {
     dropZoneHint.textContent = enabled
@@ -274,7 +297,10 @@ function setDocumentConversionEnabled(enabled: boolean): void {
     if (removedCount > 0) {
       refreshUploadBtn();
       setStatus(
-        'Word document conversion is disabled on this kiosk. Removed Word document(s) from upload list.',
+        [
+          'Word files were turned off on this kiosk, so they were removed from your list.',
+          'Save them as PDF, then send the PDFs.',
+        ],
         'info',
       );
     }
@@ -554,6 +580,7 @@ function createQueueItem(qf: QueuedFile): HTMLElement {
     <div class="queue-item__info">
       <p class="queue-item__name" title="${escHtml(qf.file.name)}">${escHtml(qf.file.name)}</p>
       <span class="queue-item__size">${size}</span>
+      ${isWordDocument(qf.file.name, qf.file.type) ? `<span class="queue-item__note">${escHtml(WORD_QUEUE_NOTE)}</span>` : ''}
     </div>
     <div class="queue-item__actions">
       <span class="queue-item__status queue-item__status--pending">Ready to send</span>
@@ -626,6 +653,7 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
   const unsupported: string[] = [];
   const tooLarge: string[] = [];
   const duplicateFiles: string[] = [];
+  let wordAdded = 0;
 
   for (const file of arr) {
     // Same predicate decides the error message and queue entry, so a rejected
@@ -661,16 +689,14 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
     qf.el = el;
     queue.push(qf);
     fileQueue.appendChild(el);
+    if (isWordDocument(file.name, file.type)) wordAdded++;
   }
 
   const rejectedCount =
     wordRejected.length + unsupported.length + tooLarge.length;
   const more = (n: number) => (n > 1 ? ` (+${n - 1} more)` : '');
   if (wordRejected.length > 0) {
-    setStatus(
-      'Word document conversion is disabled on this kiosk. Please upload PDF or image files.',
-      'error',
-    );
+    setStatus([WORD_UPLOADS_OFF_MESSAGE, SAVE_AS_PDF_HOWTO], 'error');
   } else if (unsupported.length > 0) {
     setStatus(
       `Unsupported file type: ${unsupported[0]}${more(unsupported.length)}.`,
@@ -697,6 +723,14 @@ async function addFilesToQueue(files: FileList | File[]): Promise<void> {
   if (duplicateFiles.length > 0) {
     setStatus(
       `${duplicateFiles[0]} is already in the upload list${more(duplicateFiles.length)}.`,
+      'info',
+    );
+  } else if (rejectedCount === 0 && wordAdded > 0) {
+    setStatus(
+      [
+        'Word files are converted to PDF at the kiosk, which can take up to a minute.',
+        'For faster, more reliable printing, send a PDF instead.',
+      ],
       'info',
     );
   } else if (rejectedCount === 0) {
@@ -873,7 +907,11 @@ function attachSocket(sid: string): void {
       typeof (info as { filename: unknown }).filename === 'string'
         ? (info as { filename: string }).filename
         : 'file';
-    setStatus(`Analyzing ${name}…`, 'info');
+    if (isWordDocument(name)) {
+      setStatus([WORD_CONVERTING_MESSAGE], 'info', WORD_CONVERTING_TITLE);
+    } else {
+      setStatus(`Analyzing ${name}…`, 'info');
+    }
   });
 
   socket.on('AnalysisCompleted', (info: unknown) => {
@@ -883,6 +921,17 @@ function attachSocket(sid: string): void {
             .analysis
         : undefined;
     const pageCount = analysis?.totalPages ?? analysis?.pageCount;
+    const doneName =
+      typeof info === 'object' && info !== null
+        ? (info as { filename?: unknown }).filename
+        : undefined;
+    const recovered = queue.find(
+      (q) => q.preparationFailed && q.file.name === doneName,
+    );
+    if (recovered) {
+      recovered.preparationFailed = false;
+      updateItemStatus(recovered, 'done');
+    }
     if (
       !largePrintWarningShown &&
       isLargePrintDocument(pageCount, maxPagesPerSession)
@@ -898,15 +947,26 @@ function attachSocket(sid: string): void {
   });
 
   socket.on('AnalysisFailed', (info: unknown) => {
-    const name =
-      typeof info === 'object' &&
-      info !== null &&
-      'filename' in info &&
-      typeof (info as { filename: unknown }).filename === 'string'
-        ? (info as { filename: string }).filename
-        : 'file';
-    // Analysis failure is non-fatal — file can still be printed, just without page count info
-    setStatus(`⚠ ${name} analysis unavailable. Proceed at kiosk.`, 'info');
+    const data =
+      typeof info === 'object' && info !== null
+        ? (info as { filename?: unknown; error?: unknown })
+        : {};
+    const name = typeof data.filename === 'string' ? data.filename : '';
+    const copy = describePreparationFailure(
+      name,
+      typeof data.error === 'string' ? data.error : '',
+    );
+    // The kiosk cannot print this file until it is prepared, so say why and what to send instead.
+    setStatus([copy.reason, copy.phoneAction], 'error', copy.title);
+    const sent = queue.find((q) => q.status === 'done' && q.file.name === name);
+    if (sent) {
+      sent.preparationFailed = true;
+      updateItemStatus(
+        sent,
+        'error',
+        copy.isWord ? 'Could not convert' : 'Could not prepare',
+      );
+    }
   });
 }
 
@@ -1004,7 +1064,7 @@ async function uploadPendingFiles(): Promise<void> {
       !documentConversionEnabled &&
       isWordDocument(qf.file.name, qf.file.type)
     ) {
-      updateItemStatus(qf, 'error', 'Word document conversion is disabled.');
+      updateItemStatus(qf, 'error', 'Word files not accepted');
       errorCount++;
       continue;
     }

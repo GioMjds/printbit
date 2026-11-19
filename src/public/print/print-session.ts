@@ -1,6 +1,8 @@
 // Pure helpers for the kiosk /print page. Kept free of DOM access so they can
 // be unit tested under jest's node environment.
 
+import { isWordFile } from '../shared/document-formats';
+
 export type UploadedFile = {
   documentId?: string;
   filename: string;
@@ -55,16 +57,26 @@ export function filesSignature(
 export const ANALYSIS_FAILED_TEXT =
   '⚠ Could not prepare this file. Tap Continue to retry.';
 export const ANALYSIS_PREPARING_TEXT = 'Preparing pages…';
+export const WORD_CONVERTING_BADGE_TEXT = 'Converting to PDF…';
+export const WORD_CONVERSION_FAILED_TEXT =
+  '⚠ Could not convert to PDF. Tap Continue to retry, or send a PDF.';
 
 export type AnalysisBadge = { state: 'analyzing' | 'failed'; text: string };
 
 /** Badge for a row, derived from session data so it survives list re-renders. */
 export function getAnalysisBadge(file: UploadedFile): AnalysisBadge | null {
+  const isWord = isWordFile(file.filename);
   if (file.analysisStatus === 'pending') {
-    return { state: 'analyzing', text: ANALYSIS_PREPARING_TEXT };
+    return {
+      state: 'analyzing',
+      text: isWord ? WORD_CONVERTING_BADGE_TEXT : ANALYSIS_PREPARING_TEXT,
+    };
   }
   if (file.analysisStatus === 'failed') {
-    return { state: 'failed', text: ANALYSIS_FAILED_TEXT };
+    return {
+      state: 'failed',
+      text: isWord ? WORD_CONVERSION_FAILED_TEXT : ANALYSIS_FAILED_TEXT,
+    };
   }
   return null;
 }
@@ -93,7 +105,12 @@ export type AnalysisWaitResult =
       analysis?: UploadedFile['analysis'];
       document?: UploadedFile;
     }
-  | { ready: false; message: string };
+  | {
+      ready: false;
+      message: string;
+      /** Set when preparation itself failed or timed out; holds the raw reason. */
+      failure?: { error: string };
+    };
 
 export type SessionDocumentsFetch =
   | { ok: true; documents: UploadedFile[] }
@@ -118,6 +135,7 @@ export async function pollDocumentAnalysis(opts: {
         ready: false,
         message:
           'Preparing is taking longer than expected. Tap Continue to try again.',
+        failure: { error: 'timed out' },
       };
     }
 
@@ -150,6 +168,7 @@ export async function pollDocumentAnalysis(opts: {
           message:
             document.analysisError ||
             'Document could not be prepared. Choose another file or try again.',
+          failure: { error: document.analysisError ?? '' },
         };
       }
     } catch {

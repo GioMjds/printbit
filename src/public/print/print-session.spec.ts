@@ -9,6 +9,8 @@ import {
   pollDocumentAnalysis,
   type SocketLike,
   type UploadedFile,
+  WORD_CONVERSION_FAILED_TEXT,
+  WORD_CONVERTING_BADGE_TEXT,
 } from './print-session';
 
 const file = (over: Partial<UploadedFile> = {}): UploadedFile => ({
@@ -48,6 +50,14 @@ describe('getAnalysisBadge', () => {
     expect(badge?.text).toBe(ANALYSIS_FAILED_TEXT);
     expect(ANALYSIS_FAILED_TEXT.toLowerCase()).not.toContain('still printable');
     expect(ANALYSIS_FAILED_TEXT.toLowerCase()).toContain('retry');
+  });
+
+  it('says Word files are converting, and recommends PDF when that fails', () => {
+    const word = (status: UploadedFile['analysisStatus']) =>
+      getAnalysisBadge(file({ filename: 'a.docx', analysisStatus: status }));
+    expect(word('pending')?.text).toBe(WORD_CONVERTING_BADGE_TEXT);
+    expect(word('failed')?.text).toBe(WORD_CONVERSION_FAILED_TEXT);
+    expect(WORD_CONVERSION_FAILED_TEXT).toMatch(/PDF/);
   });
 });
 
@@ -150,7 +160,11 @@ describe('pollDocumentAnalysis', () => {
       },
     ]);
     const result = await pollDocumentAnalysis({ ...h.base, ...h });
-    expect(result).toEqual({ ready: false, message: 'Corrupt PDF' });
+    expect(result).toEqual({
+      ready: false,
+      message: 'Corrupt PDF',
+      failure: { error: 'Corrupt PDF' },
+    });
   });
 
   it('reports an expired session and a missing document', async () => {
