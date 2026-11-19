@@ -27,7 +27,19 @@ import {
   getPrintingStage,
 } from './printing-stage';
 import { presentMaintenanceError } from './maintenance-view';
-import type { PageRange } from '../shared/page-selection';
+import {
+  formatPageRangeString,
+  type PageRange,
+} from '../shared/page-selection';
+import {
+  clearPrintHistory,
+  countPages,
+  formatPagesLabel,
+  recordPrintedPages,
+  selectionToRanges,
+  takePages,
+  unprintedRanges,
+} from '../shared/print-history';
 import {
   attachPowerSafetyOverlay,
   type PowerSafetyOverlayController,
@@ -86,18 +98,8 @@ void initializePageIdleTimeout({
     );
     await releasePaymentLease('idle_timeout', true);
     await releaseTransientFilesForCurrentMode('confirm_idle_timeout');
-    const sessionId = sessionStorage.getItem('printbit.sessionId');
-    const sessionToken = sessionStorage.getItem('printbit.sessionToken');
-    if (sessionId && sessionToken) {
-      try {
-        await fetch(
-          `/api/wireless/sessions/${encodeURIComponent(sessionId)}/cancel?token=${encodeURIComponent(sessionToken)}`,
-          { method: 'DELETE' },
-        );
-      } catch {
-        // Best-effort cleanup
-      }
-    }
+    await cancelWirelessSession();
+    clearPrintHistory();
     // Clear state before redirect
     sessionStorage.removeItem('printbit.config');
     sessionStorage.removeItem('printbit.copyPreviewPath');
@@ -488,6 +490,20 @@ const thankYouDoneBtn = document.getElementById(
 const printAnotherBtn = document.getElementById(
   'printAnotherBtn',
 ) as HTMLButtonElement | null;
+const reprintBtn = document.getElementById(
+  'reprintBtn',
+) as HTMLButtonElement | null;
+const remainingPagesCard = document.getElementById('remainingPagesCard');
+const remainingPagesTitle = document.getElementById('remainingPagesTitle');
+const remainingPagesText = document.getElementById('remainingPagesText');
+const printRemainingBtn = document.getElementById(
+  'printRemainingBtn',
+) as HTMLButtonElement | null;
+const printRemainingBtnLabel = document.getElementById(
+  'printRemainingBtnLabel',
+);
+const thankYouDoneNote = document.getElementById('thankYouDoneNote');
+const thankYouDoneFileCount = document.getElementById('thankYouDoneFileCount');
 const transactionReference = document.getElementById(
   'transactionReference',
 ) as HTMLElement | null;
@@ -2255,8 +2271,92 @@ function finalizePrintSuccess(
     }
   }
 
+  renderPostPrintActions();
   applyConfirmGate();
   void checkRemainingFilesAndPrompt();
+}
+
+/** Pages to preselect on /config for "Print remaining pages"; null hides it. */
+let remainingPagesSelection: string | null = null;
+
+/** /config URL for the file that just printed, or null outside print mode. */
+function buildPrintedFileConfigUrl(
+  extra: Record<string, string>,
+): string | null {
+  const sessionId =
+    config.sessionId ?? sessionStorage.getItem('printbit.sessionId');
+  const token = sessionStorage.getItem('printbit.sessionToken');
+  const documentId = config.documentId;
+  if (config.mode !== 'print' || !sessionId || !documentId || !uploadedFile) {
+    return null;
+  }
+  const params = new URLSearchParams({
+    mode: 'print',
+    sessionId,
+    file: uploadedFile,
+    documentId,
+    ...(token ? { token } : {}),
+    ...extra,
+  });
+  return `/config?${params.toString()}`;
+}
+
+function pagesPhrase(label: string, count: number): string {
+  return `${count === 1 ? 'Page' : 'Pages'} ${label}`;
+}
+
+function renderPostPrintActions(): void {
+  remainingPagesSelection = null;
+  remainingPagesCard?.setAttribute('hidden', '');
+  const canReprint = buildPrintedFileConfigUrl({}) !== null;
+  reprintBtn?.toggleAttribute('hidden', !canReprint);
+  thankYouDoneNote?.toggleAttribute('hidden', config.mode !== 'print');
+  if (config.mode === 'print') {
+    thankYouDoneBtn?.setAttribute('aria-describedby', 'thankYouDoneNote');
+  } else {
+    thankYouDoneBtn?.removeAttribute('aria-describedby');
+  }
+  if (!canReprint || !config.documentId || !uploadedFile) return;
+
+  const totalPages = config.totalPages ?? config.quote?.totalPages ?? 0;
+  if (!(totalPages > 0)) return;
+  const entry = recordPrintedPages(
+    config.documentId,
+    uploadedFile,
+    totalPages,
+    selectionToRanges(config.pageRange, totalPages),
+  );
+  const left = unprintedRanges(totalPages, entry.printedRanges);
+  if (left.length === 0) return;
+
+  const limit =
+    Number(sessionStorage.getItem('printbit.maxPagesPerSession')) || 30;
+  const copies = Math.max(1, Math.floor(config.copies) || 1);
+  const nextBatch = takePages(left, Math.max(1, Math.floor(limit / copies)));
+  const leftCount = countPages(left);
+  const batchCount = countPages(nextBatch);
+  remainingPagesSelection = formatPageRangeString(nextBatch);
+
+  if (remainingPagesTitle) {
+    remainingPagesTitle.textContent = `${leftCount} ${leftCount === 1 ? 'page' : 'pages'} of this file not printed yet`;
+  }
+  if (remainingPagesText) {
+    const limitNote =
+      totalPages * copies > limit
+        ? ` Each print is limited to ${limit} pages, so the rest prints as a next batch.`
+        : '';
+    remainingPagesText.textContent =
+      `${pagesPhrase(formatPagesLabel(left), leftCount)} of “${truncateFilename(uploadedFile, 32)}” ` +
+      `${leftCount === 1 ? 'was' : 'were'} not printed.${limitNote} Your file is still on this kiosk.`;
+  }
+  if (printRemainingBtnLabel) {
+    const batchLabel = formatPagesLabel(nextBatch);
+    printRemainingBtnLabel.textContent =
+      batchCount === leftCount
+        ? `Print ${pagesPhrase(batchLabel, batchCount)}`
+        : `Print Next ${batchCount} Pages (${batchLabel})`;
+  }
+  remainingPagesCard?.removeAttribute('hidden');
 }
 
 function enterWorkerPendingState(transactionId: string | null): void {
@@ -2618,12 +2718,68 @@ function clearConfirmSessionStorage(): void {
   sessionStorage.removeItem('printbit.sessionToken');
 }
 
+/** Tell the customer how many files Done will delete. No auto-redirect. */
 async function checkRemainingFilesAndPrompt(): Promise<void> {
-  if (config.mode !== 'print' || !config.sessionId) {
-    // No auto-redirect: user taps Done when ready
-    return;
+  const sessionId = sessionStorage.getItem('printbit.sessionId');
+  const token = sessionStorage.getItem('printbit.sessionToken');
+  if (config.mode !== 'print' || !sessionId || !token) return;
+  try {
+    const response = await fetchWithTimeout(
+      `/api/wireless/sessions/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(token)}`,
+      {},
+      5_000,
+    );
+    if (!response.ok) return;
+    const body = (await response.json()) as {
+      documents?: unknown[];
+      document?: unknown;
+    };
+    const count = Array.isArray(body.documents)
+      ? body.documents.length
+      : body.document
+        ? 1
+        : 0;
+    if (thankYouDoneFileCount && count > 0) {
+      thankYouDoneFileCount.textContent =
+        count === 1 ? 'your 1 uploaded file' : `all ${count} of your uploaded files`;
+    }
+  } catch {
+    // Keep the generic "your uploaded files" wording.
   }
-  // Simplified for brevity — no auto-redirect
+}
+
+/** Ends the wireless session; the server deletes every uploaded file. */
+async function cancelWirelessSession(): Promise<void> {
+  const sessionId = sessionStorage.getItem('printbit.sessionId');
+  const sessionToken = sessionStorage.getItem('printbit.sessionToken');
+  if (!sessionId || !sessionToken) return;
+  try {
+    await fetch(
+      `/api/wireless/sessions/${encodeURIComponent(sessionId)}/cancel?token=${encodeURIComponent(sessionToken)}`,
+      // keepalive: the request must survive the navigation home.
+      { method: 'DELETE', keepalive: true },
+    );
+  } catch {
+    // Best-effort cleanup
+  }
+}
+
+/** Clears the finished job's UI state before starting another job. */
+function resetForNextJob(): void {
+  setTransactionReference(null);
+  jobState = reduceJob(jobState, { type: 'owed-change-cleared' });
+  if (owedChangeAlert) {
+    owedChangeAlert.setAttribute('hidden', '');
+  }
+  clearPendingPaymentSessionState();
+}
+
+function openPrintedFileConfig(extra: Record<string, string>): void {
+  const url = buildPrintedFileConfigUrl(extra);
+  if (!url) return;
+  resetForNextJob();
+  // printbit.config stays: /config restores this file's last settings from it.
+  navigateWithKioskMotion(url);
 }
 
 confirmBtn?.addEventListener('click', () => showModal());
@@ -2878,8 +3034,21 @@ modalConfirmBtn?.addEventListener('click', async () => {
 });
 
 thankYouDoneBtn?.addEventListener('click', () => {
+  // Done ends the visit: delete the uploaded files now. Printed files are
+  // otherwise kept in the session so the customer can reprint them.
+  void cancelWirelessSession();
+  clearPrintHistory();
   clearConfirmSessionStorage();
   navigateWithKioskMotion('/');
+});
+
+reprintBtn?.addEventListener('click', () => {
+  openPrintedFileConfig({ reprint: '1' });
+});
+
+printRemainingBtn?.addEventListener('click', () => {
+  if (!remainingPagesSelection) return;
+  openPrintedFileConfig({ pages: remainingPagesSelection });
 });
 
 maintenanceDoneBtn?.addEventListener('click', () => {
@@ -2889,12 +3058,7 @@ maintenanceDoneBtn?.addEventListener('click', () => {
 });
 
 printAnotherBtn?.addEventListener('click', () => {
-  setTransactionReference(null);
-  jobState = reduceJob(jobState, { type: 'owed-change-cleared' });
-  if (owedChangeAlert) {
-    owedChangeAlert.setAttribute('hidden', '');
-  }
-  clearPendingPaymentSessionState();
+  resetForNextJob();
   sessionStorage.removeItem('printbit.config');
   sessionStorage.removeItem('printbit.copyPreviewPath');
   sessionStorage.removeItem('printbit.copyPreviewReleaseToken');

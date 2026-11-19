@@ -169,6 +169,16 @@ async function cleanupSuccessfulPrint(input: {
 
   if (!filename) return;
 
+  // Keep the file for reprint / remaining pages; session end deletes it.
+  if (sessionId && documentId && sessionStore.hasDocument(sessionId, documentId)) {
+    await adminService.appendAdminLog(
+      'upload_retained_after_print',
+      'Uploaded file kept in its live session for reprint after worker-confirmed print completion.',
+      { transactionId, sessionId, documentId, filename, source: 'worker-return-pipe' },
+    );
+    return;
+  }
+
   if (sessionId && documentId) {
     const removed = await sessionStore.removeDocument(sessionId, documentId);
     if (removed.success && removed.deletedFile) {

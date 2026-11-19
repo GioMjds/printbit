@@ -20,8 +20,10 @@ import {
 } from '../shared/large-print-warning';
 import {
   formatPageRangeString,
+  parsePageRangeString,
   type PageRange,
 } from '../shared/page-selection';
+import { selectionToRanges } from '../shared/print-history';
 import {
   destroyPdfLoadingTask,
   type PdfLoadingTask,
@@ -190,6 +192,11 @@ interface QuoteRequestBody {
 
 interface StoredConfigSeed {
   mode?: 'print' | 'copy' | 'scan';
+  documentId?: string | null;
+  colorMode?: ColorMode;
+  duplex?: boolean;
+  copies?: number;
+  pageRange?: PageRangeSelection;
   scanFilename?: string | null;
   scanReleaseToken?: string | null;
   orientation?: Orientation;
@@ -1680,6 +1687,59 @@ function syncPageRangeAvailability(): void {
   clampCopiesInput();
 }
 
+// "Print again" / "Print remaining pages" from the confirm page: restore the
+// last settings used for this same document, or preselect the pages left out.
+const reprintPages = mode === 'print' ? params.get('pages') : null;
+const isReprint = mode === 'print' && params.get('reprint') === '1';
+let reprintSeedApplied = false;
+
+function applyReprintSeed(): void {
+  if (reprintSeedApplied || (!isReprint && !reprintPages)) return;
+  reprintSeedApplied = true;
+
+  const sameDocument =
+    Boolean(selectedDocumentId) &&
+    storedConfig?.documentId === selectedDocumentId;
+  const max = getPageRangeMaxPages();
+  const ranges = reprintPages
+    ? parsePageRangeString(reprintPages, max)
+    : sameDocument && storedConfig?.pageRange && storedConfig.pageRange.type !== 'all'
+      ? selectionToRanges(storedConfig.pageRange, max)
+      : [];
+
+  if (ranges.length > 0 && hasMultiplePages() && pageModeCustom && customRangeBuilder) {
+    pageModeCustom.checked = true;
+    pageModeCustom.dispatchEvent(new Event('change', { bubbles: true }));
+    customRangeBuilder.setFromRanges(ranges);
+    syncPageRangeUI();
+    syncCustomRangeValidity();
+  }
+
+  if (sameDocument && storedConfig) {
+    const colorRadio = document.querySelector<HTMLInputElement>(
+      `input[name="colorMode"][value="${storedConfig.colorMode === 'grayscale' ? 'grayscale' : 'colored'}"]`,
+    );
+    if (colorRadio && !colorRadio.disabled && !colorRadio.checked) {
+      colorRadio.checked = true;
+      colorRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const duplexRadio = document.querySelector<HTMLInputElement>(
+      `input[name="duplex"][value="${storedConfig.duplex ? 'duplex' : 'simplex'}"]`,
+    );
+    if (duplexRadio && !duplexRadio.disabled && !duplexRadio.checked) {
+      duplexRadio.checked = true;
+      duplexRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (copiesInput && typeof storedConfig.copies === 'number' && storedConfig.copies > 1) {
+      copiesInput.value = String(Math.floor(storedConfig.copies));
+    }
+  }
+
+  clampCopiesInput();
+  updateSummary();
+  schedulePrintQuoteRefresh();
+}
+
 function getRadio(name: string): string {
   return (
     document.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)
@@ -2447,6 +2507,7 @@ async function loadPreview(): Promise<void> {
       await applyDocumentAutoDetection();
       syncPageRangeAvailability();
       clampSinglePage();
+      applyReprintSeed();
       updateSummary();
     });
     void applyColorAnalysis(sessionId, selectedFile, selectedDocumentId);
@@ -2464,6 +2525,7 @@ async function loadPreview(): Promise<void> {
   }
   syncPageRangeAvailability();
   clampSinglePage();
+  applyReprintSeed();
   updateSummary();
   await refreshPrintQuote();
 }

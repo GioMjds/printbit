@@ -277,6 +277,19 @@ export class SessionStore {
     return 'active';
   }
 
+  /**
+   * True while the document is still listed in a live session. Printed files
+   * stay until the session ends (Done, idle timeout, cancel) so the customer
+   * can reprint or print the pages the per-print limit left out.
+   */
+  hasDocument(sessionId: string, documentId: string): boolean {
+    if (this.getSessionState(sessionId) !== 'active') return false;
+    const session = this.sessions.get(sessionId);
+    const docs =
+      session?.documents ?? (session?.document ? [session.document] : []);
+    return docs.some((doc) => doc.documentId === documentId);
+  }
+
   getTokenState(token: string): SessionState {
     const sessionId = this.byToken.get(token);
     if (!sessionId) return 'missing';

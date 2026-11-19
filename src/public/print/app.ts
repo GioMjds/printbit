@@ -31,6 +31,14 @@ import {
   type UploadedFile,
 } from './print-session';
 
+import {
+  clearPrintHistory,
+  countPages,
+  forgetPrintedDocument,
+  formatPagesLabel,
+  readPrintHistory,
+} from '../shared/print-history';
+
 attachPowerSafetyOverlay();
 attachUiBlockingOverlay();
 void initPrinterGuard(null, { mode: 'kiosk_wide_only' });
@@ -664,6 +672,7 @@ async function deleteSessionFile(file: UploadedFile): Promise<void> {
       payload = null;
     }
 
+    forgetPrintedDocument(documentId);
     await checkUploadStatus();
 
     if (footerHint) {
@@ -712,6 +721,18 @@ function addFileToList(file: UploadedFile): void {
     ? `<span class="file-item__blank-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(239,68,68,0.15);color:#ef4444;font-size:11px;font-weight:600;margin-left:6px;">⚠ Blank</span>`
     : '';
 
+  const printed = file.documentId
+    ? readPrintHistory()[file.documentId]
+    : undefined;
+  const printedCount = printed ? countPages(printed.printedRanges) : 0;
+  const printedBadge = printed && printedCount > 0
+    ? `<span class="file-item__printed-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(58,158,82,0.18);color:#86db93;font-size:11px;font-weight:600;margin-left:6px;">✓ ${
+        printedCount >= printed.totalPages
+          ? 'Printed'
+          : `Printed pages ${escapeHtml(formatPagesLabel(printed.printedRanges))} of ${printed.totalPages}`
+      }</span>`
+    : '';
+
   const analysisBadge = getAnalysisBadge(file);
   const analysisStatusHtml = analysisBadge
     ? analysisBadge.state === 'analyzing'
@@ -736,6 +757,7 @@ function addFileToList(file: UploadedFile): void {
         <span class="file-item__ext">${escapeHtml(ext)}</span>
         ${file.size !== undefined ? `<span>${formatBytes(file.size)}</span>` : ''}
         ${analysisStatusHtml}
+        ${printedBadge}
         ${pageLimitBadge}
         ${blankBadge}
       </div>
@@ -982,6 +1004,7 @@ async function createSession(): Promise<void> {
     sessionStorage.removeItem('printbit.uploadedDocumentId');
     sessionStorage.removeItem('printbit.uploadedFiles');
     sessionStorage.removeItem('printbit.largePrintNoticeShown');
+    clearPrintHistory();
 
     setSessionText(session.sessionId);
     setSessionActive(true);
@@ -1623,6 +1646,23 @@ continueBtn?.addEventListener('click', async () => {
 });
 
 hydrateNewSessionCooldownState();
+
+// Back to home ends the visit: delete uploaded files, including printed ones
+// kept for reprint. Kiosk navigation (document listener) still does the route.
+document
+  .querySelector<HTMLAnchorElement>('.topbar .back-btn')
+  ?.addEventListener('click', () => {
+    if (activeSessionId && activeSessionToken) {
+      void fetch(
+        `/api/wireless/sessions/${encodeURIComponent(activeSessionId)}/cancel?token=${encodeURIComponent(activeSessionToken)}&reason=customer_exit`,
+        { method: 'DELETE', keepalive: true },
+      ).catch(() => {});
+    }
+    sessionStorage.removeItem('printbit.sessionId');
+    sessionStorage.removeItem('printbit.sessionToken');
+    sessionStorage.removeItem('printbit.uploadedFiles');
+    clearPrintHistory();
+  });
 
 const savedSessionId = sessionStorage.getItem('printbit.sessionId');
 if (savedSessionId) {

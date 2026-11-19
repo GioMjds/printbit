@@ -202,7 +202,6 @@
             aria-label="Coin insertion guidance"
           >
             <div class="payment-col__notice-head">
-              <span class="payment-col__notice-icon" aria-hidden="true">1</span>
               <span class="payment-col__notice-title">Insert 1 coin at a time</span>
             </div>
             <p class="payment-col__note" id="coinInsertNote">
@@ -1295,20 +1294,46 @@
           <span>Need phone Wi-Fi to open QR? Connect here</span>
         </button>
 
-        <!-- Remaining files continuation prompt (print mode only) -->
-        <p
-          class="modal-subtitle modal-subtitle--remaining"
-          id="remainingFilesHint"
+        <!-- Pages of this file not printed yet (print mode only) -->
+        <section
+          class="remaining-pages-card"
+          id="remainingPagesCard"
+          aria-labelledby="remainingPagesTitle"
           hidden
         >
-          You still have files uploaded.
-        </p>
+          <div class="remaining-pages-card__body">
+            <p class="remaining-pages-card__title" id="remainingPagesTitle">
+              Some pages are not printed yet
+            </p>
+            <p class="remaining-pages-card__text" id="remainingPagesText"></p>
+          </div>
+          <button
+            id="printRemainingBtn"
+            type="button"
+            class="modal-btn modal-btn--continue remaining-pages-card__btn"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 9V3h12v6" />
+              <rect x="6" y="14" width="12" height="7" rx="1" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            </svg>
+            <span id="printRemainingBtnLabel">Print remaining pages</span>
+          </button>
+        </section>
 
         <div class="thankyou-actions" id="thankYouActions">
           <button
-            id="printAnotherBtn"
+            id="reprintBtn"
             type="button"
-            class="modal-btn modal-btn--continue"
+            class="modal-btn modal-btn--secondary"
             hidden
           >
             <svg
@@ -1320,18 +1345,46 @@
               stroke-linejoin="round"
               aria-hidden="true"
             >
-              <path d="M6 9l6 6 6-6" />
+              <path d="M3 12a9 9 0 1 0 3-6.7" />
+              <path d="M3 4v5h5" />
+            </svg>
+            <span>Print This File Again</span>
+          </button>
+          <button
+            id="printAnotherBtn"
+            type="button"
+            class="modal-btn modal-btn--secondary"
+            hidden
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+              <path d="M14 3v6h6" />
+              <path d="M12 12v6M9 15h6" />
             </svg>
             <span>Print Another File</span>
           </button>
-          <button
-            id="thankYouDoneBtn"
-            type="button"
-            class="modal-btn modal-btn--confirm modal-btn--wide"
-          >
-            <span>Done</span>
-          </button>
         </div>
+
+        <button
+          id="thankYouDoneBtn"
+          type="button"
+          class="modal-btn modal-btn--confirm modal-btn--wide thankyou-done-btn"
+        >
+          <span id="thankYouDoneLabel">Done</span>
+        </button>
+        <p class="thankyou-done-note" id="thankYouDoneNote" hidden>
+          Your files stay on this kiosk until you tap Done.
+          Done deletes <strong id="thankYouDoneFileCount">your uploaded files</strong>
+          for your privacy.
+        </p>
       </div>
     </div>
 

@@ -760,7 +760,10 @@ export class PrinterService {
           : null;
 
       if (filename) {
-        if (sessionId && documentId) {
+        if (sessionId && documentId && this.sessionStore.hasDocument(sessionId, documentId)) {
+          // Keep the file so the customer can print the cancelled pages later;
+          // session end deletes it.
+        } else if (sessionId && documentId) {
           await this.sessionStore.removeDocument(sessionId, documentId);
         } else {
           const uploadsDir = path.resolve('uploads');

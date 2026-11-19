@@ -2251,6 +2251,20 @@ export class FinancialService {
   }): Promise<void> {
     const { transactionId, sessionId, documentId, filename } = input;
 
+    // Keep the file for reprint / remaining pages; session end deletes it.
+    if (
+      sessionId &&
+      documentId &&
+      this.deps.sessionStore.hasDocument(sessionId, documentId)
+    ) {
+      await adminService.appendAdminLog(
+        'upload_retained_after_print',
+        'Uploaded file kept in its live session for reprint after spooler-confirmed print completion.',
+        { transactionId, sessionId, documentId, filename, source: 'spooler-confirmed' },
+      );
+      return;
+    }
+
     let cleaned = false;
     if (sessionId && documentId) {
       const removedDocument = await this.deps.sessionStore.removeDocument(
