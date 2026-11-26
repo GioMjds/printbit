@@ -69,6 +69,105 @@
         </button>
       </section>
 
+      <section class="direct-print" aria-labelledby="directPrintTitle">
+        <h2 id="directPrintTitle" class="coin-console-section-title">
+          Direct print (no coins)
+        </h2>
+        <p class="direct-print__hint">
+          For customers who paid you directly. Charged at the kiosk price and
+          recorded as direct earnings.
+        </p>
+
+        <form id="directPrintForm" class="direct-print__form" novalidate>
+          <label class="direct-print__field direct-print__field--wide">
+            <span>File</span>
+            <input
+              id="directFile"
+              type="file"
+              accept=".pdf,.doc,.docx,.jpeg,.jpg,.png,.gif,.webp,.bmp,image/jpeg,image/png,image/gif,image/webp,image/bmp"
+              required
+            />
+          </label>
+          <label class="direct-print__field">
+            <span>Copies</span>
+            <input
+              id="directCopies"
+              type="number"
+              min="1"
+              max="99"
+              value="1"
+              inputmode="numeric"
+            />
+          </label>
+          <label class="direct-print__field">
+            <span>Color</span>
+            <select id="directColor">
+              <option value="grayscale">Grayscale</option>
+              <option value="colored">Colored</option>
+            </select>
+          </label>
+          <label class="direct-print__field">
+            <span>Paper</span>
+            <select id="directPaper">
+              <option value="A4">A4</option>
+              <option value="Short">Short</option>
+              <option value="Long">Long</option>
+            </select>
+          </label>
+          <label class="direct-print__field">
+            <span>Orientation</span>
+            <select id="directOrientation">
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </label>
+          <label class="direct-print__field">
+            <span>Quality</span>
+            <select id="directQuality">
+              <option value="standard">Standard</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label class="direct-print__field">
+            <span>Page range</span>
+            <input
+              id="directPageRange"
+              type="text"
+              placeholder="All pages, or e.g. 1-3, 5"
+            />
+          </label>
+          <label class="direct-print__field direct-print__field--check">
+            <input id="directDuplex" type="checkbox" />
+            <span>Double-sided</span>
+          </label>
+        </form>
+
+        <div class="direct-print__summary">
+          <span>Price:</span>
+          <strong id="directPrice">—</strong>
+          <span
+            id="directStatus"
+            class="direct-print__status"
+            role="status"
+            aria-live="polite"
+          ></span>
+        </div>
+
+        <div class="direct-print__actions">
+          <button
+            id="directPrintBtn"
+            type="button"
+            class="coin-button direct-print__btn"
+            disabled
+          >
+            Print (direct)
+          </button>
+          <button id="directResetBtn" type="button" class="reset-button">
+            New job
+          </button>
+        </div>
+      </section>
+
       <div id="messageBanner" class="message-banner hidden" role="status"></div>
     </main>
 

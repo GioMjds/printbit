@@ -1,4 +1,5 @@
 import { initAuth, apiFetch, setMessage, peso } from '../admin/shared';
+import { initDirectPrint } from './direct-print';
 
 type Denomination = 'one' | 'five' | 'ten' | 'twenty';
 type Counters = Record<Denomination, number>;
@@ -264,6 +265,7 @@ function bootstrap(): void {
       if (!initialized) {
         bindCoinButtons();
         bindResetButton();
+        initDirectPrint();
         initialized = true;
       }
     },
