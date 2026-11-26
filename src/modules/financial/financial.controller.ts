@@ -5,7 +5,15 @@ import {
   scanLegacyUploadForMalware,
   handleMulterError,
 } from '@/middleware/file-validation';
+import { requireAdminLocalAccess, requireAdminPin } from '@/middleware';
+import { createRateLimit } from '@/middleware';
 import { FinancialService } from './financial.service';
+
+const directPrintRateLimit = createRateLimit({
+  keyPrefix: 'admin-direct-print',
+  windowMs: 60_000,
+  max: 10,
+});
 
 export class FinancialController {
   public readonly router: Router;
@@ -37,6 +45,13 @@ export class FinancialController {
     this.router.use('/upload', handleMulterError);
     this.router.post('/print', this.printLegacy);
     this.router.post('/api/confirm-payment', this.confirmPayment);
+    this.router.post(
+      '/api/admin/direct-print/confirm',
+      requireAdminLocalAccess,
+      requireAdminPin,
+      directPrintRateLimit,
+      this.confirmDirectPrint,
+    );
   }
 
   private getBalance = (req: Request, res: Response): void => {
@@ -86,6 +101,18 @@ export class FinancialController {
     req: Request,
     res: Response,
   ): Promise<void> => {
+    await this.financialService.confirmPayment(req, res);
+  };
+
+  private confirmDirectPrint = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    if (req.body?.mode !== 'print') {
+      res.status(400).json({ error: 'Direct print supports print jobs only.' });
+      return;
+    }
+    res.locals.paymentSource = 'direct';
     await this.financialService.confirmPayment(req, res);
   };
 }

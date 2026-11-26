@@ -45,7 +45,7 @@ import {
 } from '@/core/database/sqlite-storage';
 import { adminService } from '@/services/admin';
 import { financialLedgerService } from '@/services/financial-ledger';
-import { settlementService } from '@/services/settlement';
+import { settlementService, type SettlementInput } from '@/services/settlement';
 import { printFile, type PrintJobOptions } from '@/services/printer';
 import { withPrintQuality } from '@/services/print-job-options';
 import type { SessionStore, UploadedDocument } from '@/services/session';
@@ -349,8 +349,7 @@ export class FinancialService {
       ? Number(coinValue.toFixed(2))
       : 0;
     const isTest =
-      source === 'test-ui' ||
-      state.settings?.developerMode?.enabled === true;
+      source === 'test-ui' || state.settings?.developerMode?.enabled === true;
     const meta = {
       source,
       balance: state.balance,
@@ -532,9 +531,7 @@ export class FinancialService {
       paperProfiles:
         config?.paperProfiles ?? defaultPricingEngine.paperProfiles,
       highQualitySurcharge:
-        config?.highQualitySurcharge ??
-        pricing?.highQualitySurcharge ??
-        2,
+        config?.highQualitySurcharge ?? pricing?.highQualitySurcharge ?? 2,
       duplexEnabled: config?.duplexEnabled ?? false,
       bulkDiscountTiers: config?.bulkDiscountTiers ?? [],
       rounding: config?.rounding ?? 'whole_peso_total_only',
@@ -1191,8 +1188,13 @@ export class FinancialService {
       return;
     }
 
+    const isDirect = res.locals.paymentSource === 'direct';
+    const directTag: Record<string, string> = isDirect
+      ? { paymentSource: 'direct' }
+      : {};
     const { paymentLeaseId } = (req.body ?? {}) as ConfirmPaymentBody;
-    if (this.paymentAcceptorGate) {
+
+    if (this.paymentAcceptorGate && !isDirect) {
       const disarmed = await this.paymentAcceptorGate.disarm(
         paymentLeaseId,
         'confirm_payment',
@@ -1688,6 +1690,7 @@ export class FinancialService {
           sessionId: sessionId ?? null,
           documentId: targetDocumentId ?? null,
           filename: serverFilename ?? null,
+          ...directTag,
           ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       });
@@ -1703,7 +1706,7 @@ export class FinancialService {
       return;
     }
 
-    const settlement = await settlementService.settle({
+    const settlementInput: SettlementInput = {
       requiredAmount,
       io: this.deps.io,
       jobContext: {
@@ -1719,7 +1722,10 @@ export class FinancialService {
         filename: serverFilename ?? null,
         environment: isTestEnvironment ? 'test' : undefined,
       },
-    });
+    };
+    const settlement = isDirect
+      ? await settlementService.settleDirect(settlementInput)
+      : await settlementService.settle(settlementInput);
 
     if (!settlement.ok) {
       sendResponse(400, {
@@ -1744,17 +1750,21 @@ export class FinancialService {
       jobDispatchedAt,
       settledAt,
       context: {
+        ...directTag,
         changeState: settlement.change.state,
         changeRequested: settlement.change.requested,
         changeDispensed: settlement.change.dispensed,
         selectedPages: printQuotePages?.selectedPages ?? 1,
         billableColorPages: printQuotePages?.billableColorPages ?? 0,
         billableBwPages: printQuotePages?.billableBwPages ?? 0,
-        copies: typeof copies === 'number' && Number.isFinite(copies) ? copies : 1,
+        copies:
+          typeof copies === 'number' && Number.isFinite(copies) ? copies : 1,
         paperSize: paperSize ?? 'A4',
         quality: quality ?? 'standard',
         duplex: printOptions?.duplex ?? duplex ?? false,
-        colorMode: printOptions?.colorMode ?? (colorMode === 'colored' ? 'colored' : 'grayscale'),
+        colorMode:
+          printOptions?.colorMode ??
+          (colorMode === 'colored' ? 'colored' : 'grayscale'),
         orientation: printOptions?.orientation ?? orientation ?? 'portrait',
         pageRange:
           typeof printOptions?.pageRange === 'string'
@@ -1887,6 +1897,7 @@ export class FinancialService {
           changeRequested: settlement.change.requested,
           changeDispensed: settlement.change.dispensed,
           remainingBalance: settlement.remainingBalance,
+          ...directTag,
           ...(isTestEnvironment ? { environment: 'test' } : {}),
         },
       });
@@ -2013,6 +2024,7 @@ export class FinancialService {
             spoolerCorrelationKey,
             filename: serverFilename,
             source: 'confirm-payment-enqueue',
+            ...directTag,
           },
         });
         this.safeUpdateReceiptTerminalStatus({
@@ -2052,6 +2064,7 @@ export class FinancialService {
           spoolerCorrelationKey,
           settledAt,
           context: {
+            ...directTag,
             filename: serverFilename,
             queuedAt,
           },
@@ -2126,6 +2139,7 @@ export class FinancialService {
 
       await runAuditStep('payment_confirmed', () =>
         adminService.appendAdminLog('payment_confirmed', 'Payment confirmed.', {
+          ...directTag,
           transactionId,
           mode,
           amount: requiredAmount,
@@ -2268,7 +2282,13 @@ export class FinancialService {
       await adminService.appendAdminLog(
         'upload_retained_after_print',
         'Uploaded file kept in its live session for reprint after spooler-confirmed print completion.',
-        { transactionId, sessionId, documentId, filename, source: 'spooler-confirmed' },
+        {
+          transactionId,
+          sessionId,
+          documentId,
+          filename,
+          source: 'spooler-confirmed',
+        },
       );
       return;
     }
