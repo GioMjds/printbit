@@ -140,9 +140,12 @@ function appendConsumableUsageEvent(
 async function cleanupSuccessfulPrint(input: {
   transactionId: string;
   sessionStore: SessionStore;
+  sessionId: string | null;
+  documentId: string | null;
   recoveryContext: Record<string, string | number | boolean | null>;
 }): Promise<void> {
-  const { transactionId, sessionStore, recoveryContext } = input;
+  const { transactionId, sessionStore, sessionId, documentId, recoveryContext } =
+    input;
 
   appendConsumableUsageEvent('print', transactionId, recoveryContext);
   try {
@@ -158,14 +161,6 @@ async function cleanupSuccessfulPrint(input: {
   }
   const filename =
     typeof recoveryContext.filename === 'string' ? recoveryContext.filename : null;
-  const sessionId =
-    typeof recoveryContext.sessionId === 'string'
-      ? recoveryContext.sessionId
-      : null;
-  const documentId =
-    typeof recoveryContext.documentId === 'string'
-      ? recoveryContext.documentId
-      : null;
 
   if (!filename) return;
 
@@ -646,6 +641,9 @@ async function processWorkerReturnPrintEvent(input: {
       await cleanupSuccessfulPrint({
         transactionId,
         sessionStore: input.sessionStore,
+        // Ids live on the recovery entry; its context never carries them.
+        sessionId: recovery?.sessionId ?? null,
+        documentId: recovery?.documentId ?? null,
         recoveryContext,
       });
     }

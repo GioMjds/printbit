@@ -14,6 +14,9 @@ bin/
 .superpowers
 .worktrees/
 .pnpm-store
+.specify
+.serena
+.omc
 
 graphify-out/
 .impeccable

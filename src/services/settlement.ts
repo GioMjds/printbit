@@ -161,6 +161,20 @@ class SettlementService {
       };
     });
   }
+
+  async settleDirect(input: SettlementInput): Promise<SettlementResult> {
+    assertTrustedTimeForFinancialOperation('settlement:direct');
+
+    const balance = db.data!.balance;
+    return {
+      ok: true,
+      chargedAmount: input.requiredAmount,
+      previousBalance: balance,
+      remainingBalance: balance,
+      earnings: db.data!.earnings,
+      change: { requested: 0, dispensed: 0, state: 'none' as const },
+    }
+  }
 }
 
 export const settlementService = new SettlementService();

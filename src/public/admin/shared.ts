@@ -361,6 +361,13 @@ export type EarningsAnalyticsResponse = {
     year: number;
     allTime: number;
     period: number;
+    direct: {
+      today: number;
+      week: number;
+      month: number;
+      year: number;
+      allTime: number;
+    };
   };
   buckets: {
     key: string;
