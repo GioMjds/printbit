@@ -174,19 +174,23 @@ export async function upsertSpoolerFailureRefund(input: {
   const createdTs = getTrustedTimestamp().timestamp;
 
   const autoRefunded = input.autoRefund;
+  const isDirect = isDirectPaymentTransaction(input.jobContext);
   const contextWithDisposition: Record<
     string,
     string | number | boolean | null | undefined
   > = {
     ...normalizedContext,
+    ...(isDirect ? { paymentSource: 'direct' } : {}),
     refundDisposition: autoRefunded ? 'auto_refunded' : 'pending_admin_review',
-    restoredBalanceAmount: autoRefunded ? input.chargedAmount : 0,
+    restoredBalanceAmount: autoRefunded && !isDirect ? input.chargedAmount : 0,
   };
   const entry: PendingRefundEntry = {
     id: randomUUID(),
     timestamp: createdTs,
     chargedAmount: input.chargedAmount,
-    reason: input.reason,
+    reason: isDirect
+      ? `${input.reason} (direct: refund customer manually)`
+      : input.reason,
     status: autoRefunded ? 'refunded' : 'open',
     closedAt: autoRefunded ? createdTs : null,
     jobContext: normalizeJobContext(contextWithDisposition),
@@ -194,11 +198,17 @@ export async function upsertSpoolerFailureRefund(input: {
 
   let restoredBalanceAmount = 0;
   if (autoRefunded) {
-    await withBalanceLock(async () => {
-      db.data!.balance += input.chargedAmount;
-      db.data!.earnings = Math.max(0, db.data!.earnings - input.chargedAmount);
-      restoredBalanceAmount = input.chargedAmount;
-    });
+    // Direct customers paid staff: no coins to restore, kiosk earnings untouched.
+    if (!isDirect) {
+      await withBalanceLock(async () => {
+        db.data!.balance += input.chargedAmount;
+        db.data!.earnings = Math.max(
+          0,
+          db.data!.earnings - input.chargedAmount,
+        );
+        restoredBalanceAmount = input.chargedAmount;
+      });
+    }
     await financialLedgerService.append({
       eventType: 'refund_issued',
       amount: input.chargedAmount,
@@ -206,6 +216,7 @@ export async function upsertSpoolerFailureRefund(input: {
       meta: {
         source: 'auto_spooler_refund',
         reason: input.reason,
+        ...(isDirect ? { paymentSource: 'direct' } : {}),
       },
     });
   }
@@ -267,8 +278,9 @@ export async function processPendingRefund(input: {
   entry.payoutType = payoutType;
   entry.jobContext.payoutType = payoutType;
   entry.jobContext.refundedAmount = entry.chargedAmount;
+  const isDirect = entry.jobContext.paymentSource === 'direct';
 
-  if (input.restoreBalance) {
+  if (isDirect && input.restoreBalance) {
     await withBalanceLock(async () => {
       db.data!.balance += entry.chargedAmount;
       db.data!.earnings = Math.max(0, db.data!.earnings - entry.chargedAmount);
@@ -283,20 +295,29 @@ export async function processPendingRefund(input: {
         payoutType: 'balance',
       },
     });
+    throw new PendingRefundServiceError(
+      409,
+      'Direct payment refunds should be processed manually. Balance restored.',
+    );
   } else {
-    await withBalanceLock(async () => {
-      db.data!.earnings = Math.max(0, db.data!.earnings - entry.chargedAmount);
-    });
-    await financialLedgerService.append({
-      eventType: 'refund_issued',
-      amount: entry.chargedAmount,
-      referenceId: (entry.jobContext.transactionId as string) || entry.id,
-      meta: {
-        source: 'admin_cash_refund',
-        reason: entry.reason,
-        payoutType: 'cash',
-      },
-    });
+    if (!isDirect) {
+      await withBalanceLock(async () => {
+        db.data!.earnings = Math.max(
+          0,
+          db.data!.earnings - entry.chargedAmount,
+        );
+      });
+      await financialLedgerService.append({
+        eventType: 'refund_issued',
+        amount: entry.chargedAmount,
+        referenceId: (entry.jobContext.transactionId as string) || entry.id,
+        meta: {
+          source: 'admin_cash_refund',
+          reason: entry.reason,
+          payoutType: 'cash',
+        },
+      });
+    }
   }
 
   await db.write();
@@ -381,4 +402,22 @@ export async function dismissPendingRefund(
   entry.closedAt = getTrustedTimestamp().timestamp;
   await db.write();
   return entry;
+}
+
+export function isDirectPaymentTransaction(
+  jobContext: Record<string, string | number | boolean | null | undefined>,
+): boolean {
+  if (jobContext.paymentMethod === 'direct') return true;
+  const transactionId =
+    typeof jobContext.transactionId === 'string'
+      ? jobContext.transactionId
+      : null;
+
+  if (!transactionId) return false;
+  return (db.data?.financialLedger ?? []).some(
+    (entry) =>
+      entry.eventType === 'job_started' &&
+      entry.referenceId === transactionId &&
+      entry.meta?.paymentSource === 'direct',
+  );
 }
