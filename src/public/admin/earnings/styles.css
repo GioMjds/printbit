@@ -373,10 +373,17 @@
   outline: 2px solid var(--lavender);
   outline-offset: 2px;
 }
-.service-mix {
+/* Holds By service + Direct so they stack in one deck cell instead of overlapping. */
+.service-mix-stack {
   display: grid;
   grid-column: 2;
   grid-row: 1;
+  gap: 0.75rem;
+  align-content: start;
+  min-width: 0;
+}
+.service-mix {
+  display: grid;
   gap: 0.5rem;
   align-content: start;
   padding: 0.875rem;
@@ -390,6 +397,9 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
+}
+.service-mix__header {
+  flex-wrap: wrap;
 }
 .service-mix__header h4,
 .service-mix__header p {
@@ -520,7 +530,7 @@
     justify-content: center;
   }
 
-  .service-mix {
+  .service-mix-stack {
     grid-column: 1;
     grid-row: 3;
   }
