@@ -13,31 +13,159 @@
     <link rel="stylesheet" href="/scc/styles.css" />
   </head>
   <body class="coin-console-body">
-    <main id="coinConsoleMain" class="coin-console-main hidden">
-      <header class="coin-console-header">
-        <h1 class="coin-console-title">Coin Console</h1>
-        <p class="coin-console-subtitle">
-          Test coin insertion. Click a denomination to credit the live balance.
-        </p>
+    <main
+      id="coinConsoleMain"
+      class="coin-console-main hidden"
+      aria-label="Coin Console"
+    >
+      <!-- ── Toast / Banner (fixed, floats at bottom) ─────────────── -->
+      <div
+        id="messageBanner"
+        class="message-banner hidden"
+        role="status"
+        aria-live="polite"
+      ></div>
+
+      <!-- ── Topbar ───────────────────────────────────────────────── -->
+      <header class="console-topbar">
+        <div class="console-topbar__brand">
+          <div class="console-topbar__logomark" aria-hidden="true">
+            <svg viewBox="0 0 40 40" fill="none">
+              <rect
+                x="6"
+                y="5"
+                width="28"
+                height="17"
+                rx="3.5"
+                fill="currentColor"
+                opacity=".3"
+              />
+              <rect
+                x="3"
+                y="14"
+                width="34"
+                height="19"
+                rx="5"
+                fill="currentColor"
+                opacity=".85"
+              />
+              <rect x="6" y="20" width="28" height="14" rx="3" fill="#0b0a1a" />
+              <rect
+                x="10"
+                y="25"
+                width="16"
+                height="2.5"
+                rx="1.25"
+                fill="var(--lavender)"
+                opacity=".55"
+              />
+              <rect
+                x="10"
+                y="30"
+                width="11"
+                height="2.5"
+                rx="1.25"
+                fill="var(--lavender)"
+                opacity=".3"
+              />
+              <circle cx="30" cy="30" r="3" fill="var(--peach)" opacity=".9" />
+            </svg>
+          </div>
+          <div class="console-topbar__text">
+            <h1 class="console-topbar__title">Coin Console</h1>
+            <span class="console-topbar__crumb">PrintBit · Admin</span>
+          </div>
+        </div>
+        <div class="console-topbar__actions">
+          <span class="console-live-pill" aria-hidden="true">
+            <span class="dot"></span>Live
+          </span>
+          <button id="resetCoinsBtn" type="button" class="reset-button">
+            Reset session
+          </button>
+        </div>
       </header>
 
-      <section class="coin-console-buttons" aria-label="Test coin buttons">
-        <button type="button" class="coin-button" data-coin-value="1">
-          ₱1
-        </button>
-        <button type="button" class="coin-button" data-coin-value="5">
-          ₱5
-        </button>
-        <button type="button" class="coin-button" data-coin-value="10">
-          ₱10
-        </button>
-        <button type="button" class="coin-button" data-coin-value="20">
-          ₱20
-        </button>
+      <!-- ── Live Balance Hero ────────────────────────────────────── -->
+      <section class="balance-hero" aria-label="Live balance">
+        <div class="balance-hero__top">
+          <span class="balance-hero__label">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M8 1.5A6.5 6.5 0 1 1 1.5 8 6.5 6.5 0 0 1 8 1.5Zm.75 3a.75.75 0 0 0-1.5 0v.55a2.25 2.25 0 0 0-1.5 2.13v.64a2.25 2.25 0 0 0 1.87 2.22l1.13.19a.75.75 0 0 1 .62.74v.28a.75.75 0 0 1-.56.72 2.25 2.25 0 0 1-1.38 0 .75.75 0 0 1-.56-.72v-.28a.75.75 0 0 0-1.5 0v.28a2.25 2.25 0 0 0 1.63 2.16v.55a.75.75 0 0 0 1.5 0v-.55a2.25 2.25 0 0 0 1.5-2.13v-.28a2.25 2.25 0 0 0-1.87-2.22l-1.13-.19a.75.75 0 0 1-.62-.74V7.18a.75.75 0 0 1 .56-.72 2.25 2.25 0 0 1 1.38 0 .75.75 0 0 1 .56.72v.28a.75.75 0 0 0 1.5 0v-.28a2.25 2.25 0 0 0-1.63-2.16Z"
+              />
+            </svg>
+            Live balance
+          </span>
+          <span class="balance-hero__meta">Updates in real time</span>
+        </div>
+        <div class="balance-hero__value-row">
+          <span id="liveBalance" class="balance-value">—</span>
+        </div>
+        <p class="balance-hero__hint">
+          Credits appear the moment the printer worker confirms a coin.
+        </p>
       </section>
 
-      <section class="coin-console-counters" aria-label="Session counters">
-        <h2 class="coin-console-section-title">Inserted this session</h2>
+      <!-- ── Test Coin Panel ──────────────────────────────────────── -->
+      <section class="coin-panel" aria-labelledby="coinPanelTitle">
+        <header class="panel-header">
+          <div>
+            <h2 id="coinPanelTitle" class="coin-console-section-title">
+              Test coin insertion
+            </h2>
+            <p class="panel-hint">
+              Tap a denomination to credit the live balance. Keyboard shortcut
+              shown in each button.
+            </p>
+          </div>
+        </header>
+
+        <div class="coin-console-buttons" aria-label="Test coin buttons">
+          <button type="button" class="coin-button" data-coin-value="1">
+            <span class="coin-button__value">₱1</span>
+            <kbd class="coin-button__kbd">1</kbd>
+          </button>
+          <button type="button" class="coin-button" data-coin-value="5">
+            <span class="coin-button__value">₱5</span>
+            <kbd class="coin-button__kbd">2</kbd>
+          </button>
+          <button type="button" class="coin-button" data-coin-value="10">
+            <span class="coin-button__value">₱10</span>
+            <kbd class="coin-button__kbd">3</kbd>
+          </button>
+          <button type="button" class="coin-button" data-coin-value="20">
+            <span class="coin-button__value">₱20</span>
+            <kbd class="coin-button__kbd">4</kbd>
+          </button>
+        </div>
+      </section>
+
+      <!-- ── Session Counters ─────────────────────────────────────── -->
+      <section class="session-panel" aria-labelledby="sessionTitle">
+        <header class="panel-header">
+          <div>
+            <h2 id="sessionTitle" class="coin-console-section-title">
+              Session counters
+            </h2>
+            <p class="panel-hint">
+              Track what has been inserted since the last reset.
+            </p>
+          </div>
+          <div class="session-totals" aria-live="polite">
+            <span class="session-totals__count" id="sessionTotalCount"
+              >0 coins</span
+            >
+            <span class="session-totals__value" id="sessionTotalValue">₱0</span>
+          </div>
+        </header>
+
         <ul id="counterList" class="counter-list">
           <li class="counter-row" data-counter="one">
             <span class="counter-label">₱1</span>
@@ -58,25 +186,17 @@
         </ul>
       </section>
 
-      <section class="coin-console-balance" aria-label="Live balance">
-        <span class="balance-label">Live balance:</span>
-        <span id="liveBalance" class="balance-value">—</span>
-      </section>
-
-      <section class="coin-console-actions">
-        <button id="resetCoinsBtn" type="button" class="reset-button">
-          Reset coins
-        </button>
-      </section>
-
+      <!-- ── Direct Print ─────────────────────────────────────────── -->
       <section class="direct-print" aria-labelledby="directPrintTitle">
-        <h2 id="directPrintTitle" class="coin-console-section-title">
-          Direct print (no coins)
-        </h2>
-        <p class="direct-print__hint">
-          For customers who paid you directly. Charged at the kiosk price and
-          recorded as direct earnings.
-        </p>
+        <header class="direct-print__header">
+          <h2 id="directPrintTitle" class="coin-console-section-title">
+            Direct print (no coins)
+          </h2>
+          <p class="direct-print__hint">
+            For customers who paid you directly. Charged at the kiosk price and
+            recorded as direct earnings.
+          </p>
+        </header>
 
         <form id="directPrintForm" class="direct-print__form" novalidate>
           <label class="direct-print__field direct-print__field--wide">
@@ -142,37 +262,35 @@
           </label>
         </form>
 
-        <div class="direct-print__summary">
-          <span>Price:</span>
-          <strong id="directPrice">—</strong>
-          <span
-            id="directStatus"
-            class="direct-print__status"
-            role="status"
-            aria-live="polite"
-          ></span>
-        </div>
-
-        <div class="direct-print__actions">
-          <button
-            id="directPrintBtn"
-            type="button"
-            class="coin-button direct-print__btn"
-            disabled
-          >
-            Print (direct)
-          </button>
-          <button id="directResetBtn" type="button" class="reset-button">
-            New job
-          </button>
+        <div class="direct-print__footer">
+          <div class="direct-print__summary">
+            <span>Price:</span>
+            <strong id="directPrice">—</strong>
+            <span
+              id="directStatus"
+              class="direct-print__status"
+              role="status"
+              aria-live="polite"
+            ></span>
+          </div>
+          <div class="direct-print__actions">
+            <button
+              id="directPrintBtn"
+              type="button"
+              class="coin-button direct-print__btn"
+              disabled
+            >
+              Print (direct)
+            </button>
+            <button id="directResetBtn" type="button" class="reset-button">
+              New job
+            </button>
+          </div>
         </div>
       </section>
-
-      <div id="messageBanner" class="message-banner hidden" role="status"></div>
     </main>
 
-    <!-- PIN gate: same shape as other admin pages. Hidden by default; app.ts
-         shows it until auth succeeds. -->
+    <!-- PIN gate (unchanged structure — styled by /admin/shared.css) -->
     <div id="adminAuthView" class="auth-gate">
       <div class="auth-card">
         <div class="auth-card__brand" aria-hidden="true">
@@ -277,5 +395,105 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/scc/app.js"></script>
+
+    <!-- ── Additive UX enhancements (do not alter app.ts behavior) ── -->
+    <script>
+      (function () {
+        'use strict';
+        var main = document.getElementById('coinConsoleMain');
+        if (!main) return;
+
+        /* 1. Keyboard shortcuts: 1 2 3 4 → ₱1 ₱5 ₱10 ₱20 ───────── */
+        var shortcuts = { 1: 1, 2: 5, 3: 10, 4: 20 };
+        document.addEventListener('keydown', function (e) {
+          var tag = (e.target && e.target.tagName) || '';
+          if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+          if (e.metaKey || e.ctrlKey || e.altKey) return;
+          var value = shortcuts[e.key];
+          if (!value) return;
+          if (main.classList.contains('hidden')) return;
+          var btn = document.querySelector(
+            '.coin-button[data-coin-value="' + value + '"]',
+          );
+          if (!btn || btn.disabled) return;
+          e.preventDefault();
+          btn.click();
+        });
+
+        /* 2. Flash the balance on change ─────────────────────────── */
+        var balanceEl = document.getElementById('liveBalance');
+        if (balanceEl && 'MutationObserver' in window) {
+          var last = balanceEl.textContent;
+          new MutationObserver(function () {
+            var next = balanceEl.textContent;
+            if (next === last) return;
+            last = next;
+            balanceEl.classList.remove('balance-value--flash');
+            void balanceEl.offsetWidth;
+            balanceEl.classList.add('balance-value--flash');
+          }).observe(balanceEl, {
+            childList: true,
+            characterData: true,
+            subtree: true,
+          });
+        }
+
+        /* 3. Live session totals from rendered counters ─────────── */
+        var countEl = document.getElementById('sessionTotalCount');
+        var valueEl = document.getElementById('sessionTotalValue');
+        var counterList = document.getElementById('counterList');
+        var VALUES = { one: 1, five: 5, ten: 10, twenty: 20 };
+
+        function updateTotals() {
+          if (!counterList) return;
+          var count = 0;
+          var value = 0;
+          Object.keys(VALUES).forEach(function (denom) {
+            var node = counterList.querySelector(
+              '[data-counter-count="' + denom + '"]',
+            );
+            if (!node) return;
+            var m = (node.textContent || '').match(/(\d+)/);
+            var n = m ? parseInt(m[1], 10) : 0;
+            count += n;
+            value += n * VALUES[denom];
+          });
+          if (countEl) {
+            countEl.textContent = count + (count === 1 ? ' coin' : ' coins');
+          }
+          if (valueEl) {
+            valueEl.textContent = '₱' + value.toLocaleString();
+          }
+        }
+
+        if (counterList && 'MutationObserver' in window) {
+          new MutationObserver(updateTotals).observe(counterList, {
+            childList: true,
+            characterData: true,
+            subtree: true,
+          });
+        }
+        updateTotals();
+
+        /* 4. Confirm destructive reset (capture-phase guard) ─────── */
+        var resetBtn = document.getElementById('resetCoinsBtn');
+        if (resetBtn) {
+          resetBtn.addEventListener(
+            'click',
+            function (e) {
+              if (
+                !window.confirm(
+                  'Reset session counters and clear the live balance?',
+                )
+              ) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+              }
+            },
+            true,
+          );
+        }
+      })();
+    </script>
   </body>
 </html>
