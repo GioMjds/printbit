@@ -21,6 +21,7 @@ mixes with coin-box earnings.
 | Price                 | Always the kiosk quote from `/api/print/quote`. No manual override.                                                                   |
 | Customer identity     | Not recorded. One direct bucket.                                                                                                      |
 | Developer mode        | Unchanged: test jobs skip both buckets.                                                                                               |
+| Direct totals source  | Derived from ledger entries tagged `paymentSource: 'direct'`. No stored counter.                                                     |
 
 ## Architecture
 
@@ -74,12 +75,9 @@ The kiosk route `/api/confirm-payment` behaves exactly as today. A
 ### `settleDirect` (`src/services/settlement.ts`)
 
 - Calls `assertTrustedTimeForFinancialOperation('settlement:direct')`.
-- Runs inside `withBalanceLock` so writes to `db.data` stay serialized with
-  kiosk settlements.
-- Does not read, zero, or emit `balance`. Does not dispense change.
-- If the job is not a test job (same `environment === 'test'` /
-  developer-mode check as `settle`), adds `requiredAmount` to
-  `db.data.directEarnings`.
+- Writes nothing: no balance change, no `earnings` change, no change
+  dispensed, no socket emit. Revenue is recorded by the tagged
+  `job_completed` ledger entry that `confirmPayment` already writes.
 - Returns a `SettlementResult` with `ok: true`,
   `chargedAmount: requiredAmount`, `previousBalance` and `remainingBalance`
   equal to the untouched current balance, `earnings` = current coin-box
@@ -87,30 +85,27 @@ The kiosk route `/api/confirm-payment` behaves exactly as today. A
 
 ## Earnings separation
 
-### Storage (`src/core/database/db.ts`)
+### Storage
 
-- Add `directEarnings: number` to the data shape, default `0`, loaded with
-  `finiteOr` like `earnings`. Existing databases load as `0`; no migration
-  is needed.
-- `db.data.earnings` remains coin-box earnings only.
+- No schema change. `db.data.earnings` stays coin-box earnings only, because
+  direct prints never touch it.
+- Direct revenue is the sum of ledger `job_completed` entries tagged
+  `paymentSource: 'direct'`, minus `refund_issued` entries with the same tag.
+  Entries tagged `environment: 'test'` are excluded.
 
 ### Bucket computation (`src/modules/admin/admin.service.ts`)
 
 - `computeEarningsBuckets` skips logs whose `meta.paymentSource === 'direct'`.
-- New `computeDirectEarningsBuckets(now)` returns `{ today, week, allTime }`
-  using the same log scan, restricted to direct-tagged logs. `allTime` reads
-  `db.data.directEarnings`.
 - The earnings analytics view excludes direct-tagged entries from `totals`,
   `buckets` and `methods`, and adds
-  `totals.direct: { today, week, month, year, allTime }`.
-- The dashboard payload adds `directEarnings` next to `earnings`.
+  `totals.direct: { today, week, month, year, allTime }`, computed by
+  `sumDirectLedger` (`src/modules/admin/earnings-split.ts`).
 
 ### Refunds (`src/services/pending-refund.ts`)
 
 `upsertSpoolerFailureRefund` reads `jobContext.paymentSource`. When the
 value is `'direct'` and `autoRefund` is true:
 
-- Subtract the charged amount from `db.data.directEarnings`, floored at 0.
 - Do not change `balance` or `earnings`.
 - Record `restoredBalanceAmount: 0`.
 - Tag the `refund_issued` ledger entry with `paymentSource: 'direct'`.
@@ -124,7 +119,8 @@ ledger entry carries `paymentSource: 'direct'`.
 
 - `restoreBalance: true` is rejected with 409 ("Direct prints are refunded in
   cash, not kiosk balance.").
-- A cash refund subtracts from `directEarnings` instead of `earnings`.
+- A cash refund leaves `earnings` unchanged and tags its `refund_issued`
+  ledger entry `paymentSource: 'direct'`.
 
 The kiosk refund path is unchanged.
 
@@ -135,8 +131,9 @@ The kiosk refund path is unchanged.
 - File picker, options form (copies, color mode, paper size, duplex, page
   range, quality), live price from the quote endpoint, **Print (direct)**
   button.
-- Shows job progress from the existing print socket events.
-- Shows a readout of today's and all-time direct earnings.
+- After a successful submit, shows "Queued" with the amount and disables
+  Print until a new file is chosen. No live printer status (the admin is at
+  the printer).
 - Buttons are disabled while a request is in flight. Errors are shown with
   the existing `setMessage` helper.
 - Existing coin console sections stay as they are.
@@ -145,10 +142,6 @@ The kiosk refund path is unchanged.
 
 - A separate **Direct (bypass)** card shows `totals.direct`. Kiosk totals
   and charts exclude direct revenue.
-
-### `/admin/transactions`
-
-- Rows tagged `paymentSource: 'direct'` show a **Direct** badge.
 
 ## Error handling
 
@@ -159,19 +152,20 @@ The kiosk refund path is unchanged.
 | Power emergency                            | 503 `POWER_EMERGENCY` (existing check).                 |
 | Trusted time unavailable                   | 503 (existing check), plus `settleDirect` assertion.    |
 | Session expired or missing                 | 410/404 (existing checks).                              |
-| Enqueue failure                            | Auto refund reverses `directEarnings`; 503 to the page. |
+| Enqueue failure                            | Direct-tagged auto refund; coin balance untouched; 503. |
 | Duplicate submit                           | Idempotency key returns the stored response.            |
 
 ## Testing
 
 Jest, following existing spec patterns:
 
-1. `settleDirect` leaves `balance` and `earnings` unchanged and increments
-   `directEarnings`. In developer mode it increments nothing.
-2. `computeEarningsBuckets` and `computeDirectEarningsBuckets` split a mixed
-   set of logs correctly.
-3. `upsertSpoolerFailureRefund` with a direct job context reverses
-   `directEarnings` and does not credit `balance`.
+1. `settleDirect` leaves `balance` and `earnings` unchanged and writes
+   nothing.
+2. `sumDirectLedger` sums only direct, non-test completions minus direct
+   refunds.
+3. `upsertSpoolerFailureRefund` with a direct job context (tagged, or found
+   via the ledger) does not credit `balance` and tags the refund. A direct
+   pending refund rejects `restoreBalance: true` with 409.
 4. `/api/confirm-payment` ignores `paymentSource` in the request body and
    still requires coin balance.
 5. `/api/admin/direct-print/confirm` returns 401 without an admin session.
@@ -182,3 +176,6 @@ Jest, following existing spec patterns:
 - Manual price override.
 - Direct copy or scan jobs.
 - Changes to the coin simulation part of `/scc`.
+- Live print status and a direct-earnings readout on `/scc`.
+- A Direct badge on `/admin/transactions`.
+- Direct totals in the dashboard API.
