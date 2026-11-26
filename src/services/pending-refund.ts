@@ -271,6 +271,14 @@ export async function processPendingRefund(input: {
     );
   }
 
+  const isDirect = entry.jobContext.paymentSource === 'direct';
+  if (isDirect && input.restoreBalance) {
+    throw new PendingRefundServiceError(
+      409,
+      'Direct prints are refunded in cash, not kiosk balance.',
+    );
+  }
+
   entry.status = 'refunded';
   entry.closedAt = getTrustedTimestamp().timestamp;
 
@@ -278,9 +286,8 @@ export async function processPendingRefund(input: {
   entry.payoutType = payoutType;
   entry.jobContext.payoutType = payoutType;
   entry.jobContext.refundedAmount = entry.chargedAmount;
-  const isDirect = entry.jobContext.paymentSource === 'direct';
 
-  if (isDirect && input.restoreBalance) {
+  if (input.restoreBalance) {
     await withBalanceLock(async () => {
       db.data!.balance += entry.chargedAmount;
       db.data!.earnings = Math.max(0, db.data!.earnings - entry.chargedAmount);
@@ -295,11 +302,8 @@ export async function processPendingRefund(input: {
         payoutType: 'balance',
       },
     });
-    throw new PendingRefundServiceError(
-      409,
-      'Direct payment refunds should be processed manually. Balance restored.',
-    );
   } else {
+    // Direct prints never added to kiosk earnings, so there is nothing to take back.
     if (!isDirect) {
       await withBalanceLock(async () => {
         db.data!.earnings = Math.max(
@@ -307,17 +311,18 @@ export async function processPendingRefund(input: {
           db.data!.earnings - entry.chargedAmount,
         );
       });
-      await financialLedgerService.append({
-        eventType: 'refund_issued',
-        amount: entry.chargedAmount,
-        referenceId: (entry.jobContext.transactionId as string) || entry.id,
-        meta: {
-          source: 'admin_cash_refund',
-          reason: entry.reason,
-          payoutType: 'cash',
-        },
-      });
     }
+    await financialLedgerService.append({
+      eventType: 'refund_issued',
+      amount: entry.chargedAmount,
+      referenceId: (entry.jobContext.transactionId as string) || entry.id,
+      meta: {
+        source: 'admin_cash_refund',
+        reason: entry.reason,
+        payoutType: 'cash',
+        ...(isDirect ? { paymentSource: 'direct' } : {}),
+      },
+    });
   }
 
   await db.write();
@@ -407,7 +412,7 @@ export async function dismissPendingRefund(
 export function isDirectPaymentTransaction(
   jobContext: Record<string, string | number | boolean | null | undefined>,
 ): boolean {
-  if (jobContext.paymentMethod === 'direct') return true;
+  if (jobContext.paymentSource === 'direct') return true;
   const transactionId =
     typeof jobContext.transactionId === 'string'
       ? jobContext.transactionId

@@ -114,13 +114,6 @@ export interface EarningsAnalyticsResult {
     end: string;
     label: string;
   };
-  direct: {
-    today: number;
-    week: number;
-    month: number;
-    year: number;
-    allTime: number;
-  };
   totals: {
     today: number;
     week: number;
@@ -128,6 +121,13 @@ export interface EarningsAnalyticsResult {
     year: number;
     allTime: number;
     period: number;
+    direct: {
+      today: number;
+      week: number;
+      month: number;
+      year: number;
+      allTime: number;
+    };
   };
   buckets: EarningsAnalyticsBucket[];
   methods: {
@@ -1263,7 +1263,7 @@ export class AdminService {
       weekTimestamp,
     )) {
       if (log.meta?.environment === 'test') continue;
-      if (log.meta?.environment === 'direct') continue;
+      if (log.meta?.paymentSource === 'direct') continue;
       const txId =
         (typeof log.meta?.transactionId === 'string' &&
           log.meta.transactionId) ||
@@ -1650,7 +1650,7 @@ export class AdminService {
         continue;
       }
 
-      if (entry.meta?.environment === 'direct') {
+      if (entry.meta?.paymentSource === 'direct') {
         continue;
       }
 
@@ -1786,13 +1786,6 @@ export class AdminService {
         end: period.end.toISOString(),
         label: period.label,
       },
-      direct: {
-        today: this.normalizeMoney(direct.today),
-        week: this.normalizeMoney(direct.week),
-        month: this.normalizeMoney(direct.month),
-        year: this.normalizeMoney(direct.year),
-        allTime: this.normalizeMoney(direct.allTime),
-      },
       totals: {
         today: this.normalizeMoney(today),
         week: this.normalizeMoney(week),
@@ -1800,6 +1793,13 @@ export class AdminService {
         year: this.normalizeMoney(year),
         allTime: this.normalizeMoney(db.data!.earnings),
         period: this.normalizeMoney(periodTotal),
+        direct: {
+          today: this.normalizeMoney(direct.today),
+          week: this.normalizeMoney(direct.week),
+          month: this.normalizeMoney(direct.month),
+          year: this.normalizeMoney(direct.year),
+          allTime: this.normalizeMoney(direct.allTime),
+        },
       },
       buckets,
       methods: {
