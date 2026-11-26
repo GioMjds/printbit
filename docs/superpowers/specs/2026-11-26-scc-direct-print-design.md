@@ -1,7 +1,7 @@
 # SCC Direct Print (Bypass) — Design
 
 Date: 2026-11-26
-Status: Approved design, pending spec review
+Status: Approved (spec reviewed 2026-11-26)
 
 ## Goal
 
@@ -13,14 +13,14 @@ mixes with coin-box earnings.
 
 ## Decisions
 
-| Topic | Decision |
-|-------|----------|
-| Earnings treatment | Separate bucket. Charged at the normal kiosk price. Never added to coin-box `earnings`. |
+| Topic                 | Decision                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Earnings treatment    | Separate bucket. Charged at the normal kiosk price. Never added to coin-box `earnings`.                                               |
 | File and option scope | Full kiosk parity: all upload types (office docs converted to PDF), copies, color/grayscale, paper size, duplex, page range, quality. |
-| Approach | Reuse the kiosk pipeline (`confirmPayment`) with a server-set `paymentSource: 'direct'`. No parallel print pipeline. |
-| Price | Always the kiosk quote from `/api/print/quote`. No manual override. |
-| Customer identity | Not recorded. One direct bucket. |
-| Developer mode | Unchanged: test jobs skip both buckets. |
+| Approach              | Reuse the kiosk pipeline (`confirmPayment`) with a server-set `paymentSource: 'direct'`. No parallel print pipeline.                  |
+| Price                 | Always the kiosk quote from `/api/print/quote`. No manual override.                                                                   |
+| Customer identity     | Not recorded. One direct bucket.                                                                                                      |
+| Developer mode        | Unchanged: test jobs skip both buckets.                                                                                               |
 
 ## Architecture
 
@@ -116,6 +116,16 @@ value is `'direct'` and `autoRefund` is true:
 - Tag the `refund_issued` ledger entry with `paymentSource: 'direct'`.
 - Set the refund reason suffix to `(direct: refund customer manually)`.
 
+Worker and startup-recovery callers do not pass `paymentSource`. The refund
+service therefore also treats a transaction as direct when its `job_started`
+ledger entry carries `paymentSource: 'direct'`.
+
+`processPendingRefund` on a direct entry:
+
+- `restoreBalance: true` is rejected with 409 ("Direct prints are refunded in
+  cash, not kiosk balance.").
+- A cash refund subtracts from `directEarnings` instead of `earnings`.
+
 The kiosk refund path is unchanged.
 
 ## UI
@@ -142,15 +152,15 @@ The kiosk refund path is unchanged.
 
 ## Error handling
 
-| Case | Behavior |
-|------|----------|
-| No admin session | 401 from `requireAdminPin`. |
-| Non-local request with `adminLocalOnly` on | 403 from `requireAdminLocalAccess`. |
-| Power emergency | 503 `POWER_EMERGENCY` (existing check). |
-| Trusted time unavailable | 503 (existing check), plus `settleDirect` assertion. |
-| Session expired or missing | 410/404 (existing checks). |
-| Enqueue failure | Auto refund reverses `directEarnings`; 503 to the page. |
-| Duplicate submit | Idempotency key returns the stored response. |
+| Case                                       | Behavior                                                |
+| ------------------------------------------ | ------------------------------------------------------- |
+| No admin session                           | 401 from `requireAdminPin`.                             |
+| Non-local request with `adminLocalOnly` on | 403 from `requireAdminLocalAccess`.                     |
+| Power emergency                            | 503 `POWER_EMERGENCY` (existing check).                 |
+| Trusted time unavailable                   | 503 (existing check), plus `settleDirect` assertion.    |
+| Session expired or missing                 | 410/404 (existing checks).                              |
+| Enqueue failure                            | Auto refund reverses `directEarnings`; 503 to the page. |
+| Duplicate submit                           | Idempotency key returns the stored response.            |
 
 ## Testing
 
