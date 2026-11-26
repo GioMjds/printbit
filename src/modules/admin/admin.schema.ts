@@ -145,6 +145,8 @@ export interface PipelineSettings {
   malwareScanningEnabled: boolean;
   documentConversionEnabled: boolean;
   colorDetectionEnabled: boolean;
+  /** When false, success modals hide the E-Receipt QR behind a reveal button. */
+  eReceiptAutoShowEnabled: boolean;
 }
 
 export interface PrintLimitsSettings {

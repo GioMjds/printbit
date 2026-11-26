@@ -943,6 +943,24 @@
                       When disabled, skips page-by-page operator scanning (preventing timeouts on 30+ pages) and defaults print jobs to Black &amp; White, allowing customers to manually choose Color if desired.
                     </p>
                   </div>
+
+                  <!-- E-Receipt on success screen -->
+                  <div class="field field--stretch">
+                    <label class="field__lbl" for="settingEReceiptAutoShow">E-Receipt on Success Screen</label>
+                    <div class="checkbox-row">
+                      <label class="checkbox-label" for="settingEReceiptAutoShow">
+                        <input
+                          type="checkbox"
+                          id="settingEReceiptAutoShow"
+                          class="checkbox-input"
+                        />
+                        <span>Always show the E-Receipt QR after a successful transaction</span>
+                      </label>
+                    </div>
+                    <p class="field__hint">
+                      When disabled, the QR stays hidden behind a "Show E-Receipt" button customers can tap if they need one. Receipts are still recorded either way.
+                    </p>
+                  </div>
                 </div>
               </div>
 

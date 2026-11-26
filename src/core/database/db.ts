@@ -325,6 +325,7 @@ const DEFAULT_DATA: Schema = {
       malwareScanningEnabled: true,
       documentConversionEnabled: true,
       colorDetectionEnabled: true,
+      eReceiptAutoShowEnabled: true,
     },
     printLimits: {
       maxPagesPerSession: 30,
@@ -1569,6 +1570,10 @@ export function normalizeSchema(data: Partial<Schema> | undefined): Schema {
           typeof pipelineSettings?.colorDetectionEnabled === 'boolean'
             ? pipelineSettings.colorDetectionEnabled
             : DEFAULT_DATA.settings.pipelineSettings.colorDetectionEnabled,
+        eReceiptAutoShowEnabled:
+          typeof pipelineSettings?.eReceiptAutoShowEnabled === 'boolean'
+            ? pipelineSettings.eReceiptAutoShowEnabled
+            : DEFAULT_DATA.settings.pipelineSettings.eReceiptAutoShowEnabled,
       },
       printLimits: {
         maxPagesPerSession: Math.max(

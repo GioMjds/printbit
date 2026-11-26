@@ -53,6 +53,9 @@ const settingDocumentConversion = document.getElementById(
 const settingColorDetection = document.getElementById(
   'settingColorDetection',
 ) as HTMLInputElement | null;
+const settingEReceiptAutoShow = document.getElementById(
+  'settingEReceiptAutoShow',
+) as HTMLInputElement | null;
 
 const settingCopyBwPerPage = document.getElementById(
   'settingCopyBwPerPage',
@@ -388,6 +391,10 @@ function applySettings(settings: SettingsResponse): void {
   if (settingColorDetection) {
     settingColorDetection.checked =
       settings.pipelineSettings?.colorDetectionEnabled ?? true;
+  }
+  if (settingEReceiptAutoShow) {
+    settingEReceiptAutoShow.checked =
+      settings.pipelineSettings?.eReceiptAutoShowEnabled ?? true;
   }
 
   // Ink Monitoring (optional)
@@ -905,6 +912,7 @@ settingsForm.addEventListener('submit', (e) => {
       malwareScanningEnabled: settingMalwareScanning?.checked ?? true,
       documentConversionEnabled: settingDocumentConversion?.checked ?? true,
       colorDetectionEnabled: settingColorDetection?.checked ?? true,
+      eReceiptAutoShowEnabled: settingEReceiptAutoShow?.checked ?? true,
     },
   };
 

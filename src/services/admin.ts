@@ -21,6 +21,7 @@ const DEFAULT_PIPELINE_SETTINGS = {
   malwareScanningEnabled: true,
   documentConversionEnabled: true,
   colorDetectionEnabled: true,
+  eReceiptAutoShowEnabled: true,
 } satisfies PipelineSettings;
 
 interface SocketEmitter {

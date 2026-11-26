@@ -133,6 +133,7 @@ export const DEFAULT_PIPELINE_SETTINGS = {
   malwareScanningEnabled: true,
   documentConversionEnabled: true,
   colorDetectionEnabled: true,
+  eReceiptAutoShowEnabled: true,
 } satisfies PipelineSettings;
 
 export interface AdminControllerDeps {
@@ -1783,6 +1784,7 @@ export class AdminController {
         malwareScanningEnabled?: boolean;
         documentConversionEnabled?: boolean;
         colorDetectionEnabled?: boolean;
+        eReceiptAutoShowEnabled?: boolean;
       };
       inkMonitoring?: {
         enabled?: boolean;
@@ -2072,6 +2074,11 @@ export class AdminController {
       if (body.pipelineSettings.colorDetectionEnabled !== undefined) {
         nextSettings.pipelineSettings.colorDetectionEnabled = Boolean(
           body.pipelineSettings.colorDetectionEnabled,
+        );
+      }
+      if (body.pipelineSettings.eReceiptAutoShowEnabled !== undefined) {
+        nextSettings.pipelineSettings.eReceiptAutoShowEnabled = Boolean(
+          body.pipelineSettings.eReceiptAutoShowEnabled,
         );
       }
     }

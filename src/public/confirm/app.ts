@@ -79,6 +79,7 @@ export {};
 
 void initKioskLocalization();
 void loadHotspotConfig();
+void loadReceiptDisplaySetting();
 
 // Initialize page idle timeout on load with warning modal
 void setupPageIdleWarningButton();
@@ -565,6 +566,32 @@ const receiptQrCanvas = document.getElementById(
 const receiptQrExpiry = document.getElementById(
   'receiptQrExpiry',
 ) as HTMLElement | null;
+const receiptRevealBtn = document.getElementById(
+  'receiptRevealBtn',
+) as HTMLButtonElement | null;
+
+// Defaults to showing the QR so a failed settings fetch never hides a receipt.
+let eReceiptAutoShow = true;
+let receiptRevealed = false;
+
+async function loadReceiptDisplaySetting(): Promise<void> {
+  try {
+    const res = await fetch('/api/settings/idle-timeout');
+    if (!res.ok) return;
+    const data = (await res.json()) as { eReceiptAutoShowEnabled?: boolean };
+    if (typeof data.eReceiptAutoShowEnabled === 'boolean') {
+      eReceiptAutoShow = data.eReceiptAutoShowEnabled;
+      if (jobState.outcome.receipt) renderReceiptCta();
+    }
+  } catch {
+    /* keep auto-show default */
+  }
+}
+
+receiptRevealBtn?.addEventListener('click', () => {
+  receiptRevealed = true;
+  renderReceiptCta();
+});
 
 // Wi-Fi Troubleshooting Modal Elements
 const confirmWifiHelpBtn = document.getElementById('confirmWifiHelpBtn');
@@ -2019,6 +2046,12 @@ async function pollCopyJobReceipt(jobId: string): Promise<void> {
 function renderReceiptCta(): void {
   const receipt = jobState.outcome.receipt;
   if (!receiptCtaContainer || !receiptQrCanvas || !receipt) return;
+  if (!eReceiptAutoShow && !receiptRevealed) {
+    receiptCtaContainer.setAttribute('hidden', '');
+    receiptRevealBtn?.removeAttribute('hidden');
+    return;
+  }
+  receiptRevealBtn?.setAttribute('hidden', '');
   receiptCtaContainer.removeAttribute('hidden');
   if (receiptQrExpiry) {
     if (receipt.expiresAt) {

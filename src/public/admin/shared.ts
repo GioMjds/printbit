@@ -325,6 +325,7 @@ export interface AdminSettings {
     malwareScanningEnabled: boolean;
     documentConversionEnabled: boolean;
     colorDetectionEnabled: boolean;
+    eReceiptAutoShowEnabled: boolean;
   };
   printLimits?: PrintLimitsSettings;
   uiBlocking?: UiBlockingSettings;
