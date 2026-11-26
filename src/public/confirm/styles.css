@@ -3329,3 +3329,126 @@ body {
   color: #76c0f8;
   border-color: rgba(99, 179, 237, 0.4);
 }
+
+/* ── Success sheet: header / two-column body / pinned Done footer ──
+   Fits a 768px-tall kiosk screen without scrolling. On smaller screens
+   only the body scrolls, so Done is always visible. */
+.modal-sheet.thankyou-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: min(96vw, 1080px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  padding: 26px 32px 22px;
+}
+.modal-sheet.thankyou-sheet.modal-sheet--dual-qr {
+  max-width: min(96vw, 1180px);
+}
+
+.thankyou-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: left;
+}
+.thankyou-header .status-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0;
+  flex: none;
+}
+.thankyou-header .modal-subtitle {
+  margin: 4px 0 0;
+}
+
+.thankyou-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: start;
+}
+.thankyou-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.thankyou-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.thankyou-main .owed-change-alert {
+  max-width: none;
+  margin: 0;
+}
+.thankyou-main .remaining-pages-card,
+.thankyou-main .thankyou-actions {
+  margin-top: 0;
+}
+.thankyou-side .success-qr-grid {
+  width: auto;
+  max-width: none;
+  margin: 0;
+}
+.modal-sheet--dual-qr .thankyou-side .success-qr-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.thankyou-side .qr-troubleshoot-btn--confirm {
+  margin: 0;
+}
+/* QR shrinks with screen height so the side column never pushes Done down. */
+.thankyou-sheet .scan-qr-canvas,
+.thankyou-sheet.modal-sheet--dual-qr .scan-qr-canvas {
+  width: clamp(150px, 26vh, 210px) !important;
+  height: clamp(150px, 26vh, 210px) !important;
+}
+
+.thankyou-footer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.thankyou-footer .thankyou-done-btn {
+  margin-top: 0;
+}
+.thankyou-footer .thankyou-done-note {
+  margin: 0;
+  font-size: 15px;
+}
+.thankyou-done-note--auto {
+  opacity: 0.8;
+}
+.thankyou-countdown {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrow or portrait screens: one column; the body scrolls above Done. */
+@media (max-width: 900px) {
+  .thankyou-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .modal-sheet--dual-qr .thankyou-side .success-qr-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 540px) {
+  .modal-sheet.thankyou-sheet {
+    padding: 20px 18px 18px;
+  }
+  .thankyou-header .status-icon {
+    width: 56px;
+    height: 56px;
+  }
+  .thankyou-actions {
+    flex-direction: column;
+  }
+}

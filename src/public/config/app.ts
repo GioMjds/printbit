@@ -1358,6 +1358,8 @@ if (mode === 'scan') {
 let currentPrintQuote: PrintQuote | null = null;
 let detectedColorMode: ColorMode | null = null;
 let quoteError: string | null = null;
+/** The server no longer has the file; retrying or reconnecting cannot help. */
+let quoteFileMissing = false;
 let quoteLoading = false;
 let quoteRequestVersion = 0;
 let quoteDebounceHandle: number | null = null;
@@ -1943,6 +1945,7 @@ async function refreshPrintQuote(): Promise<void> {
     let resolvedError: string | null = null;
     let attemptedAnalysisRecovery = false;
     let analysisStillPending = false;
+    let fileMissing = false;
 
     const endpoint = mode === 'print' ? '/api/print/quote' : '/api/copy/quote';
 
@@ -2005,6 +2008,7 @@ async function refreshPrintQuote(): Promise<void> {
       }
 
       if (!response.ok || !payload.quote) {
+        fileMissing = responseCode === 'FILE_NOT_FOUND';
         analysisStillPending = isAnalysisPending;
         resolvedError = isAnalysisPending
           ? 'Document preparation is still in progress.'
@@ -2018,6 +2022,7 @@ async function refreshPrintQuote(): Promise<void> {
 
     if (requestVersion !== quoteRequestVersion) return;
 
+    quoteFileMissing = fileMissing;
     if (resolvedQuote) {
       currentPrintQuote = resolvedQuote;
       quoteError = null;
@@ -2195,7 +2200,9 @@ function updateSummary(): void {
   if (quoteError) {
     footerSummary.textContent = 'Price unavailable';
     if (footerBreakdown)
-      footerBreakdown.textContent = `${quoteError} Check the connection, then change a setting to recalculate.`;
+      footerBreakdown.textContent = quoteFileMissing
+        ? quoteError
+        : `${quoteError} Check the connection, then change a setting to recalculate.`;
     if (footerTotal) footerTotal.textContent = '—';
     footerSummary.classList.remove('ready');
     return;

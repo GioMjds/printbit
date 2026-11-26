@@ -782,6 +782,14 @@ export class FinancialService {
       });
     }
 
+    // Stop here, before coins go in, instead of failing at payment.
+    if (!fs.existsSync(target.filePath)) {
+      return res.status(410).json({
+        code: 'FILE_NOT_FOUND',
+        error: 'This file is no longer on the kiosk. Please upload it again.',
+      });
+    }
+
     if (!target.analysis) {
       return res.status(409).json(buildAnalysisUnavailablePayload(target));
     }

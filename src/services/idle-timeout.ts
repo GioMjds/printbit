@@ -52,6 +52,17 @@ let cachedModalElement: HTMLElement | null = null;
 let cachedCountdownElement: HTMLElement | null = null;
 let cachedButtonElement: HTMLButtonElement | null = null;
 let areListenersAttached = false;
+let timeoutCapSeconds: number | null = null;
+
+/**
+ * Shortens (never lengthens) the page idle period and restarts the countdown,
+ * so a finished screen closes sooner than the admin's page timeout.
+ */
+export function capPageIdleTimeout(seconds: number): void {
+  timeoutCapSeconds = seconds;
+  pageIdleState.timeoutSeconds = Math.min(pageIdleState.timeoutSeconds, seconds);
+  resetPageIdleTimer();
+}
 
 export async function initializePageIdleTimeout(
   config: IdleTimeoutConfig = {},
@@ -78,6 +89,13 @@ export async function initializePageIdleTimeout(
   } catch (err) {
     console.error('Failed to fetch idle timeout settings, using default:', err);
   } finally {
+    // A cap set while settings were loading must survive the fetched value.
+    if (timeoutCapSeconds !== null) {
+      pageIdleState.timeoutSeconds = Math.min(
+        pageIdleState.timeoutSeconds,
+        timeoutCapSeconds,
+      );
+    }
     // Always enable and start the idle timer even if settings fetch fails
     pageIdleState.enabled = true;
     cachePageIdleDOMElements();

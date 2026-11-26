@@ -1,6 +1,8 @@
 import QRCode from 'qrcode';
 import { DotLottie } from '@lottiefiles/dotlottie-web';
 import {
+  capPageIdleTimeout,
+  getPageIdleState,
   initializePageIdleTimeout,
   setupPageIdleWarningButton,
 } from '@/services/idle-timeout';
@@ -91,6 +93,12 @@ void initializePageIdleTimeout({
       console.log(
         '[PAGE IDLE] Confirm page timeout deferred - job is interrupted awaiting staff',
       );
+      return;
+    }
+    // Walking away from the success screen counts as tapping Done.
+    if (thankYouOverlay?.classList.contains('is-visible')) {
+      console.log('[PAGE IDLE] Success screen left idle, finishing the visit');
+      finishVisit();
       return;
     }
     console.log(
@@ -504,6 +512,12 @@ const printRemainingBtnLabel = document.getElementById(
 );
 const thankYouDoneNote = document.getElementById('thankYouDoneNote');
 const thankYouDoneFileCount = document.getElementById('thankYouDoneFileCount');
+const thankYouAutoFinishSeconds = document.getElementById(
+  'thankYouAutoFinishSeconds',
+);
+/** An untouched success screen finishes the visit by itself after this. */
+const SUCCESS_AUTO_FINISH_SECONDS = 60;
+let successAutoFinishTicker: number | null = null;
 const transactionReference = document.getElementById(
   'transactionReference',
 ) as HTMLElement | null;
@@ -2274,6 +2288,23 @@ function finalizePrintSuccess(
   renderPostPrintActions();
   applyConfirmGate();
   void checkRemainingFilesAndPrompt();
+  startSuccessAutoFinish();
+}
+
+/** Shows the seconds left before an untouched success screen finishes itself. */
+function startSuccessAutoFinish(): void {
+  capPageIdleTimeout(SUCCESS_AUTO_FINISH_SECONDS);
+  if (successAutoFinishTicker !== null) return;
+  const render = () => {
+    const { timeoutSeconds, elapsedSeconds } = getPageIdleState();
+    if (thankYouAutoFinishSeconds) {
+      thankYouAutoFinishSeconds.textContent = String(
+        Math.max(0, Math.ceil(timeoutSeconds - elapsedSeconds)),
+      );
+    }
+  };
+  render();
+  successAutoFinishTicker = window.setInterval(render, 500);
 }
 
 /** Pages to preselect on /config for "Print remaining pages"; null hides it. */
@@ -2718,7 +2749,17 @@ function clearConfirmSessionStorage(): void {
   sessionStorage.removeItem('printbit.sessionToken');
 }
 
-/** Tell the customer how many files Done will delete. No auto-redirect. */
+/** Hides "print again" offers for a file the kiosk no longer holds. */
+function hideReprintActions(): void {
+  remainingPagesSelection = null;
+  reprintBtn?.setAttribute('hidden', '');
+  remainingPagesCard?.setAttribute('hidden', '');
+}
+
+/**
+ * Tell the customer how many files Done will delete, and drop reprint offers
+ * when the printed file is gone from the session.
+ */
 async function checkRemainingFilesAndPrompt(): Promise<void> {
   const sessionId = sessionStorage.getItem('printbit.sessionId');
   const token = sessionStorage.getItem('printbit.sessionToken');
@@ -2729,16 +2770,27 @@ async function checkRemainingFilesAndPrompt(): Promise<void> {
       {},
       5_000,
     );
+    if (response.status === 404 || response.status === 410) {
+      hideReprintActions();
+      return;
+    }
     if (!response.ok) return;
     const body = (await response.json()) as {
-      documents?: unknown[];
-      document?: unknown;
+      documents?: { documentId?: string }[];
+      document?: { documentId?: string };
     };
-    const count = Array.isArray(body.documents)
-      ? body.documents.length
+    const docs = Array.isArray(body.documents)
+      ? body.documents
       : body.document
-        ? 1
-        : 0;
+        ? [body.document]
+        : [];
+    if (
+      config.documentId &&
+      !docs.some((doc) => doc?.documentId === config.documentId)
+    ) {
+      hideReprintActions();
+    }
+    const count = docs.length;
     if (thankYouDoneFileCount && count > 0) {
       thankYouDoneFileCount.textContent =
         count === 1 ? 'your 1 uploaded file' : `all ${count} of your uploaded files`;
@@ -3033,14 +3085,18 @@ modalConfirmBtn?.addEventListener('click', async () => {
   }
 });
 
-thankYouDoneBtn?.addEventListener('click', () => {
-  // Done ends the visit: delete the uploaded files now. Printed files are
-  // otherwise kept in the session so the customer can reprint them.
+/**
+ * Done ends the visit: delete the uploaded files now. Printed files are
+ * otherwise kept in the session so the customer can reprint them.
+ */
+function finishVisit(): void {
   void cancelWirelessSession();
   clearPrintHistory();
   clearConfirmSessionStorage();
   navigateWithKioskMotion('/');
-});
+}
+
+thankYouDoneBtn?.addEventListener('click', finishVisit);
 
 reprintBtn?.addEventListener('click', () => {
   openPrintedFileConfig({ reprint: '1' });
