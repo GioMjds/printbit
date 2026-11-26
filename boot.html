@@ -3,184 +3,674 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="google" content="notranslate" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
     <meta http-equiv="cache-control" content="no-store" />
     <meta name="theme-color" content="#0e0d1f" />
     <title>Starting PrintBit…</title>
     <style>
+      /* ── Plus Jakarta Sans (with graceful system fallback) ───────── */
+      @font-face {
+        font-family: 'Plus Jakarta Sans';
+        font-weight: 400;
+        font-style: normal;
+        src: url('/fonts/PlusJakartaSans-Regular.ttf') format('truetype');
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Plus Jakarta Sans';
+        font-weight: 600;
+        font-style: normal;
+        src: url('/fonts/PlusJakartaSans-SemiBold.ttf') format('truetype');
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Plus Jakarta Sans';
+        font-weight: 700;
+        font-style: normal;
+        src: url('/fonts/PlusJakartaSans-Bold.ttf') format('truetype');
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Plus Jakarta Sans';
+        font-weight: 800;
+        font-style: normal;
+        src: url('/fonts/PlusJakartaSans-ExtraBold.ttf') format('truetype');
+        font-display: swap;
+      }
+
       :root {
         color-scheme: dark;
         --bg: #0e0d1f;
-        --text: #fff;
+        --indigo: #696fc7;
+        --lavender: #a7aae1;
+        --peach: #f5d3c4;
+        --pink: #f2aebb;
+        --white: #ffffff;
         --muted: #c9c9dc;
         --soft: #a6a5b9;
-        --primary: #696fc7;
-        --lavender: #a7aae1;
-        --pink: #f2aebb;
         --warn: #ffd38a;
+        --success: #4ade80;
+        --hairline: rgba(255, 255, 255, 0.06);
+        --font:
+          'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
       }
+
       * {
         box-sizing: border-box;
       }
+
       html,
       body {
         margin: 0;
-        height: 100%;
+        min-height: 100%;
         background: var(--bg);
-        color: var(--text);
-        font-family: 'Segoe UI', system-ui, sans-serif;
+        color: var(--white);
+        font-family: var(--font);
         user-select: none;
         -webkit-user-select: none;
       }
+
       body {
-        display: grid;
-        place-items: center;
+        min-height: 100dvh;
         overflow: hidden;
+        position: relative;
         background:
           radial-gradient(
-            circle at 15% 8%,
-            rgba(105, 111, 199, 0.22),
-            transparent 34rem
+            circle at 12% 8%,
+            rgba(105, 111, 199, 0.2),
+            transparent 42rem
           ),
           radial-gradient(
             circle at 88% 92%,
             rgba(242, 174, 187, 0.12),
-            transparent 28rem
+            transparent 36rem
           ),
-          linear-gradient(145deg, #0e0d1f, #111024 48%, #0d0c1b);
+          linear-gradient(145deg, #0e0d1f 0%, #111024 48%, #0d0c1b 100%);
       }
-      main {
-        width: min(720px, 92vw);
-        padding: 48px 40px;
-        text-align: center;
-        border: 1px solid rgba(167, 170, 225, 0.22);
-        border-radius: 28px;
-        background: linear-gradient(
-          160deg,
-          rgba(29, 27, 51, 0.98),
-          rgba(18, 17, 34, 0.98)
+
+      /* ── Ambient drifting glow orbs (cover full viewport) ────────── */
+      .ambient {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 0;
+      }
+      .ambient__orb {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        will-change: transform;
+      }
+      .ambient__orb--1 {
+        width: 80vmax;
+        height: 80vmax;
+        top: -34vmax;
+        left: -26vmax;
+        background: radial-gradient(
+          circle,
+          rgba(105, 111, 199, 0.32),
+          transparent 62%
         );
-        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+        animation: drift-a 28s ease-in-out infinite;
       }
+      .ambient__orb--2 {
+        width: 68vmax;
+        height: 68vmax;
+        bottom: -32vmax;
+        right: -22vmax;
+        background: radial-gradient(
+          circle,
+          rgba(242, 174, 187, 0.18),
+          transparent 62%
+        );
+        animation: drift-b 24s ease-in-out infinite;
+      }
+      .ambient__orb--3 {
+        width: 52vmax;
+        height: 52vmax;
+        top: 30%;
+        left: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(167, 170, 225, 0.16),
+          transparent 62%
+        );
+        animation: drift-c 34s ease-in-out infinite;
+      }
+      @keyframes drift-a {
+        0%,
+        100% {
+          transform: translate3d(0, 0, 0);
+        }
+        50% {
+          transform: translate3d(6vw, 4vh, 0);
+        }
+      }
+      @keyframes drift-b {
+        0%,
+        100% {
+          transform: translate3d(0, 0, 0);
+        }
+        50% {
+          transform: translate3d(-5vw, -3vh, 0);
+        }
+      }
+      @keyframes drift-c {
+        0%,
+        100% {
+          transform: translate3d(-50%, 0, 0);
+        }
+        50% {
+          transform: translate3d(-52%, 4vh, 0);
+        }
+      }
+
+      /* Subtle edge vignette for depth on full-screen */
+      .vignette {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 40%,
+          rgba(0, 0, 0, 0.35) 100%
+        );
+      }
+
+      /* ── Full-screen frame ──────────────────────────────────────── */
+      .frame {
+        position: relative;
+        z-index: 1;
+        min-height: 100dvh;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        padding: clamp(24px, 3.2vw, 52px) clamp(28px, 4vw, 72px);
+        gap: clamp(24px, 4vh, 48px);
+      }
+
+      /* ── Header ─────────────────────────────────────────────────── */
+      .frame__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding-bottom: clamp(18px, 2.4vh, 28px);
+        border-bottom: 1px solid var(--hairline);
+      }
+
       .brand {
         display: inline-flex;
         align-items: center;
-        gap: 12px;
-        color: var(-- lavender);
+        gap: 14px;
       }
-      .brand svg {
-        width: 40px;
-        height: 40px;
+      .brand__mark {
+        width: clamp(48px, 4vw, 60px);
+        height: clamp(48px, 4vw, 60px);
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        color: var(--lavender);
+        background: linear-gradient(
+          140deg,
+          rgba(105, 111, 199, 0.32),
+          rgba(167, 170, 225, 0.14)
+        );
+        border: 1px solid rgba(167, 170, 225, 0.35);
+        box-shadow:
+          0 12px 32px rgba(105, 111, 199, 0.35),
+          0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+        flex-shrink: 0;
       }
-      .brand span {
-        font-size: 22px;
+      .brand__mark svg {
+        width: clamp(26px, 2.2vw, 34px);
+        height: clamp(26px, 2.2vw, 34px);
+      }
+      .brand__text {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+      }
+      .brand__name {
+        font-size: clamp(20px, 1.6vw, 24px);
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        color: var(--white);
+        line-height: 1.1;
+      }
+      .brand__tag {
+        font-size: clamp(10px, 0.72vw, 11px);
         font-weight: 700;
-        letter-spacing: -0.03em;
-        color: var(--text);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--lavender);
+        margin-top: 4px;
+        opacity: 0.85;
       }
-      .eyebrow {
-        margin: 28px 0 10px;
-        font-size: 13px;
+
+      /* ── State pill (top-right) ─────────────────────────────────── */
+      .state-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 18px;
+        border-radius: 999px;
+        background: rgba(167, 170, 225, 0.08);
+        border: 1px solid rgba(167, 170, 225, 0.22);
+        font-size: clamp(11px, 0.8vw, 13px);
         font-weight: 700;
         letter-spacing: 0.14em;
+        text-transform: uppercase;
         color: var(--lavender);
+        transition:
+          color 300ms ease,
+          background 300ms ease,
+          border-color 300ms ease;
+        white-space: nowrap;
       }
-      h1 {
+      .state-pill__dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--indigo);
+        box-shadow:
+          0 0 0 4px rgba(105, 111, 199, 0.22),
+          0 0 12px rgba(105, 111, 199, 0.7);
+        animation: dot-pulse 2.2s ease-in-out infinite;
+        transition:
+          background 300ms ease,
+          box-shadow 300ms ease;
+        flex-shrink: 0;
+      }
+      @keyframes dot-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(0.8);
+          opacity: 0.6;
+        }
+      }
+
+      /* ── Hero (fills remaining space, vertically centered) ──────── */
+      .frame__hero {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: clamp(20px, 3.4vh, 40px);
+        padding: clamp(24px, 4vh, 48px) 0;
+        isolation: isolate;
+      }
+
+      /* Soft spotlight behind the hero */
+      .frame__hero::before {
+        content: '';
+        position: absolute;
+        width: min(1000px, 92vw);
+        height: min(1000px, 92vw);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(
+          circle,
+          rgba(105, 111, 199, 0.14),
+          transparent 60%
+        );
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      .hero__title {
         margin: 0;
-        font-size: clamp(32px, 6vw, 52px);
-        line-height: 1.05;
+        font-size: clamp(52px, 7vw, 112px);
+        font-weight: 800;
+        line-height: 1.02;
         letter-spacing: -0.045em;
+        color: var(--white);
+        max-width: 16ch;
       }
-      #status {
-        margin: 20px auto 0;
-        max-width: 46ch;
-        font-size: 17px;
+      .hero__grad {
+        background: linear-gradient(
+          135deg,
+          var(--lavender) 0%,
+          var(--pink) 100%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+      }
+      .hero__status {
+        margin: 0;
+        max-width: 56ch;
+        font-size: clamp(16px, 1.25vw, 20px);
+        font-weight: 400;
         line-height: 1.6;
         color: var(--muted);
-        min-height: 56px;
+        min-height: 3.2em;
+        transition: color 300ms ease;
       }
-      .track {
+
+      /* ── Progress bar (wide, kiosk-scale) ───────────────────────── */
+      .progress {
+        width: min(860px, 84vw);
+        margin-top: clamp(12px, 1.6vh, 20px);
+      }
+      .progress__track {
         position: relative;
-        height: 6px;
-        margin: 28px auto 0;
-        max-width: 460px;
-        overflow: hidden;
+        height: 10px;
+        width: 100%;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        overflow: hidden;
+        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.015) inset;
       }
-      .bar {
+      .progress__bar {
         position: absolute;
-        inset: 0 auto 0 0;
+        top: 0;
+        bottom: 0;
+        left: 0;
         width: 42%;
         border-radius: inherit;
         background: linear-gradient(
           90deg,
-          rgba(105, 111, 199, 0),
-          var(--lavender),
-          var(-- pink),
-          rgba(242, 174, 187, 0)
+          rgba(105, 111, 199, 0) 0%,
+          var(--indigo) 22%,
+          var(--lavender) 50%,
+          var(--peach) 78%,
+          rgba(245, 211, 196, 0) 100%
         );
-        transform: translateX(-110%);
-        animation: slide 1.7s ease-in-out infinite;
+        box-shadow: 0 0 22px rgba(167, 170, 225, 0.55);
+        transform: translateX(-100%);
+        animation: progress-slide 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
       }
-      html[data-state='slow'] #status {
-        color: var(--warn);
-      }
-      @keyframes slide {
-        to {
-          transform: translateX(270%);
+      @keyframes progress-slide {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(260%);
         }
       }
+      .progress__meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+        padding: 0 6px;
+        font-size: clamp(11px, 0.85vw, 13px);
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--soft);
+      }
+      .progress__meta #stage-label {
+        transition: color 300ms ease;
+      }
+      .progress__meta #timer {
+        font-variant-numeric: tabular-nums;
+        color: var(--soft);
+        font-weight: 600;
+      }
+
+      /* ── Footer ─────────────────────────────────────────────────── */
+      .frame__footer {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: clamp(16px, 2.4vh, 24px);
+        border-top: 1px solid var(--hairline);
+        font-size: clamp(13px, 0.95vw, 15px);
+        font-weight: 500;
+        color: var(--muted);
+        text-align: center;
+      }
+      .footnote {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        max-width: 62ch;
+      }
+      .footnote__icon {
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
+        color: var(--lavender);
+        opacity: 0.9;
+      }
+
+      /* ── State: slow (>60s waiting) ────────────────────────────── */
+      html[data-state='slow'] .state-pill {
+        color: var(--warn);
+        background: rgba(255, 211, 138, 0.08);
+        border-color: rgba(255, 211, 138, 0.28);
+      }
+      html[data-state='slow'] .state-pill__dot {
+        background: var(--warn);
+        box-shadow:
+          0 0 0 4px rgba(255, 211, 138, 0.22),
+          0 0 12px rgba(255, 211, 138, 0.7);
+      }
+      html[data-state='slow'] .hero__status {
+        color: var(--warn);
+      }
+      html[data-state='slow'] .progress__bar {
+        background: linear-gradient(
+          90deg,
+          rgba(255, 211, 138, 0) 0%,
+          #d4a35a 22%,
+          var(--warn) 50%,
+          #d4a35a 78%,
+          rgba(255, 211, 138, 0) 100%
+        );
+        box-shadow: 0 0 22px rgba(255, 211, 138, 0.55);
+      }
+
+      /* ── State: ready (brief flash before redirect) ────────────── */
+      html[data-state='ready'] .state-pill {
+        color: var(--success);
+        background: rgba(74, 222, 128, 0.1);
+        border-color: rgba(74, 222, 128, 0.3);
+      }
+      html[data-state='ready'] .state-pill__dot {
+        background: var(--success);
+        box-shadow:
+          0 0 0 4px rgba(74, 222, 128, 0.22),
+          0 0 12px rgba(74, 222, 128, 0.8);
+      }
+      html[data-state='ready'] .hero__status {
+        color: var(--success);
+      }
+      html[data-state='ready'] .progress__bar {
+        background: linear-gradient(
+          90deg,
+          rgba(74, 222, 128, 0) 0%,
+          #38b360 22%,
+          var(--success) 50%,
+          #38b360 78%,
+          rgba(74, 222, 128, 0) 100%
+        );
+        box-shadow: 0 0 22px rgba(74, 222, 128, 0.55);
+      }
+      html[data-state='ready'] .progress__track {
+        border-color: rgba(74, 222, 128, 0.25);
+      }
+
+      /* ── Short-viewport tuning (landscape kiosks, laptops) ────── */
+      @media (max-height: 700px) {
+        .frame {
+          gap: clamp(14px, 2vh, 24px);
+        }
+        .hero__title {
+          font-size: clamp(40px, 5.4vw, 72px);
+        }
+        .hero__status {
+          min-height: 0;
+        }
+        .frame__hero {
+          gap: clamp(14px, 2.2vh, 24px);
+          padding: clamp(12px, 2vh, 20px) 0;
+        }
+        .progress {
+          margin-top: 8px;
+        }
+      }
+
+      /* ── Small-width tuning (phones) ──────────────────────────── */
+      @media (max-width: 560px) {
+        .frame {
+          padding: 24px 20px;
+        }
+        .frame__header {
+          padding-bottom: 14px;
+        }
+        .brand {
+          gap: 10px;
+        }
+        .brand__name {
+          font-size: 18px;
+        }
+        .brand__tag {
+          font-size: 9px;
+          letter-spacing: 0.14em;
+        }
+        .state-pill {
+          padding: 7px 12px;
+          font-size: 10px;
+          letter-spacing: 0.1em;
+        }
+        .progress__meta {
+          font-size: 10px;
+        }
+      }
+
+      /* ── Reduced motion ───────────────────────────────────────── */
       @media (prefers-reduced-motion: reduce) {
-        .bar {
-          animation: none;
-          transform: none;
+        .ambient__orb,
+        .state-pill__dot {
+          animation: none !important;
+        }
+        .progress__bar {
+          animation: none !important;
+          transform: none !important;
           width: 68%;
+        }
+        * {
+          transition-duration: 0.01ms !important;
         }
       }
     </style>
   </head>
   <body>
-    <main>
-      <div class="brand" aria-label="PrintBit">
-        <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-          <rect
-            x="7"
-            y="4"
-            width="18"
-            height="11"
-            rx="2.5"
-            fill="currentColor"
-            opacity=".92"
-          />
-          <rect
-            x="4"
-            y="12"
-            width="24"
-            height="14"
-            rx="3.5"
-            fill="currentColor"
-          />
-          <rect x="7" y="20" width="18" height="9" rx="2" fill="#fff" />
-          <rect
-            x="10"
-            y="23"
-            width="12"
-            height="2"
-            rx="1"
-            fill="currentColor"
-            opacity=".55"
-          />
-        </svg>
-        <span>PrintBit</span>
-      </div>
-      <p class="eyebrow">SELF-SERVICE PRINTING KIOSK</p>
-      <h1>Getting PrintBit ready</h1>
-      <p id="status" role="status" aria-live="polite">
-        Starting kiosk services. This screen will continue automatically.
-      </p>
-      <div class="track" aria-hidden="true"><span class="bar"></span></div>
-    </main>
+    <div class="ambient" aria-hidden="true">
+      <span class="ambient__orb ambient__orb--1"></span>
+      <span class="ambient__orb ambient__orb--2"></span>
+      <span class="ambient__orb ambient__orb--3"></span>
+    </div>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <div class="frame" role="main">
+      <header class="frame__header">
+        <div class="brand">
+          <div class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <rect
+                x="7"
+                y="4"
+                width="18"
+                height="11"
+                rx="2.5"
+                fill="currentColor"
+                opacity=".92"
+              />
+              <rect
+                x="4"
+                y="12"
+                width="24"
+                height="14"
+                rx="3.5"
+                fill="currentColor"
+              />
+              <rect x="7" y="20" width="18" height="9" rx="2" fill="#ffffff" />
+              <rect
+                x="10"
+                y="23"
+                width="12"
+                height="2"
+                rx="1"
+                fill="currentColor"
+                opacity=".55"
+              />
+            </svg>
+          </div>
+          <div class="brand__text">
+            <span class="brand__name">PrintBit</span>
+            <span class="brand__tag">Self-Service Printing</span>
+          </div>
+        </div>
+
+        <div class="state-pill" role="status" aria-live="polite">
+          <span class="state-pill__dot" aria-hidden="true"></span>
+          <span id="state-pill-text">Booting</span>
+        </div>
+      </header>
+
+      <section class="frame__hero">
+        <h1 class="hero__title">
+          Warming up <span class="hero__grad">PrintBit</span>
+        </h1>
+        <p id="status" class="hero__status" role="status" aria-live="polite">
+          Starting kiosk services. This screen updates automatically.
+        </p>
+
+        <div class="progress" aria-hidden="true">
+          <div class="progress__track">
+            <div class="progress__bar"></div>
+          </div>
+          <div class="progress__meta">
+            <span id="stage-label">Connecting</span>
+            <span id="timer">0s</span>
+          </div>
+        </div>
+      </section>
+
+      <footer class="frame__footer">
+        <span class="footnote">
+          <svg
+            class="footnote__icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M9 12l2 2 4-4"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>This screen updates automatically — no action required.</span>
+        </span>
+      </footer>
+    </div>
 
     <script>
       (function () {
@@ -188,7 +678,7 @@
 
         var BASE = 'http://127.0.0.1:3000';
         var PROBE_URL = BASE + '/api/startup/ready';
-        var TARGET_URL = BASE + '/loading';
+        var TARGET_URL = BASE + '/';
 
         var POLL_MS = 1000;
         var PROBE_TIMEOUT_MS = 3000;
@@ -200,11 +690,35 @@
         var navigating = false;
         var pollInFlight = false;
         var pollTimer = null;
+
+        var rootEl = document.documentElement;
         var statusEl = document.getElementById('status');
+        var timerEl = document.getElementById('timer');
+        var stageEl = document.getElementById('stage-label');
+        var pillTextEl = document.getElementById('state-pill-text');
+
+        function fmtElapsed() {
+          var s = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+          if (s < 60) return s + 's';
+          var m = Math.floor(s / 60);
+          var r = s % 60;
+          return m + 'm ' + (r < 10 ? '0' + r : r) + 's';
+        }
+        function refreshTimer() {
+          if (timerEl) timerEl.textContent = fmtElapsed();
+        }
+        function setStage(text) {
+          if (stageEl && stageEl.textContent !== text)
+            stageEl.textContent = text;
+        }
+        function setPill(text) {
+          if (pillTextEl && pillTextEl.textContent !== text)
+            pillTextEl.textContent = text;
+        }
 
         function serverAnswers() {
           var controller = new AbortController();
-          var timer = setTimeout(function () {
+          var timeout = setTimeout(function () {
             controller.abort();
           }, PROBE_TIMEOUT_MS);
           return fetch(PROBE_URL, {
@@ -221,7 +735,7 @@
               },
             )
             .then(function (ok) {
-              clearTimeout(timer);
+              clearTimeout(timeout);
               return ok;
             });
         }
@@ -240,20 +754,39 @@
 
             if (okStreak >= CONSECUTIVE_OK_REQUIRED) {
               navigating = true;
-              statusEl.textContent = 'Kiosk server found. Opening PrintBit…';
-              location.replace(TARGET_URL);
+              rootEl.dataset.state = 'ready';
+              setPill('Ready');
+              setStage('Ready');
+              statusEl.textContent = 'Kiosk ready — opening PrintBit now…';
+              setTimeout(function () {
+                location.replace(TARGET_URL);
+              }, 400);
               return;
             }
 
-            if (Date.now() - startedAt > SLOW_AFTER_MS) {
-              document.documentElement.dataset.state = 'slow';
-              statusEl.textContent =
-                'Still waiting for the kiosk server. Automatic recovery is running — no action needed.';
+            if (up && okStreak === 1 && !rootEl.dataset.state) {
+              setPill('Verifying');
+              setStage('Verifying');
             }
+
+            if (
+              Date.now() - startedAt > SLOW_AFTER_MS &&
+              rootEl.dataset.state !== 'slow' &&
+              rootEl.dataset.state !== 'ready'
+            ) {
+              rootEl.dataset.state = 'slow';
+              setPill('Recovering');
+              setStage('Recovering');
+              statusEl.textContent =
+                'Still waiting for the kiosk server. PrintBit is recovering automatically — no action needed.';
+            }
+
             pollTimer = setTimeout(tick, POLL_MS);
           });
         }
 
+        refreshTimer();
+        setInterval(refreshTimer, 1000);
         tick();
 
         document.addEventListener('visibilitychange', function () {

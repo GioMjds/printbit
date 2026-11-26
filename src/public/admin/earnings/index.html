@@ -11,14 +11,22 @@
     <link rel="manifest" href="/admin/manifest.webmanifest" />
     <meta name="theme-color" content="#111827" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <meta name="apple-mobile-web-app-title" content="PB Admin" />
     <link rel="apple-touch-icon" href="/admin/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="/admin/icons/favicon.svg" />
     <link rel="stylesheet" href="/globals.css" />
     <link rel="stylesheet" href="/admin/shared.css" />
     <link rel="stylesheet" href="/admin/earnings/styles.css" />
-          <div id="adminToast" class="admin-toast hidden" role="status" aria-live="polite"></div>
+    <div
+      id="adminToast"
+      class="admin-toast hidden"
+      role="status"
+      aria-live="polite"
+    ></div>
 
     <script>
       if (
@@ -305,9 +313,23 @@
       <div class="main">
         <header class="topbar">
           <div class="topbar__left">
-            <button id="menuBtn" class="topbar-menu-btn" aria-label="Open navigation menu">
-              <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true">
-                <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+            <button
+              id="menuBtn"
+              class="topbar-menu-btn"
+              aria-label="Open navigation menu"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                width="20"
+                height="20"
+                aria-hidden="true"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                  clip-rule="evenodd"
+                />
               </svg>
               <span id="menuBadge" class="topbar-menu-badge hidden"></span>
             </button>
@@ -403,19 +425,28 @@
                 Year
               </button>
             </div>
-            <section class="service-mix earnings-breakdown-grid" aria-labelledby="serviceMixTitle">
+            <section
+              class="service-mix earnings-breakdown-grid"
+              aria-labelledby="directMixTitle"
+            >
               <div class="service-mix__header">
-                <h4 id="serviceMixTitle">By service</h4>
-                <p id="topMethod">Top service: —</p>
+                <h4 id="directMixTitle">Direct (bypass)</h4>
+                <p>
+                  Paid to staff, printed from the Coin Console. Not in kiosk
+                  totals.
+                </p>
               </div>
               <div class="service-mix__item">
-                <span>Print</span><strong id="servicePrint">₱ 0.00</strong>
+                <span>Today</span><strong id="directToday">₱ 0.00</strong>
               </div>
               <div class="service-mix__item">
-                <span>Copy</span><strong id="serviceCopy">₱ 0.00</strong>
+                <span>Last 7 days</span><strong id="directWeek">₱ 0.00</strong>
               </div>
               <div class="service-mix__item">
-                <span>Scan</span><strong id="serviceScan">₱ 0.00</strong>
+                <span>This month</span><strong id="directMonth">₱ 0.00</strong>
+              </div>
+              <div class="service-mix__item">
+                <span>All time</span><strong id="directAllTime">₱ 0.00</strong>
               </div>
             </section>
           </section>

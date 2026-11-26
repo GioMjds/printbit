@@ -24,6 +24,7 @@ import { db, defaultPricingEngine } from '@/services/db';
 import { getTrustedTimestamp } from '@/services/time-source';
 import { adminLogStore } from '@/core/database/sqlite-storage';
 import { financialLedgerService } from '@/services/financial-ledger';
+import { sumDirectLedger } from './earnings-split';
 
 export type EarningsAnalyticsView = 'daily' | 'weekly' | 'monthly' | 'yearly';
 type EarningsMode = 'print' | 'copy' | 'scan';
@@ -112,6 +113,13 @@ export interface EarningsAnalyticsResult {
     start: string;
     end: string;
     label: string;
+  };
+  direct: {
+    today: number;
+    week: number;
+    month: number;
+    year: number;
+    allTime: number;
   };
   totals: {
     today: number;
@@ -238,7 +246,9 @@ export class AdminService {
       const ratePerPage = isColor ? copyColorRate : copyBwRate;
       const qualitySurcharge =
         quality === 'high'
-          ? (engineCfg?.highQualitySurcharge ?? pricing.highQualitySurcharge ?? 2)
+          ? (engineCfg?.highQualitySurcharge ??
+            pricing.highQualitySurcharge ??
+            2)
           : 0;
       return (ratePerPage + qualitySurcharge) * totalPages * safeCopies;
     }
@@ -720,7 +730,9 @@ export class AdminService {
       const allTxLogs = txId ? (logsByTxId.get(txId) ?? [txLog]) : [txLog];
       const ledgerEntries = txId ? (ledgerByRefId.get(txId) ?? []) : [];
       const pendingRefunds = txId ? (pendingRefundsByTxId.get(txId) ?? []) : [];
-      const recoverySession = txId ? recoverySessionByTxId.get(txId) : undefined;
+      const recoverySession = txId
+        ? recoverySessionByTxId.get(txId)
+        : undefined;
       const receiptRecord = txId ? receiptRecordByTxId.get(txId) : undefined;
 
       // 1. Charged Amount
@@ -774,11 +786,10 @@ export class AdminService {
       const pendingRefundIds = new Set(pendingRefunds.map((p) => p.id));
       const refundLedgerEntries = [
         ...ledgerEntries.filter((e) => e.eventType === 'refund_issued'),
-        ...Array.from(pendingRefundIds).flatMap(
-          (pId) =>
-            (ledgerByRefId.get(pId) ?? []).filter(
-              (e) => e.eventType === 'refund_issued',
-            ),
+        ...Array.from(pendingRefundIds).flatMap((pId) =>
+          (ledgerByRefId.get(pId) ?? []).filter(
+            (e) => e.eventType === 'refund_issued',
+          ),
         ),
       ];
       const uniqueRefundLedgers = new Map<string, FinancialLedgerEntry>();
@@ -819,7 +830,9 @@ export class AdminService {
       let rawCol: number | null = null;
       let rawBw: number | null = null;
 
-      if (typeof receiptRecord?.details?.printConfiguration?.copies === 'number') {
+      if (
+        typeof receiptRecord?.details?.printConfiguration?.copies === 'number'
+      ) {
         rawReq = receiptRecord.details.printConfiguration.copies;
       }
       if (typeof receiptRecord?.colorPages === 'number') {
@@ -850,17 +863,13 @@ export class AdminService {
           }
         }
         if (rawCol === null) {
-          const colVal =
-            l.meta?.colorPages ??
-            l.meta?.colorPagesPrinted;
+          const colVal = l.meta?.colorPages ?? l.meta?.colorPagesPrinted;
           if (typeof colVal === 'number' && Number.isFinite(colVal)) {
             rawCol = colVal;
           }
         }
         if (rawBw === null) {
-          const bwVal =
-            l.meta?.bwPages ??
-            l.meta?.bwPagesPrinted;
+          const bwVal = l.meta?.bwPages ?? l.meta?.bwPagesPrinted;
           if (typeof bwVal === 'number' && Number.isFinite(bwVal)) {
             rawBw = bwVal;
           }
@@ -979,9 +988,7 @@ export class AdminService {
       const hasSpoolerFailure =
         spoolerLogs.length > 0 ||
         recoverySession?.phase === 'spooler_failed' ||
-        pendingRefunds.some((p) =>
-          p.reason?.toLowerCase().includes('spooler'),
-        );
+        pendingRefunds.some((p) => p.reason?.toLowerCase().includes('spooler'));
 
       if (hasSpoolerFailure) {
         spoolerFailures++;
@@ -1043,9 +1050,7 @@ export class AdminService {
     let unresolvedOwedChangeCount = 0;
 
     const dateFromMs =
-      typeof filters.dateFrom === 'string'
-        ? Date.parse(filters.dateFrom)
-        : NaN;
+      typeof filters.dateFrom === 'string' ? Date.parse(filters.dateFrom) : NaN;
     const dateToMs =
       typeof filters.dateTo === 'string' ? Date.parse(filters.dateTo) : NaN;
 
@@ -1093,8 +1098,7 @@ export class AdminService {
         : 100;
 
     // Normalizing financials
-    const round2 = (v: number) =>
-      Math.round((v + Number.EPSILON) * 100) / 100;
+    const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
     const finalGrossCharged = round2(grossCharged);
     const finalRefunds = round2(cashRefundsIssued);
     const finalNetRetained = round2(finalGrossCharged - finalRefunds);
@@ -1259,6 +1263,7 @@ export class AdminService {
       weekTimestamp,
     )) {
       if (log.meta?.environment === 'test') continue;
+      if (log.meta?.environment === 'direct') continue;
       const txId =
         (typeof log.meta?.transactionId === 'string' &&
           log.meta.transactionId) ||
@@ -1645,6 +1650,10 @@ export class AdminService {
         continue;
       }
 
+      if (entry.meta?.environment === 'direct') {
+        continue;
+      }
+
       if (entry.eventType === 'job_completed') {
         if (
           typeof entry.referenceId === 'string' &&
@@ -1741,6 +1750,13 @@ export class AdminService {
       });
     }
 
+    const direct = sumDirectLedger(db.data!.financialLedger, {
+      startOfToday,
+      startOfWeek,
+      startOfMonth,
+      startOfYear,
+    });
+
     const buckets = period.buckets.map((bucket) => ({
       ...bucket,
       amount: this.normalizeMoney(bucketTotals.get(bucket.key) ?? 0),
@@ -1769,6 +1785,13 @@ export class AdminService {
         start: period.start.toISOString(),
         end: period.end.toISOString(),
         label: period.label,
+      },
+      direct: {
+        today: this.normalizeMoney(direct.today),
+        week: this.normalizeMoney(direct.week),
+        month: this.normalizeMoney(direct.month),
+        year: this.normalizeMoney(direct.year),
+        allTime: this.normalizeMoney(direct.allTime),
       },
       totals: {
         today: this.normalizeMoney(today),

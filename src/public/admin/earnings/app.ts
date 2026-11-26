@@ -52,6 +52,11 @@ const servicePrint = document.getElementById('servicePrint')!;
 const serviceCopy = document.getElementById('serviceCopy')!;
 const serviceScan = document.getElementById('serviceScan')!;
 
+const directToday = document.getElementById('directToday')!;
+const directWeek = document.getElementById('directWeek')!;
+const directMonth = document.getElementById('directMonth')!;
+const directAllTime = document.getElementById('directAllTime')!;
+
 const viewButtons = Array.from(
   viewSwitch.querySelectorAll<HTMLButtonElement>('.view-switch__btn'),
 );
@@ -162,6 +167,12 @@ function renderAnalytics(
   servicePrint.textContent = peso(model.services[0].amount);
   serviceCopy.textContent = peso(model.services[1].amount);
   serviceScan.textContent = peso(model.services[2].amount);
+
+  directToday.textContent = peso(current.totals.direct.today);
+  directWeek.textContent = peso(current.totals.direct.week);
+  directMonth.textContent = peso(current.totals.direct.month);
+  directAllTime.textContent = peso(current.totals.direct.allTime);
+
   topMethod.textContent = `Top service: ${model.topService ?? '—'}`;
   nextAnchorBtn.disabled = !canNavigateToNextEarningsPeriod(
     currentView,
@@ -255,11 +266,7 @@ async function loadAnalyticsData(): Promise<void> {
     .then((pair) => {
       if (
         requestSeq <= analyticsRequestSeq &&
-        isCurrentEarningsAnalyticsRequest(
-          requestKey,
-          currentView,
-          anchorDate,
-        )
+        isCurrentEarningsAnalyticsRequest(requestKey, currentView, anchorDate)
       )
         renderAnalytics(pair.current, pair.previous);
     })
